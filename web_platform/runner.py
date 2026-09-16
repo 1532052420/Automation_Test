@@ -313,6 +313,11 @@ class ExecutionManager(object):
             proc = subprocess.Popen(
                 pytest_args, cwd=BASE_DIR,
                 start_new_session=True,
+                # 显式 DEVNULL：pytest 不需要 stdin。不指定会继承平台自身的 stdin，
+                # 而平台被 nohup/systemd/Popen 以非终端方式启动时该 fd 可能已失效，
+                # pytest 的 capture 会以 "saved filedescriptor not valid anymore" 崩掉，
+                # 表现为任务 1 秒内 FAILED、无日志无明细。
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 bufsize=1)
         except Exception as e:

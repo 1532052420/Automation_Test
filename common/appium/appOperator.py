@@ -74,10 +74,20 @@ class AppOperator:
         self._session_id=driver.session_id
         # 获得设备支持的性能数据类型
         self._performance_types=ujson.loads(self._doRequest.post_with_form('/session/'+self._session_id+'/appium/performanceData/types').body)['value']
-        # 获取当前窗口大小
-        self._window_size=self.get_window_size()
-        # 获得当前窗口的位置
-        self._window_rect=self.get_window_rect()
+        # 当前窗口大小/位置：UiAutomator2 等移动端驱动不支持这两个命令（Appium 3 直接返回
+        # UnknownCommand 404），而框架内部并未使用这两个属性——取不到就置空，
+        # 不能让整个 session 构造在这里中断（否则所有 APP 用例在 setup 阶段即报错）。
+        self._window_size=self._safe_window(self.get_window_size)
+        self._window_rect=self._safe_window(self.get_window_rect)
+
+    @staticmethod
+    def _safe_window(fn):
+        """调用驱动获取窗口信息，驱动不支持时返回 None 并告警（不抛异常）"""
+        try:
+            return fn()
+        except Exception as e:
+            logger.warning('获取窗口信息失败（当前驱动可能不支持，已忽略）: %s' % str(e)[:100])
+            return None
 
     def _change_element_to_webElement_type(self,element):
         if isinstance(element, ElementInfo):

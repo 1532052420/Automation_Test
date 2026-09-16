@@ -118,6 +118,10 @@ case "$1" in
         exit 1
       fi
       mkdir -p logs
+      # Appium 3.7.0/base-driver 10.8.0 上游缺陷：proxyRouteIsAvoided 收到完整 URL 导致
+      # driver 的 NO_PROXY 白名单全部失配，所有命令被误代理给设备端 server 而 404。
+      # 幂等补丁，详见 deploy/patch_appium_base_driver.py；已打则跳过。
+      .venv/bin/python deploy/patch_appium_base_driver.py || true
       nohup "$HOME/appium2/node_modules/.bin/appium" --port "$APPIUM_PORT" --address 127.0.0.1 --base-path /wd/hub --log-level info > logs/appium.log 2>&1 &
       if wait_for appium_up 30; then
         echo "Appium(3.7.0) 已启动(端口${APPIUM_PORT}), 日志: logs/appium.log"
@@ -154,7 +158,10 @@ case "$1" in
         exit 1
       fi
       mkdir -p logs
-      nohup .venv/bin/python web_platform/app.py > logs/platform.log 2>&1 &
+      # stdin 显式关到 /dev/null：nohup 只在 stdin 是终端时才兜底重定向，
+      # 从脚本/服务管理器启动时它会继承一个可能已失效的 fd，导致平台派生的
+      # pytest 子进程 capture 崩溃（任务秒失败且无日志）
+      nohup .venv/bin/python web_platform/app.py > logs/platform.log 2>&1 < /dev/null &
       if wait_for platform_up 20; then
         echo "Web 执行平台已启动: ${PLATFORM_URL}  日志: logs/platform.log"
       else

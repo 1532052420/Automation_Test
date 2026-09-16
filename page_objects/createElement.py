@@ -7,7 +7,7 @@ from pojo.elementInfo import ElementInfo
 class CreateElement:
 
     @classmethod
-    def create(cls, locator_type, locator_value, expected_value=None, wait_type=None, wait_expected_value=None, wait_seconds=30):
+    def create(cls, locator_type, locator_value, expected_value=None, wait_type=None, wait_expected_value=None, wait_seconds=30, desc=None):
         elementInfo = ElementInfo()
         elementInfo.locator_type = locator_type
         elementInfo.locator_value = locator_value
@@ -15,4 +15,7 @@ class CreateElement:
         elementInfo.wait_type=wait_type
         elementInfo.wait_seconds=wait_seconds
         elementInfo.wait_expected_value=wait_expected_value
+        # desc：元素中文说明（元素定位器"真机抓取"生成的元素行会带此参数），仅作备注透传
+        if desc is not None:
+            elementInfo.desc = desc
         return elementInfo
