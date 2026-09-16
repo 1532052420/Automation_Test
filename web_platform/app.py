@@ -39,10 +39,6 @@ def _no_cache(resp):
 from web_platform.routes import bp as platform_bp
 app.register_blueprint(platform_bp)
 
-# 代码审查（框架调试）：独立蓝图，纯增量，详见 代码调试/ 目录
-from web_platform.debug_routes import bp as debug_bp
-app.register_blueprint(debug_bp)
-
 # 管理后台（用例/元素/页面对象 上传与管理）：独立蓝图
 from web_platform.admin_routes import bp as admin_bp
 app.register_blueprint(admin_bp)

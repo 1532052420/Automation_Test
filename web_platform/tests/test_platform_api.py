@@ -57,10 +57,9 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 @pytest.fixture(scope='session')
 def platform(tmp_path_factory):
-    rec_path = tmp_path_factory.mktemp('dbg_records') / 'records.json'
     meta_path = tmp_path_factory.mktemp('admin_meta') / 'admin_meta.json'
     env = dict(os.environ, WEB_PLATFORM_PORT=str(PORT), PYTHONIOENCODING='utf-8',
-               DEBUG_RECORDS_PATH=str(rec_path), ADMIN_META_PATH=str(meta_path))
+               ADMIN_META_PATH=str(meta_path))
     # 启动前清理端口占用者：上一个会话若 teardown 失败留下孤儿进程，
     # 新平台会绑定失败/请求打到旧代码上，导致瞬态 500
     try:
@@ -127,7 +126,7 @@ def fake_run():
 
 # ---------------------------------------------------------------- 页面与导航
 def test_pages_ok(platform):
-    for page in ('/', '/run', '/report', '/debug'):
+    for page in ('/', '/run', '/report'):
         code, body, _ = http('GET', page)
         assert code == 200, '%s -> %s' % (page, code)
         assert 'sidebar' in body
@@ -298,21 +297,6 @@ def test_attachment_traversal_blocked(platform, fake_run):
         assert code == 404, '%s -> %s（应拒绝）' % (evil, code)
 
 
-# ---------------------------------------------------------------- 代码审查回归
-def test_debug_items(platform):
-    code, body, _ = http('GET', '/api/debug/items')
-    assert code == 200
-    d = json.loads(body)
-    assert d['ok'] and len(d['items']) >= 40 and not d['load_errors']
-
-
-def test_debug_run_single(platform):
-    code, body, _ = http('POST', '/api/debug/run', {'id': 'common.hamcrest'}, timeout=120)
-    assert code == 200 and json.loads(body)['result']['status'] == 'PASS'
-    code, body, _ = http('POST', '/api/debug/run', {'id': 'nope.nope'}, timeout=30)
-    assert code == 200 and json.loads(body)['result']['status'] == 'FAIL'
-
-
 # ---------------------------------------------------------------- 临时文件清理（单元级）
 def test_tmp_device_files_cleanup():
     """任务终态后 config/app_ui_tmp/<pid>* 两个设备临时文件应被清理（TC-035）"""
@@ -335,87 +319,6 @@ def test_run_sh_no_dead_branch():
     content = open(os.path.join(ROOT, 'run.sh'), encoding='utf-8').read()
     assert 'run_web_ui_test' not in content
     subprocess.run(['bash', '-n', os.path.join(ROOT, 'run.sh')], check=True)
-
-
-# ---------------------------------------------------------------- 审查记录
-def _make_results(passed=38, failed=2, skipped=2):
-    results = []
-    n = 0
-    for status, count in (('PASS', passed), ('FAIL', failed), ('SKIP', skipped)):
-        for _ in range(count):
-            results.append({'id': 'case.%03d' % n, 'file': 'x.py', 'title': 't',
-                            'status': status, 'detail': '', 'error': None, 'duration_ms': 1})
-            n += 1
-    return results
-
-
-def test_debug_records_save_and_list(platform):
-    for i in range(3):
-        code, body, _ = http('POST', '/api/debug/records',
-                             {'results': _make_results(passed=30 + i), 'duration_ms': 1000 + i})
-        assert code == 200 and json.loads(body)['ok']
-    code, body, _ = http('GET', '/api/debug/records')
-    d = json.loads(body)
-    assert d['ok'] and d['total'] == 3 and d['pages'] == 1
-    newest = d['records'][0]
-    assert newest['summary']['passed'] == 32, '应按时间倒序（最新在前）'
-    assert 'results' not in newest, '列表载荷不应携带明细'
-
-
-def test_debug_records_pagination(platform):
-    for i in range(12):
-        http('POST', '/api/debug/records', {'results': _make_results(), 'duration_ms': i})
-    code, body, _ = http('GET', '/api/debug/records')
-    d = json.loads(body)
-    assert d['total'] == 15 and d['pages'] == 2 and len(d['records']) == 10
-    code, body, _ = http('GET', '/api/debug/records?page=2')
-    d2 = json.loads(body)
-    assert len(d2['records']) == 5 and d2['page'] == 2
-
-
-def test_debug_records_detail_and_delete(platform):
-    code, body, _ = http('POST', '/api/debug/records', {'results': _make_results()})
-    rid = json.loads(body)['record_id']
-    code, body, _ = http('GET', '/api/debug/records/%s' % rid)
-    rec = json.loads(body)['record']
-    assert len(rec['results']) == 42 and rec['summary']['failed'] == 2
-    code, body, _ = http('DELETE', '/api/debug/records/%s' % rid)
-    assert code == 200 and json.loads(body)['ok']
-    code, body, _ = http('GET', '/api/debug/records/%s' % rid)
-    assert code == 404
-
-
-def test_debug_records_validation(platform):
-    code, body, _ = http('POST', '/api/debug/records', {'results': []})
-    assert code == 400
-    code, body, _ = http('GET', '/api/debug/records/bad..id')
-    assert code == 400
-    code, body, _ = http('GET', '/api/debug/records/no_such_id')
-    assert code == 404
-
-# ---------------------------------------------------------------- 交互调试工具
-def _run_tool(tool, params):
-    code, body, _ = http('POST', '/api/debug/tool', {'tool': tool, 'params': params}, timeout=120)
-    return code, json.loads(body)
-
-
-def test_debug_functions_catalog(platform):
-    """方法目录自动识别：覆盖框架文件，新增/删除文件后清单自动增减"""
-    code, body, _ = http('GET', '/api/debug/functions', timeout=60)
-    assert code == 200
-    d = json.loads(body)
-    assert d['ok'] and d['total_files'] >= 30 and d['total_methods'] >= 100
-    files = {f['file']: f for f in d['files']}
-    assert 'common/dateTimeTool.py' in files, '框架文件未自动识别'
-    entries = files['common/dateTimeTool.py']['entries']
-    targets = [e['target'] for e in entries]
-    assert 'common.dateTimeTool::DateTimeTool.strToTimeStamp' in targets
-    # 参数签名来自源码反射
-    st = next(e for e in entries if e['target'] == 'common.dateTimeTool::DateTimeTool.strToTimeStamp')
-    names = [p['name'] for p in st['params']]
-    assert names == ['str', 'str_format', 'is_with_millisecond']
-    # 用例目录也在扫描范围
-    assert any(f.startswith('cases/') for f in files)
 
 
 def test_entry_scripts_clean():
