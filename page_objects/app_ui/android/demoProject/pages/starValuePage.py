@@ -156,3 +156,9 @@ class StarValuePage:
             '断言点击礼物卡片无响应（不跳转、不弹窗）', ok,
             '点击礼物卡片后页面发生变化：activity %s -> %s 或详情页元素消失'
             % (before_activity, after_activity))
+
+    def click_test_lkwg(self):
+        """点击「洛克王国：世界」"""
+        self.appOperator.click(self._elements.test_lkwg)
+
+

@@ -15,3 +15,4 @@ class StarValueElements:
         self.text_starlight_value = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/tv_starlight_value', wait_type=Wait_By.VISIBILITY_OF)  # 星光值详情页-星光值数值
         self.text_gift_wall = CreateElement.create(Locator_Type.XPATH, '//*[@text=\'礼物墙\']', wait_type=Wait_By.VISIBILITY_OF)  # 星光值详情页-礼物墙标题
         self.gift_card_first = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/tv_gift_name', wait_type=Wait_By.VISIBILITY_OF)  # 礼物墙-第一个礼物卡片名（多个取第一个）
+        self.test_lkwg = CreateElement.create(Locator_Type.XPATH, '//*[@text="洛克王国：世界"]', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)

@@ -42,6 +42,10 @@ class Test1StarValue:
 
         # 6. 断言关闭详情页回跳上一级页面（个人主页）
         page.assert_profile_nickname()
+        # 点击test_lkwg
+        page.click_test_lkwg()
+        # 点击test_lkwg
+        page.click_test_lkwg()
 
     def test_gift_card_no_response(self):
         page = self.page
