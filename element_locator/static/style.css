@@ -281,27 +281,6 @@ html.night .flow-col.soft .col-head::after { color: #6b7280; }
 .steps-list .sl-row.new { color: #1d4ed8; font-weight: 600; background: #eff6ff; border-radius: 4px; padding: 2px 4px; margin-top: 4px; }
 .steps-list .sl-idx { color: #9ca3af; min-width: 20px; text-align: right; }
 .steps-list .sl-row.new .sl-idx { color: #1d4ed8; }
-/* 连续添加模式悬浮条（贴在截图上方） */
-/* 连续添加确认弹窗：屏幕居中、iOS 原生弹窗风格；点「好」关闭，不自动消失 */
-.cont-add-chip { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 1500;
-  width: min(320px, 82vw); padding: 20px 22px 14px; border: 0; border-radius: 18px; cursor: default;
-  background: rgba(250, 250, 252, .98); color: #111827; text-align: center;
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 18px 48px rgba(17, 24, 39, .22), 0 2px 10px rgba(17, 24, 39, .10);
-  display: flex; flex-direction: column; align-items: center; gap: 9px;
-  animation: contIn .18s ease-out; }
-@keyframes contIn { from { opacity: 0; transform: translate(-50%, -50%) scale(.92); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
-.cont-add-chip .cc-main { font-size: 15.5px; font-weight: 700; letter-spacing: .2px; }
-.cont-add-chip .cc-sub { font-size: 13px; font-weight: 400; color: #4b5563; line-height: 1.65; }
-.cont-add-chip .cc-btn { margin-top: 6px; width: 100%; padding: 9px 0; border: 0; border-radius: 12px;
-  background: var(--accent, #2563eb); color: #fff; font-size: 14.5px; font-weight: 600; cursor: pointer;
-  transition: filter .15s, transform .1s; }
-.cont-add-chip .cc-btn:hover { filter: brightness(1.08); }
-.cont-add-chip .cc-btn:active { transform: scale(.97); }
-/* 夜间模式（html.night）：深色卡片 */
-html.night .cont-add-chip { background: rgba(44, 44, 48, .98); color: #f3f4f6;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, .6), 0 2px 10px rgba(0, 0, 0, .4); }
-html.night .cont-add-chip .cc-sub { color: #b6bcc6; }
 .modal-title .hint { font-weight: 400; font-size: 12px; color: #9ca3af; margin-left: 10px; }
 /* 元素名绑定联动提示（自动切换元素文件等） */
 .bind-note { font-size: 12px; color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 5px 10px; margin: 4px 0 8px; }

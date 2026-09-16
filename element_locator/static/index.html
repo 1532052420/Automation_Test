@@ -24,7 +24,7 @@ try {
   if (window.self !== window.top) _de.classList.add('embedded');
 } catch (e) { /* 隐私模式等场景忽略 */ }
 </script>
-<link rel="stylesheet" href="static/style.css?v=46">
+<link rel="stylesheet" href="static/style.css?v=48">
 </head>
 <body>
 <div id="embed-bar" class="embed-bar"></div>
@@ -68,11 +68,6 @@ try {
       <img id="shot" alt="设备截图" style="display:none">
       <div id="shot-overlay"></div>
       <div id="shot-empty" class="empty">← 点击"刷新"加载手机截图</div>
-      <div id="cont-add-chip" class="cont-add-chip" style="display:none" role="alertdialog" aria-label="连续添加已开启">
-        <span class="cc-main">🔁 连续添加已开启</span>
-        <span class="cc-sub">在左侧截图上<b>点选下一个元素</b>，会自动弹出「添加测试用例」继续录入；<br>不再需要时，在弹窗里点「取消」即可结束连续添加。</span>
-        <button id="cont-alert-ok" class="cc-btn" type="button">好</button>
-      </div>
     </div>
   <div id="step-undo-bar" class="step-undo-bar" style="display:none" title="本次会话通过「添加到用例」写入的步骤；撤销按倒序进行">
     <span class="su-title">🧾 本次会话已录 <b id="su-count">0</b> 步<em id="su-last"></em></span>
@@ -121,7 +116,7 @@ try {
       <div class="flow-step">
         <span class="fs-label">保存到哪一步：</span>
         <label class="purpose"><input type="radio" name="el-purpose" value="only" checked> <span class="help-icon" data-help="只把元素写进元素库（先攒元素，之后统一写用例）。右侧②③栏熄灭不可用。">?</span> ① 仅元素</label>
-        <label class="purpose"><input type="radio" name="el-purpose" value="all"> <span class="help-icon" data-help="三件套一次完成（推荐）：元素入库 + 用例行追加 + 页面操作方法自动生成/更新到目标用例的页面文件。用例、元素、操作缺一不可，选这个就不会漏。目标用例选「➕ 新建…」并填用例名时：保存并继续=直接入库继续录；保存=导出 zip。">?</span> ② 元素 + 用例 + 操作（推荐）</label>
+        <label class="purpose"><input type="radio" name="el-purpose" value="all"> <span class="help-icon" data-help="三件套一次完成（推荐）：元素入库 + 用例行追加 + 页面操作方法自动生成/更新到目标用例的页面文件。用例、元素、操作缺一不可，选这个就不会漏。目标用例选「➕ 新建…」并填用例名时：步骤存入临时用例（未入库）——「保存并继续」继续累积，「保存」导出全部步骤的 zip。">?</span> ② 元素 + 用例 + 操作（推荐）</label>
       </div>
 
       <div class="flow-cols">
@@ -164,7 +159,7 @@ try {
         <!-- 第二栏：用例 -->
         <section class="flow-col" id="col-case">
           <div class="col-head">② 用例 <span class="hint">这步操作追加到哪条用例</span></div>
-          <label>目标用例文件 <span class="help-icon" data-help="操作代码行追加到哪个用例文件（test_*.py）。下拉列出现有用例文件；选「➕ 新建…」并输入用例名后：点「保存并继续」= 三件套直接入库并继续编辑当前用例；点「保存」= 打包为 zip 下载（再到平台「用例管理 → 上传用例包」入库）。">?</span>
+          <label>目标用例文件 <span class="help-icon" data-help="操作代码行追加到哪个用例文件（test_*.py）。下拉列出现有用例文件；选「➕ 新建…」并输入用例名后：步骤先存入临时用例（不写框架）——「保存并继续」累积步骤继续录，「保存」把全部已录步骤打包 zip 下载，再到平台「用例管理 → 上传用例包」入库。">?</span>
             <select id="el-case-file"></select>
             <span id="el-case-new-wrap" style="display:none;margin-top:6px">
               <span class="hint" style="font-size:12px;font-weight:600">test_</span><input id="el-case-new" type="text" placeholder="如: login_flow" style="width:calc(100% - 40px)">
@@ -247,6 +242,6 @@ try {
 
 <div id="hit-toast" class="hit-toast" style="display:none" aria-live="polite"></div>
 <script src="/static/theme.js"></script>
-<script src="static/index.js?v=55"></script>
+<script src="static/index.js?v=57"></script>
 </body>
 </html>

@@ -56,6 +56,10 @@ class Test1StarValue:
         page.click_tvTitle()
         # 点击appBarLayout
         page.click_appBarLayout()
+        # 点击element_10
+        page.click_element_10()
+        # 点击Appium_Settings
+        page.click_Appium_Settings()
 
     def test_gift_card_no_response(self):
         page = self.page
