@@ -10,27 +10,52 @@
     ADB_SERIAL               指定设备序列号（缺省按用例设备信息，无则自动发现第一台在线设备）
     VIDEO_EVIDENCE_ROOT      录屏产物根目录（缺省为框架根目录，由 conftest 注入）
 """
+import configparser as ConfigParser
 import os
 import shutil
 import subprocess
 from pathlib import Path
 
+# 录屏配置文件（平台「录屏配置」模块统一管理；直接跑 pytest 也读同一份）
+# 优先级：代码默认值 < 本 conf 文件 < 环境变量（与平台「env 可覆盖」惯例一致）
+RECORDING_CONF = Path(__file__).resolve().parents[2] / 'config' / 'recording.conf'
+
 # PATH 找不到命令时再探测的常见安装位置（homebrew 等）
 _FALLBACK_TOOL_DIRS = ('/opt/homebrew/bin', '/usr/local/bin')
 
 
-def _int_env(name, default):
+def _conf_values():
+    """读 config/recording.conf 的 [recording] 段；文件缺失/字段缺失返回空 dict。"""
+    values = {}
+    if not RECORDING_CONF.is_file():
+        return values
+    parser = ConfigParser.ConfigParser()
     try:
-        return int(os.environ.get(name, default))
+        parser.read(str(RECORDING_CONF), encoding='utf-8')
+        for key in parser.options('recording') if parser.has_section('recording') else []:
+            values[key.strip().lower()] = (parser.get('recording', key) or '').strip()
+    except Exception:
+        pass
+    return values
+
+
+def _resolve(name, cast, default, conf):
+    """解析单项：默认值 < conf 文件 < 环境变量；解析失败回退默认值。
+    conf 键不带 RECORDING_ 前缀（conf 里写 before_seconds，环境变量叫 RECORDING_BEFORE_SECONDS）。"""
+    env = os.environ.get(name)
+    raw = env if env is not None and env != '' else conf.get(name.lower().replace('recording_', ''), '')
+    try:
+        return cast(raw) if raw != '' else default
     except (TypeError, ValueError):
         return default
 
 
-def _bool_env(name, default):
-    val = os.environ.get(name)
-    if val is None:
+def _resolve_bool(name, default, conf):
+    env = os.environ.get(name)
+    raw = env if env is not None and env != '' else conf.get(name.lower().replace('recording_', ''), '')
+    if raw == '':
         return default
-    return val.strip().lower() in ('1', 'true', 'yes', 'on')
+    return str(raw).strip().lower() in ('1', 'true', 'yes', 'on')
 
 
 def find_tool(name):
@@ -68,14 +93,22 @@ def detect_first_device():
 
 
 class RecordingConfig:
-    """一次运行共享的录屏配置。"""
+    """一次运行共享的录屏配置。
+
+    解析优先级：代码默认值 < config/recording.conf（平台「录屏配置」模块维护）
+    < 环境变量（RECORDING_*，手工临时覆盖用）。
+    """
 
     def __init__(self, adb_serial=None):
-        self.enabled = _bool_env('RECORDING_ENABLED', True)
-        self.required = _bool_env('RECORDING_REQUIRED', False)
-        self.keep_on_success = _bool_env('RECORDING_KEEP_ON_SUCCESS', False)
-        self.before_seconds = _int_env('RECORDING_BEFORE_SECONDS', 5)
-        self.after_seconds = _int_env('RECORDING_AFTER_SECONDS', 5)
+        conf = _conf_values()
+        self.enabled = _resolve_bool('RECORDING_ENABLED', True, conf)
+        self.required = _resolve_bool('RECORDING_REQUIRED', False, conf)
+        self.keep_on_success = _resolve_bool('RECORDING_KEEP_ON_SUCCESS', False, conf)
+        self.before_seconds = _resolve('RECORDING_BEFORE_SECONDS', int, 5, conf)
+        self.after_seconds = _resolve('RECORDING_AFTER_SECONDS', int, 5, conf)
+        # screenrecord 单段录制上限（Android 硬上限 180s，超长用例从此截断）与码率
+        self.max_segment_seconds = max(3, min(180, _resolve('RECORDING_MAX_SEGMENT_SECONDS', int, 180, conf)))
+        self.bit_rate = _resolve('RECORDING_BIT_RATE', int, 4000000, conf)
         # adb_serial 传入优先，其次 ADB_SERIAL 环境变量，最后自动发现
         self.adb_serial = adb_serial or os.environ.get('ADB_SERIAL') or detect_first_device()
         run_root = Path(os.environ.get('VIDEO_EVIDENCE_ROOT', os.getcwd()))

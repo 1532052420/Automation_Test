@@ -94,6 +94,16 @@ def api_changelog():
     return jsonify({'ok': True, 'version': APP_VERSION, 'entries': CHANGELOG})
 
 
+@bp.route('/api/recording/config', methods=['GET', 'POST'])
+def api_recording_config():
+    """录屏配置：GET 读当前生效值（默认值 < conf < 环境变量），POST 校验并落盘 conf。"""
+    from web_platform import recording_config
+    if request.method == 'GET':
+        return jsonify({'ok': True, 'config': recording_config.load_recording_config()})
+    ok, msg, _effective = recording_config.save_recording_config(request.get_json(silent=True) or {})
+    return jsonify({'ok': ok, 'msg': msg}), (200 if ok else 400)
+
+
 @bp.route('/api/devices')
 def api_devices():
     adb = adb_devices()

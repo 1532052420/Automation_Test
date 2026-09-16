@@ -279,11 +279,50 @@ async function initRun() {
   renderSidebar('/run');
   await loadExecDefaults();
   await loadCaseTree();
+  await loadRecordingConfig();
   $('#btnStart').addEventListener('click', startRun);
   $('#btnStop').addEventListener('click', stopRun);
   $('#btnSelectAll').addEventListener('click', () => setAllChecked(true));
   $('#btnSelectNone').addEventListener('click', () => setAllChecked(false));
   $('#confSel').addEventListener('change', () => loadExecDefaults($('#confSel').value));
+  $('#btnRecSave').addEventListener('click', saveRecordingConfig);
+}
+
+/* ---------------- 录屏配置（失败证据视频的开关与时间参数，存 config/recording.conf） ---------------- */
+async function loadRecordingConfig() {
+  try {
+    const d = await api('/api/recording/config');
+    if (!d.ok) return;
+    const c = d.config || {};
+    $('#recBefore').value = c.before_seconds;
+    $('#recAfter').value = c.after_seconds;
+    $('#recMaxSeg').value = c.max_segment_seconds;
+    $('#recBitRate').value = c.bit_rate;
+    $('#recEnabled').checked = !!c.enabled;
+    $('#recKeep').checked = !!c.keep_on_success;
+    $('#recRequired').checked = !!c.required;
+  } catch (e) { /* 配置加载失败不打断执行页 */ }
+}
+
+async function saveRecordingConfig() {
+  const payload = {
+    before_seconds: $('#recBefore').value.trim(),
+    after_seconds: $('#recAfter').value.trim(),
+    max_segment_seconds: $('#recMaxSeg').value.trim(),
+    bit_rate: $('#recBitRate').value.trim(),
+    enabled: $('#recEnabled').checked,
+    keep_on_success: $('#recKeep').checked,
+    required: $('#recRequired').checked,
+  };
+  try {
+    const r = await fetch('/api/recording/config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const d = await r.json();
+    toast(d.msg || (d.ok ? '已保存' : '保存失败'), !!d.ok);
+    if (d.ok) loadRecordingConfig();   // 回读校准（含边界裁剪后的值）
+  } catch (e) { toast('保存失败：' + e, false); }
 }
 
 async function loadExecDefaults(conf) {

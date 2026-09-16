@@ -63,9 +63,11 @@ class RecordingLog(object):
 class AdbScreenrecordRecorder:
     """基于 `adb shell screenrecord` 的录屏器（首选后端）。"""
 
-    def __init__(self, serial, tmp_dir, node_name):
+    def __init__(self, serial, tmp_dir, node_name, time_limit=180, bit_rate=4000000):
         self.serial = serial
         self.node_name = node_name
+        self.time_limit = max(3, min(180, int(time_limit)))
+        self.bit_rate = int(bit_rate)
         self._adb = find_tool('adb')
         if not self._adb:
             raise RecorderError('未找到 adb 命令')
@@ -78,10 +80,12 @@ class AdbScreenrecordRecorder:
         self._log_f = None
 
     def start(self):
-        self.recording_log.write('后端=adb screenrecord 设备=%s 开始录制(单次上限180s) '
-                                 'bit_rate=4000000 远端文件=%s' % (self.serial, self.remote_path))
+        self.recording_log.write('后端=adb screenrecord 设备=%s 开始录制(单次上限%ds) '
+                                 'bit_rate=%d 远端文件=%s'
+                                 % (self.serial, self.time_limit, self.bit_rate, self.remote_path))
         cmd = [self._adb, '-s', self.serial, 'shell', 'screenrecord',
-               '--bit-rate', '4000000', '--time-limit', '180', self.remote_path]
+               '--bit-rate', str(self.bit_rate), '--time-limit', str(self.time_limit),
+               self.remote_path]
         self._log_f = open(os.path.join(self.work_dir, 'screenrecord.log'), 'ab')
         self._proc = subprocess.Popen(
             cmd, stdout=self._log_f, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
@@ -294,7 +298,9 @@ def create_recorder(cfg, node_name):
     if not cfg.ffmpeg:
         raise RecorderError('未找到 ffmpeg，无法处理失败证据视频')
     if probe_screenrecord(serial):
-        return AdbScreenrecordRecorder(serial, cfg.tmp_dir, node_name)
+        return AdbScreenrecordRecorder(serial, cfg.tmp_dir, node_name,
+                                       time_limit=getattr(cfg, 'max_segment_seconds', 180),
+                                       bit_rate=getattr(cfg, 'bit_rate', 4000000))
     return FrameLoopRecorder(serial, cfg.tmp_dir, node_name)
 
 

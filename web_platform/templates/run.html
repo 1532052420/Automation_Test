@@ -32,6 +32,23 @@
   </div>
 
   <div class="card">
+    <h3>🎥 录屏配置 <span class="muted" style="font-size:12px;font-weight:400">失败自动生成 [失败前 N 秒, 失败后 M 秒] 证据视频；保存后下次执行生效</span></h3>
+    <div class="fields" style="grid-template-columns:repeat(4,1fr)">
+      <div class="field"><label>失败前保留秒数（0~60）</label><input type="text" id="recBefore" placeholder="5"></div>
+      <div class="field"><label>失败后继续录制秒数（0~60）</label><input type="text" id="recAfter" placeholder="5"></div>
+      <div class="field"><label>单段录制上限秒（3~180）</label><input type="text" id="recMaxSeg" placeholder="180"></div>
+      <div class="field"><label>录制码率 bps（100万~2000万）</label><input type="text" id="recBitRate" placeholder="4000000"></div>
+    </div>
+    <div class="mt" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+      <label class="chk"><input type="checkbox" id="recEnabled"> 启用自动录屏</label>
+      <label class="chk"><input type="checkbox" id="recKeep"> 成功后保留原始视频</label>
+      <label class="chk"><input type="checkbox" id="recRequired"> 录屏失败时终止用例（默认仅告警）</label>
+      <button class="ghost mini" id="btnRecSave" style="margin-left:auto">💾 保存录屏配置</button>
+    </div>
+    <p class="muted mt" style="font-size:12px">录屏时机固定为每条用例 setup 执行前启动（覆盖启动 App 现场），不做配置；证据视频随失败明细挂在测试报告里。</p>
+  </div>
+
+  <div class="card">
     <h3>选择用例（cases/app_ui）</h3>
     <div style="display:flex;gap:10px;margin-bottom:12px">
       <button class="ghost mini" id="btnSelectAll">全选</button>

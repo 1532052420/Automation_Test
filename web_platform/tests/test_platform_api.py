@@ -477,3 +477,58 @@ def test_admin_overwrite_backup(platform):
     # 清理
     os.remove(os.path.join(target_dir, 'test_admin_backup.py'))
     os.remove(os.path.join(target_dir, backups[0]))
+
+
+# ---------------------------------------------------------------- 录屏配置
+def test_recording_config_roundtrip(platform):
+    """录屏配置：GET 读生效值 → POST 落盘 conf → 回读一致；非法值 400 且不落盘"""
+    import json as _json
+    import shutil as _shutil
+    from web_platform.recording_config import CONF_PATH
+
+    code, body, _ = http('GET', '/api/recording/config')
+    assert code == 200 and _json.loads(body)['ok']
+    cfg = _json.loads(body)['config']
+    for k in ('enabled', 'required', 'keep_on_success', 'before_seconds',
+              'after_seconds', 'max_segment_seconds', 'bit_rate'):
+        assert k in cfg, '缺字段 %s' % k
+
+    # 备份既有 conf（可能不存在），测试后还原
+    backup = _shutil.copyfile(CONF_PATH, CONF_PATH + '.bak') if os.path.isfile(CONF_PATH) else None
+    try:
+        # 合法保存：改全部 7 项
+        payload = dict(cfg, before_seconds=8, after_seconds=3, max_segment_seconds=120,
+                       bit_rate=6000000, enabled=False, keep_on_success=True, required=False)
+        code, body, _ = http('POST', '/api/recording/config', payload)
+        assert code == 200 and _json.loads(body)['ok']
+        assert os.path.isfile(CONF_PATH), 'conf 未落盘'
+        code, body, _ = http('GET', '/api/recording/config')
+        cfg2 = _json.loads(body)['config']
+        assert (cfg2['before_seconds'], cfg2['after_seconds']) == (8, 3)
+        assert (cfg2['max_segment_seconds'], cfg2['bit_rate']) == (120, 6000000)
+        assert cfg2['enabled'] is False and cfg2['keep_on_success'] is True and cfg2['required'] is False
+        # pytest 侧加载器读同一份 conf（录屏配置单一数据源）
+        import importlib
+        import common.video_evidence.config as ve_cfg
+        importlib.reload(ve_cfg)
+        rc = ve_cfg.RecordingConfig(adb_serial='X')
+        assert (rc.before_seconds, rc.after_seconds, rc.enabled, rc.keep_on_success) == (8, 3, False, True)
+        assert (rc.max_segment_seconds, rc.bit_rate) == (120, 6000000)
+        # 越界被钳制/拒绝：max_segment 超上限由保存接口 400 拒绝
+        code, body, _ = http('POST', '/api/recording/config',
+                             dict(payload, max_segment_seconds=999))
+        assert code == 400 and '范围' in _json.loads(body)['msg']
+        # 非法整数 400
+        code, body, _ = http('POST', '/api/recording/config', dict(payload, before_seconds='abc'))
+        assert code == 400 and '不是合法' in _json.loads(body)['msg']
+        # 400 后 conf 仍是上一次合法内容（部分写入防护）
+        code, body, _ = http('GET', '/api/recording/config')
+        assert _json.loads(body)['config']['before_seconds'] == 8
+    finally:
+        if backup is not None:
+            _shutil.move(CONF_PATH + '.bak', CONF_PATH)
+        elif os.path.isfile(CONF_PATH):
+            os.remove(CONF_PATH)
+    # 还原后回读为默认值
+    code, body, _ = http('GET', '/api/recording/config')
+    assert _json.loads(body)['config']['before_seconds'] == 5
