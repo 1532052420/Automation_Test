@@ -111,6 +111,15 @@ def _release_ui_idle(serial):
         time.sleep(1.5)
 
 
+def _u2_server_running(serial):
+    """设备上 uiautomator2 server 是否在运行（pidof，毫秒级）。
+    在跑即独占设备的 UiAutomation 通道，系统 uiautomator dump 会一直卡到超时——
+    真机执行用例后 server 常驻设备，正是「刷新十几秒才失败」的来源；
+    先按进程探测再选通道，被占用时直接走 u2 秒级出树。"""
+    out = _run(['-s', serial, 'shell', 'pidof', 'io.appium.uiautomator2.server'], timeout=5)
+    return bool(out and out.strip())
+
+
 def dump_xml(serial):
     """uiautomator dump 返回页面 XML 文本；连续失败返回 None
 
@@ -123,22 +132,24 @@ def dump_xml(serial):
     持续动画页面（如登录页顶部轮播/跑马灯）会让 uiautomator 永远等不到 idle ——
     这是华为 ROM 系统级限制，解锁动作无效。此时降级走 Appium uiautomator2 server，
     用 waitForIdleTimeout=0 跳过 idle 等待直接抓 accessibility 树。
-    """
-    # uiautomator2 server 一旦启动会占用设备的 UiAutomation 通道（系统 dump 被阻塞），
-    # 之后统一走 u2 通道，不再回头试系统 dump（按设备隔离：只看该设备自己的 u2 状态）
-    if _u2_state(serial)['ok']:
+
+    通道选择：u2 server 在设备上运行时（刚跑完真机用例会常驻），系统 dump 必然
+    卡死到超时——此时直接走 u2，秒级出树；系统 dump 的单次超时也从 30s 收紧到 8s
+    （正常 2~3s 就该完成），避免被占用场景下 3 次重试拖到几十秒才降级。"""
+    u2_running = _u2_state(serial)['ok'] or _u2_server_running(serial)
+    if u2_running:
         u2 = _dump_via_u2(serial)
         if u2:
             return u2
     for _ in range(3):
         # 先删旧文件：若 dump 失败，cat 无文件可读 -> 返回空，绝不把旧树当新树
-        _run(['-s', serial, 'shell', 'rm', '-f', '/sdcard/ui_dump.xml'], timeout=10)
-        _run(['-s', serial, 'shell', 'uiautomator', 'dump', '/sdcard/ui_dump.xml'], timeout=30)
-        xml = _run(['-s', serial, 'shell', 'cat', '/sdcard/ui_dump.xml'], timeout=30)
+        _run(['-s', serial, 'shell', 'rm', '-f', '/sdcard/ui_dump.xml'], timeout=8)
+        _run(['-s', serial, 'shell', 'uiautomator', 'dump', '/sdcard/ui_dump.xml'], timeout=8)
+        xml = _run(['-s', serial, 'shell', 'cat', '/sdcard/ui_dump.xml'], timeout=8)
         if xml and '<hierarchy' in xml:
             return xml
         _release_ui_idle(serial)
-    # 系统 dump 连续失败（多为持续动画导致 never idle）→ 降级 uiautomator2 通道
+    # 系统 dump 连续失败（多为持续动画导致 never idle，或 u2 通道刚失败）→ 降级 u2
     return _dump_via_u2(serial)
 
 
@@ -171,6 +182,13 @@ def _u2_state(serial):
     return _U2_STATES.setdefault(serial, {'ok': False, 'session': None})
 
 
+# u2 server 就在本机 127.0.0.1，绝不能走系统代理：环境配了 http_proxy 时，
+# urlopen 默认把 127.0.0.1:6790 的请求发给代理，代理转发失败还会返回它自己的
+# 错误文本（如 "upstream connect failed"）——非空 body 会被误判为"server 已就绪"。
+# 直连 opener（ProxyHandler({})）彻底绕开代理；实测代理环境下必须如此。
+_U2_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
 def _u2_http(serial, method, path, data=None, timeout=20):
     """发请求到指定设备的 uiautomator2 server（经该设备专属主机端口），返回响应文本；失败返回 ''
     注意：u2 server 对未实现的路由返回 404 + JSON body（如 /status），
@@ -182,7 +200,7 @@ def _u2_http(serial, method, path, data=None, timeout=20):
                                      data=body, method=method)
         req.add_header('Content-Type', 'application/json')
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            with _U2_OPENER.open(req, timeout=timeout) as resp:
                 return resp.read().decode('utf-8', errors='ignore')
         except urllib.error.HTTPError as e:
             # 404 等错误也带 body（JSON），说明服务在跑
@@ -192,13 +210,17 @@ def _u2_http(serial, method, path, data=None, timeout=20):
 
 
 def _u2_start_server(serial):
-    """通过 instrument 启动设备上的 uiautomator2 server（阻塞等待就绪，最多 ~15s）
-    forward 的主机端口用该设备专属端口，设备端端口恒为 6790"""
+    """确保设备上 uiautomator2 server 运行并建立 forward（主机端口用该设备专属端口，
+    设备端端口恒为 6790）。先查进程：server 已在跑则只补 forward——
+    重复 am instrument 会与现存实例冲突，导致该通道明明可用却启动"失败"。"""
     host_port = _u2_host_port(serial)
-    _run(['-s', serial, 'shell',
-          'nohup am instrument -w -e debug false -e principalServerPort 6790 '
-          'io.appium.uiautomator2.server.test/androidx.test.runner.AndroidJUnitRunner '
-          '>/dev/null 2>&1 &'], timeout=10)
+    running = bool(_run(['-s', serial, 'shell', 'pidof', 'io.appium.uiautomator2.server'],
+                        timeout=5).strip())
+    if not running:
+        _run(['-s', serial, 'shell',
+              'nohup am instrument -w -e debug false -e principalServerPort 6790 '
+              'io.appium.uiautomator2.server.test/androidx.test.runner.AndroidJUnitRunner '
+              '>/dev/null 2>&1 &'], timeout=10)
     _run(['-s', serial, 'forward', 'tcp:%d' % host_port, 'tcp:6790'], timeout=10)
     for _ in range(15):
         if _u2_http(serial, 'GET', '/status'):
@@ -243,7 +265,7 @@ def _u2_session_alive(serial):
         req = urllib.request.Request(
             'http://127.0.0.1:%d/wd/hub/session/%s' % (_u2_host_port(serial), sid))
         try:
-            with urllib.request.urlopen(req, timeout=10):
+            with _U2_OPENER.open(req, timeout=10):
                 return True
         except urllib.error.HTTPError as e:
             return e.code == 200
