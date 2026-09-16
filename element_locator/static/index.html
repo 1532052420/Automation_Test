@@ -10,18 +10,21 @@
 <script>
 /* 首帧前恢复主题：夜间模式在样式表加载前同步挂 night 类 + 给根节点上深色底，
    双保险保证第一帧就是深色（日间模式由 CSS 的 color-scheme:light 覆回，见 style.css）。
+   主题与测试平台共用 localStorage['platform_theme']——两端任一处切换即全局生效；
+   平台契约 html.day=日间（默认夜间），定位器契约 html.night=夜间（默认日间），
+   默认态相反，故这里是「非 day 即 night」。
    内嵌检测：被平台 iframe 嵌入时挂 embedded 类，首帧即隐藏自带侧栏（避免与平台侧栏形成双栏），
    侧栏里的功能件（刷新/快速打开/设备状态）由 index.js 移到顶部工具条。 */
 try {
   var _de = document.documentElement;
-  if (localStorage.getItem('locator_theme') === 'night') {
+  if (localStorage.getItem('platform_theme') !== 'day') {
     _de.classList.add('night');
     _de.style.background = '#101012';
   }
   if (window.self !== window.top) _de.classList.add('embedded');
 } catch (e) { /* 隐私模式等场景忽略 */ }
 </script>
-<link rel="stylesheet" href="static/style.css?v=41">
+<link rel="stylesheet" href="static/style.css?v=42">
 </head>
 <body>
 <div id="embed-bar" class="embed-bar"></div>
@@ -253,6 +256,7 @@ try {
 <!-- 字段帮助气泡（点击问号显示） -->
 <div id="help-tip" class="help-tip" style="display:none"></div>
 
+<script src="/static/theme.js"></script>
 <script src="static/index.js?v=48"></script>
 </body>
 </html>
