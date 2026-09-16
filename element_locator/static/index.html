@@ -24,7 +24,7 @@ try {
   if (window.self !== window.top) _de.classList.add('embedded');
 } catch (e) { /* 隐私模式等场景忽略 */ }
 </script>
-<link rel="stylesheet" href="static/style.css?v=45">
+<link rel="stylesheet" href="static/style.css?v=46">
 </head>
 <body>
 <div id="embed-bar" class="embed-bar"></div>
@@ -80,7 +80,6 @@ try {
   </div>
   </section>
   <div class="col-resizer" data-resize="left" title="拖动调整左右两栏宽度"></div>
-
   <!-- 中：元素树 + 详情 -->
   <section class="col middle">
     <div class="col-title">元素 / 坐标</div>
@@ -267,7 +266,8 @@ try {
 <!-- 字段帮助气泡（点击问号显示） -->
 <div id="help-tip" class="help-tip" style="display:none"></div>
 
+<div id="hit-toast" class="hit-toast" style="display:none" aria-live="polite"></div>
 <script src="/static/theme.js"></script>
-<script src="static/index.js?v=51"></script>
+<script src="static/index.js?v=52"></script>
 </body>
 </html>

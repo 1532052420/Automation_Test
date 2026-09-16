@@ -592,3 +592,16 @@ html.night .step-undo-bar { background: rgba(255,255,255,.06); border-color: rgb
 html.night .su-title { color: #d1d5db; }
 html.night .su-title em { color: #9ca3af; }
 html.night .su-btn { background: rgba(59,130,246,.18); border-color: rgba(59,130,246,.5); color: #93c5fd; }
+
+/* ---------- 命中定位底部提示：6s 自动消失；pointer-events:none 不阻挡任何操作 ---------- */
+.hit-toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 1400;
+  max-width: 72vw; padding: 10px 20px; border-radius: 999px; pointer-events: none;
+  background: rgba(250, 250, 252, .95); color: #111827; font-size: 13px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(127, 127, 127, .22);
+  box-shadow: 0 8px 26px rgba(17, 24, 39, .18), 0 2px 6px rgba(17, 24, 39, .08);
+  animation: hitToastIn .22s ease-out; }
+@keyframes hitToastIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+html.night .hit-toast { background: rgba(44, 44, 48, .95); color: #f3f4f6;
+  border-color: rgba(255, 255, 255, .18); box-shadow: 0 8px 26px rgba(0, 0, 0, .55), 0 2px 6px rgba(0, 0, 0, .4); }

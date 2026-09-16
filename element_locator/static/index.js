@@ -550,6 +550,7 @@ function onShotClick(e) {
   if (!r) return;
   state.hitCands = r.cands;
   selectNode(r.hit.uid);
+  showHitToast(r.hit, r.cands.length, '');
 }
 // 双击执行器：双击截图 = 在设备上真实点击该元素（验证定位是否准确）
 function onShotDblClick(e) {
@@ -557,7 +558,26 @@ function onShotDblClick(e) {
   if (!r) return;
   state.hitCands = r.cands;
   selectNode(r.hit.uid);
+  showHitToast(r.hit, r.cands.length, ' · 已在设备上真实点击');
   tapOnDevice(r.hit.center, r.hit.text || r.hit['resource-id'] || '双击元素');
+}
+
+/* ---------- 命中定位底部提示：6 秒自动消失，pointer-events:none 不阻挡任何操作 ---------- */
+let hitToastTimer = null;
+function showHitToast(node, candCount, extra) {
+  const t = $('hit-toast');
+  if (!t) return;
+  const name = (node.text && node.text.trim()) ? '「' + truncate(node.text.trim(), 12) + '」'
+    : (node['resource-id'] ? truncate(node['resource-id'].split('/').pop(), 16) : candName(node));
+  const coords = node.center ? ' · 中心坐标 (' + node.center.join(', ') + ')' : '';
+  const multi = candCount > 1 ? ' · 共命中 ' + candCount + ' 层，可在中间栏选更精确的一层' : '';
+  t.textContent = '🎯 已命中 ' + name + coords + multi + extra;
+  t.style.display = '';
+  t.style.animation = 'none';   // 连续命中时重播入场动画
+  void t.offsetWidth;
+  t.style.animation = '';
+  clearTimeout(hitToastTimer);
+  hitToastTimer = setTimeout(() => { t.style.display = 'none'; }, 6000);
 }
 // 「▶ 设备上点击」按钮：点击选中的元素
 async function onTapElement() {
