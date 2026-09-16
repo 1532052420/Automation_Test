@@ -25,3 +25,6 @@ gui-test-screenshots/
 
 # Appium 三件套（APK 二进制不入库）
 三件套/
+
+# WorkBuddy 个人工作日志不入库（.workbuddy/skills/ 为项目级 skill，照常入库）
+.workbuddy/memory/
