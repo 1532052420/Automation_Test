@@ -527,6 +527,11 @@ def test_admin_protected_delete_denied(platform):
 
 def test_admin_rename_and_folder(platform):
     """重命名 + 新建文件夹"""
+    # 上次中断可能留下的产物先清干净，保证用例幂等（目标文件已存在会让 rename 失败）
+    for leftover in ('cases/demoProject/api/test_admin_rename.py',
+                     'cases/demoProject/api/test_admin_renamed.py'):
+        if os.path.isfile(os.path.join(ROOT, leftover)):
+            os.remove(os.path.join(ROOT, leftover))
     code, d = _upload(platform, 'test_admin_rename.py', b'pass\n')
     assert d['ok']
     code, body, _ = http('POST', '/api/admin/rename',

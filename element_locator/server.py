@@ -1,17 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-App 元素定位器 · Flask 服务入口（element_locator）
-启动：cd ~/Desktop/AutomationTest && ./run.sh locator
-默认地址：http://127.0.0.1:8001
+App 元素定位器 · Flask 应用（element_locator）
+已并入 Web 执行平台，由 web_platform/app.py 以 DispatcherMiddleware 挂在 /locator 子路径，
+随平台一起启动/停止；不再有独立的 8001 服务。
+访问：cd ~/Desktop/AutomationTest && ./run.sh platform  →  http://127.0.0.1:8080/locator/
 技术方案与配置方法见同目录 技术实现方案.md
 """
 import ast
 import base64
-import json
 import os
 import re
 import sys
-import urllib.request
 
 from flask import Flask, jsonify, request, send_file
 
@@ -179,8 +178,9 @@ def api_cases():
 @app.route('/api/save_case_package', methods=['POST'])
 def api_save_case_package():
     """「保存测试用例包·保存到框架」：三个文件内容入库。
-    校验/备份/登记全部转发平台管理后台 upload_zip 同一套逻辑（远程 urllib 调 8090，
-    平台不在则降级直写——本机单人场景仍可用）。"""
+    定位器现以 /locator 子应用挂在测试平台同一进程内，因此直接调用管理后台的入库实现
+    （import_case_package），享受与之完全一致的语法校验、覆盖备份与上传人登记——
+    不再需要一个从来不存在的 8090 端点。"""
     data = request.get_json(silent=True) or {}
     package = (data.get('package') or '').strip()
     files = data.get('files') or []
@@ -188,24 +188,15 @@ def api_save_case_package():
         return jsonify({'ok': False, 'msg': '缺少包名或文件内容'})
     if not all(isinstance(f, dict) and f.get('name') and f.get('content') is not None for f in files):
         return jsonify({'ok': False, 'msg': '文件结构不合法'})
-    payload = json.dumps({'package': package, 'uploader': (data.get('uploader') or 'locator'),
-                          'files': files}).encode('utf-8')
-    # 平台在跑 → 转发（享受完整校验/备份/登记）；不在 → 直写文件（本机兜底）
     try:
-        req = urllib.request.Request('http://127.0.0.1:8090/api/admin/upload_zip_content',
-                                     data=payload, method='POST')
-        req.add_header('Content-Type', 'application/json')
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return jsonify(json.loads(resp.read().decode('utf-8')))
-    except Exception as e:
-        code = getattr(e, 'code', None)
-        if code:
-            try:
-                body = e.read().decode('utf-8')
-                return jsonify(json.loads(body))
-            except Exception:
-                pass
-        return jsonify({'ok': False, 'msg': '保存失败：测试平台未运行（%s）。可先「下载用例包」再用管理后台上传' % str(e)[:80]})
+        from web_platform.admin_routes import import_case_package
+    except ImportError as e:
+        return jsonify({'ok': False, 'msg': '「保存到框架」需与测试平台运行在同一进程（%s）；'
+                                            '可改用「⬇ 下载用例包」再在管理后台「上传用例包」入库'
+                        % str(e)[:80]})
+    payload, status = import_case_package(package, files,
+                                          (data.get('uploader') or 'locator').strip()[:32])
+    return jsonify(payload), status
 
 
 @app.route('/api/build_case_package', methods=['POST'])

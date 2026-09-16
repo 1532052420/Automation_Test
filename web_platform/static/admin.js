@@ -132,6 +132,25 @@ async function adminUpload(force) {
   if (d.ok) { fileInput.value = ''; adminLoadFiles(); }
 }
 
+/* ---------------- 用例包（zip）入库：三件套一次性写入 ---------------- */
+async function adminUploadPackage() {
+  const fileInput = $('#upPkgFile');
+  if (!fileInput.files.length) return toast('请选择用例包 zip', false);
+  const fd = new FormData();
+  fd.append('uploader', $('#upPkgUploader').value.trim() || 'admin');
+  fd.append('file', fileInput.files[0]);
+  const btn = $('#btnUploadPkg');
+  btn.textContent = '⏳ 入库中…'; btn.disabled = true;
+  try {
+    const d = await adminApi('/api/admin/upload_package', {method: 'POST', body: fd});
+    if (d.needToken) { $('#authCard').style.display = ''; return toast('请先输入访问口令', false); }
+    toast(d.msg || (d.ok ? '用例包已入库' : '入库失败'), d.ok);
+    if (d.ok) { fileInput.value = ''; adminLoadFiles(); }
+  } finally {
+    btn.textContent = '📦 上传用例包'; btn.disabled = false;
+  }
+}
+
 /* ---------------- 批量 / 重命名 / 新建文件夹 ---------------- */
 async function adminBatchDelete() {
   const paths = adminSelected().filter(p => {
@@ -178,6 +197,7 @@ function adminInit() {
   renderSidebar('/admin');
   adminLoadFiles();
   $('#btnUpload').addEventListener('click', () => adminUpload(false));
+  $('#btnUploadPkg').addEventListener('click', adminUploadPackage);
   $('#btnToken').addEventListener('click', () => {
     localStorage.setItem('adminToken', $('#inToken').value.trim());
     toast('口令已保存到本机浏览器');

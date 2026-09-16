@@ -1343,9 +1343,9 @@ function pkgFiles() {
     + '    def teardown_class(self):\n'
     + '        self.appOperator.close_app()\n';
   return [
-    { dir: 'cases', name: pkgCaseFileName(), content: casePy },
-    { dir: 'pages', name: pageFile, content: pagePy },
-    { dir: 'elements', name: elemFile, content: elemPy },
+    { dir: 'cases/app_ui/android/demoProject', name: pkgCaseFileName(), content: casePy },
+    { dir: 'page_objects/app_ui/android/demoProject/pages', name: pageFile, content: pagePy },
+    { dir: 'page_objects/app_ui/android/demoProject/elements', name: elemFile, content: elemPy },
   ];
 }
 /* 包弹窗预览：三个文件落点 */
@@ -1353,9 +1353,7 @@ function updatePkgPreview() {
   const box = $('pkg-files-preview');
   if (!box) return;
   const files = pkgFiles();
-  box.textContent = files.map(f =>
-    (f.dir === 'cases' ? 'cases/app_ui/android/demoProject/' : 'page_objects/app_ui/android/demoProject/' + f.dir + '/') + f.name
-  ).join('\n');
+  box.textContent = files.map(f => f.dir + '/' + f.name).join('\n');
 }
 function openPackageModal() {
   $('pkg-name').value = pkgBase();
@@ -1364,7 +1362,7 @@ function openPackageModal() {
   $('pkg-content').textContent = '';
   $('pkg-mask').style.display = 'flex';
 }
-/* 生成三件套 zip：mode=save（转发平台校验入库）/ download（浏览器下载 zip） */
+/* 生成三件套 zip：mode=save（交平台做校验/备份/登记后入库）/ download（浏览器下载 zip） */
 async function submitPackage(mode) {
   const base = ($('pkg-name').value || '').trim().replace(/[^A-Za-z0-9_\-]/g, '_');
   if (!base) { showPkgResult('请填写用例包名称', false); return; }

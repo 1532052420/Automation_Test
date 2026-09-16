@@ -51,6 +51,25 @@
   </div>
 
   <div class="card">
+    <h3>📦 上传用例包（zip）</h3>
+    <div class="fields">
+      <div class="field"><label>用例包 zip（元素定位器「⬇ 下载用例包」的产物）</label>
+        <input type="file" id="upPkgFile" accept=".zip">
+      </div>
+      <div class="field"><label>上传人（用于追溯）</label>
+        <input type="text" id="upPkgUploader" placeholder="你的名字">
+      </div>
+    </div>
+    <div class="mt">
+      <button id="btnUploadPkg">📦 上传用例包</button>
+    </div>
+    <p class="muted mt" style="font-size:12px">zip 内文件须落在受管目录：用例 <code>cases/app_ui/android/demoProject/</code>、
+      页面 <code>page_objects/app_ui/android/demoProject/pages/</code>、元素 <code>…/elements/</code>
+      （定位器「⬇ 下载用例包」产出即此结构，其余文件自动忽略）。
+      三件套一次性入库：先整体做语法校验，全部通过才落盘；同名文件自动备份历史版本。</p>
+  </div>
+
+  <div class="card">
     <div class="cardhead">
       <h3>📄 文件列表 <span class="muted" id="fileCount"></span>
         <select id="typeFilter" style="margin-left:10px;background:var(--dark);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:2px 6px">

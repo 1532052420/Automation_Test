@@ -1,16 +1,19 @@
 # App 元素定位器（element_locator）
 
 框架内置的可视化元素定位器：连上真机 → 看实时截图 → 点元素拿坐标和定位写法 → **一键写进框架元素库**；带**双击执行器**可先在设备上真实点击验证；右侧内置操作教学（点击/滑动/toast 断言…），不用上网查。
-当前版本 **v3.0**（左上角徽章，用于确认本地代码是否已更新）。
+当前版本 **v3.2**（左上角徽章，用于确认本地代码是否已更新）。
 
 > 技术架构、坐标映射原理、配置方法与移植到其他项目的步骤见 **[技术实现方案.md](技术实现方案.md)**。
 
 ## 启动
 
+定位器已并入 Web 执行平台（同一进程，挂在 `/locator` 子路径），不再有独立的 8001 服务：
+
 ```bash
 cd ~/Desktop/AutomationTest
-./run.sh locator          # 启动并自动打开浏览器 http://127.0.0.1:8001/
-./run.sh stop-locator     # 停止
+./run.sh platform                    # 平台 + 定位器一起启动
+./run.sh restart-platform            # 改完定位器代码后一键生效
+open http://127.0.0.1:8080/locator/  # 定位器页面
 ```
 
 前提：手机已连电脑并允许 USB 调试（`adb devices` 能看到设备）。
@@ -61,12 +64,39 @@ item = appOperator.getElements(elements.city_btns)[1]   # 重复元素取第 2 �
 assert appOperator.is_toast_visible('操作成功')          # 断言 toast
 ```
 
+## 添加到用例 / 新建用例包（两条入库通路）
+
+定位器右侧「添加到用例」有两个模式，两者产物都能被平台执行页直接选中运行：
+
+**① 添加到已有用例（选目标用例文件）**
+选目标用例文件 → 选目标测试方法 → 选用途（仅存元素库 / 追加到用例 / 元素+用例+操作）→ 保存。
+代码追加到该用例方法体末尾；选「元素+用例+操作」时同步生成页面对象方法。归属由用例的
+`self.page = XxxPage(...)` 反解得出，页面文件字段只读（改它等于换目标用例）。
+
+**② 新建用例包（三件套一次生成）**
+填用例名 → 一键生成三件套，两个出口：
+
+| 出口 | 行为 |
+|---|---|
+| **💾 保存到框架** | 直接入库（与平台同进程调用，享受同一套 py 语法校验 / 同名自动备份 / 上传人登记）。**先全部校验、全部通过才落盘**，任一文件语法错则一个都不写 |
+| **⬇ 下载用例包（zip）** | 下载 zip，再到平台「**管理后台 → 📦 上传用例包**」上传入库（同一套校验逻辑，适合局域网/离线上传） |
+
+三件套落点（与弹窗预览一致）：
+
+```
+cases/app_ui/android/demoProject/test_<用例名>.py                  ← 用例（含 test_<用例名> 方法）
+page_objects/app_ui/android/demoProject/pages/<首字母大写>Page.py   ← 页面操作
+page_objects/app_ui/android/demoProject/elements/<用例名>Elements.py ← 元素库
+```
+
+> 注意：用例必须落在 `cases/app_ui/**` 下平台才扫得到——这一步由定位器自动带上，无需手填。
+
 ## 常见问题
 
 - **截图空白/刷新失败**：确认手机亮屏（黑屏时 uiautomator dump 不出内容）、USB 调试已授权
-- **页面没变/功能是旧的**：左上角看版本号是不是 v2.16；是旧版说明浏览器缓存了，`Cmd+Shift+R`（Mac）或 `Ctrl+F5`（Win）强刷，或点开页面后浏览器右上角「开发者工具 → Network → Disable cache」
-- **定位器端口被占**：`LOCATOR_PORT=8002 ./run.sh locator`
-- **不改动框架任何现有代码**，定位器是独立模块（`element_locator/`），随时可删
+- **页面没变/功能是旧的**：左上角看版本号是不是 v3.2；是旧版说明浏览器缓存了，`Cmd+Shift+R`（Mac）或 `Ctrl+F5`（Win）强刷，或点开页面后浏览器右上角「开发者工具 → Network → Disable cache」
+- **平台起不来/端口被占**：`./run.sh status` 会列出占用者；`./run.sh restart-platform` 一键重启
+- 定位器与平台同进程（`/locator` 子路径），改完代码用 `./run.sh restart-platform` 生效
 
 ## 技术栈
 

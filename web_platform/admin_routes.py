@@ -165,6 +165,184 @@ def _syntax_check(abs_path, ext=None):
         raise AdminError('不支持的文件后缀: %s' % ext)
 
 
+# ---------------- 受管文件写入（单文件上传与用例包入库共用同一套校验/备份/登记） ----------------
+def _rm_quiet(path):
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
+def _target_dir(kind, subdir):
+    """受管子目录内的目标目录；越界返回 (None, 错误信息)"""
+    sub = (subdir or '').strip().strip('/')
+    if sub and (not re.match(r'^[A-Za-z0-9_/-]+$', sub) or '..' in sub):
+        return None, '子目录不合法: %r' % subdir
+    target_dir = os.path.normpath(os.path.join(_UPLOAD_TARGETS[kind], sub))
+    norm_base = os.path.normpath(_UPLOAD_TARGETS[kind])
+    if target_dir != norm_base and not target_dir.startswith(norm_base + os.sep):
+        return None, '目标路径越界'
+    return target_dir, None
+
+
+def _stage_file(target, content, ext):
+    """写 .uploading 临时文件并做语法校验；失败抛 AdminError（临时文件已清理）。
+    只动临时文件、不碰原文件 —— 便于多文件先整体校验、再统一落盘。"""
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    tmp = target + '.uploading'
+    with open(tmp, 'wb') as fh:
+        fh.write(content)
+    try:
+        _syntax_check(tmp, ext)
+    except AdminError:
+        _rm_quiet(tmp)
+        raise
+    return tmp
+
+
+def _commit_file(target, tmp, meta, full_rel, uploader):
+    """暂存文件落盘：覆盖前备份历史版本，登记上传人与时间。返回是否发生了备份"""
+    m = meta.setdefault(full_rel, {})
+    backed = os.path.isfile(target)
+    if backed:
+        stem, ext = os.path.splitext(target)
+        backup_name = '%s_%s_backup%s' % (stem, time.strftime('%Y%m%d_%H%M%S'), ext)
+        os.replace(target, backup_name)
+        m.setdefault('backups', []).append(os.path.basename(backup_name))
+        m['backups'] = m['backups'][-20:]
+    m['uploader'] = uploader
+    m['uploaded_at'] = int(time.time())
+    os.replace(tmp, target)
+    return backed
+
+
+def write_managed_file(kind, filename, content, subdir='', force=False,
+                       uploader='admin', force_admin=False, meta=None):
+    """单文件入库：校验名与目录 → 暂存+语法校验 → 落盘（覆盖前备份、登记元数据）。
+    返回 (payload, status)；status=409 表示同名文件已存在且未允许覆盖（供前端弹确认框）。"""
+    meta = {} if meta is None else meta
+    try:
+        _validate_name(kind, filename)
+    except AdminError as e:
+        # cases 下非 test_ 前缀的 py = 框架公共文件，仅管理员可上传（4.4）
+        if kind == 'cases' and re.match(r'^(?!test_)[A-Za-z_][A-Za-z0-9_]*\.py$', filename):
+            if not _protected_allowed(force_admin):
+                return {'ok': False,
+                        'msg': '框架公共文件（非 test_ 前缀 py）仅管理员可上传，'
+                               '请携带管理员凭据（force_admin=true 或管理员令牌）'}, 403
+        else:
+            return {'ok': False, 'msg': str(e)}, 400
+    target_dir, err = _target_dir(kind, subdir)
+    if err:
+        return {'ok': False, 'msg': err}, 400
+    content = content.encode('utf-8') if isinstance(content, str) else content
+    if len(content) > MAX_UPLOAD_BYTES:
+        return {'ok': False, 'msg': '文件过大（限 200KB）'}, 400
+    target = os.path.join(target_dir, filename)
+    full_rel = os.path.relpath(target, ROOT).replace(os.sep, '/')
+    exists = os.path.isfile(target)
+    if exists and not force:
+        m = _meta_of(meta, full_rel)
+        st = os.stat(target)
+        # 未勾选覆盖：返回已存在文件的元信息，供前端弹确认框（覆盖交互 3.3）
+        return {'ok': False, 'exists': True,
+                'meta': {'uploader': m.get('uploader', '框架'),
+                         'uploaded_at': m.get('uploaded_at', int(st.st_mtime)),
+                         'modify_time': int(st.st_mtime)}}, 409
+    try:
+        tmp = _stage_file(target, content, os.path.splitext(filename)[1])
+    except AdminError as e:
+        return {'ok': False, 'msg': str(e)}, 400
+    backed = _commit_file(target, tmp, meta, full_rel, uploader)
+    return {'ok': True, 'path': full_rel, 'filename': filename, 'backed_up': backed,
+            'msg': ('已覆盖上传 %s（旧文件已自动备份）' if backed else '已上传 %s') % filename
+                   + '，平台已自动识别'}, 200
+
+
+# ---------------- 用例包（元素定位器三件套）整体入库 ----------------
+MAX_PACKAGE_BYTES = MAX_UPLOAD_BYTES * 3
+
+
+def import_case_package(package='', files=None, uploader='admin'):
+    """用例包整体入库：files = [{'dir': 相对项目根的目录, 'name': ..., 'content': ...}]
+    例如 dir='cases/app_ui/android/demoProject'、'page_objects/app_ui/android/demoProject/pages'。
+    目录必须落在受管目录内（_resolve_managed_path 校验，杜绝路径穿越）。
+
+    两阶段执行：先把全部文件写成 .uploading 并逐个语法校验，全部通过后才统一落盘 ——
+    三件套必须整体成功，避免留下「用例已入库但页面文件语法错」的半成品。
+    同名文件自动备份历史版本（与单文件上传同一套逻辑）。"""
+    items = [f for f in (files or []) if isinstance(f, dict)]
+    if not items:
+        return {'ok': False, 'msg': '用例包为空'}, 400
+    meta, staged, errors = _load_meta(), [], []
+    for f in items:
+        subdir = (f.get('dir') or '').strip().strip('/')
+        name = os.path.basename((f.get('name') or '').strip())
+        content = f.get('content')
+        where = '%s/%s' % (subdir or '?', name or '?')
+        if not subdir or not name or not isinstance(content, str):
+            errors.append('%s: 结构不合法（dir 为相对项目根的目录，'
+                          '如 cases/app_ui/android/demoProject）' % where)
+            continue
+        try:
+            target, kind, _ = _resolve_managed_path('%s/%s' % (subdir, name))
+        except AdminError as e:
+            errors.append('%s: %s' % (where, e))
+            continue
+        try:
+            _validate_name(kind, name)
+        except AdminError as e:
+            errors.append('%s: %s' % (where, e))
+            continue
+        raw = content.encode('utf-8')
+        if len(raw) > MAX_UPLOAD_BYTES:
+            errors.append('%s: 文件过大（限 200KB）' % where)
+            continue
+        try:
+            staged.append((kind, name, target,
+                           _stage_file(target, raw, os.path.splitext(name)[1])))
+        except AdminError as e:
+            errors.append('%s: %s' % (where, e))
+    if errors:
+        for _, _, _, tmp in staged:
+            _rm_quiet(tmp)
+        return {'ok': False, 'errors': errors,
+                'msg': '用例包校验未通过，未写入任何文件：' + '；'.join(errors)}, 400
+    done = []
+    for kind, name, target, tmp in staged:
+        full_rel = os.path.relpath(target, ROOT).replace(os.sep, '/')
+        backed = _commit_file(target, tmp, meta, full_rel, uploader)
+        done.append({'dir': os.path.dirname(full_rel), 'name': name,
+                     'path': full_rel, 'backed_up': backed})
+    _save_meta(meta)
+    return {'ok': True, 'package': package, 'files': done, 'total': len(done),
+            'backed_up': sum(1 for d in done if d['backed_up']),
+            'msg': '用例包「%s」已入库 %d 个文件（%s），平台已自动识别'
+                   % (package or '未命名', len(done),
+                      '、'.join(d['path'] for d in done))}, 200
+
+
+def _read_package_zip(zf):
+    """读用例包 zip → files 列表；结构非法返回错误字符串。
+    只收录落在受管目录（cases/ 及 page_objects 的 pages/elements）内的文件，
+    其余（__MACOSX、说明书等）一律忽略；目录层级不限，与「下载用例包」产出对齐。"""
+    files, total = [], 0
+    for info in zf.infolist():
+        if info.is_dir():
+            continue
+        rel = info.filename.replace('\\', '/').lstrip('/')
+        try:
+            _resolve_managed_path(rel)
+        except AdminError:
+            continue
+        total += info.file_size
+        if total > MAX_PACKAGE_BYTES:
+            return '用例包过大（限 %dKB）' % (MAX_PACKAGE_BYTES // 1024)
+        files.append({'dir': os.path.dirname(rel), 'name': os.path.basename(rel),
+                      'content': zf.read(info).decode('utf-8', 'replace')})
+    return files or 'zip 内未找到受管目录（cases/ 或 page_objects 的 pages/elements）内的文件'
+
+
 @bp.route('/admin')
 def page_admin():
     return render_template('admin.html')
@@ -222,75 +400,63 @@ def api_admin_upload():
         auth = _check_token()
     except AdminError as e:
         return jsonify({'ok': False, 'msg': str(e)}), 401
-    kind = request.form.get('kind', '')
-    subdir = request.form.get('subdir', '')
-    force = request.form.get('force') == 'true'
-    uploader = (request.form.get('uploader') or 'admin').strip()[:32]
     f = request.files.get('file')
     if f is None or not f.filename:
         return jsonify({'ok': False, 'msg': '未选择文件'}), 400
-    filename = os.path.basename(f.filename)
-    try:
-        _validate_name(kind, filename)
-    except AdminError as e:
-        # cases 下非 test_ 前缀的 py = 框架公共文件，仅管理员可上传（4.4）
-        if kind == 'cases' and re.match(r'^(?!test_)[A-Za-z_][A-Za-z0-9_]*\.py$', filename):
-            if not _protected_allowed(request.form.get('force_admin') == 'true'):
-                return jsonify({'ok': False,
-                                'msg': '框架公共文件（非 test_ 前缀 py）仅管理员可上传，'
-                                       '请携带管理员凭据（force_admin=true 或管理员令牌）'}), 403
-        else:
-            return jsonify({'ok': False, 'msg': str(e)}), 400
-    subdir_clean = (subdir or '').strip().strip('/')
-    if subdir_clean and (not re.match(r'^[A-Za-z0-9_/-]+$', subdir_clean) or '..' in subdir_clean):
-        return jsonify({'ok': False, 'msg': '子目录不合法: %r' % subdir_clean}), 400
-    target_dir = os.path.normpath(os.path.join(_UPLOAD_TARGETS[kind], subdir_clean))
-    norm_base = os.path.normpath(_UPLOAD_TARGETS[kind])
-    if target_dir != norm_base and not target_dir.startswith(norm_base + os.sep):
-        return jsonify({'ok': False, 'msg': '目标路径越界'}), 400
-    target = os.path.join(target_dir, filename)
-    content = f.read()
-    if len(content) > MAX_UPLOAD_BYTES:
-        return jsonify({'ok': False, 'msg': '文件过大（限 200KB）'}), 400
-
     meta = _load_meta()
-    full_rel = os.path.relpath(target, ROOT).replace(os.sep, '/')
-    exists = os.path.isfile(target)
-    if exists and not force:
-        m = _meta_of(meta, full_rel)
-        st = os.stat(target)
-        # 未勾选覆盖：返回已存在文件的元信息，供前端弹确认框（覆盖交互 3.3）
-        return jsonify({'ok': False, 'exists': True,
-                        'meta': {'uploader': m.get('uploader', '框架'),
-                                 'uploaded_at': m.get('uploaded_at', int(st.st_mtime)),
-                                 'modify_time': int(st.st_mtime)}}), 409
+    payload, status = write_managed_file(
+        request.form.get('kind', ''), os.path.basename(f.filename), f.read(),
+        subdir=request.form.get('subdir', ''),
+        force=request.form.get('force') == 'true',
+        uploader=(request.form.get('uploader') or 'admin').strip()[:32],
+        force_admin=request.form.get('force_admin') == 'true',
+        meta=meta)
+    if status == 200:
+        _save_meta(meta)
+        payload['auth'] = auth
+    return jsonify(payload), status
 
-    os.makedirs(target_dir, exist_ok=True)
-    tmp = target + '.uploading'
-    with open(tmp, 'wb') as fh:
-        fh.write(content)
+
+@bp.route('/api/admin/upload_zip_content', methods=['POST'])
+def api_admin_upload_zip_content():
+    """用例包入库（JSON 形式）：{package, uploader, files:[{dir,name,content}]}。
+    元素定位器「💾 保存到框架」与平台同进程，直接调用 import_case_package，
+    不再依赖任何外部端口。"""
     try:
-        _syntax_check(tmp, os.path.splitext(filename)[1])
+        auth = _check_token()
     except AdminError as e:
-        os.remove(tmp)
-        return jsonify({'ok': False, 'msg': str(e)}), 400
+        return jsonify({'ok': False, 'msg': str(e)}), 401
+    data = request.get_json(silent=True) or {}
+    payload, status = import_case_package(
+        (data.get('package') or '').strip(), data.get('files'),
+        (data.get('uploader') or 'locator').strip()[:32])
+    payload['auth'] = auth
+    return jsonify(payload), status
 
-    if exists:
-        # 覆盖前自动备份历史版本（4.3）：xxx_时间戳_backup.后缀
-        stem, ext = os.path.splitext(target)
-        backup_name = '%s_%s_backup%s' % (stem, time.strftime('%Y%m%d_%H%M%S'), ext)
-        os.replace(target, backup_name)
-        m = _meta_of(meta, full_rel)
-        m.setdefault('backups', []).append(os.path.basename(backup_name))
-        m['backups'] = m['backups'][-20:]
-    m = meta.setdefault(full_rel, {})
-    m['uploader'] = uploader
-    m['uploaded_at'] = int(time.time())
-    _save_meta(meta)
-    os.replace(tmp, target)
-    return jsonify({'ok': True, 'auth': auth, 'path': full_rel, 'backed_up': bool(exists),
-                    'msg': ('已覆盖上传 %s（旧文件已自动备份）' if exists else '已上传 %s') % filename
-                    + '，平台已自动识别'})
+
+@bp.route('/api/admin/upload_package', methods=['POST'])
+def api_admin_upload_package():
+    """用例包入库（multipart 上传 .zip）：管理后台「📦 上传用例包」入口。
+    zip 内一级目录须为 cases/ pages/ elements/（与定位器「⬇ 下载用例包」产出一致）。"""
+    try:
+        auth = _check_token()
+    except AdminError as e:
+        return jsonify({'ok': False, 'msg': str(e)}), 401
+    f = request.files.get('file')
+    if f is None or not f.filename:
+        return jsonify({'ok': False, 'msg': '未选择文件'}), 400
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(f.read()))
+    except zipfile.BadZipFile:
+        return jsonify({'ok': False, 'msg': '不是合法的 zip 文件'}), 400
+    files = _read_package_zip(zf)
+    if isinstance(files, str):
+        return jsonify({'ok': False, 'msg': files}), 400
+    payload, status = import_case_package(
+        os.path.splitext(os.path.basename(f.filename))[0], files,
+        (request.form.get('uploader') or 'admin').strip()[:32])
+    payload['auth'] = auth
+    return jsonify(payload), status
 
 
 @bp.route('/api/admin/download')
