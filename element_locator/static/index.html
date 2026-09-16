@@ -121,7 +121,7 @@ try {
       <div class="flow-step">
         <span class="fs-label">保存到哪一步：</span>
         <label class="purpose"><input type="radio" name="el-purpose" value="only" checked> <span class="help-icon" data-help="只把元素写进元素库（先攒元素，之后统一写用例）。右侧②③栏熄灭不可用。">?</span> ① 仅元素</label>
-        <label class="purpose"><input type="radio" name="el-purpose" value="all"> <span class="help-icon" data-help="三件套一次完成（推荐）：元素入库 + 用例行追加 + 页面操作方法自动生成/更新到目标用例的页面文件。用例、元素、操作缺一不可，选这个就不会漏。目标用例文件可以选已有的，也可以新建——新建时会弹出「保存测试用例包」一次生成三件套。">?</span> ② 元素 + 用例 + 操作（推荐）</label>
+        <label class="purpose"><input type="radio" name="el-purpose" value="all"> <span class="help-icon" data-help="三件套一次完成（推荐）：元素入库 + 用例行追加 + 页面操作方法自动生成/更新到目标用例的页面文件。用例、元素、操作缺一不可，选这个就不会漏。目标用例选「➕ 新建…」并填用例名时：保存并继续=直接入库继续录；保存=导出 zip。">?</span> ② 元素 + 用例 + 操作（推荐）</label>
       </div>
 
       <div class="flow-cols">
@@ -164,7 +164,7 @@ try {
         <!-- 第二栏：用例 -->
         <section class="flow-col" id="col-case">
           <div class="col-head">② 用例 <span class="hint">这步操作追加到哪条用例</span></div>
-          <label>目标用例文件 <span class="help-icon" data-help="操作代码行追加到哪个用例文件（test_*.py）。下拉列出现有用例文件；选「➕ 新建…」则生成全新用例：test_ 前缀固定不可改，只需输入后面的名字——保存时会弹出「保存测试用例包」，把用例/页面对象/元素三个文件一次生成。">?</span>
+          <label>目标用例文件 <span class="help-icon" data-help="操作代码行追加到哪个用例文件（test_*.py）。下拉列出现有用例文件；选「➕ 新建…」并输入用例名后：点「保存并继续」= 三件套直接入库并继续编辑当前用例；点「保存」= 打包为 zip 下载（再到平台「用例管理 → 上传用例包」入库）。">?</span>
             <select id="el-case-file"></select>
             <span id="el-case-new-wrap" style="display:none;margin-top:6px">
               <span class="hint" style="font-size:12px;font-weight:600">test_</span><input id="el-case-new" type="text" placeholder="如: login_flow" style="width:calc(100% - 40px)">
@@ -229,27 +229,6 @@ try {
   </div>
 </div>
 
-<!-- 保存测试用例包 弹窗：新建用例文件时一次生成三件套（本机直存框架 / 局域网下载 zip） -->
-<div id="pkg-mask" class="modal-mask" style="display:none">
-  <div class="modal" style="max-width:640px">
-    <div class="modal-title">📦 保存测试用例包 <span class="hint">用例 + 页面对象 + 元素 三个文件一次生成</span></div>
-    <div class="modal-body">
-      <label>用例包名称 <span class="help-icon" data-help="包的标识名（执行页按包筛选用）。默认与用例同名；仅字母/数字/下划线/中划线。">?</span>
-        <input id="pkg-name" type="text" placeholder="如: login_flow">
-      </label>
-      <div class="pv-title">将生成 3 个文件 <span class="hint">实时预览落点</span></div>
-      <pre id="pkg-files-preview" class="el-content mini"></pre>
-      <div id="pkg-result" class="el-result"></div>
-      <pre id="pkg-content" class="el-content"></pre>
-    </div>
-    <div class="modal-foot">
-      <button id="btn-pkg-cancel" class="btn">取消</button>
-      <button id="btn-pkg-download" class="btn">⬇ 下载用例包（zip）</button>
-      <button id="btn-pkg-save" class="btn primary">💾 保存到框架</button>
-    </div>
-  </div>
-</div>
-
 <!-- 顶部快速打开·文件编辑 弹窗 -->
 <div id="view-mask" class="modal-mask" style="display:none">
   <div class="modal modal-wide">
@@ -268,6 +247,6 @@ try {
 
 <div id="hit-toast" class="hit-toast" style="display:none" aria-live="polite"></div>
 <script src="/static/theme.js"></script>
-<script src="static/index.js?v=52"></script>
+<script src="static/index.js?v=54"></script>
 </body>
 </html>

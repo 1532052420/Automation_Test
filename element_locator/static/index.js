@@ -17,6 +17,7 @@ const state = {
   prevSigs: null,         // 上一次刷新的元素签名集合（Diff 基线；null=尚无）
   goneSigs: [],           // 本次刷新相对上次「消失」的元素签名
   undoStack: [],          // 本次会话「添加到用例」步骤的撤销栈（LIFO，存 add_code 返回的文件快照）
+  lastNewCaseFile: null,  // 刚「保存并继续」直通入库的新用例完整路径（弹窗预选，继续编辑当前用例）
 };
 // 右侧教学：搜索时展开所有分类，否则默认收起（点分类标题展开）
 var tutExpandAll = false;
@@ -199,9 +200,6 @@ async function init() {
   });
   $('el-file-new').addEventListener('input', updatePreview);
   // 「保存测试用例包」弹窗按钮
-  $('btn-pkg-cancel').addEventListener('click', () => { $('pkg-mask').style.display = 'none'; });
-  $('btn-pkg-save').addEventListener('click', () => submitPackage('save'));
-  $('btn-pkg-download').addEventListener('click', () => submitPackage('download'));
   // 三栏字段变动 → 三个示例代码区实时刷新
   ['el-name', 'el-value', 'el-comment', 'el-case-comment'].forEach(id => $(id).addEventListener('input', updatePreview));
   $('el-op-comment').addEventListener('input', () => { opCommentAuto = false; updatePreview(); });
@@ -562,22 +560,25 @@ function onShotDblClick(e) {
   tapOnDevice(r.hit.center, r.hit.text || r.hit['resource-id'] || '双击元素');
 }
 
-/* ---------- 命中定位底部提示：6 秒自动消失，pointer-events:none 不阻挡任何操作 ---------- */
+/* ---------- 底部提示（通用）：6 秒自动消失，pointer-events:none 不阻挡任何操作 ---------- */
 let hitToastTimer = null;
-function showHitToast(node, candCount, extra) {
+function showToast(msg) {
   const t = $('hit-toast');
   if (!t) return;
-  const name = (node.text && node.text.trim()) ? '「' + truncate(node.text.trim(), 12) + '」'
-    : (node['resource-id'] ? truncate(node['resource-id'].split('/').pop(), 16) : candName(node));
-  const coords = node.center ? ' · 中心坐标 (' + node.center.join(', ') + ')' : '';
-  const multi = candCount > 1 ? ' · 共命中 ' + candCount + ' 层，可在中间栏选更精确的一层' : '';
-  t.textContent = '🎯 已命中 ' + name + coords + multi + extra;
+  t.textContent = msg;
   t.style.display = '';
-  t.style.animation = 'none';   // 连续命中时重播入场动画
+  t.style.animation = 'none';   // 连续弹出时重播入场动画
   void t.offsetWidth;
   t.style.animation = '';
   clearTimeout(hitToastTimer);
   hitToastTimer = setTimeout(() => { t.style.display = 'none'; }, 6000);
+}
+function showHitToast(node, candCount, extra) {
+  const name = (node.text && node.text.trim()) ? '「' + truncate(node.text.trim(), 12) + '」'
+    : (node['resource-id'] ? truncate(node['resource-id'].split('/').pop(), 16) : candName(node));
+  const coords = node.center ? ' · 中心坐标 (' + node.center.join(', ') + ')' : '';
+  const multi = candCount > 1 ? ' · 共命中 ' + candCount + ' 层，可在中间栏选更精确的一层' : '';
+  showToast('🎯 已命中 ' + name + coords + multi + extra);
 }
 // 「▶ 设备上点击」按钮：点击选中的元素
 async function onTapElement() {
@@ -1334,8 +1335,14 @@ async function loadCaseFiles() {
   // 「➕ 新建…」永远在最后：选择后显示 test_ 前缀锁定输入行（保存走「保存测试用例包」）
   sel.innerHTML = files.map(f => '<option value="' + esc(f) + '">' + esc(f) + '</option>').join('')
     + '<option value="' + NEW_FILE_OPT + '">➕ 新建用例文件…</option>';
-  if (cur === NEW_FILE_OPT || (cur && files.indexOf(cur) >= 0)) sel.value = cur;
-  else if (files.length) sel.value = files[0];
+  // 预选优先级：用户已显式选中的有效用例 > 刚直通入库的新用例（继续编辑当前用例）> 第一个
+  if (cur && cur !== NEW_FILE_OPT && files.indexOf(cur) >= 0) {
+    sel.value = cur;
+  } else if (state.lastNewCaseFile && files.indexOf(state.lastNewCaseFile) >= 0) {
+    sel.value = state.lastNewCaseFile;
+  } else if (files.length) {
+    sel.value = files[0];
+  }
   onCaseFileChange();
 }
 function onCaseFileChange() {
@@ -1346,7 +1353,7 @@ function onCaseFileChange() {
   $('el-insert-pos').disabled = newCase;
   $('el-page-file').value = newCase ? (newCaseBase() ? capFirst(newCaseBase()) + 'Page.py（随用例包新建）' : '（输入用例名后自动派生）')
                                     : '';
-  if (newCase) { renderStepsList([]); updatePkgPreview(); return; }
+  if (newCase) { renderStepsList([]); return; }
   const f = $('el-case-file').value;
   const infos = (state.caseFiles || []).filter(c => c.file === f);
   const methods = [];
@@ -1527,73 +1534,77 @@ function pkgFiles() {
   ];
 }
 /* 包弹窗预览：三个文件落点 */
-function updatePkgPreview() {
-  const box = $('pkg-files-preview');
-  if (!box) return;
-  const files = pkgFiles();
-  box.textContent = files.map(f => f.dir + '/' + f.name).join('\n');
-}
-function openPackageModal() {
-  $('pkg-name').value = pkgBase();
-  updatePkgPreview();
-  $('pkg-result').className = 'el-result'; $('pkg-result').textContent = '';
-  $('pkg-content').textContent = '';
-  $('pkg-mask').style.display = 'flex';
-}
 /* 生成三件套 zip：mode=save（交平台做校验/备份/登记后入库）/ download（浏览器下载 zip） */
-async function submitPackage(mode) {
-  const base = ($('pkg-name').value || '').trim().replace(/[^A-Za-z0-9_\-]/g, '_');
-  if (!base) { showPkgResult('请填写用例包名称', false); return; }
+/* 新建用例（填写了自定义文件名）的按钮直通分支：
+   continueMode=true（保存并继续）→ 三件套（已含当前步骤）直接入库，弹窗关闭并进入
+   连续添加，后续步骤默认继续写入该用例；continueMode=false（保存）→ 打包为 zip
+   下载（不落库），由用户经平台「用例管理 → 上传用例包」入库。 */
+async function directSaveNewCase(continueMode) {
+  const res = $('el-result');
+  const base = pkgBase();
   const files = pkgFiles().map(f => ({ dir: f.dir, name: f.name, content: f.content }));
-  const btn = mode === 'save' ? $('btn-pkg-save') : $('btn-pkg-download');
-  btn.textContent = '⏳ 处理中…'; btn.disabled = true;
+  res.className = 'el-result';
+  res.textContent = continueMode ? '⏳ 正在创建用例并写入当前步骤…' : '⏳ 正在打包用例 zip…';
   try {
-    if (mode === 'save') {
+    if (continueMode) {
       const r = await fetch('api/save_case_package', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ package: base, uploader: 'locator', files: files }),
       }).then(x => x.json()).catch(() => null);
-      if (!r) { showPkgResult('保存失败：服务异常', false); return; }
-      showPkgResult(r.msg || (r.ok ? '已保存到框架' : '保存失败'), !!r.ok);
-      if (r.ok) {
-        loadPages(); loadLibraryFiles(); loadCaseFiles();
-        setTimeout(() => { $('pkg-mask').style.display = 'none'; $('modal-mask').style.display = 'none'; }, 1500);
+      if (!r || !r.ok) {
+        res.className = 'el-result err';
+        res.textContent = '保存失败：' + ((r && r.msg) || '服务异常') + '（弹窗未关闭，可重试）';
+        return;
       }
+      // 继续编辑当前用例：记录新用例路径 → 刷新列表并预选 → 进入连续添加
+      state.lastNewCaseFile = 'cases/app_ui/android/demoProject/' + pkgCaseFileName();
+      loadPages(); loadLibraryFiles(); loadCaseFiles();
+      state.continuousAdd = true;
+      updateContChip();
+      $('modal-mask').style.display = 'none';
     } else {
       const resp = await fetch('api/build_case_package', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ package: base, files: files }),
       });
-      if (!resp.ok) { showPkgResult('生成 zip 失败', false); return; }
+      if (!resp.ok) { res.className = 'el-result err'; res.textContent = '生成 zip 失败：服务异常'; return; }
       const blob = await resp.blob();
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = base + '.zip';
       a.click();
       URL.revokeObjectURL(a.href);
-      showPkgResult('用例包 ' + base + '.zip 已下载——请到测试平台「用例管理 → 📦 上传用例包」入库', true);
+      res.className = 'el-result ok';
+      res.textContent = '✅ 用例包 ' + base + '.zip 已下载——请到平台「用例管理 → 📦 上传用例包」入库';
+      setTimeout(() => { $('modal-mask').style.display = 'none'; }, 2200);
     }
-  } finally {
-    btn.textContent = mode === 'save' ? '💾 保存到框架' : '⬇ 下载用例包（zip）';
-    btn.disabled = false;
+  } catch (e) {
+    res.className = 'el-result err';
+    res.textContent = '处理失败：' + (e && e.message ? e.message : e) + '（弹窗未关闭，可重试）';
   }
-}
-function showPkgResult(msg, ok) {
-  const box = $('pkg-result');
-  box.className = 'el-result ' + (ok ? 'ok' : 'err');
-  box.textContent = msg;
 }
 
 async function onSaveElement(continueMode) {
   const purpose = purposeValue();
   if (!purpose) return;
   const name = $('el-name').value.trim();
-  // 新建用例文件场景：不走「追加到已有用例」，改走「保存测试用例包」（三件套一次生成）
-  if (purpose !== 'only' && (isNewCase() || isNewElementFile())) {
-    if (!pkgBase()) { showElResult('请先输入新用例名（test_ 后面的部分）', false); return; }
-    if (!$('el-name').value.trim()) { showElResult('元素名称不能为空', false); return; }
-    openPackageModal();
-    return;
+  if (purpose !== 'only') {
+    // 防误操作：「写入元素文件」与「目标用例文件」的新建状态必须同步——
+    // 一起新建（随三件套包创建）或都选已有文件；不同步时 toast 提示并阻止保存
+    if (isNewCase() !== isNewElementFile()) {
+      showToast('⚠️ 「写入元素文件」与「目标用例文件」需同步：要么都用「➕ 新建」，要么都选已有文件');
+      return;
+    }
+    // 新建用例（填写了自定义文件名）：按按钮分流，不再弹「保存测试用例包」二级弹窗——
+    //   保存并继续 → 三件套（含当前步骤）直接入库 → 进入连续添加，继续编辑当前用例
+    //   保存       → 直接打包为 zip 下载（不落库），由用户经平台「用例管理」入库
+    if (isNewCase()) {
+      if (!pkgBase()) { showElResult('请先输入新用例名（test_ 后面的部分）', false); return; }
+      if (!$('el-name').value.trim()) { showElResult('元素名称不能为空', false); return; }
+      await directSaveNewCase(continueMode);
+      return;
+    }
+    // 都选已有文件 → 继续走「元素入库 + 追加用例行」（下方既有流程）
   }
   // 选②：前置校验用例栏（保存元素前就拦住，避免元素入库了代码却追加不了）
   let caseFile = '', methodName = '';
