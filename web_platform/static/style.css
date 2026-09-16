@@ -247,73 +247,13 @@ img.thumb:hover { transform: scale(1.05); border-color: var(--accent); }
 #lightbox .lb-close { position: absolute; top: 18px; right: 24px; background: rgba(255, 255, 255, .12); color: #fff; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 15px; cursor: pointer; }
 #lightbox .lb-close:hover { background: rgba(255, 255, 255, .25); }
 
-/* ---------- 代码审查页：统计卡筛选 / 文件锚点 / 历史记录 ---------- */
-/* 管理后台：文件列表固定高度内滚（筛选不改变页面高度，滚动位置稳定） */
+/* ---------- 管理后台：文件列表固定高度内滚（筛选不改变页面高度，滚动位置稳定） ---------- */
 .card .tblwrap.fixed-height { max-height: 52vh; overflow: auto; }
 .admin-file-path { white-space: nowrap; }
 #fileList td { white-space: nowrap; }
 #fileList td:nth-child(2) { max-width: 520px; overflow: hidden; text-overflow: ellipsis; }
 
-.stat.clickable { cursor: pointer; transition: transform .12s, box-shadow .12s; }
-.stat.clickable:hover { transform: translateY(-2px); }
-.stat.filter-on { outline: 2px solid var(--accent); box-shadow: 0 0 0 4px var(--accent-tint); }
-.stat.filter-on::after { content: "● 筛选中"; position: absolute; left: 14px; bottom: 10px; font-size: 11px; color: #fff; opacity: .9; }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
-.chips .chip {
-  background: var(--panel2); color: var(--ink2); border: 1px solid var(--line-soft);
-  border-radius: 999px; padding: 3px 10px; font-size: 12px; cursor: pointer; transition: all .12s;
-}
-.chips .chip:hover { color: #fff; border-color: var(--accent); background: var(--accent-tint); }
-.viewbanner { padding: 12px 16px; margin-bottom: 14px; color: var(--ink); border-left: 3px solid var(--accent); }
-
-/* ---------- 代码审查页 v2：顶层页签 / 体检状态行 / 工具表单 / 代码盒 ---------- */
-.toptabs { display: flex; gap: 8px; margin-bottom: 16px; }
-.toptabs .ttab {
-  background: var(--panel2); color: var(--ink2); border: 1px solid var(--line-soft);
-  border-radius: 10px; padding: 8px 18px; font-size: 14px; cursor: pointer; transition: all .12s;
-}
-.toptabs .ttab:hover { color: #fff; }
-.toptabs .ttab.on { background: var(--primary2); color: var(--primary-ink); font-weight: 700; border-color: transparent; }
-.healthline { padding: 12px 16px; margin-bottom: 14px; font-size: 14px; display: flex; align-items: center; gap: 8px; border-left: 3px solid var(--accent); }
-.healthline .hl-icon { font-size: 18px; }
-.healthline b { color: var(--ink); }
-.detail-pre { background: var(--dark); border: 1px solid var(--line-soft); border-radius: 8px;
-  padding: 10px 12px; font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-all;
-  color: var(--ink2); max-height: 320px; overflow: auto; }
-.tooltabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
-.tooltabs .ttab2 {
-  background: var(--panel2); color: var(--ink2); border: 1px solid var(--line-soft);
-  border-radius: 999px; padding: 5px 14px; font-size: 13px; cursor: pointer; transition: all .12s;
-}
-.tooltabs .ttab2.on { background: var(--accent-deep); color: #fff; border-color: transparent; }
-.tooltabs .ttab2:hover { color: #fff; }
-.tooltabs .ttab2.on:hover { color: #fff; }
-.codebox { background: var(--dark); border: 1px solid var(--line-soft); border-radius: 8px;
-  padding: 10px 12px; font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-all;
-  color: var(--ink2); max-height: 420px; overflow: auto; margin-bottom: 10px; }
-.toolForm .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-#toolForm .fields .field textarea, #toolForm .fields .field input, #toolForm .fields .field select {
-  width: 100%; background: var(--dark); border: 1px solid var(--line); border-radius: 8px;
-  color: var(--ink); padding: 8px 10px; font-size: 13px; }
-#poRows input, #poRows select { width: 100%; background: var(--dark); border: 1px solid var(--line);
-  border-radius: 6px; color: var(--ink); padding: 6px 8px; font-size: 12.5px; }
 h4 { color: var(--ink); margin: 12px 0 8px; }
-
-/* 文件名单元格：截断显示 + 点击复制 */
-.file-cell { cursor: pointer; color: var(--ink2); }
-.file-cell:hover { color: var(--accent); }
-.auto-tag { background: var(--accent-tint); color: var(--accent-deep); border: 1px solid var(--line-soft);
-  border-radius: 6px; padding: 2px 8px; font-size: 12px; }
-tr.auto-head td { background: var(--panel2); }
-
-/* 方法调试器：左目录右表单 */
-.mdebug { display: flex; gap: 14px; align-items: flex-start; }
-.mtree { width: 340px; flex: 0 0 340px; max-height: 520px; overflow: auto;
-  border: 1px solid var(--line-soft); border-radius: 8px; padding: 8px; background: var(--panel2); }
-.mtree-file { font-size: 12px; color: var(--muted); font-weight: 700; margin: 10px 0 4px; }
-.mtree-item { padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 12.5px; transition: background .1s; }
-.mtree-item:hover { background: rgba(255,255,255,.06); }
-.mtree-item.on { background: var(--accent-tint); color: var(--ink); }
 
 /* ---------- 日间/夜间模式切换（theme.js 注入悬浮按钮，Mac/iPhone 简约风图标） ---------- */
 .theme-fab {
