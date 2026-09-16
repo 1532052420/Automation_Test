@@ -500,3 +500,68 @@ if __name__ == '__main__':
             if hit:
                 print('hit text:', hit.get('text'), 'rid:', hit.get('resource-id'))
                 print('locators:', gen_locators(hit, data['all']))
+
+
+# 前端定位方式（Locator_Type 键）→ uiautomator2 server 的 W3C 定位策略
+_LOCATE_STRATEGIES = {
+    'ID': 'id',
+    'XPATH': 'xpath',
+    'ACCESSIBILITY_ID': 'accessibility id',
+    'ANDROID_UIAUTOMATOR': '-android uiautomator',
+    'CLASS_NAME': 'class name',
+    'NAME': 'name',
+}
+
+
+def locate_check(serial, locator_type, locator_value):
+    """「定位器体检」：按定位方式在当前页面实查元素。
+    返回 {ok, found, count, bounds, msg}；bounds 为首元素 [x1,y1,x2,y2]。
+    复用 u2 通道（与抓树同一条 session）；session 失效自动重建重试一次。"""
+    strategy = _LOCATE_STRATEGIES.get(str(locator_type or '').upper())
+    if not strategy:
+        return {'ok': False, 'msg': '不支持的定位方式: %s' % locator_type}
+    if not locator_value:
+        return {'ok': False, 'msg': '定位值为空'}
+    for _attempt in (1, 2):
+        if not _u2_ensure(serial):
+            return {'ok': False, 'msg': 'u2 通道未就绪（设备离线或 server 启动失败）'}
+        sid = _u2_state(serial).get('session')
+        resp = _u2_http(serial, 'POST', '/wd/hub/session/%s/elements' % sid,
+                        # 设备端 uiautomator2 server 的 FindElementModel 要求 strategy/selector 字段
+                        {'strategy': strategy, 'selector': locator_value}, timeout=15)
+        if not resp:
+            # session 可能已失效：置空重建后重试一次
+            st = _u2_state(serial)
+            st['session'] = None
+            st['ok'] = False
+            continue
+        try:
+            val = json.loads(resp).get('value')
+        except Exception:
+            return {'ok': False, 'msg': '设备端响应异常'}
+        if isinstance(val, dict) and val.get('error'):
+            err = str(val.get('error') or '')
+            if 'no such element' in err.lower():
+                return {'ok': True, 'found': False, 'count': 0, 'bounds': None, 'msg': '当前页面未命中'}
+            # 其他错误（invalid selector / session 失效等）如实上报，不能伪装成"未命中"
+            return {'ok': False, 'msg': '设备端查找出错: %s' % (err or val)[:120]}
+        if not isinstance(val, list):
+            return {'ok': False, 'msg': '设备端响应格式异常'}
+        count = len(val)
+        if not count:
+            return {'ok': True, 'found': False, 'count': 0, 'bounds': None, 'msg': '当前页面未命中'}
+        bounds = None
+        first = val[0]
+        eid = first.get(next((k for k in first if 'element' in k.lower()), ''), '')
+        if eid:
+            rect = _u2_http(serial, 'GET', '/wd/hub/session/%s/element/%s/rect' % (sid, eid),
+                            None, timeout=10)
+            try:
+                r = json.loads(rect)['value']
+                bounds = [int(r['x']), int(r['y']),
+                          int(r['x']) + int(r['width']), int(r['y']) + int(r['height'])]
+            except Exception:
+                bounds = None
+        return {'ok': True, 'found': True, 'count': count, 'bounds': bounds,
+                'msg': '命中 %d 处' % count}
+    return {'ok': False, 'msg': 'u2 通道异常（session 重建后仍失败）'}

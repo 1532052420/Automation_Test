@@ -13,6 +13,10 @@ const state = {
   elementsAll: {},        // { 元素文件: [元素名...] }
   defaultEleFile: 'locator_gui_elements.py',
   caseFiles: [],          // 现有用例文件 [{file, class, methods:[...]}]（「保存并添加到用例」目标下拉用）
+  treeDiffOn: true,       // 页面树 Diff：刷新后标记 🟢 新增 / 🔴 消失
+  prevSigs: null,         // 上一次刷新的元素签名集合（Diff 基线；null=尚无）
+  goneSigs: [],           // 本次刷新相对上次「消失」的元素签名
+  undoStack: [],          // 本次会话「添加到用例」步骤的撤销栈（LIFO，存 add_code 返回的文件快照）
 };
 // 右侧教学：搜索时展开所有分类，否则默认收起（点分类标题展开）
 var tutExpandAll = false;
@@ -172,6 +176,10 @@ async function init() {
   $('btn-modal-save-continue').addEventListener('click', () => onSaveElement(true));
   // 连续添加确认弹窗：点「好」仅关闭弹窗（不退出连续添加）；已有元素复用面板三按钮
   $('cont-alert-ok').addEventListener('click', () => { $('cont-add-chip').style.display = 'none'; });
+  // 树 Diff 开关 / 定位器体检 / 会话步骤撤销
+  $('btn-tree-diff').addEventListener('click', toggleTreeDiff);
+  $('btn-locate-check').addEventListener('click', runLocateCheck);
+  $('btn-undo-step').addEventListener('click', undoLastStep);
   $('btn-dup-reuse').addEventListener('click', () => { const r = dupResolver; closeDupPanel(); if (r) r('reuse'); });
   $('btn-dup-update').addEventListener('click', () => { const r = dupResolver; closeDupPanel(); if (r) r('update'); });
   $('btn-dup-cancel').addEventListener('click', () => { const r = dupResolver; closeDupPanel(); if (r) r('cancel'); });
@@ -487,6 +495,7 @@ async function refresh() {
     (function assign(node) { node.uid = seq++; node.children.forEach(assign); })(state.tree);
     let k = 0;
     (function assignAll(node) { state.all[k++].uid = node.uid; node.children.forEach(assignAll); })(state.tree);
+    applyTreeDiff();
     state.selUid = null; state.selNode = null;
     state.hitCands = null;
     $('detail').style.display = 'none';
@@ -579,7 +588,41 @@ async function tapOnDevice(center, label) {
 function renderTree(tree) {
   const box = $('tree');
   box.innerHTML = '';
+  // 树 Diff：消失项摘要置顶（消失节点无法在重建的树里"原位"展示，集中列出）
+  if (state.treeDiffOn && state.goneSigs && state.goneSigs.length) {
+    const gone = document.createElement('div');
+    gone.className = 'tree-gone';
+    gone.textContent = '🔴 较上次刷新消失 ' + state.goneSigs.length + ' 项：'
+      + state.goneSigs.slice(0, 6).map(prettySig).join('、') + (state.goneSigs.length > 6 ? ' …' : '');
+    box.appendChild(gone);
+  }
   box.appendChild(buildTreeUl(tree));
+}
+/* ---------- 页面树 Diff ---------- */
+function nodeSig(n) {
+  // 签名不含 bounds：滚动会整体位移，按 class/rid/text/desc 判定"新增/消失"才稳定
+  return [n.class || '', n['resource-id'] || '', (n.text || '').trim(), n['content-desc'] || ''].join('|');
+}
+function applyTreeDiff() {
+  if (!state.tree) return;
+  const prev = state.treeDiffOn ? state.prevSigs : null;
+  const cur = new Set();
+  state.goneSigs = [];
+  (function walk(n) {
+    const s = nodeSig(n);
+    cur.add(s);
+    n._diffNew = !!(prev && !prev.has(s));
+    n.children.forEach(walk);
+  })(state.tree);
+  if (prev) prev.forEach(s => { if (!cur.has(s)) state.goneSigs.push(s); });
+  state.prevSigs = state.treeDiffOn ? cur : null;
+}
+function prettySig(sig) {
+  const [cls, rid, text, desc] = sig.split('|');
+  if (text) return '「' + truncate(text, 10) + '」';
+  if (rid) return truncate(rid.split('/').pop(), 14);
+  if (desc) return truncate(desc, 10);
+  return truncate((cls || 'node').split('.').pop(), 12);
 }
 function buildTreeUl(node) {
   const ul = document.createElement('ul');
@@ -612,6 +655,11 @@ function appendNode(ul, n) {
     badge.className = 'clickable-badge'; badge.textContent = '可点';
     row.appendChild(badge);
   }
+  if (state.treeDiffOn && n._diffNew) {
+    const nb = document.createElement('span');
+    nb.className = 'diff-new-badge'; nb.textContent = '🟢新增';
+    row.appendChild(nb);
+  }
   row.addEventListener('click', (ev) => { ev.stopPropagation(); selectNode(n.uid); });
   li.appendChild(row);
   if (hasKids) {
@@ -627,6 +675,19 @@ function appendNode(ul, n) {
   ul.appendChild(li);
 }
 function truncate(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n) + '…' : s; }
+
+/* 树 Diff 开关：开启时以当前树为新基线（当前刷新不标新增），之后每次刷新对比上次 */
+function toggleTreeDiff() {
+  state.treeDiffOn = !state.treeDiffOn;
+  $('btn-tree-diff').textContent = state.treeDiffOn ? '🟢 树对比：开' : '⚪ 树对比：关';
+  state.prevSigs = null;
+  state.goneSigs = [];
+  if (state.tree) {
+    (function clear(n) { n._diffNew = false; n.children.forEach(clear); })(state.tree);
+    applyTreeDiff();
+    renderTree(state.tree);
+  }
+}
 
 /* 树搜索：按 text / resource-id / class 过滤（命中节点保留，父链保留） */
 function onTreeSearch(e) {
@@ -669,11 +730,14 @@ function selectNode(uid) {
   if (state.continuousAdd) openModal();
 }
 function highlightShot(node) {
+  highlightBounds(node.bounds_num);
+}
+function highlightBounds(b) {
   const ov = $('shot-overlay');
   const img = $('shot');
-  if (!node.bounds_num || img.style.display === 'none') { ov.style.display = 'none'; return; }
+  if (!b || b.length !== 4 || img.style.display === 'none') { ov.style.display = 'none'; return; }
   const scale = img.clientWidth / state.width;
-  const [x1, y1, x2, y2] = node.bounds_num;
+  const [x1, y1, x2, y2] = b;
   ov.style.display = 'block';
   // 截图选了机型预设时居中显示，高亮框要加上图片在栏内的偏移
   ov.style.left = (img.offsetLeft + x1 * scale) + 'px';
@@ -750,6 +814,85 @@ function candName(n) {
   if (r) return r;
   if (n['content-desc']) return n['content-desc'].slice(0, 12);
   return (n.class || 'node').split('.').pop();
+}
+/* ---------- 定位器体检：按选中定位在当前页面实查元素（验证定位是否仍有效） ---------- */
+async function runLocateCheck() {
+  const res = $('check-result');
+  const loc = selectedLocator();
+  if (!loc || !loc.value) {
+    res.style.display = 'block'; res.className = 'check-result bad';
+    res.textContent = '请先在「定位写法」里选一个定位方式';
+    return;
+  }
+  const btn = $('btn-locate-check');
+  btn.disabled = true; btn.textContent = '🎯 查找中…';
+  try {
+    const r = await fetch('api/locate_check', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locator_type: loc.type, locator_value: loc.value, serial: state.serial }),
+    }).then(x => x.json()).catch(() => null);
+    res.style.display = 'block';
+    if (!r || !r.ok) {
+      res.className = 'check-result bad';
+      res.textContent = '体检失败：' + ((r && r.msg) || '服务异常');
+      return;
+    }
+    if (!r.found) {
+      res.className = 'check-result bad';
+      res.textContent = '❌ 未命中——该定位在当前页面已失效（页面可能已变化）';
+      $('shot-overlay').style.display = 'none';
+      return;
+    }
+    const multi = r.count > 1;
+    res.className = 'check-result ' + (multi ? 'warn' : 'ok');
+    res.textContent = multi ? '⚠️ 命中 ' + r.count + ' 处（定位不唯一，回放会取第 1 处）' : '✅ 唯一命中，定位有效';
+    if (r.bounds) highlightBounds(r.bounds);
+  } finally {
+    btn.disabled = false; btn.textContent = '🎯 体检：实查当前页面';
+  }
+}
+/* ---------- 本次会话步骤撤销（LIFO）：恢复 add_code 写入前的文件内容 ---------- */
+function pushUndoRecord(cr) {
+  if (!cr || !cr.case_before) return;   // 写盘失败/无快照的步骤不可撤销
+  state.undoStack.push({
+    desc: (cr.case_file || '').split('/').pop() + '::' + (cr.method_name || ''),
+    case_file: cr.case_file, case_before: cr.case_before,
+    page_file: cr.page_file || '', page_before: cr.page_before || '',
+  });
+  updateUndoBar();
+}
+function updateUndoBar() {
+  const bar = $('step-undo-bar');
+  const n = state.undoStack.length;
+  bar.style.display = n ? '' : 'none';
+  $('su-count').textContent = n;
+  const last = state.undoStack[n - 1];
+  $('su-last').textContent = last ? ' · 最近：' + last.desc : '';
+}
+async function undoLastStep() {
+  const rec = state.undoStack[state.undoStack.length - 1];
+  if (!rec) return;
+  if (!confirm('撤销最近一步「' + rec.desc + '」？\n对应文件将恢复到写入前内容（撤销按倒序进行）。')) return;
+  const btn = $('btn-undo-step');
+  btn.disabled = true;
+  try {
+    const entries = [{ kind: 'case', filename: rec.case_file.split('/').pop(), content: rec.case_before }];
+    if (rec.page_file && rec.page_before) {
+      entries.push({ kind: 'page', filename: rec.page_file.split('/').pop(), content: rec.page_before });
+    }
+    for (const e of entries) {
+      const r = await fetch('api/save_file', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(e),
+      }).then(x => x.json()).catch(() => null);
+      if (!r || !r.ok) { alert('撤销失败：' + ((r && r.msg) || '服务异常') + '（步骤记录保留，可重试）'); return; }
+    }
+    state.undoStack.pop();
+    updateUndoBar();
+    loadCaseFiles(); loadPages(); loadLibraryFiles();
+  } finally {
+    btn.disabled = false;
+  }
 }
 function selectedLocator() {
   const radio = document.querySelector('input[name="loc"]:checked');
@@ -1509,6 +1652,7 @@ async function onSaveElement(continueMode) {
     return;
   }
   res.className = 'el-result ok';
+  pushUndoRecord(cr);
   res.textContent = (dupHandled ? '已使用已有元素「' + savedName + '」' : r.msg)
     + '；' + cr.msg + '（三件套已联动完成）';
   // 展示追加后的目标方法片段 + ③ 生成的页面方法片段（方便确认写入位置）

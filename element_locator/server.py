@@ -249,9 +249,24 @@ def api_add_code():
                     'case_file': data.get('case_file', '').strip(),
                     'method_name': data.get('method_name', '').strip(),
                     'content': r.get('content', ''),
+                    'case_before': r.get('case_before', ''),
+                    'page_before': r.get('page_before', ''),
                     'page_file': r.get('page_file', ''),
                     'page_method': r.get('page_method', ''),
                     'page_content': r.get('page_content', '')})
+
+
+@app.route('/api/locate_check', methods=['POST'])
+def api_locate_check():
+    """「定位器体检」：按定位方式在当前页面实查元素。
+    POST {locator_type, locator_value, serial?} → {ok, found, count, bounds, msg}"""
+    data = request.get_json(silent=True) or {}
+    serial = device.get_device(_request_serial())
+    if not serial:
+        return jsonify({'ok': False, 'msg': '未检测到设备'})
+    r = device.locate_check(serial, data.get('locator_type'), (data.get('locator_value') or '').strip())
+    r['serial'] = serial
+    return jsonify(r)
 
 
 @app.route('/api/pages')

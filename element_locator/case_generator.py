@@ -439,6 +439,7 @@ def append_code_to_method(case_file, method_name, step, gen_page_method=False, i
     if not os.path.exists(path):
         return {'ok': False, 'msg': '用例文件 %s 不存在（可在测试平台「用例管理」上传，或在 cases/app_ui/android/demoProject/ 下按框架格式创建）' % case_file}
     content = _read(path)
+    case_before = content   # 撤销用：写入前快照
 
     m = re.search(r'^%sdef %s\(self\):' % (IND, re.escape(method_name)), content, re.MULTILINE)
     if not m:
@@ -474,6 +475,7 @@ def append_code_to_method(case_file, method_name, step, gen_page_method=False, i
     new_content = content[:body_start] + new_body + content[body_end:]
     _write(path, new_content)
     result = {'ok': True, 'action': 'appended', 'line': line, 'content': new_content,
+              'case_before': case_before,
               'page_file': '', 'page_method': '', 'page_content': '',
               'msg': '代码已追加到 %s::%s：%s' % (case_file, method_name, line)}
     if not gen_page_method:
@@ -488,13 +490,13 @@ def append_code_to_method(case_file, method_name, step, gen_page_method=False, i
             break
     hits = find_page_files(page_class)
     if len(hits) > 1:
-        return {'ok': False,
+        return {'ok': False, 'case_before': case_before, 'page_file': '',
                 'msg': ('已追加用例行，但页面类 %s 在多个文件里重名（%s），归属不唯一，'
                         '已中止写入页面方法——请先给重名文件改名或删除，再重试'
                         % (page_class, '、'.join(hits)))}
     page_file, elements_file = resolve_page(page_class)
     if not page_file:
-        return {'ok': False,
+        return {'ok': False, 'case_before': case_before, 'page_file': '',
                 'msg': ('已追加用例行，但目标用例没有页面对象（找不到 self.page = XxxPage(...)），'
                         '无法生成操作方法——请先给该用例补页面对象文件')}
 
@@ -511,7 +513,7 @@ def append_code_to_method(case_file, method_name, step, gen_page_method=False, i
         if el_name not in element_library.list_element_names(elements_file):
             where = [ff for ff in element_library.list_element_files()
                      if el_name in element_library.list_element_names(ff)]
-            return {'ok': False,
+            return {'ok': False, 'case_before': case_before, 'page_file': page_file,
                     'msg': ('已追加用例行，但元素 %s 不在页面 %s 引用的元素文件 %s 里（元素实际在: %s）。'
                             '请把元素保存到 %s（保存元素时「写入元素文件」选它），或在元素库统一后重试'
                             % (el_name, page_file, elements_file,
@@ -520,6 +522,7 @@ def append_code_to_method(case_file, method_name, step, gen_page_method=False, i
     # 3) upsert 页面方法：同名元素操作方法覆盖更新；工具方法已存在则不重复生成
     ppath = os.path.join(PAGES_DIR, page_file)
     pcontent = _read(ppath)
+    page_before = pcontent   # 撤销用：页面文件写入前快照（仅本次真正写盘时有效）
     mname = re.match(r'%sdef (\w+)' % IND, method_code).group(1)
     exists = set(re.findall(r'^%sdef (\w+)' % IND, pcontent, re.MULTILINE))
     if not (mname in exists and mname in TOOL_METHODS):
@@ -532,8 +535,10 @@ def append_code_to_method(case_file, method_name, step, gen_page_method=False, i
         pcontent = _upsert_class_method(pcontent, page_class, [method_code])
         _write(ppath, pcontent)
         result['msg'] += '；页面方法 %s() 已生成/更新到 %s' % (mname, page_file)
+        result['page_before'] = page_before
     else:
         result['msg'] += '；页面方法 %s() 已存在于 %s（不重复生成）' % (mname, page_file)
+        result['page_before'] = ''   # 页面文件未被改动，无需撤销
     result['page_file'] = page_file
     result['page_method'] = mname
     result['page_content'] = pcontent

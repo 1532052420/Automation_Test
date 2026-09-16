@@ -24,7 +24,7 @@ try {
   if (window.self !== window.top) _de.classList.add('embedded');
 } catch (e) { /* 隐私模式等场景忽略 */ }
 </script>
-<link rel="stylesheet" href="static/style.css?v=44">
+<link rel="stylesheet" href="static/style.css?v=45">
 </head>
 <body>
 <div id="embed-bar" class="embed-bar"></div>
@@ -43,6 +43,7 @@ try {
     <select id="open-page-sel" class="hdr-select" title="选择页面操作文件打开编辑"><option value="">打开页面操作…</option></select>
   </div>
   <button id="btn-refresh" class="btn primary side-btn">🔄 刷新</button>
+  <button id="btn-tree-diff" class="btn ghost side-btn" title="每次刷新与上一次元素树对比：🟢 新增 / 🔴 消失（快速发现跳转与弹窗）">🟢 树对比：开</button>
   <div class="side-foot">
     <div class="dev-row">
       <span class="side-label">📱 设备</span>
@@ -73,6 +74,10 @@ try {
         <button id="cont-alert-ok" class="cc-btn" type="button">好</button>
       </div>
     </div>
+  <div id="step-undo-bar" class="step-undo-bar" style="display:none" title="本次会话通过「添加到用例」写入的步骤；撤销按倒序进行">
+    <span class="su-title">🧾 本次会话已录 <b id="su-count">0</b> 步<em id="su-last"></em></span>
+    <button id="btn-undo-step" class="su-btn">↩ 撤销上一步</button>
+  </div>
   </section>
   <div class="col-resizer" data-resize="left" title="拖动调整左右两栏宽度"></div>
 
@@ -93,6 +98,8 @@ try {
       <div id="dup-tip"></div>
       <div class="loc-title">定位写法（框架 Locator_Type）</div>
       <div id="locators"></div>
+      <button id="btn-locate-check" class="check-btn" title="按上面选中的定位方式，在当前页面真实查找该元素并高亮">🎯 体检：实查当前页面</button>
+      <div id="check-result" class="check-result" style="display:none"></div>
     </div>
   </section>
   <div class="col-resizer" data-resize="middle" title="拖动调整中间与教学栏宽度"></div>
@@ -261,6 +268,6 @@ try {
 <div id="help-tip" class="help-tip" style="display:none"></div>
 
 <script src="/static/theme.js"></script>
-<script src="static/index.js?v=50"></script>
+<script src="static/index.js?v=51"></script>
 </body>
 </html>
