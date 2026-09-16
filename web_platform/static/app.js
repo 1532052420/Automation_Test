@@ -1,4 +1,4 @@
-/* App UI 自动化测试平台 v1.1 · 前端逻辑 */
+/* App UI 自动化测试平台 v1.6 · 前端逻辑 */
 'use strict';
 
 /* ---------------- 基础工具 ---------------- */
@@ -73,7 +73,7 @@ function renderSidebar(active) {
     ['/locator', '🎯', '元素定位器'],
   ];
   sb.innerHTML =
-    '<div class="brand"><div class="logo">🤖</div><div>AppUI 自动化<br><small>测试平台 v1.1</small></div></div>' +
+    '<div class="brand"><div class="logo">🤖</div><div>AppUI 自动化<br><small>测试平台 v1.6</small></div></div>' +
     '<nav>' + items.map(([href, ico, name]) =>
       '<a href="' + href + '" class="' + (href === active ? 'on' : '') + '"><span class="ico">' + ico + '</span>' + name + '</a>'
     ).join('') + '</nav>' +
@@ -83,30 +83,6 @@ function renderSidebar(active) {
     '</div>';
   pollFootStatus();
   setInterval(pollFootStatus, 10000);
-  // 元素定位器智能启动：点击先探测/拉起服务（按钮 loading），就绪后打开页面
-  const locatorLink = sb.querySelector('a[href="/locator"]');
-  if (locatorLink) locatorLink.addEventListener('click', async (e) => {
-    e.preventDefault();
-    const link = e.currentTarget;
-    if (link.dataset.busy) return;
-    link.dataset.busy = '1';
-    const orig = link.innerHTML;
-    link.innerHTML = '<span class="ico">⏳</span> 启动中…';
-    try {
-      const d = await postJson('/api/locator/start', {});
-      if (d.ok) {
-        toast(d.started ? '元素定位器服务已启动' : '元素定位器已在运行');
-        window.open(d.url, '_blank');
-      } else {
-        toast('元素定位器启动失败: ' + (d.msg || ''), false);
-      }
-    } catch (err) {
-      toast('启动请求异常: ' + err, false);
-    } finally {
-      link.innerHTML = orig;
-      delete link.dataset.busy;
-    }
-  });
 }
 
 async function pollFootStatus() {

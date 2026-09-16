@@ -1,7 +1,7 @@
 # App 元素定位器（element_locator）
 
 框架内置的可视化元素定位器：连上真机 → 看实时截图 → 点元素拿坐标和定位写法 → **一键写进框架元素库**；带**双击执行器**可先在设备上真实点击验证；右侧内置操作教学（点击/滑动/toast 断言…），不用上网查。
-当前版本 **v1.5**（左上角徽章，用于确认本地代码是否已更新）。
+当前版本 **v3.0**（左上角徽章，用于确认本地代码是否已更新）。
 
 > 技术架构、坐标映射原理、配置方法与移植到其他项目的步骤见 **[技术实现方案.md](技术实现方案.md)**。
 
@@ -64,10 +64,22 @@ assert appOperator.is_toast_visible('操作成功')          # 断言 toast
 ## 常见问题
 
 - **截图空白/刷新失败**：确认手机亮屏（黑屏时 uiautomator dump 不出内容）、USB 调试已授权
-- **页面没变/功能是旧的**：左上角看版本号是不是 v1.5；是旧版说明浏览器缓存了，`Cmd+Shift+R`（Mac）或 `Ctrl+F5`（Win）强刷，或点开页面后浏览器右上角「开发者工具 → Network → Disable cache」
+- **页面没变/功能是旧的**：左上角看版本号是不是 v2.16；是旧版说明浏览器缓存了，`Cmd+Shift+R`（Mac）或 `Ctrl+F5`（Win）强刷，或点开页面后浏览器右上角「开发者工具 → Network → Disable cache」
 - **定位器端口被占**：`LOCATOR_PORT=8002 ./run.sh locator`
 - **不改动框架任何现有代码**，定位器是独立模块（`element_locator/`），随时可删
 
 ## 技术栈
 
-Python 3.8 + Flask（venv 已内置），设备数据走 adb（screencap + uiautomator dump + input tap），**不依赖 Appium session**。目录改名说明：原 `gui/` 已更名为 `element_locator/`（v1.5）。
+Python 3.8 + Flask（venv 已内置），设备数据走 adb（screencap + uiautomator dump + input tap），**不依赖 Appium session**。目录改名说明：原 `gui/` 已更名为 `element_locator/`。
+
+
+## 多设备切换（v3.0）
+
+服务器可同时连接多台 Android 手机：
+
+- 侧栏底部（内嵌模式在顶部工具条）**📱 设备下拉**：列出全部在线设备（型号 · Android 版本），切换即刷新对应设备画面
+- 每台设备的状态（截图/元素树/选中项/真机点击）完全独立，切换时自动清空上一台痕迹，避免坐标错位
+- 上次选中的设备会被记住（刷新页面不跳回第一台）
+- 选中的设备中途掉线：自动回退到第一台在线设备并提示
+- 局域网同事各自选一台设备使用互不干扰；选同一台时会互相影响（占用锁后续迭代）
+- 底层：uiautomator2 降级通道按设备隔离（每台独立 session 与 adb forward 主机端口），杜绝多设备串台

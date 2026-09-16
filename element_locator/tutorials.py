@@ -160,6 +160,60 @@ TUTORIALS = [
          "框架已封装的不必绕过；仅当封装方法缺失时可用 driver 原生（client.appium_driver）",
          "el = appOperator.getElement(elements.start_btn)\nassert el.text == '开始测试'"),
     ]),
+    ("长流程步骤（轮询/分支/收键盘）", [
+        # ============ 元素定位器「操作类型」下拉新增的四类长流程步骤 ============
+        # 对应 case_generator.STEP_TYPES: wait_element / assert_gone / if_click / hide_keyboard
+        ("轮询等待元素出现（生成中/加载慢）",
+         "操作类型选「轮询等待出现」→ 生成 page.wait_元素名(最长秒数)",
+         "元素一出现立刻继续（不干等），最长等 N 秒，超时用例失败。适合：歌曲生成中、页面加载慢、弹窗延迟出现",
+         "# 元素定位器自动生成的页面方法（页面文件里）\n"
+         "def wait_save_success(timeout_seconds=60):\n"
+         "    probe = CreateElement.create(self._elements.text_save_success.locator_type,\n"
+         "                                 self._elements.text_save_success.locator_value,\n"
+         "                                 wait_type=Wait_By.PRESENCE_OF_ELEMENT_LOCATED,\n"
+         "                                 wait_seconds=timeout_seconds)\n"
+         "    self.appOperator.getElement(probe)\n"
+         "# 用例里调用：page.wait_save_success(60)"),
+        ("断言元素消失（弹窗已关闭）",
+         "操作类型选「断言消失」→ 生成 page.assert_元素名_gone()",
+         "反向断言：元素必须「找不到」才算通过；元素还在 = 用例失败并截图。适合：点确定后验证弹窗消失",
+         "# 元素定位器自动生成的页面方法（页面文件里）\n"
+         "def assert_save_success_gone(wait_seconds=2):\n"
+         "    probe = CreateElement.create(..., wait_seconds=wait_seconds)\n"
+         "    gone = True\n"
+         "    try:\n"
+         "        self.appOperator.getElement(probe)\n"
+         "        gone = False\n"
+         "    except Exception:\n"
+         "        pass\n"
+         "    self.appOperator.assert_true_with_shot('断言「保存成功弹窗」已消失', gone,\n"
+         "                                       '等待%s秒内元素仍可见' % wait_seconds)\n"
+         "# 用例里调用：page.assert_save_success_gone()"),
+        ("分支：元素出现才点击（偶发弹窗）",
+         "操作类型选「出现才点击(分支)」→ 生成 page.click_元素名_if_visible(探测秒数)",
+         "弹窗出现了就点它，没出现就跳过继续（不会因没弹而卡死用例）。适合：今日首次发布领金豆、活动挽留弹窗",
+         "# 元素定位器自动生成的页面方法（页面文件里）\n"
+         "def click_get_bean_if_visible(timeout_seconds=3):\n"
+         "    probe = CreateElement.create(..., wait_seconds=timeout_seconds)\n"
+         "    try:\n"
+         "        self.appOperator.click(self.appOperator.getElement(probe))\n"
+         "    except Exception:\n"
+         "        pass   # 没弹窗，跳过\n"
+         "# 用例里调用：page.click_get_bean_if_visible(3)"),
+        ("收起键盘（输入完点下一步）",
+         "操作类型选「收起键盘」→ 生成 page.dismiss_keyboard()",
+         "键盘可见才收起（is_keyboard_shown 判断），个别 ROM 异常时按返回键兜底。无需选元素",
+         "# 元素定位器自动生成的页面方法（页面文件里）\n"
+         "def dismiss_keyboard():\n"
+         "    try:\n"
+         "        if self.appOperator.is_keyboard_shown():\n"
+         "            self.appOperator.hide_keyboard()\n"
+         "    except Exception:\n"
+         "        self.appOperator.press_keycode(4)\n"
+         "    import time\n"
+         "    time.sleep(1)\n"
+         "# 用例里调用：page.dismiss_keyboard()"),
+    ]),
     ("获取元素 Get", [
         ("定位单个元素",
          "appOperator.getElement(元素信息)",

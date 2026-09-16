@@ -13,6 +13,22 @@ body {
   display: flex; align-items: stretch;
 }
 
+/* ---------- 内嵌模式（被平台 iframe 嵌入）：隐藏自带侧栏避免与平台侧栏形成双栏，
+   侧栏功能件（刷新/快速打开/设备状态）由 index.js 移入顶部工具条 ---------- */
+html.embedded .side { display: none; }
+html.embedded body { flex-direction: column; }
+.embed-bar { display: none; }
+html.embedded .embed-bar {
+  display: flex; flex: 0 0 auto; width: 100%; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 6px 10px; background: #1f2937; border-radius: 8px;
+}
+#embed-bar .bar-label { font-size: 12px; color: #9ca3af; }
+#embed-bar .dev-info { font-size: 12px; }
+/* 内嵌工具条右侧设备组：设备下拉+状态紧靠成组不换行，整体推到最右 */
+#embed-bar .dev-group { margin-left: auto; display: flex; align-items: center; gap: 8px; white-space: nowrap; flex: 0 0 auto; }
+#embed-bar .dev-group .dev-info { overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+html.night .embed-bar { background: #1b1c1f; border: 1px solid rgba(255,255,255,.06); }
+
 /* ---------- 布局：左侧边栏（与测试平台一致）+ 右侧三栏主内容 ---------- */
 .side {
   width: 200px; flex: 0 0 200px; height: 100vh; position: sticky; top: 0;
@@ -44,11 +60,17 @@ body {
 .hdr-select:hover, .hdr-select:focus { background: #4338ca; border-color: #6366f1; }
 .hdr-select option { color: #1f2937; background: #fff; }
 .side-btn { width: 100%; padding: 9px 12px; font-size: 13.5px; }
+/* 内嵌工具条里的刷新按钮：恢复自适应宽（side-btn 的 100% 宽只属于侧栏场景） */
+#embed-bar .side-btn { width: auto; flex: 0 0 auto; padding: 5px 14px; }
 .side-foot {
   margin-top: auto; padding: 12px 4px 2px; border-top: 1px solid rgba(255,255,255,.12);
-  display: flex; flex-direction: column;
+  display: flex; flex-direction: column; gap: 8px;
 }
-.side-foot .dev-info { font-size: 12.5px; line-height: 1.6; word-break: break-all; }
+/* 设备行：标签与切换下拉同行，下拉占满剩余宽度（不再挤换行） */
+.dev-row { display: flex; align-items: center; gap: 6px; }
+.dev-row .side-label { margin: 0; white-space: nowrap; }
+.dev-row .mini-select { flex: 1 1 auto; min-width: 0; width: auto; }
+.side-foot .dev-info { font-size: 12.5px; line-height: 1.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dev-info { font-size: 13px; color: #d1d5db; }
 .dev-info.ok { color: #34d399; }
 .dev-info.bad { color: #f87171; }
@@ -66,7 +88,8 @@ body {
 /* ---------- 窄屏：三栏纵向堆叠（侧栏保持，栏内给固定可视高度） ---------- */
 @media (max-width: 920px) {
   main { flex-direction: column; overflow: auto; }
-  .left, .middle, .right { flex: 0 0 auto; }
+  .left, .middle, .right { flex: 0 0 auto; min-width: 0; }
+  .col-resizer { display: none; }   /* 纵向堆叠时横向拖拽无意义 */
   .left .shot-wrap { height: 46vh; }
   .middle .tree { max-height: 38vh; }
   .right .tutorials { max-height: 40vh; }
@@ -83,16 +106,33 @@ body {
 .btn.small { padding: 3px 10px; font-size: 12px; }
 
 /* ---------- 三栏 ---------- */
-main { flex: 1; display: flex; gap: 10px; padding: 10px 12px; min-height: 0; }
-.col { display: flex; flex-direction: column; background: #fff; border-radius: 8px; overflow: hidden; }
+main { flex: 1; display: flex; gap: 10px; padding: 10px 12px; min-height: 0; min-width: 0; overflow: hidden; }
+/* min-width:0 关键：flex 子项默认 min-width:auto，长代码行会把整行撑出横向滚动条；
+   归零后各栏保持自身宽度，超宽内容在栏内换行/滚动（tut-code 已 pre-wrap） */
+.col { display: flex; flex-direction: column; background: #fff; border-radius: 8px; overflow: hidden; min-width: 0; }
 .col-title {
   padding: 8px 12px; font-weight: 600; border-bottom: 1px solid #eee;
   background: #fafafa; flex: 0 0 auto;
 }
 .col-title .hint { font-weight: 400; font-size: 12px; color: #9ca3af; margin-left: 8px; }
-.left  { flex: 0 0 40%; }
-.middle{ flex: 0 0 34%; }
-.right { flex: 1; }
+/* 左/中栏按百分比分宽但允许收缩（shrink:1）：空间不足时收到 280px 下限，
+   不会把 main 撑出横向滚动（不可收缩的 % 基准会与右栏 min-width 形成撑宽反馈） */
+.left  { flex: 0 1 40%; min-width: 280px; }
+.middle{ flex: 0 1 34%; min-width: 280px; }
+.right { flex: 1 1 0; min-width: 280px; }
+
+/* ---------- 三栏拖拽调宽手柄：拖动时相邻两栏宽度此消彼长，内容等比跟随 ---------- */
+.col-resizer { flex: 0 0 10px; cursor: col-resize; position: relative; align-self: stretch; }
+.col-resizer::after {
+  content: ''; position: absolute; left: 4px; top: 22%; bottom: 22%; width: 2px;
+  border-radius: 1px; background: #d1d5db; transition: background .15s, top .15s, bottom .15s;
+}
+.col-resizer:hover::after, .col-resizer.dragging::after { background: #2563eb; top: 8%; bottom: 8%; }
+html.night .col-resizer::after { background: #374151; }
+html.night .col-resizer:hover::after, html.night .col-resizer.dragging::after { background: #60a5fa; }
+/* 拖拽中：全局禁选中文字 + 光标保持，避免拖到文本上光标闪烁 */
+body.col-resizing { user-select: none; cursor: col-resize; }
+body.col-resizing * { cursor: col-resize !important; }
 
 /* ---------- 左：截图 ---------- */
 .shot-wrap { position: relative; flex: 1; overflow: auto; background: #eef0f3; }
@@ -212,7 +252,16 @@ main { flex: 1; display: flex; gap: 10px; padding: 10px 12px; min-height: 0; }
 .flow-col .col-head { font-weight: 600; font-size: 13px; color: #111827; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #e5e7eb; }
 .flow-col .col-head .hint { font-weight: 400; font-size: 12px; color: #9ca3af; margin-left: 4px; }
 .flow-col.dim { opacity: .45; pointer-events: none; }
+/* 元素栏「此操作不依赖元素」弱化：只降透明度不禁交互（元素本身仍需填写入库） */
+.flow-col.soft { opacity: .6; }
+.flow-col.soft .col-head::after { content: '（此操作类型不依赖元素，元素仍会照常入库）'; font-weight: 400; font-size: 11px; color: #9ca3af; margin-left: 4px; }
+html.night .flow-col.soft .col-head::after { color: #6b7280; }
 .op-note { font-size: 12px; color: #1d4ed8; margin: 2px 0 8px; min-height: 16px; }
+/* 操作类型下拉弹层：分组标题（基本操作/断言/长流程）白色加粗；
+   弹层统一深底，保证日间/夜间模式下白字都清晰可读 */
+#el-op-type optgroup, #el-op-type option { background: #232428; }
+#el-op-type optgroup { color: #ffffff; font-weight: 700; }
+#el-op-type option { color: #e5e7eb; }
 /* 栏内示例代码：小高度、不抢主预览的戏 */
 /* 栏内示例代码：长行自动换行（不横向滚动、不加宽），允许更高 */
 .el-content.mini { max-height: 220px; min-height: 60px; font-size: 11.5px; padding: 8px 10px;
@@ -238,45 +287,9 @@ main { flex: 1; display: flex; gap: 10px; padding: 10px 12px; min-height: 0; }
   font-size: 12px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
 .cont-add-chip:hover { background: #1e40af; }
 .modal-title .hint { font-weight: 400; font-size: 12px; color: #9ca3af; margin-left: 10px; }
-.case-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; }
-.case-grid label { margin-bottom: 8px; }
-.case-grid label.chk { display: flex; align-items: center; gap: 6px; align-self: end; margin-bottom: 14px; }
-.case-grid label.chk.wide { grid-column: 1 / -1; margin-bottom: 10px; align-self: center; }
-.case-grid label.chk input { width: auto; margin: 0; }
-/* 高级：生成去向（折叠，默认收起） */
-.adv-group { margin: 6px 0 10px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 6px 12px; background: #f9fafb; }
-.adv-group summary { cursor: pointer; font-size: 12.5px; font-weight: 600; color: #374151; user-select: none; }
-.adv-group summary:hover { color: #1d4ed8; }
-.adv-group[open] summary { margin-bottom: 8px; }
-.steps-head { font-weight: 600; font-size: 13px; margin: 10px 0 6px; }
-.steps-head .hint { font-weight: 400; font-size: 12px; color: #9ca3af; }
-#case-steps { max-height: 260px; overflow: auto; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 8px; background: #fafafa; }
-.step-row { display: flex; align-items: center; gap: 6px; padding: 4px 2px; border-bottom: 1px dashed #e5e7eb; }
-.step-row:last-child { border-bottom: none; }
-/* 步骤列头：与 .step-row 同布局 */
-.step-cols { display: flex; align-items: center; gap: 6px; padding: 2px 2px 5px; color: #6b7280; font-size: 11.5px; border-bottom: 1px solid #e5e7eb; }
-.step-idx { width: 22px; text-align: center; color: #9ca3af; font-size: 12px; flex: 0 0 auto; }
-.step-row .st-type { flex: 0 0 96px; }
-.step-row .st-ele { flex: 1.1; min-width: 90px; }
-.step-row .st-param { flex: 1; min-width: 90px; }
-.step-row .st-desc { flex: 1.4; min-width: 120px; }
-.step-row .st-type, .step-row .st-ele, .step-row .st-param, .step-row .st-desc {
-  width: auto; margin: 0; padding: 4px 8px; font-size: 12px;
-}
-.step-btns { display: flex; gap: 3px; flex: 0 0 auto; }
-.btn.mini { padding: 1px 7px; font-size: 12px; line-height: 1.6; border-radius: 4px; }
-.btn.mini.del { color: #dc2626; }
-.btn.mini:hover { background: #eef2ff; }
-.btn.mini.del:hover { background: #fee2e2; }
-.step-row .st-ele.missing { border-color: #dc2626; background: #fef2f2; }
-.step-row .st-ele.missing:focus { border-color: #dc2626; }
 /* 元素名绑定联动提示（自动切换元素文件等） */
 .bind-note { font-size: 12px; color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 5px 10px; margin: 4px 0 8px; }
-.steps-tools { display: flex; gap: 8px; margin: 8px 0; }
-.steps-empty { padding: 18px 10px; font-size: 12px; }
 .pv-title { font-weight: 600; font-size: 13px; margin: 8px 0 4px; }
-#case-preview-content { max-height: 240px; }
-#case-result { margin-top: 8px; }
 .quick-step { border-top: 1px dashed #d1d5db; margin-top: 10px; padding-top: 8px; }
 .quick-step .qs-title { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
 .quick-step label { margin-bottom: 8px; }
@@ -333,6 +346,9 @@ html.night .theme-fab:hover { background: rgba(255,255,255,.16); }
 /* 夜间模式（html.night）：黑色居多；日间=默认浅色（上方基础样式）。
    设备截图、元素树的文字配色按块逐一翻转，截图本身保持原色不受影响 */
 html.night { color-scheme: dark; }
+/* 日间模式覆回 light：head 里的 <meta color-scheme=dark> 只为加载期画布不闪白，
+   主题确定后日间模式的表单控件（下拉/输入框弹层）仍按浅色渲染 */
+html:not(.night) { color-scheme: light; }
 html.night body { background: #101012; color: #e5e7eb; }
 html.night .side { background: #17181b; }
 html.night .brand .bt { color: #f3f4f6; }
@@ -396,3 +412,130 @@ html.night .dup-panel { background: #271c05; border-color: #a16207; }
 html.night .dup-tip { background: #271c05; border-color: #a16207; color: #fbbf24; }
 html.night .dup-tip code { background: #3a2c05; }
 html.night ::-webkit-scrollbar-thumb { background: #3a3c42; }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   v2.1 UI 升级（后置覆盖）：对齐测试平台 v2.0 设计语言（sky 品牌渐变/光晕/彩条）
+   本次仅动 UI（CSS），业务 JS 与后端零改动；日间=默认浅色 / 夜间=html.night
+   ═══════════════════════════════════════════════════════════════════ */
+:root {
+  --sky: #0284c7; --sky-2: #38bdf8; --sky-deep: #0369a1;
+  --grad-sky: linear-gradient(135deg, #0ea5e9, #38bdf8);
+  --grad-sky-hover: linear-gradient(135deg, #38bdf8, #7dd3fc);
+  --radius-lg: 14px; --radius-md: 10px; --radius-sm: 7px;
+}
+
+/* 页面背景：微妙品牌光晕 */
+body {
+  background:
+    radial-gradient(1100px 400px at 14% -6%, rgba(14,165,233,.08), transparent 60%),
+    radial-gradient(900px 360px at 96% -4%, rgba(99,102,241,.05), transparent 58%),
+    #f5f6f8;
+}
+
+/* ---------- 侧栏：品牌渐变点缀 ---------- */
+.back-platform { background: var(--grad-sky); border: none; color: #fff; box-shadow: 0 2px 10px rgba(14,165,233,.3); }
+.back-platform:hover { background: var(--grad-sky-hover); box-shadow: 0 4px 14px rgba(14,165,233,.4); transform: translateY(-1px); }
+.brand .bt { color: #f8fafc; }
+.ver { background: var(--grad-sky); border: none; color: #fff; border-radius: 999px; padding: 1px 8px; box-shadow: 0 2px 8px rgba(14,165,233,.3); }
+.side { border-right: none; box-shadow: 1px 0 0 rgba(255,255,255,.06), 4px 0 24px rgba(0,0,0,.25); }
+.side-btn { border-radius: var(--radius-md); }
+
+/* ---------- 三栏卡片：圆角/阴影/hover ---------- */
+.col { border-radius: var(--radius-lg); box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 14px rgba(0,0,0,.05); border: 1px solid rgba(0,0,0,.04); transition: box-shadow .2s, transform .2s; }
+.col:hover { box-shadow: 0 2px 6px rgba(0,0,0,.08), 0 8px 22px rgba(0,0,0,.08); }
+.col-title { background: linear-gradient(180deg, #fbfcfe, #f6f8fa); border-bottom: 1px solid #eef0f3; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.col-title::before { content: ""; display: inline-block; width: 4px; height: 13px; border-radius: 2px;
+  background: var(--grad-sky); margin-right: 7px; vertical-align: -1px; }
+
+/* ---------- 按钮体系 ---------- */
+.btn { border-radius: var(--radius-sm); transition: all .15s; }
+.btn:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0,0,0,.1); }
+.btn.primary { background: var(--grad-sky); border: none; color: #fff; box-shadow: 0 2px 10px rgba(14,165,233,.32); }
+.btn.primary:hover { background: var(--grad-sky-hover); box-shadow: 0 4px 16px rgba(14,165,233,.42); }
+.btn.small { border-radius: var(--radius-sm); }
+
+/* ---------- 输入 focus 统一 sky ring ---------- */
+.toolbar input:focus, .mini-select:focus, .modal-body input:focus, .modal-body select:focus {
+  border-color: var(--sky-2); box-shadow: 0 0 0 3px rgba(56,189,248,.18);
+}
+
+/* ---------- 元素树：hover/选中 ---------- */
+.tree .tnode { border-radius: 6px; transition: background .1s; }
+.tree .tnode:hover { background: #eef6ff; }
+.tree .tnode.sel { background: linear-gradient(90deg, rgba(14,165,233,.16), rgba(56,189,248,.08));
+  box-shadow: inset 2.5px 0 0 var(--sky); }
+.tree .tnode.sel .t-text { color: var(--sky-deep); }
+.tree .tnode .clickable-badge { color: var(--sky); border-color: #bae6fd; background: #f0f9ff; }
+
+/* ---------- 命中候选 / 定位写法 ---------- */
+.cand-chip { border-radius: 999px; transition: all .12s; }
+.cand-chip.sel { background: var(--grad-sky); border: none; box-shadow: 0 2px 8px rgba(14,165,233,.3); }
+.loc-item { transition: border-color .12s, box-shadow .12s; }
+.loc-item:hover { border-color: #bae6fd; box-shadow: 0 2px 8px rgba(14,165,233,.08); }
+.loc-item code { background: #f0f9ff; }
+
+/* ---------- 教学卡 ---------- */
+.tut-leaf { transition: box-shadow .15s, border-color .15s; }
+.tut-leaf:hover { border-color: #bae6fd; box-shadow: 0 3px 12px rgba(14,165,233,.1); }
+.copy-btn { border-radius: 5px; }
+
+/* ---------- 弹窗精修 ---------- */
+.modal { border-radius: var(--radius-lg); box-shadow: 0 24px 64px rgba(0,0,0,.22); animation: pop .18s cubic-bezier(.2,.9,.3,1.2); }
+@keyframes pop { from { transform: scale(.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.modal-title { background: linear-gradient(180deg, #fbfcfe, #f6f8fa); border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.modal-foot { border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+.modal-foot .btn.primary, .modal-foot .btn:not(.ghost):first-child { box-shadow: 0 2px 10px rgba(14,165,233,.3); }
+
+/* ---------- 滚动条 ---------- */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,.16); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,.3); background-clip: content-box; }
+
+/* ---------- 截图区 ---------- */
+.shot-wrap { background: linear-gradient(180deg, #f2f5f8, #eef1f5); }
+
+/* ═════════ 夜间模式（html.night）同步升级 ═════════ */
+html.night body {
+  background:
+    radial-gradient(1100px 400px at 14% -6%, rgba(14,165,233,.09), transparent 60%),
+    radial-gradient(900px 360px at 96% -4%, rgba(99,102,241,.06), transparent 58%),
+    #101012;
+}
+html.night .col { background: #1a1b1e; border-color: rgba(255,255,255,.06);
+  box-shadow: 0 1px 3px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.25); }
+html.night .col-title { background: linear-gradient(180deg, #202126, #1b1c20); border-bottom-color: rgba(255,255,255,.06); }
+html.night .col-title .hint { color: #9ca3af; }
+html.night .toolbar input { background: #101012; border-color: rgba(255,255,255,.12); color: #e5e7eb; }
+html.night .tree .tnode:hover { background: rgba(255,255,255,.06); }
+html.night .tree .tnode.sel { background: linear-gradient(90deg, rgba(14,165,233,.2), rgba(56,189,248,.08));
+  box-shadow: inset 2.5px 0 0 var(--sky-2); }
+html.night .tree .tnode.sel .t-text { color: #7dd3fc; }
+html.night .tree .tnode .t-text { color: #e5e7eb; }
+html.night .detail { background: #1b1c20; border-top-color: rgba(255,255,255,.08); }
+html.night .attrs td { border-bottom-color: rgba(255,255,255,.05); }
+html.night .attrs td:first-child { color: #9ca3af; }
+html.night .loc-item { background: #1b1c20; border-color: rgba(255,255,255,.08); }
+html.night .loc-item code { background: #101012; color: #a5f3fc; }
+html.night .tut-leaf { background: #1b1c20; border-color: rgba(255,255,255,.07); }
+html.night .tut-leaf .tut-title { color: #f1f5f9; }
+html.night .cat-head { background: rgba(255,255,255,.05); color: #e5e7eb; }
+html.night .cat-head:hover { background: rgba(255,255,255,.09); }
+html.night .shot-wrap { background: linear-gradient(180deg, #17181b, #131417); }
+html.night .cand-chip { background: #1b1c20; border-color: rgba(255,255,255,.14); color: #e5e7eb; }
+html.night .modal { background: #1a1b1e; }
+html.night .modal-title { background: linear-gradient(180deg, #202126, #1b1c20); border-bottom-color: rgba(255,255,255,.06); }
+html.night .modal-title, html.night .modal-body label { color: #e5e7eb; }
+html.night .modal-body input, html.night .modal-body select { background: #101012; border-color: rgba(255,255,255,.12); color: #e5e7eb; }
+html.night .modal-foot { border-top-color: rgba(255,255,255,.06); }
+html.night .el-content { background: #101012; border-color: rgba(255,255,255,.08); color: #d1d5db; }
+html.night .el-result.ok { background: rgba(52,211,153,.12); color: #34d399; }
+html.night .el-result.err { background: rgba(248,113,113,.12); color: #f87171; }
+html.night ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); background-clip: content-box; }
+html.night ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.26); background-clip: content-box; }
+
+/* ═══ 夜间补丁：可点徽标 / 定位方式标签提亮（深蓝在黑底看不清） ═══ */
+html.night .tree .tnode .clickable-badge { color: #7dd3fc; border-color: #155e75; background: rgba(14,165,233,.16); }
+html.night .loc-item .loc-kind { color: #7dd3fc; }
+html.night .loc-item:hover { border-color: #155e75; }

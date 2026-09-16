@@ -36,14 +36,29 @@ def _run(cmd, timeout=30):
         return ''
 
 
-def get_device():
-    """返回第一台在线设备的序列号；无设备返回 None"""
+def _online_serials():
+    """全部 device 状态的设备序列号（按 adb devices 输出顺序）"""
     out = _run(['devices'])
+    serials = []
     for line in out.splitlines()[1:]:
         parts = line.split()
         if len(parts) >= 2 and parts[1] == 'device':
-            return parts[0]
-    return None
+            serials.append(parts[0])
+    return serials
+
+
+def get_device(preferred=None):
+    """返回在线设备序列号：preferred 仍在线则优先返回它，
+    否则回退第一台（单设备场景与旧行为一致）；无设备返回 None"""
+    serials = _online_serials()
+    if preferred and preferred in serials:
+        return preferred
+    return serials[0] if serials else None
+
+
+def list_devices():
+    """全部在线设备（含型号/系统版本），供前端设备切换下拉"""
+    return [device_info(s) for s in _online_serials()]
 
 
 def device_info(serial):
@@ -110,8 +125,8 @@ def dump_xml(serial):
     用 waitForIdleTimeout=0 跳过 idle 等待直接抓 accessibility 树。
     """
     # uiautomator2 server 一旦启动会占用设备的 UiAutomation 通道（系统 dump 被阻塞），
-    # 之后统一走 u2 通道，不再回头试系统 dump
-    if _U2_STATE['ok']:
+    # 之后统一走 u2 通道，不再回头试系统 dump（按设备隔离：只看该设备自己的 u2 状态）
+    if _u2_state(serial)['ok']:
         u2 = _dump_via_u2(serial)
         if u2:
             return u2
@@ -128,25 +143,43 @@ def dump_xml(serial):
 
 
 # ---------------------------------------------------------------
-# uiautomator2 降级通道
+# uiautomator2 降级通道（多设备：状态与主机端口均按 serial 隔离）
 # 系统 uiautomator dump 要求窗口 idle；持续动画页面（轮播/跑马灯）永远等不到 idle，
 # 华为 ROM 上必失败。设备上预装的 Appium uiautomator2 server 可用 waitForIdleTimeout=0
 # 跳过 idle 等待直接抓 accessibility 树 —— 两种通道互相补充。
 # 注意：u2 server 进程会长时间占用设备的 UiAutomation 通道，启动后系统 uiautomator
 # dump 不再可用（返回 FATAL），此后统一走 u2。这是有意为之的取舍。
+# 多设备注意：adb forward 的主机端口必须每台不同（都用 6790 的话，
+# 第二台 forward 会悄悄把 6790 改指向新设备，旧 session 全部串台）。
 # ---------------------------------------------------------------
-_U2_STATE = {'ok': False, 'session': None}
-_U2_BASE = 'http://127.0.0.1:6790'
+_U2_STATES = {}          # serial -> {'ok':bool, 'session':str|None}
+_U2_PORT_BASE = 6790     # 每台设备的主机端口 = 6790 + 在线序号
 
 
-def _u2_http(method, path, data=None, timeout=20):
-    """发请求到设备上的 uiautomator2 server，返回响应文本；失败返回 ''
+def _u2_host_port(serial):
+    """该设备专用的主机端口：按其在在线设备列表中的序号分配，保证多设备互不串台"""
+    serials = _online_serials()
+    try:
+        idx = serials.index(serial)
+    except ValueError:
+        idx = 0
+    return _U2_PORT_BASE + idx
+
+
+def _u2_state(serial):
+    """取该设备的 u2 状态（惰性初始化）"""
+    return _U2_STATES.setdefault(serial, {'ok': False, 'session': None})
+
+
+def _u2_http(serial, method, path, data=None, timeout=20):
+    """发请求到指定设备的 uiautomator2 server（经该设备专属主机端口），返回响应文本；失败返回 ''
     注意：u2 server 对未实现的路由返回 404 + JSON body（如 /status），
     HTTPError 也要读出 body —— 有 body 即证明端口已通，不能当失败。
     """
     try:
         body = json.dumps(data).encode('utf-8') if data is not None else None
-        req = urllib.request.Request(_U2_BASE + path, data=body, method=method)
+        req = urllib.request.Request('http://127.0.0.1:%d%s' % (_u2_host_port(serial), path),
+                                     data=body, method=method)
         req.add_header('Content-Type', 'application/json')
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -159,51 +192,56 @@ def _u2_http(method, path, data=None, timeout=20):
 
 
 def _u2_start_server(serial):
-    """通过 instrument 启动设备上的 uiautomator2 server（阻塞等待就绪，最多 ~15s）"""
+    """通过 instrument 启动设备上的 uiautomator2 server（阻塞等待就绪，最多 ~15s）
+    forward 的主机端口用该设备专属端口，设备端端口恒为 6790"""
+    host_port = _u2_host_port(serial)
     _run(['-s', serial, 'shell',
           'nohup am instrument -w -e debug false -e principalServerPort 6790 '
           'io.appium.uiautomator2.server.test/androidx.test.runner.AndroidJUnitRunner '
           '>/dev/null 2>&1 &'], timeout=10)
-    _run(['-s', serial, 'forward', 'tcp:6790', 'tcp:6790'], timeout=10)
+    _run(['-s', serial, 'forward', 'tcp:%d' % host_port, 'tcp:6790'], timeout=10)
     for _ in range(15):
-        if _u2_http('GET', '/status'):
+        if _u2_http(serial, 'GET', '/status'):
             return True
         time.sleep(1)
     return False
 
 
 def _u2_ensure(serial):
-    """确保 u2 server + session 就绪，返回 True；无法就绪返回 False"""
-    if _U2_STATE['ok'] and _U2_STATE['session']:
+    """确保该设备的 u2 server + session 就绪，返回 True；无法就绪返回 False"""
+    st = _u2_state(serial)
+    if st['ok'] and st['session']:
         return True
     # 先确认 server 端口通（可能之前已启动）；不通则冷启动
-    if not _u2_http('GET', '/status'):
+    if not _u2_http(serial, 'GET', '/status'):
         if not _u2_start_server(serial):
             return False
-    # 建 session：waitForIdleTimeout=0 跳过 idle 等待（抓树不要求窗口空闲）
-    resp = _u2_http('POST', '/wd/hub/session', {
+    # 建 session：waitForIdleTimeout=0 跳过 idle 等待（抓树不要求窗口空闲）；udid 明确指向本设备
+    resp = _u2_http(serial, 'POST', '/wd/hub/session', {
         'capabilities': {'alwaysMatch': {
             'appium:automationName': 'UiAutomator2',
             'appium:deviceName': 'android',
+            'appium:udid': serial,
             'appium:waitForIdleTimeout': 0,
         }},
     }, timeout=30)
     try:
         sid = json.loads(resp)['sessionId']
-        _U2_STATE['session'] = sid
-        _U2_STATE['ok'] = True
+        st['session'] = sid
+        st['ok'] = True
         return True
     except Exception:
         return False
 
 
-def _u2_session_alive():
-    """u2 session 是否还有效（探测：请求不存在的 session 返回 404，存在的返回 200）"""
-    sid = _U2_STATE.get('session')
+def _u2_session_alive(serial):
+    """该设备 u2 session 是否还有效（探测：请求不存在的 session 返回 404，存在的返回 200）"""
+    sid = _u2_state(serial).get('session')
     if not sid:
         return False
     try:
-        req = urllib.request.Request(_U2_BASE + '/wd/hub/session/%s' % sid)
+        req = urllib.request.Request(
+            'http://127.0.0.1:%d/wd/hub/session/%s' % (_u2_host_port(serial), sid))
         try:
             with urllib.request.urlopen(req, timeout=10):
                 return True
@@ -218,13 +256,14 @@ def _dump_via_u2(serial):
     /source 返回 JSON：{"sessionId":..., "value":"<xml>"} —— 需取 value 字段"""
     if not _u2_ensure(serial):
         return None
-    if not _u2_session_alive():
-        _U2_STATE['session'] = None
-        _U2_STATE['ok'] = False
+    st = _u2_state(serial)
+    if not _u2_session_alive(serial):
+        st['session'] = None
+        st['ok'] = False
         if not _u2_ensure(serial):
             return None
-    sid = _U2_STATE['session']
-    resp = _u2_http('GET', '/wd/hub/session/%s/source' % sid, timeout=30)
+    sid = st['session']
+    resp = _u2_http(serial, 'GET', '/wd/hub/session/%s/source' % sid, timeout=30)
     try:
         xml = json.loads(resp).get('value') or ''
     except Exception:

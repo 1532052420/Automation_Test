@@ -37,21 +37,29 @@ def _escape(value):
     return str(value).replace('\\', '\\\\').replace("'", "\\'")
 
 
+DEFAULT_WAIT_SECONDS = 6   # 元素默认显式等待秒数（个别慢页面元素保存时可单独指定更长等待）
+
+
 def element_line(name, locator_type, value, wait_type='VISIBILITY_OF', wait_seconds=None, comment=None):
-    """wait_seconds：显式等待超时秒数（框架 CreateElement.create 默认 30）；
+    """wait_seconds：显式等待超时秒数（默认 6，见 DEFAULT_WAIT_SECONDS）；
     comment：元素备注，写在生成行行尾注释（# ...），方便回看元素是什么。
-    传正整数时显式写进生成行，所见即所得；不传/非法则沿用框架默认。"""
+    传正整数时显式写进生成行，所见即所得；不传/非法则用默认 6。"""
     line = '%sself.%s = CreateElement.create(Locator_Type.%s, \'%s\', wait_type=Wait_By.%s' % (
         INDENT, name, locator_type, _escape(value), wait_type)
     try:
         sec = int(wait_seconds)
-        if sec > 0:
-            line += ', wait_seconds=%d' % sec
+        if sec <= 0:
+            sec = DEFAULT_WAIT_SECONDS
     except (TypeError, ValueError):
-        pass
+        sec = DEFAULT_WAIT_SECONDS
+    line += ', wait_seconds=%d' % sec
+    comment_text = str(comment).strip() if comment and str(comment).strip() else ''
+    if comment_text:
+        # 业务名称：报告步骤/日志优先显示它（appOperator._element_desc 读取）
+        line += ", desc='%s'" % _escape(comment_text)
     line += ')'
-    if comment and str(comment).strip():
-        line += '  # %s' % str(comment).strip().replace('\n', ' ')
+    if comment_text:
+        line += '  # %s' % comment_text.replace('\n', ' ')
     return line
 
 
@@ -127,7 +135,7 @@ def add_element(filename, name, locator_type, value, wait_type='VISIBILITY_OF', 
                 comment=None, check_dup=True):
     """
     向元素库文件添加/覆盖元素。
-    wait_seconds：显式等待超时秒数（None/非法 = 沿用框架默认 30）。
+    wait_seconds：显式等待超时秒数（None/非法 = 默认 6）。
     comment：元素备注（生成行行尾 # 注释，可空）。
     check_dup=True 时先做重复检测：库中已有相同定位（且非同名覆盖）→ 不落盘，
     返回 {'ok': False, 'duplicate': {...}}，由前端决定「使用已有元素」还是「强制新建」。

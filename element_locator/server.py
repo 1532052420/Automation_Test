@@ -7,9 +7,11 @@ App 元素定位器 · Flask 服务入口（element_locator）
 """
 import ast
 import base64
+import json
 import os
 import re
 import sys
+import urllib.request
 
 from flask import Flask, jsonify, request, send_file
 
@@ -23,7 +25,7 @@ from tutorials import TUTORIALS, search_tutorials
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 
 # 元素定位器版本号：每次功能/修复后递增，左上角会显示，用来确认本地是否已更新
-APP_VERSION = 'v2.13'
+APP_VERSION = 'v3.2'
 
 # 开发工具要能"改完即刷"，静态文件禁用浏览器强缓存（Flask 默认 max-age=12h）
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
@@ -57,9 +59,19 @@ def _serialize(node, with_children=True):
     return d
 
 
+def _request_serial():
+    """前端指定的设备序列号（JSON body 或 query 的 serial），缺省回退第一台在线设备"""
+    data = request.get_json(silent=True) or {}
+    serial = (data.get('serial') or request.args.get('serial') or '').strip()
+    return serial or None
+
+
 def _refresh_payload():
-    """截图 + 元素树 完整载荷"""
-    serial = device.get_device()
+    """截图 + 元素树 完整载荷（按前端指定的设备；设备掉线自动回退第一台）
+    fallback=True：请求的设备已掉线、响应来自回退设备——前端据此校正下拉，
+    并与「过期响应」（用户已切到别的设备）区分开，过期响应直接丢弃防串台"""
+    asked = _request_serial()
+    serial = device.get_device(asked)
     if not serial:
         return None
     png = device.screenshot_png(serial)
@@ -74,6 +86,8 @@ def _refresh_payload():
     for n in data['all']:
         n['locators'] = device.gen_locators(n, data['all'])
     return {
+        'serial': serial,
+        'fallback': bool(asked and serial != asked),
         'device': device.device_info(serial),
         'screenshot': 'data:image/png;base64,' + base64.b64encode(png).decode() if png else '',
         'width': data['width'],
@@ -88,13 +102,20 @@ def index():
     return send_file(os.path.join(app.static_folder, 'index.html'))
 
 
+@app.route('/api/devices')
+def api_devices():
+    """全部在线设备（多设备切换下拉数据源）"""
+    return jsonify({'ok': True, 'devices': device.list_devices()})
+
+
 @app.route('/api/status')
 def api_status():
-    serial = device.get_device()
+    serial = device.get_device(_request_serial())
     if not serial:
         return jsonify({'ok': False, 'version': APP_VERSION,
                         'msg': '未检测到已授权的 Android 设备，请连接手机并允许 USB 调试'})
-    return jsonify({'ok': True, 'version': APP_VERSION, 'device': device.device_info(serial)})
+    return jsonify({'ok': True, 'version': APP_VERSION, 'serial': serial,
+                    'device': device.device_info(serial)})
 
 
 @app.route('/api/refresh', methods=['POST'])
@@ -155,6 +176,57 @@ def api_cases():
                     'case_info': case_generator.case_files_info()})
 
 
+@app.route('/api/save_case_package', methods=['POST'])
+def api_save_case_package():
+    """「保存测试用例包·保存到框架」：三个文件内容入库。
+    校验/备份/登记全部转发平台管理后台 upload_zip 同一套逻辑（远程 urllib 调 8090，
+    平台不在则降级直写——本机单人场景仍可用）。"""
+    data = request.get_json(silent=True) or {}
+    package = (data.get('package') or '').strip()
+    files = data.get('files') or []
+    if not package or not isinstance(files, list) or not files:
+        return jsonify({'ok': False, 'msg': '缺少包名或文件内容'})
+    if not all(isinstance(f, dict) and f.get('name') and f.get('content') is not None for f in files):
+        return jsonify({'ok': False, 'msg': '文件结构不合法'})
+    payload = json.dumps({'package': package, 'uploader': (data.get('uploader') or 'locator'),
+                          'files': files}).encode('utf-8')
+    # 平台在跑 → 转发（享受完整校验/备份/登记）；不在 → 直写文件（本机兜底）
+    try:
+        req = urllib.request.Request('http://127.0.0.1:8090/api/admin/upload_zip_content',
+                                     data=payload, method='POST')
+        req.add_header('Content-Type', 'application/json')
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return jsonify(json.loads(resp.read().decode('utf-8')))
+    except Exception as e:
+        code = getattr(e, 'code', None)
+        if code:
+            try:
+                body = e.read().decode('utf-8')
+                return jsonify(json.loads(body))
+            except Exception:
+                pass
+        return jsonify({'ok': False, 'msg': '保存失败：测试平台未运行（%s）。可先「下载用例包」再用管理后台上传' % str(e)[:80]})
+
+
+@app.route('/api/build_case_package', methods=['POST'])
+def api_build_case_package():
+    """「保存测试用例包·下载 zip」：三个文件打包（cases/pages/elements 一级目录），供管理后台上传"""
+    import io
+    import zipfile
+    data = request.get_json(silent=True) or {}
+    package = (data.get('package') or 'case_package').strip()
+    files = data.get('files') or []
+    if not files:
+        return jsonify({'ok': False, 'msg': '缺少文件内容'}), 400
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for f in files:
+            zf.writestr('%s/%s' % (f.get('dir', ''), f.get('name', '')), f.get('content', ''))
+    buf.seek(0)
+    return send_file(buf, as_attachment=True, mimetype='application/zip',
+                     attachment_filename='%s.zip' % re.sub(r'[^A-Za-z0-9_\-]', '_', package))
+
+
 @app.route('/api/add_code', methods=['POST'])
 def api_add_code():
     """「保存并添加到用例」：把一步操作代码追加到目标用例文件的指定方法体末尾。
@@ -196,59 +268,10 @@ def api_pages():
     })
 
 
-@app.route('/api/add_case', methods=['POST'])
-def api_add_case():
-    """生成/追加 用例文件（可选同时生成页面对象文件）"""
-    data = request.get_json(silent=True) or {}
-    steps = data.get('steps') or []
-    if not isinstance(steps, list) or not steps:
-        return jsonify({'ok': False, 'msg': '至少需要一个用例步骤'})
-    # 校验步骤结构
-    valid_types = set(case_generator.STEP_TYPES)
-    for s in steps:
-        if not isinstance(s, dict) or s.get('type') not in valid_types:
-            return jsonify({'ok': False, 'msg': '步骤结构不合法：%r' % (s,)})
-
-    r = case_generator.gen_case(
-        data.get('case_file', '').strip(),
-        data.get('method_name', '').strip(),
-        data.get('desc', '').strip(),
-        data.get('pkg', '').strip(),
-        data.get('activity', '').strip(),
-        steps,
-        data.get('page_file', '').strip() or 'locator_gui_page.py',
-        page_class=data.get('page_class', '').strip() or None,
-        case_class=data.get('case_class', '').strip() or None,
-        gen_teardown=bool(data.get('gen_teardown', True)),
-    )
-    if not r['ok']:
-        return jsonify({'ok': False, 'msg': r.get('msg', '生成用例失败')})
-
-    page_r = None
-    if data.get('gen_page'):
-        page_r = case_generator.gen_page(
-            data.get('page_file', '').strip() or 'locator_gui_page.py',
-            steps,
-            data.get('elements_file', '').strip() or element_library.DEFAULT_FILE,
-            desc=data.get('page_desc', '').strip() or data.get('desc', '').strip(),
-            page_class=data.get('page_class', '').strip() or None,
-        )
-        if not page_r['ok']:
-            return jsonify({'ok': False, 'msg': '用例已生成，但页面生成失败：%s' % page_r.get('msg')})
-
-    return jsonify({
-        'ok': True,
-        'msg': r['msg'] + (('；页面 ' + page_r['msg']) if page_r else ''),
-        'action': r['action'],
-        'case': {'filename': data.get('case_file', '').strip(), 'content': r.get('content', '')},
-        'page': {'filename': data.get('page_file', '').strip(), 'content': page_r.get('content', '')} if page_r else None,
-    })
-
-
 @app.route('/api/tap', methods=['POST'])
 def api_tap():
-    """设备真实点击（验证定位）：POST {x, y} 设备坐标"""
-    serial = device.get_device()
+    """设备真实点击（验证定位）：POST {x, y, serial?} 设备坐标（serial 缺省回退第一台）"""
+    serial = device.get_device(_request_serial())
     if not serial:
         return jsonify({'ok': False, 'msg': '未检测到设备'})
     data = request.get_json(silent=True) or {}
@@ -256,7 +279,8 @@ def api_tap():
     if x is None or y is None:
         return jsonify({'ok': False, 'msg': '缺少坐标 x/y'})
     ok = device.tap(serial, x, y)
-    return jsonify({'ok': ok, 'msg': '已点击设备 (%d, %d)' % (x, y) if ok else '点击失败'})
+    return jsonify({'ok': ok, 'serial': serial,
+                    'msg': '已点击设备 (%d, %d)' % (x, y) if ok else '点击失败'})
 
 
 @app.route('/api/tutorials')
@@ -342,4 +366,5 @@ if __name__ == '__main__':
     else:
         print('警告: 未检测到 Android 设备，界面将无法刷新截图（请连接手机后点"刷新"）')
     print('元素定位器已启动: http://127.0.0.1:%d/' % PORT)
-    app.run(host='127.0.0.1', port=PORT, debug=False)
+    # 0.0.0.0：接受所有网卡进入，局域网同事可直接访问
+    app.run(host='0.0.0.0', port=PORT, debug=False)

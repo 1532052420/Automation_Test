@@ -137,10 +137,14 @@ def test_pages_ok(platform):
         assert 'sidebar' in body
 
 
-def test_locator_redirect(platform):
+def test_locator_mounted(platform):
+    """定位器并入平台：/locator 补斜杠跳转，/locator/ 直接返回定位器页面（TC-076）"""
     code, _, headers = http('GET', '/locator', no_redirect=True)
-    assert code == 302
-    assert headers.get('Location') == 'http://127.0.0.1:8001/'
+    assert code in (301, 308)
+    assert headers.get('Location', '').endswith('/locator/')
+    code, body, _ = http('GET', '/locator/')
+    assert code == 200
+    assert '定位' in body or '元素' in body
 
 
 # ---------------------------------------------------------------- 只读探测
@@ -418,27 +422,18 @@ def test_debug_functions_catalog(platform):
     assert any(f.startswith('cases/') for f in files)
 
 
-def test_locator_smart_start(platform):
-    """点击即启动：未运行则拉起并等就绪；已运行直接复用（TC-076）"""
-    code, body, _ = http('POST', '/api/locator/start', {}, timeout=60)
-    assert code == 200, body
-    d = json.loads(body)
-    assert d['ok'] and d['url'] == 'http://127.0.0.1:8001/'
-    assert isinstance(d['started'], bool)
-    # 再点一次：必定复用（不再重复拉起）
-    code, body, _ = http('POST', '/api/locator/start', {}, timeout=30)
-    d2 = json.loads(body)
-    assert d2['ok'] and d2['started'] is False
-
-
-def test_launcher_script_clean():
-    """双击启动器语法与内容检查（TC-077）"""
-    path = os.path.join(ROOT, '测试平台启动器.command')
-    assert os.path.isfile(path)
-    content = open(path, encoding='utf-8').read()
-    assert 'web_platform/app.py' in content and 'element_locator/server.py' in content
-    assert 'stop-platform' in content or 'pkill' in content
-    subprocess.run(['bash', '-n', path], check=True)
+def test_entry_scripts_clean():
+    """统一入口检查（TC-077）：仅保留 自动化执行入口.command + run.sh（定位器已并入平台）"""
+    main = os.path.join(ROOT, '自动化执行入口.command')
+    assert os.path.isfile(main)
+    mcontent = open(main, encoding='utf-8').read()
+    assert 'web_platform/app.py' not in mcontent  # 启动一律走 run.sh
+    assert '8001' not in mcontent                 # 独立定位器端口已取消
+    runsh = os.path.join(ROOT, 'run.sh')
+    rcontent = open(runsh, encoding='utf-8').read()
+    assert 'element_locator/server.py' not in rcontent
+    subprocess.run(['bash', '-n', main], check=True)
+    subprocess.run(['bash', '-n', runsh], check=True)
 
 # ---------------------------------------------------------------- 管理后台
 def test_admin_upload_list_delete(platform):

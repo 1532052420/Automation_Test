@@ -9,7 +9,7 @@ import sys
 import time
 import urllib.request
 
-from flask import Blueprint, jsonify, redirect, render_template, request, send_file
+from flask import Blueprint, jsonify, render_template, request, send_file
 
 from web_platform import report_data
 from web_platform import runner
@@ -34,64 +34,12 @@ _report_services = {}
 
 @atexit.register
 def _cleanup_report_services():
-    """平台退出时终止全部报告静态服务与由本平台拉起的元素定位器，避免孤儿进程占用端口"""
+    """平台退出时终止全部报告静态服务，避免孤儿进程占用端口"""
     for svc in _report_services.values():
         try:
             svc['proc'].terminate()
         except Exception:
             pass
-    loc = _locator_service.get('proc')
-    if loc is not None:
-        try:
-            loc.terminate()
-        except Exception:
-            pass
-
-
-# 由本平台拉起的元素定位器进程（平台重启后注册表为空，靠端口探测兜底）
-_locator_service = {}
-
-
-def _locator_up():
-    try:
-        with urllib.request.urlopen('http://127.0.0.1:8001/api/status', timeout=2) as resp:
-            return resp.status == 200
-    except Exception:
-        return False
-
-
-@bp.route('/api/locator/start', methods=['POST'])
-def api_locator_start():
-    """元素定位器智能启动：已运行直接返回；未运行则后台拉起并等就绪（前端按钮 loading 态）"""
-    if _locator_up():
-        return jsonify({'ok': True, 'url': 'http://127.0.0.1:8001/', 'started': False})
-    # 清理平台重启后注册表之外的残留进程，避免双实例抢端口
-    subprocess.run(['pkill', '-f', 'element_locator/server.py'],
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    time.sleep(0.5)
-    log_dir = os.path.join(BASE_DIR, 'logs')
-    os.makedirs(log_dir, exist_ok=True)
-    log_file = open(os.path.join(log_dir, 'element_locator.log'), 'a')
-    try:
-        proc = subprocess.Popen(
-            [sys.executable, 'element_locator/server.py'], cwd=BASE_DIR,
-            stdout=log_file, stderr=subprocess.STDOUT, start_new_session=True)
-    except Exception as e:
-        log_file.close()
-        return jsonify({'ok': False, 'msg': '启动元素定位器失败: %s' % e}), 500
-    deadline = time.time() + 12
-    while time.time() < deadline:
-        if _locator_up():
-            _locator_service['proc'] = proc
-            log_file.close()
-            return jsonify({'ok': True, 'url': 'http://127.0.0.1:8001/', 'started': True})
-        if proc.poll() is not None:
-            log_file.close()
-            return jsonify({'ok': False, 'msg': '元素定位器进程退出（查看 logs/element_locator.log）'}), 500
-        time.sleep(0.3)
-    proc.terminate()
-    log_file.close()
-    return jsonify({'ok': False, 'msg': '元素定位器启动超时（12 秒未就绪）'}), 500
 
 
 # 用例节点白名单：文件路径/类/方法（pytest nodeid），杜绝 API 直调注入任意 pytest 参数
@@ -116,11 +64,6 @@ def page_run_detail(run_id):
 @bp.route('/report')
 def page_report():
     return render_template('report.html')
-
-
-@bp.route('/locator')
-def page_locator():
-    return redirect('http://127.0.0.1:8001/')
 
 
 # ---------------------------------------------------------------- API
