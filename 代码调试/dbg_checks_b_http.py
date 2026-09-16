@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlparse
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from dbg_kit import check, Skip, assert_true, tmp_workdir, platform_status
+from dbg_kit import check, Skip, assert_true, tmp_workdir, platform_status, http_get_json
 
 class _Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
@@ -101,13 +101,14 @@ def _():
     return 'GET/POST(表单)/下载/请求头/回收Cookie/换址 全部通过'
 
 
-@check('platform.locator', '平台接口 · 元素定位器(:8001)', '元素定位器服务健康检查 /api/status')
+@check('platform.locator', '平台接口 · 元素定位器(平台 /locator)', '元素定位器子应用健康检查 /locator/api/status')
 def _():
-    up, data = platform_status(8001)
-    if not up:
-        raise Skip('元素定位器未启动（run.sh locator 可启动），接口探测跳过')
+    try:
+        _, data = http_get_json('http://127.0.0.1:8080/locator/api/status', timeout=3)
+    except Exception:
+        raise Skip('执行平台未启动（run.sh platform 可启动；定位器已并入平台 /locator 子路径），接口探测跳过')
     assert_true('version' in (data or {}), '状态接口返回缺 version 字段: %r' % data)
-    return '服务在线 version=%s' % (data or {}).get('version')
+    return '定位器子应用在线 version=%s' % (data or {}).get('version')
 
 
 @check('platform.web', '平台接口 · 执行平台(:8080)', 'Web 执行平台健康检查 /api/status')
@@ -127,5 +128,6 @@ def _():
     if not up and not serials:
         raise Skip('Appium 未启动且无在线设备（run.sh start-appium + 连接手机后可用）')
     assert_true(up, 'Appium 未启动，但有 %d 台设备在线' % len(serials))
-    assert_true(bool(serials), 'Appium 在线，但无在线设备')
+    if not serials:
+        raise Skip('Appium 在线但无在线设备（连上手机后可用）；Appium 服务本身正常')
     return 'Appium 在线，设备: %s' % ', '.join(serials)

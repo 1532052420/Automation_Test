@@ -28,10 +28,6 @@ FAKE_RUN = '20991231_901'
 RUNS_DIR = os.path.join(ROOT, 'output', 'runs')
 
 
-_NO_PROXY_OPENER = urllib.request.build_opener(
-    urllib.request.ProxyHandler({}), _NoRedirect) if False else None
-
-
 def _make_opener(no_redirect=False):
     handlers = [urllib.request.ProxyHandler({})]  # 本机服务绕过系统代理（防 502 干扰）
     if no_redirect:
@@ -570,6 +566,8 @@ def test_admin_files_unified_list_and_types(platform):
     # 类型筛选
     code, body, _ = http('GET', '/api/admin/files?type=framework')
     assert all(f['file_type'] == 'framework' for f in json.loads(body)['files'])
+    # 清理：与其他 admin 用例一致，避免残留文件污染用例树
+    os.remove(leftover)
 
 
 def test_admin_overwrite_backup(platform):
