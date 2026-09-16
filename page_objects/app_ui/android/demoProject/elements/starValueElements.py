@@ -17,3 +17,5 @@ class StarValueElements:
         self.gift_card_first = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/tv_gift_name', wait_type=Wait_By.VISIBILITY_OF)  # 礼物墙-第一个礼物卡片名（多个取第一个）
         self.test_lkwg = CreateElement.create(Locator_Type.XPATH, '//*[@text="洛克王国：世界"]', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)
         self.tesst = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/toolbarLayout', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)
+        self.tvTitle = CreateElement.create(Locator_Type.XPATH, '//*[@text="专辑馆"]', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)
+        self.appBarLayout = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/appBarLayout', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)

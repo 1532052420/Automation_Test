@@ -52,6 +52,10 @@ class Test1StarValue:
         page.click_tesst()
         # 点击tesst
         page.click_tesst()
+        # 点击tvTitle
+        page.click_tvTitle()
+        # 点击appBarLayout
+        page.click_appBarLayout()
 
     def test_gift_card_no_response(self):
         page = self.page

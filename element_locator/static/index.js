@@ -170,8 +170,8 @@ async function init() {
   });
   $('btn-modal-save').addEventListener('click', () => onSaveElement(false));
   $('btn-modal-save-continue').addEventListener('click', () => onSaveElement(true));
-  // 连续添加：退出悬浮条；已有元素复用面板三按钮
-  $('cont-add-chip').addEventListener('click', () => { state.continuousAdd = false; updateContChip(); });
+  // 连续添加确认弹窗：点「好」仅关闭弹窗（不退出连续添加）；已有元素复用面板三按钮
+  $('cont-alert-ok').addEventListener('click', () => { $('cont-add-chip').style.display = 'none'; });
   $('btn-dup-reuse').addEventListener('click', () => { const r = dupResolver; closeDupPanel(); if (r) r('reuse'); });
   $('btn-dup-update').addEventListener('click', () => { const r = dupResolver; closeDupPanel(); if (r) r('update'); });
   $('btn-dup-cancel').addEventListener('click', () => { const r = dupResolver; closeDupPanel(); if (r) r('cancel'); });
@@ -874,18 +874,15 @@ function closeDupPanel() {
   dupResolver = null;
 }
 /* ---- 连续添加模式：保存并继续后开启；点截图/元素树选中新元素自动弹出添加窗口 ----
-   提示条：屏幕中上方 iOS 风格弹层，闪动 3 秒后自动消失（点击可提前退出连续添加） */
-let contChipTimer = null;
+   确认弹窗：本次页面会话内只在第一次开启时弹出一次（避免每次保存并继续都打扰），
+   点「好」关闭；退出连续添加走「添加测试用例」弹窗的取消按钮 */
+let contAlertShown = false;
 function updateContChip() {
   const chip = $('cont-add-chip');
   if (!chip) return;
-  clearTimeout(contChipTimer);
-  if (state.continuousAdd) {
-    chip.style.display = '';           // 重新显示时从头播闪动动画
-    chip.style.animation = 'none';
-    void chip.offsetWidth;
-    chip.style.animation = '';
-    contChipTimer = setTimeout(() => { chip.style.display = 'none'; }, 3000);
+  if (state.continuousAdd && !contAlertShown) {
+    contAlertShown = true;
+    chip.style.display = '';
   } else {
     chip.style.display = 'none';
   }

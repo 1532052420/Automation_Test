@@ -24,7 +24,7 @@ try {
   if (window.self !== window.top) _de.classList.add('embedded');
 } catch (e) { /* 隐私模式等场景忽略 */ }
 </script>
-<link rel="stylesheet" href="static/style.css?v=43">
+<link rel="stylesheet" href="static/style.css?v=44">
 </head>
 <body>
 <div id="embed-bar" class="embed-bar"></div>
@@ -67,10 +67,11 @@ try {
       <img id="shot" alt="设备截图" style="display:none">
       <div id="shot-overlay"></div>
       <div id="shot-empty" class="empty">← 点击"刷新"加载手机截图</div>
-      <button id="cont-add-chip" class="cont-add-chip" style="display:none" title="点击退出连续添加">
-        <span class="cc-main">🔁 连续添加中</span>
-        <span class="cc-sub">在截图上点选下一个元素即可继续添加 · 点击本提示退出</span>
-      </button>
+      <div id="cont-add-chip" class="cont-add-chip" style="display:none" role="alertdialog" aria-label="连续添加已开启">
+        <span class="cc-main">🔁 连续添加已开启</span>
+        <span class="cc-sub">在左侧截图上<b>点选下一个元素</b>，会自动弹出「添加测试用例」继续录入；<br>不再需要时，在弹窗里点「取消」即可结束连续添加。</span>
+        <button id="cont-alert-ok" class="cc-btn" type="button">好</button>
+      </div>
     </div>
   </section>
   <div class="col-resizer" data-resize="left" title="拖动调整左右两栏宽度"></div>
@@ -260,6 +261,6 @@ try {
 <div id="help-tip" class="help-tip" style="display:none"></div>
 
 <script src="/static/theme.js"></script>
-<script src="static/index.js?v=49"></script>
+<script src="static/index.js?v=50"></script>
 </body>
 </html>

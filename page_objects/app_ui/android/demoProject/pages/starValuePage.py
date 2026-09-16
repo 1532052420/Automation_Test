@@ -165,4 +165,12 @@ class StarValuePage:
         """点击「toolbarLayout」"""
         self.appOperator.click(self._elements.tesst)
 
+    def click_tvTitle(self):
+        """点击「tvTitle」"""
+        self.appOperator.click(self._elements.tvTitle)
+
+    def click_appBarLayout(self):
+        """点击「appBarLayout」"""
+        self.appOperator.click(self._elements.appBarLayout)
+
 
