@@ -22,6 +22,7 @@ menu() {
   echo " 5) Appium 服务（启动/停止/状态）"
   echo " 6) 环境检查（设备/依赖自动补齐）"
   echo " 7) Web 执行平台（含元素定位器）  http://127.0.0.1:8080"
+  echo " 8) 重启 Web 执行平台（改完平台代码后让新代码生效）"
   echo " q) 退出"
   echo "=================================================="
 }
@@ -74,7 +75,7 @@ do_report() {
 
 do_appium() {
   echo ">>> Appium 服务："
-  echo " 1) 启动（端口 4725）"
+  echo " 1) 启动（端口 4726）"
   echo " 2) 停止"
   echo " 3) 状态"
   read -r AP
@@ -100,6 +101,7 @@ while true; do
     5) do_appium ;;
     6) "$RUN_SH" env-check; echo ""; echo ">>> 环境检查完毕，回车返回菜单"; read -r _ ;;
     7) "$RUN_SH" platform; sleep 1 ;;
+    8) "$RUN_SH" restart-platform; sleep 1 ;;
     q|Q) echo "再见"; exit 0 ;;
     *) echo "无效选择：$CHOICE" ;;
   esac
