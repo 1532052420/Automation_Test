@@ -31,16 +31,6 @@ def _():
     return 'http_server_init 就绪（端口 %s）；真实进程由 run_app_ui_test 启动，此处不重复拉起' % port
 
 
-@check('init.mitmproxy.config', 'init/mitmproxy/mitmproxy_init.py + addons.py', '抓包代理初始化（仅配置与接口校验，不启动进程）')
-def _():
-    from init.mitmproxy.mitmproxy_init import mitmproxy_init
-    assert_true(callable(mitmproxy_init), 'mitmproxy_init 缺失')
-    assert_true(os.path.exists(os.path.join('init', 'mitmproxy', 'addons.py')), 'addons.py 缺失')
-    from base.read_mitmproxy_config import Read_Mitmproxy_Config
-    assert_true(int(Read_Mitmproxy_Config().mitmproxy_config.proxy_port) > 0, '代理端口配置异常')
-    return 'mitmproxy_init/addons 就绪；真实进程由 run_app_ui_test 启动，此处不重复拉起'
-
-
 @check('init.appui.demo_project', 'init/app_ui/android/demoProject/demoProjectInit.py', 'APP 项目初始化链路真实执行（默认空实现）')
 def _():
     from init.app_ui.android.demoProject.demoProjectInit import DemoProjectInit

@@ -53,20 +53,6 @@ case "$1" in
   stop-appium)
     pkill -f "appium --port 4726" 2>/dev/null && echo "Appium 已停止" || echo "Appium 未在运行"
     ;;
-  locator)
-    if curl -s --max-time 2 http://127.0.0.1:8001/api/status >/dev/null 2>&1; then
-      echo "元素定位器已在运行: http://127.0.0.1:8001/"
-    else
-      mkdir -p logs
-      nohup .venv/bin/python element_locator/server.py > logs/element_locator.log 2>&1 &
-      sleep 3
-      echo "元素定位器已启动: http://127.0.0.1:8001/  日志: logs/element_locator.log"
-    fi
-    open http://127.0.0.1:8001/
-    ;;
-  stop-locator)
-    pkill -f "element_locator/server.py" 2>/dev/null && echo "元素定位器已停止" || echo "元素定位器未在运行"
-    ;;
   platform)
     if curl -s --max-time 2 http://127.0.0.1:8080/api/status >/dev/null 2>&1; then
       echo "Web 执行平台已在运行: http://127.0.0.1:8080/"
@@ -92,7 +78,7 @@ case "$1" in
     esac
     ;;
   *)
-    echo "用法: ./run.sh {api|app|platform|start-appium|stop-appium|status|locator|env-check|report}"
+    echo "用法: ./run.sh {api|app|platform|start-appium|stop-appium|status|env-check|report}"
     echo "  例: ./run.sh api                     # 跑 API 用例"
     echo "      ./run.sh app -d cases/app_ui/android/demoProject/   # 跑指定 APP 用例"
     echo "      ./run.sh platform                # 启动 Web 执行平台"

@@ -20,9 +20,8 @@ menu() {
   echo " 3) APP 测试（指定关键字，如 -k demo_tool）"
   echo " 4) 生成测试报告"
   echo " 5) Appium 服务（启动/停止/状态）"
-  echo " 6) 启动元素定位器  http://127.0.0.1:8001"
-  echo " 7) 环境检查（设备/依赖自动补齐）"
-  echo " 8) Web 执行平台     http://127.0.0.1:8080"
+  echo " 6) 环境检查（设备/依赖自动补齐）"
+  echo " 7) Web 执行平台（含元素定位器）  http://127.0.0.1:8080"
   echo " q) 退出"
   echo "=================================================="
 }
@@ -99,9 +98,8 @@ while true; do
     3) do_app_kw ;;
     4) do_report ;;
     5) do_appium ;;
-    6) "$RUN_SH" locator; echo "元素定位器已启动：http://127.0.0.1:8001/（浏览器打开）"; sleep 2 ;;
-    7) "$RUN_SH" env-check; echo ""; echo ">>> 环境检查完毕，回车返回菜单"; read -r _ ;;
-    8) "$RUN_SH" platform; sleep 1 ;;
+    6) "$RUN_SH" env-check; echo ""; echo ">>> 环境检查完毕，回车返回菜单"; read -r _ ;;
+    7) "$RUN_SH" platform; sleep 1 ;;
     q|Q) echo "再见"; exit 0 ;;
     *) echo "无效选择：$CHOICE" ;;
   esac

@@ -87,15 +87,6 @@ def _():
     return 'httpserver_port=%s local_ip=%s' % (hc.httpserver_port, getattr(hc, 'local_ip', '-'))
 
 
-@check('base.read_mitmproxy_config', 'base/read_mitmproxy_config.py + pojo/mitmproxy_config.py', '抓包代理配置读取（config/mitmproxy.conf）')
-def _():
-    from base.read_mitmproxy_config import Read_Mitmproxy_Config
-    mc = Read_Mitmproxy_Config().mitmproxy_config
-    assert_true(int(mc.proxy_port) > 0, 'proxy_port 异常: %r' % mc.proxy_port)
-    assert_true(hasattr(mc, 'ssl_insecure'), '缺少 ssl_insecure 字段')
-    return 'proxy_port=%s ssl_insecure=%s' % (mc.proxy_port, mc.ssl_insecure)
-
-
 @check('base.api.read_config', 'base/api/demoProject/api_demoProject_read_config.py + pojo/api/demoProjectConfig.py',
        '接口项目配置读取（test 环境）')
 def _():
