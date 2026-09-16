@@ -13,6 +13,7 @@ from flask import Blueprint, jsonify, render_template, request, send_file
 
 from web_platform import report_data
 from web_platform import runner
+from web_platform.changelog import APP_VERSION, CHANGELOG
 from web_platform.runtime_config import (
     BASE_DIR,
     WebPlatformConfig,
@@ -77,6 +78,7 @@ def api_status():
     return jsonify({
         'ok': True,
         'service': 'app-ui-platform',
+        'version': APP_VERSION,
         'confs': confs,
         'device_online': len(online),
         'devices': adb['devices'],
@@ -84,6 +86,12 @@ def api_status():
         'running': running,
         'port': PLATFORM_CFG.port,
     })
+
+
+@bp.route('/api/changelog')
+def api_changelog():
+    """更新日志：版本号 + 更新时间（秒级）+ 变更明细（供左下角「更新日志」入口展示）"""
+    return jsonify({'ok': True, 'version': APP_VERSION, 'entries': CHANGELOG})
 
 
 @bp.route('/api/devices')

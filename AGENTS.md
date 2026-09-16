@@ -2,15 +2,16 @@
 
 本项目的所有任务在执行前，必须先声明：**「我已按照 agents.md 执行了 xxx skill」**，并 genuinely 按对应 skill 的规范执行，而不是只走声明形式。
 
-## 三条强制规范（全项目默认启用）
+## 四条强制规范（全项目默认启用）
 
-以下三条规范为**项目默认生效**，无需每次手动指定、无需用户显式调用 skill；只要任务落在对应触发范围内，即自动适用。
+以下四条规范为**项目默认生效**，无需每次手动指定、无需用户显式调用 skill；只要任务落在对应触发范围内，即自动适用。
 
 | # | skill | 默认启用的触发范围 | 安装位置 |
 |---|-------|------------------|---------|
 | 1 | `ponytail` | 写代码、改代码、修 bug、重构、审查 diff、选型依赖 | `.workbuddy/skills/ponytail/` |
 | 2 | `icon-generator` | 为 App / 网页（含 web_platform 测试平台）产出或修改图标 | `.workbuddy/skills/icon-generator/` |
 | 3 | `qa-engineer-agent` | 设计测试策略、编写测试用例、执行测试验收 | `.workbuddy/skills/qa-engineer-agent/` |
+| 4 | `version-changelog` | **任何对项目产物（代码/UI/配置/文档）产生修改的任务** | `.workbuddy/skills/version-changelog/` |
 
 > 同一份 skill 亦同步存放于 `.zcode/skills/`（ZCode/Qoder 运行时读取路径）。两处内容需保持一致，权威副本为 `.workbuddy/skills/`。
 
@@ -30,6 +31,16 @@ ponytail 完整插件仓库备份在 `ponytail-main/`（含 hooks、MCP、命令
 
 设计测试策略、编写测试用例、执行测试验收时，按 `.workbuddy/skills/qa-engineer-agent/SKILL.md` 执行：测试金字塔（单元 60% / 集成 30% / E2E 10%）、AAA 模式（Arrange-Act-Assert）、全路径覆盖（正向 → 边界 → 异常 → 特殊场景）、测试隔离且幂等、报告必有证据（状态统计 + 缺陷分级）。测试用例格式遵循其 TC_ID 标准。
 
+### 4. 版本号与更新日志 — 严格执行 version-changelog skill
+
+**任何对项目产物产生修改的任务（含代码、UI、配置、文档），收尾时必须执行**，规范见 `.workbuddy/skills/version-changelog/SKILL.md`：
+
+- **唯一数据源**：`web_platform/changelog.py` 的 `APP_VERSION` 与 `CHANGELOG`。平台与元素定位器**共用同一版本号**，禁止在别处硬编码（定位器 `APP_VERSION` 只是读取后加 `v` 前缀）。
+- **递增规则**：有修改 → 版本号 **+1**（3.3 → 3.4）；重大改造 / 不兼容变更 → **+2**（3.3 → 3.5）。
+- **必录内容**：在 `CHANGELOG` **顶部**追加一条，含版本号、**更新时间（精确到秒）**、一句话标题、本次「改了什么 / 修了什么」明细。
+- **无需改 UI**：平台左下角「📋 更新日志」入口自动读该数据源展示，不必另写界面。
+- 同一次任务只升一次版本号；确无任何产物改动的纯问答可跳过。
+
 ## 执行声明格式
 
 每次任务开始时输出一行，例如：
@@ -37,8 +48,9 @@ ponytail 完整插件仓库备份在 `ponytail-main/`（含 hooks、MCP、命令
 - 「我已按照 agents.md 执行了 ponytail skill」
 - 「我已按照 agents.md 执行了 icon-generator skill」
 - 「我已按照 agents.md 执行了 qa-engineer-agent skill」
+- 「我已按照 agents.md 执行了 version-changelog skill」
 
-任务同时涉及多个规范时，逐条声明。未涉及编码/UI/测试的纯问答任务可不声明。
+任务同时涉及多个规范时，逐条声明。未涉及编码/UI/测试/改动的纯问答任务可不声明。
 
 ## 停用方式
 

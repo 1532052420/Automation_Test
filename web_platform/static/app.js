@@ -72,21 +72,61 @@ function renderSidebar(active) {
     ['/locator', '🎯', '元素定位器'],
   ];
   sb.innerHTML =
-    '<div class="brand"><div class="logo">🤖</div><div>AppUI 自动化<br><small>测试平台 v1.6</small></div></div>' +
+    '<div class="brand"><div class="logo">🤖</div><div>AppUI 自动化<br><small>测试平台 v<span id="brandVer">…</span></small></div></div>' +
     '<nav>' + items.map(([href, ico, name]) =>
       '<a href="' + href + '" class="' + (href === active ? 'on' : '') + '"><span class="ico">' + ico + '</span>' + name + '</a>'
     ).join('') + '</nav>' +
     '<div class="foot">' +
     '<span><i class="dot ok" id="dotDevice"></i>设备 <span id="footDevice">…</span></span>' +
     '<span><i class="dot ok" id="dotAppium"></i>Appium <span id="footAppium">…</span></span>' +
+    '<button class="ghost mini" id="btnChangelog" title="查看各版本更新时间与变更内容">📋 更新日志 v<span id="clVer">…</span></button>' +
     '</div>';
+  const clBtn = $('#btnChangelog');
+  if (clBtn) clBtn.addEventListener('click', showChangelog);
   pollFootStatus();
   setInterval(pollFootStatus, 10000);
+}
+
+/* ---------------- 更新日志（左下角入口） ---------------- */
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g,
+    c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+}
+
+async function showChangelog() {
+  const d = await api('/api/changelog');
+  if (!d.ok) return toast('更新日志加载失败', false);
+  let mask = $('#clMask');
+  if (!mask) {
+    mask = document.createElement('div');
+    mask.className = 'mask';
+    mask.id = 'clMask';
+    mask.innerHTML =
+      '<div class="modal clmodal"><h4>📋 更新日志</h4>' +
+      '<div class="cllist" id="clList"></div>' +
+      '<div class="mops"><button id="clClose">关闭</button></div></div>';
+    document.body.appendChild(mask);
+    mask.onclick = (e) => { if (e.target === mask) mask.classList.remove('show'); };
+  }
+  $('#clList').innerHTML = (d.entries || []).map(e =>
+    '<div class="clitem' + (e.version === d.version ? ' cur' : '') + '">' +
+      '<div class="clhead"><b>v' + escHtml(e.version) + '</b>' +
+      '<span class="cltime">' + escHtml(e.time) + '</span>' +
+      (e.version === d.version ? '<span class="clbadge">当前版本</span>' : '') + '</div>' +
+      (e.title ? '<div class="cltitle">' + escHtml(e.title) + '</div>' : '') +
+      '<ul>' + (e.changes || []).map(c => '<li>' + escHtml(c) + '</li>').join('') + '</ul>' +
+    '</div>').join('');
+  $('#clClose').onclick = () => mask.classList.remove('show');
+  mask.classList.add('show');
 }
 
 async function pollFootStatus() {
   try {
     const st = await api('/api/status');
+    // 版本号（平台与元素定位器统一，来自后端 changelog.py 单一数据源）
+    const bv = $('#brandVer'), cv = $('#clVer');
+    if (bv) bv.textContent = st.version || '?';
+    if (cv) cv.textContent = st.version || '?';
     const d = $('#dotDevice'), f = $('#footDevice');
     if (d) {
       const on = st.device_online > 0;

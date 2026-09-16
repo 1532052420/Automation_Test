@@ -23,8 +23,14 @@ from tutorials import TUTORIALS, search_tutorials
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 
-# 元素定位器版本号：每次功能/修复后递增，左上角会显示，用来确认本地是否已更新
-APP_VERSION = 'v3.2'
+# 元素定位器版本号：与平台统一，唯一数据源为 web_platform/changelog.py（APP_VERSION）。
+# 左上角会显示，用来确认本地是否已更新。改版本号请改 changelog.py，勿在这里硬编码。
+try:
+    from web_platform.changelog import APP_VERSION as _PLATFORM_VERSION
+    APP_VERSION = 'v' + _PLATFORM_VERSION
+except ImportError:  # 独立运行定位器且项目根不在 sys.path 时的兜底
+    APP_VERSION = 'v3.3'
+    print('警告: 未能读取 web_platform.changelog 的版本号，使用内置兜底值 %s' % APP_VERSION)
 
 # 开发工具要能"改完即刷"，静态文件禁用浏览器强缓存（Flask 默认 max-age=12h）
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0

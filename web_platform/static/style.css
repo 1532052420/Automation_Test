@@ -298,3 +298,17 @@ html.day button.ghost:hover { background: rgba(0,0,0,.07); color: #111; }
 html.day button:disabled { background: #d4d4d8; color: #8e8e93; }
 html.day .mtree-item:hover { background: rgba(0,0,0,.05); }
 html.day .st-PENDING { background: #a1a1aa; }
+
+/* ---------- 更新日志弹窗（左下角「📋 更新日志」入口） ---------- */
+.clmodal { width: min(680px, 92vw); text-align: left; }
+.cllist { max-height: 58vh; overflow: auto; margin-bottom: 14px; padding-right: 4px; }
+.clitem { padding: 12px 14px; margin-bottom: 10px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--panel2); }
+.clitem.cur { border-color: var(--accent); }
+.clhead { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.clhead b { color: var(--ink); font-size: 14px; }
+.cltime { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.clbadge { margin-left: auto; background: var(--accent-tint); color: var(--accent-deep); border-radius: 999px; padding: 1px 8px; font-size: 11px; }
+.cltitle { color: var(--ink2); font-size: 13px; margin-bottom: 6px; }
+.clitem ul { margin: 0; padding-left: 18px; }
+.clitem li { color: var(--ink2); font-size: 12.5px; line-height: 1.7; }
+.sidebar .foot button { margin-top: 4px; align-self: flex-start; }
