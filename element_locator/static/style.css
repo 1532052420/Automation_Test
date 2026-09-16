@@ -282,10 +282,25 @@ html.night .flow-col.soft .col-head::after { color: #6b7280; }
 .steps-list .sl-idx { color: #9ca3af; min-width: 20px; text-align: right; }
 .steps-list .sl-row.new .sl-idx { color: #1d4ed8; }
 /* 连续添加模式悬浮条（贴在截图上方） */
-.cont-add-chip { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 5;
-  padding: 5px 14px; border: 1px solid #93c5fd; background: #1d4ed8; color: #fff; border-radius: 999px;
-  font-size: 12px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
-.cont-add-chip:hover { background: #1e40af; }
+/* 连续添加提示：屏幕中上方居中、iOS 原生弹层风格；闪动提示，3 秒后由 JS 自动隐藏 */
+.cont-add-chip { position: fixed; left: 50%; top: 38%; transform: translate(-50%, -50%); z-index: 1500;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  max-width: 78vw; padding: 13px 24px; border: 0; border-radius: 16px; cursor: pointer;
+  background: rgba(250, 250, 252, .93); color: #111827; font-size: 14.5px; font-weight: 600; line-height: 1.5;
+  text-align: center; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 12px 36px rgba(17, 24, 39, .20), 0 2px 8px rgba(17, 24, 39, .10);
+  animation: contPulse .75s ease-in-out infinite;
+  transition: opacity .25s, transform .25s; }
+.cont-add-chip .cc-main { font-size: 14.5px; }
+.cont-add-chip .cc-sub { font-size: 12px; font-weight: 400; color: #6b7280; }
+.cont-add-chip:hover { background: rgba(255, 255, 255, .97); }
+.cont-add-chip:active { transform: translate(-50%, -50%) scale(.97); }
+@keyframes contPulse { 0%, 100% { opacity: 1; } 50% { opacity: .38; } }
+/* 夜间模式（html.night）：深色毛玻璃卡片 */
+html.night .cont-add-chip { background: rgba(44, 44, 48, .93); color: #f3f4f6;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, .55), 0 2px 8px rgba(0, 0, 0, .35); }
+html.night .cont-add-chip .cc-sub { color: #9ca3af; }
+html.night .cont-add-chip:hover { background: rgba(54, 54, 60, .96); }
 .modal-title .hint { font-weight: 400; font-size: 12px; color: #9ca3af; margin-left: 10px; }
 /* 元素名绑定联动提示（自动切换元素文件等） */
 .bind-note { font-size: 12px; color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 5px 10px; margin: 4px 0 8px; }

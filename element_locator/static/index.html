@@ -24,7 +24,7 @@ try {
   if (window.self !== window.top) _de.classList.add('embedded');
 } catch (e) { /* 隐私模式等场景忽略 */ }
 </script>
-<link rel="stylesheet" href="static/style.css?v=42">
+<link rel="stylesheet" href="static/style.css?v=43">
 </head>
 <body>
 <div id="embed-bar" class="embed-bar"></div>
@@ -67,7 +67,10 @@ try {
       <img id="shot" alt="设备截图" style="display:none">
       <div id="shot-overlay"></div>
       <div id="shot-empty" class="empty">← 点击"刷新"加载手机截图</div>
-      <button id="cont-add-chip" class="cont-add-chip" style="display:none" title="点击退出连续添加">🔁 连续添加中 · 点截图选下一个元素 · 点此退出</button>
+      <button id="cont-add-chip" class="cont-add-chip" style="display:none" title="点击退出连续添加">
+        <span class="cc-main">🔁 连续添加中</span>
+        <span class="cc-sub">在截图上点选下一个元素即可继续添加 · 点击本提示退出</span>
+      </button>
     </div>
   </section>
   <div class="col-resizer" data-resize="left" title="拖动调整左右两栏宽度"></div>
@@ -143,8 +146,8 @@ try {
           <label>写入元素文件 <span class="help-icon" data-help="元素写进哪个元素文件。选②时这里会自动对齐到目标用例页面引用的元素文件（页面只认一个元素文件，必须一致）；选「➕ 新建…」则随用例包一起新建元素文件（文件名自动按用例名推荐，可改）。">?</span>
             <select id="el-file"></select>
             <span id="el-file-new-wrap" style="display:none;margin-top:6px">
-              <input id="el-file-new" type="text" placeholder="新元素文件名，如: loginFlowElements">
-              <span class="hint" style="font-size:11px">.py 后缀自动添加</span>
+              <input id="el-file-new" type="text" placeholder="新元素文件名，如: loginFlow（后缀自动补）">
+              <span class="hint" style="font-size:11px">结尾自动补 Elements（固定不可省略）、.py 后缀自动添加</span>
             </span>
           </label>
           <div class="pv-title">元素代码 <span class="hint">实时</span></div>
@@ -257,6 +260,6 @@ try {
 <div id="help-tip" class="help-tip" style="display:none"></div>
 
 <script src="/static/theme.js"></script>
-<script src="static/index.js?v=48"></script>
+<script src="static/index.js?v=49"></script>
 </body>
 </html>

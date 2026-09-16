@@ -873,10 +873,22 @@ function closeDupPanel() {
   $('el-dup-panel').style.display = 'none';
   dupResolver = null;
 }
-/* ---- 连续添加模式：保存并继续后开启；点截图/元素树选中新元素自动弹出添加窗口 ---- */
+/* ---- 连续添加模式：保存并继续后开启；点截图/元素树选中新元素自动弹出添加窗口 ----
+   提示条：屏幕中上方 iOS 风格弹层，闪动 3 秒后自动消失（点击可提前退出连续添加） */
+let contChipTimer = null;
 function updateContChip() {
   const chip = $('cont-add-chip');
-  if (chip) chip.style.display = state.continuousAdd ? '' : 'none';
+  if (!chip) return;
+  clearTimeout(contChipTimer);
+  if (state.continuousAdd) {
+    chip.style.display = '';           // 重新显示时从头播闪动动画
+    chip.style.animation = 'none';
+    void chip.offsetWidth;
+    chip.style.animation = '';
+    contChipTimer = setTimeout(() => { chip.style.display = 'none'; }, 3000);
+  } else {
+    chip.style.display = 'none';
+  }
 }
 /* ---- 目标方法已有步骤 + 插入位置（②栏） ---- */
 function currentSteps() {
@@ -1234,9 +1246,15 @@ function capCamel(s) {  // login_flow -> LoginFlow（类名用）
 }
 function pkgBase() { return newCaseBase(); }
 function pkgElementFileName() {
-  const v = ($('el-file-new').value || '').trim().replace(/[^A-Za-z0-9_]/g, '_');
-  const stem = v || (pkgBase() ? pkgBase() + 'Elements' : '');
-  return stem ? stem.replace(/\.py$/i, '') + '.py' : '';
+  const raw = ($('el-file-new').value || '').trim().replace(/\.py$/i, '');  // 先剥 .py（过滤会把 . 变 _）
+  const v = raw.replace(/[^A-Za-z0-9_]/g, '_');
+  const b = pkgBase();
+  const stem = v || (b ? b + 'Elements' : '');
+  if (!stem) return '';
+  // 元素文件名必须以 Elements 结尾（页面/用例生成逻辑依赖该后缀判定归属）：
+  // 用户漏写或写成单数 Element 时自动规范化，.py 后缀同样自动补
+  const norm = stem.replace(/Elements?$/,'') + 'Elements';
+  return norm + '.py';
 }
 function pkgElementClassName() { const f = pkgElementFileName(); return f ? capFirst(f.replace('.py', '')) : ''; }
 function pkgPageFileName() { const b = pkgBase(); return b ? capFirst(b) + 'Page.py' : ''; }
@@ -1595,52 +1613,5 @@ function buildTutItem(item) {
 }
 
 document.addEventListener('DOMContentLoaded', init);
-/* ---------- 日间/夜间模式切换（悬浮按钮，Mac/iPhone 简约风日/月图标；默认日间=白色居多） ----------
-   按钮图标：日间显示月亮（点击切夜间），夜间显示太阳（点击切日间）；颜色随主题自适应 */
-(function () {
-  const KEY = 'locator_theme';
-  /* SF Symbols 风格：细线太阳 / 实心月牙 */
-  const ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">'
-    + '<circle cx="12" cy="12" r="4.1"/>'
-    + '<path d="M12 2.8v2M12 19.2v2M2.8 12h2M19.2 12h2M5.2 5.2l1.5 1.5M17.3 17.3l1.5 1.5M18.8 5.2l-1.5 1.5M6.7 17.3l-1.5 1.5"/></svg>';
-  const ICON_MOON = '<svg viewBox="0 0 24 24" fill="currentColor">'
-    + '<path d="M20.6 14.4A8.6 8.6 0 0 1 9.6 3.4 8.6 8.6 0 1 0 20.6 14.4Z"/></svg>';
-
-  function apply(mode) {
-    document.documentElement.classList.toggle('night', mode === 'night');
-    const fab = document.getElementById('theme-fab');
-    if (fab) {
-      fab.innerHTML = mode === 'night' ? ICON_SUN : ICON_MOON;
-      fab.title = mode === 'night' ? '切换到日间模式（白色）' : '切换到夜间模式（黑色）';
-    }
-  }
-
-  function current() {
-    try { if (localStorage.getItem(KEY) === 'night') return 'night'; } catch (e) { /* 忽略 */ }
-    return 'day';
-  }
-
-  function toggle() {
-    const m = current() === 'night' ? 'day' : 'night';
-    try { localStorage.setItem(KEY, m); } catch (e) { /* 忽略 */ }
-    apply(m);
-  }
-
-  function init() {
-    const fab = document.createElement('button');
-    fab.id = 'theme-fab';
-    fab.className = 'theme-fab';
-    fab.addEventListener('click', toggle);
-    document.body.appendChild(fab);
-    apply(current());
-    // 首屏按已存主题直接渲染（不动画）；首帧之后开启过渡，点击切换时颜色平滑渐变
-    requestAnimationFrame(function () {
-      requestAnimationFrame(function () {
-        document.documentElement.classList.add('theme-anim');
-      });
-    });
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else init();
-})();
+/* 日间/夜间模式切换按钮由平台的 /static/theme.js 统一注入（两端共用存储键、全局同步）；
+   本文件不再创建按钮——重复创建会叠出空按钮（同 id），表现为"图标消失"。 */
