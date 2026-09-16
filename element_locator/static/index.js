@@ -1201,8 +1201,12 @@ function onCaseFileChange() {
   // 写入页面文件 = 目标用例的 self.page 所在文件（只读展示，跟随用例）
   const p = purposeValue();
   const info = infos.find(c => c.page_file);
+  const amb = infos.find(c => (c.page_ambiguous || []).length);
   $('el-page-file').value = info ? info.page_file : '';
-  if (p !== 'only' && !info) {
+  if (amb) {
+    setElLinkNote('⚠ 页面类 ' + amb.page_class + ' 在多个文件里重名：' + amb.page_ambiguous.join('、')
+                  + '——归属不唯一，已禁止写入页面方法，请先改名或删除重名文件');
+  } else if (p !== 'only' && !info) {
     setElLinkNote('⚠ 该用例没有页面对象（self.page），③ 无法生成操作——请换有页面对象的用例，或先补页面文件后重试');
   } else if (p === 'all' && info && info.elements_file) {
     if ($('el-file').value !== info.elements_file) {

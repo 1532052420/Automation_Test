@@ -36,17 +36,21 @@ PROBE_STEP_TYPES = {'wait_element', 'assert_gone', 'if_click'}
 
 
 def list_case_files():
-    """枚举现有用例文件（test_*.py）"""
+    """枚举现有用例文件（test_*.py）；排除管理后台自动生成的历史备份"""
     if not os.path.isdir(CASES_DIR):
         return []
-    return sorted(f for f in os.listdir(CASES_DIR) if f.startswith('test_') and f.endswith('.py'))
+    return sorted(f for f in os.listdir(CASES_DIR)
+                  if f.startswith('test_') and f.endswith('.py')
+                  and not element_library.is_generated_backup(f))
 
 
 def list_page_files():
-    """枚举现有页面对象文件"""
+    """枚举现有页面对象文件；排除管理后台自动生成的历史备份"""
     if not os.path.isdir(PAGES_DIR):
         return []
-    return sorted(f for f in os.listdir(PAGES_DIR) if f.endswith('.py') and f != '__init__.py')
+    return sorted(f for f in os.listdir(PAGES_DIR)
+                  if f.endswith('.py') and f != '__init__.py'
+                  and not element_library.is_generated_backup(f))
 
 
 def _read(path):
@@ -322,17 +326,25 @@ def _page_class_of(cls_block):
     return m.group(1) if m else ''
 
 
-def resolve_page(page_class):
-    """页面类名 → (页面文件名, 页面引用的元素文件名)；找不到返回 ('', '')"""
+def find_page_files(page_class):
+    """所有定义了 page_class 的页面文件。同名类出现在多个文件时归属不唯一——
+    按类名反解会静默取第一个、把页面方法写进错误的文件，因此必须由调用方显式拦下。"""
     if not page_class:
+        return []
+    pat = re.compile(r'^class\s+%s\b' % re.escape(page_class), re.MULTILINE)
+    return [f for f in list_page_files()
+            if pat.search(_read(os.path.join(PAGES_DIR, f)))]
+
+
+def resolve_page(page_class):
+    """页面类名 → (页面文件名, 页面引用的元素文件名)。
+    找不到、或同名类命中多个文件（归属歧义）时返回 ('', '')，绝不静默取首个。"""
+    hits = find_page_files(page_class)
+    if len(hits) != 1:
         return '', ''
-    for f in list_page_files():
-        content = _read(os.path.join(PAGES_DIR, f))
-        if not re.search(r'^class\s+%s\b' % re.escape(page_class), content, re.MULTILINE):
-            continue
-        em = re.search(r'from\s+page_objects\.app_ui\.android\.demoProject\.elements\.(\w+)\s+import', content)
-        return f, ((em.group(1) + '.py') if em else '')
-    return '', ''
+    content = _read(os.path.join(PAGES_DIR, hits[0]))
+    em = re.search(r'from\s+page_objects\.app_ui\.android\.demoProject\.elements\.(\w+)\s+import', content)
+    return hits[0], ((em.group(1) + '.py') if em else '')
 
 
 def _method_body(content, method_name):
@@ -392,11 +404,13 @@ def case_files_info():
                 if mname not in ('setup_class', 'teardown_class'):
                     msteps[mname] = method_steps(block, mname)
             page_class = _page_class_of(block)
+            hits = find_page_files(page_class)
             page_file, elements_file = resolve_page(page_class)
             infos.append({'file': f, 'class': cls_name, 'methods': methods,
                           'method_steps': msteps,
                           'page_class': page_class, 'page_file': page_file,
-                          'elements_file': elements_file})
+                          'elements_file': elements_file,
+                          'page_ambiguous': hits if len(hits) > 1 else []})
     return infos
 
 
@@ -472,6 +486,12 @@ def append_code_to_method(case_file, method_name, step, gen_page_method=False, i
         if re.search(r'^%sdef %s\(' % (IND, re.escape(method_name)), block, re.MULTILINE):
             page_class = _page_class_of(block)
             break
+    hits = find_page_files(page_class)
+    if len(hits) > 1:
+        return {'ok': False,
+                'msg': ('已追加用例行，但页面类 %s 在多个文件里重名（%s），归属不唯一，'
+                        '已中止写入页面方法——请先给重名文件改名或删除，再重试'
+                        % (page_class, '、'.join(hits)))}
     page_file, elements_file = resolve_page(page_class)
     if not page_file:
         return {'ok': False,

@@ -12,6 +12,16 @@ ELEMENTS_DIR = 'page_objects/app_ui/android/demoProject/elements'
 # 默认新建元素文件名（用户也可选择写进已有文件）
 DEFAULT_FILE = 'locator_gui_elements.py'
 
+# 管理后台覆盖上传时自动生成的历史备份 xxx_<时间戳>_backup.py（见 web_platform/admin_routes.py）。
+# 这类文件与正式文件内容可能完全相同、且会定义同类名，绝不能出现在任何"可选文件"清单里：
+# 被选中就会写入永不被页面 import 的文件（静默失效），或让按类名反解的归属算到错误文件上。
+GENERATED_BACKUP_RE = re.compile(r'_\d{8}_\d{6}_backup\.py$')
+
+
+def is_generated_backup(filename):
+    """是否为管理后台自动生成的历史备份文件"""
+    return bool(GENERATED_BACKUP_RE.search(filename))
+
 HEADER = '''# -*- coding: utf-8 -*-
 # 本文件由 GUI 元素定位器自动生成/维护
 from page_objects.createElement import CreateElement
@@ -67,7 +77,8 @@ def list_element_files():
     """枚举现有元素库文件（含默认新文件）"""
     files = []
     if os.path.isdir(ELEMENTS_DIR):
-        files = sorted(f for f in os.listdir(ELEMENTS_DIR) if f.endswith('.py') and f != '__init__.py')
+        files = sorted(f for f in os.listdir(ELEMENTS_DIR)
+                       if f.endswith('.py') and f != '__init__.py' and not is_generated_backup(f))
     if DEFAULT_FILE not in files:
         files.insert(0, DEFAULT_FILE)
     return files
