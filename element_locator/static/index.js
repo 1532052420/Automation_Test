@@ -562,6 +562,12 @@ function onShotDblClick(e) {
 
 /* ---------- 底部提示（通用）：6 秒自动消失，pointer-events:none 不阻挡任何操作 ---------- */
 let hitToastTimer = null;
+let hitToastHideAt = 0;   // 应隐藏的时刻（ms）；后台标签页定时器被浏览器节流时，回到页面立即补隐藏
+function hideHitToast() {
+  const t = $('hit-toast');
+  if (t) t.style.display = 'none';
+  hitToastHideAt = 0;
+}
 function showToast(msg) {
   const t = $('hit-toast');
   if (!t) return;
@@ -571,8 +577,16 @@ function showToast(msg) {
   void t.offsetWidth;
   t.style.animation = '';
   clearTimeout(hitToastTimer);
-  hitToastTimer = setTimeout(() => { t.style.display = 'none'; }, 6000);
+  hitToastHideAt = Date.now() + 6000;
+  hitToastTimer = setTimeout(hideHitToast, 6000);
 }
+// 页面从后台切回时：浏览器对后台标签的 setTimeout 会节流推迟，此时按应隐藏时刻立即补隐藏
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && hitToastHideAt && Date.now() >= hitToastHideAt) {
+    clearTimeout(hitToastTimer);
+    hideHitToast();
+  }
+});
 function showHitToast(node, candCount, extra) {
   const name = (node.text && node.text.trim()) ? '「' + truncate(node.text.trim(), 12) + '」'
     : (node['resource-id'] ? truncate(node['resource-id'].split('/').pop(), 16) : candName(node));
