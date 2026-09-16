@@ -161,4 +161,8 @@ class StarValuePage:
         """点击「洛克王国：世界」"""
         self.appOperator.click(self._elements.test_lkwg)
 
+    def click_tesst(self):
+        """点击「toolbarLayout」"""
+        self.appOperator.click(self._elements.tesst)
+
 

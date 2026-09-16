@@ -46,6 +46,12 @@ class Test1StarValue:
         page.click_test_lkwg()
         # 点击test_lkwg
         page.click_test_lkwg()
+        # 1111111
+        page.click_tesst()
+        # 点击tesst
+        page.click_tesst()
+        # 点击tesst
+        page.click_tesst()
 
     def test_gift_card_no_response(self):
         page = self.page
