@@ -27,6 +27,12 @@ class TestAaaaaaaa:
 
         # 1. 在「btnRealName」输入
         page.input_btnRealName('11111')
+        # 点击element_16
+        page.click_element_16()
+        # 点击element_12
+        page.click_element_12()
+        # 点击element_12
+        page.click_element_12()
 
     def teardown_class(self):
         self.appOperator.close_app()

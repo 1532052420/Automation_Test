@@ -8,3 +8,5 @@ from page_objects.app_ui.wait_type import Wait_Type as Wait_By
 class AaaaaaaaElements:
     def __init__(self):
         self.btnRealName = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/btnRealName', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)
+        self.element_16 = CreateElement.create(Locator_Type.XPATH, '//*[@class="android.view.View"]', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)
+        self.element_12 = CreateElement.create(Locator_Type.XPATH, '//*[@class="android.widget.FrameLayout"]', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)
