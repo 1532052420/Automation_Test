@@ -40,7 +40,11 @@
         <input type="text" id="upUploader" placeholder="你的名字">
       </div>
       <div class="field"><label>选择文件（.py / .yaml / .json，≤200KB）</label>
-        <input type="file" id="upFile" accept=".py,.yaml,.json">
+        <div class="filepick">
+          <input type="file" id="upFile" accept=".py,.yaml,.json">
+          <button type="button" class="filepick-btn" data-for="upFile">📎 选择文件</button>
+          <span class="filepick-name" data-name-for="upFile">未选择文件</span>
+        </div>
       </div>
     </div>
     <div class="mt" style="display:flex;gap:10px;align-items:center">
@@ -54,7 +58,11 @@
     <h3>📦 上传用例包（zip）</h3>
     <div class="fields">
       <div class="field"><label>用例包 zip（元素定位器「⬇ 下载用例包」的产物）</label>
-        <input type="file" id="upPkgFile" accept=".zip">
+        <div class="filepick">
+          <input type="file" id="upPkgFile" accept=".zip">
+          <button type="button" class="filepick-btn" data-for="upPkgFile">📦 选择 zip</button>
+          <span class="filepick-name" data-name-for="upPkgFile">未选择文件</span>
+        </div>
       </div>
       <div class="field"><label>上传人（用于追溯）</label>
         <input type="text" id="upPkgUploader" placeholder="你的名字">

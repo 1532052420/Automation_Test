@@ -67,9 +67,28 @@ async function adminUploadPackage() {
   }
 }
 
+/* ---------------- 文件选择（自定义热区：紧凑胶囊按钮 + 已选文件名；
+   原生 file 控件保留但视觉隐藏，上传逻辑仍读 input.files，行为不变） ---------------- */
+function initFilePick() {
+  document.querySelectorAll('.filepick-btn').forEach(btn => {
+    const input = document.getElementById(btn.dataset.for);
+    if (!input) return;
+    btn.addEventListener('click', () => input.click());
+    input.addEventListener('change', () => {
+      const nameEl = document.querySelector('[data-name-for="' + input.id + '"]');
+      if (!nameEl) return;
+      const f = input.files && input.files[0];
+      nameEl.textContent = f ? f.name : '未选择文件';
+      nameEl.classList.toggle('has', !!f);
+      nameEl.title = f ? f.name : '';
+    });
+  });
+}
+
 /* ---------------- 初始化 ---------------- */
 function adminInit() {
   renderSidebar('/admin');
+  initFilePick();
   $('#btnUpload').addEventListener('click', () => adminUpload(false));
   $('#btnUploadPkg').addEventListener('click', adminUploadPackage);
   $('#btnToken').addEventListener('click', () => {
