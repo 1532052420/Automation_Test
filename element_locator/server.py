@@ -184,7 +184,7 @@ def api_cases():
 @app.route('/api/save_case_package', methods=['POST'])
 def api_save_case_package():
     """「保存测试用例包·保存到框架」：三个文件内容入库。
-    定位器现以 /locator 子应用挂在测试平台同一进程内，因此直接调用管理后台的入库实现
+    定位器现以 /locator 子应用挂在测试平台同一进程内，因此直接调用用例管理的入库实现
     （import_case_package），享受与之完全一致的语法校验、覆盖备份与上传人登记——
     不再需要一个从来不存在的 8090 端点。"""
     data = request.get_json(silent=True) or {}
@@ -198,7 +198,7 @@ def api_save_case_package():
         from web_platform.admin_routes import import_case_package
     except ImportError as e:
         return jsonify({'ok': False, 'msg': '「保存到框架」需与测试平台运行在同一进程（%s）；'
-                                            '可改用「⬇ 下载用例包」再在管理后台「上传用例包」入库'
+                                            '可改用「⬇ 下载用例包」再在平台「用例管理 → 上传用例包」入库'
                         % str(e)[:80]})
     payload, status = import_case_package(package, files,
                                           (data.get('uploader') or 'locator').strip()[:32])
@@ -207,7 +207,7 @@ def api_save_case_package():
 
 @app.route('/api/build_case_package', methods=['POST'])
 def api_build_case_package():
-    """「保存测试用例包·下载 zip」：三个文件打包（cases/pages/elements 一级目录），供管理后台上传"""
+    """「保存测试用例包·下载 zip」：三个文件打包，供平台「用例管理 → 上传用例包」入库"""
     import io
     import zipfile
     data = request.get_json(silent=True) or {}

@@ -1227,8 +1227,8 @@ function onCaseFileChange() {
  * continueMode=true（保存并继续）= 保存后回到定位器，开启连续添加（点下一个元素自动弹本窗） */
 /* ---------- 保存测试用例包（新建用例文件场景）：一次生成三件套 ----------
    用例/页面/元素三个完整文件由前端按框架风格组装，后端 /api/save_case_package
-   转发平台管理后台 upload_zip（语法+import 完整性校验、备份、登记一条龙）；
-   局域网访问者可选「下载用例包 zip」交由管理后台上传入库。 */
+   与平台同进程直调用例管理入库（语法校验、备份、登记一条龙）；
+   局域网访问者可选「下载用例包 zip」交由平台「用例管理 → 上传用例包」入库。 */
 function capCamel(s) {  // login_flow -> LoginFlow（类名用）
   return String(s || '').split('_').filter(Boolean).map(capFirst).join('');
 }
@@ -1376,11 +1376,6 @@ async function submitPackage(mode) {
         body: JSON.stringify({ package: base, uploader: 'locator', files: files }),
       }).then(x => x.json()).catch(() => null);
       if (!r) { showPkgResult('保存失败：服务异常', false); return; }
-      if (r.conflicts) {
-        showPkgResult('与库内同名文件冲突：' + r.conflicts.map(c => c.path).join('、')
-          + '。请在管理后台处理（覆盖会自动备份）', false);
-        return;
-      }
       showPkgResult(r.msg || (r.ok ? '已保存到框架' : '保存失败'), !!r.ok);
       if (r.ok) {
         loadPages(); loadLibraryFiles(); loadCaseFiles();
@@ -1398,7 +1393,7 @@ async function submitPackage(mode) {
       a.download = base + '.zip';
       a.click();
       URL.revokeObjectURL(a.href);
-      showPkgResult('用例包 ' + base + '.zip 已下载——请到测试平台「管理后台 → 上传用例包」入库', true);
+      showPkgResult('用例包 ' + base + '.zip 已下载——请到测试平台「用例管理 → 📦 上传用例包」入库', true);
     }
   } finally {
     btn.textContent = mode === 'save' ? '💾 保存到框架' : '⬇ 下载用例包（zip）';

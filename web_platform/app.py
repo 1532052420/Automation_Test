@@ -39,7 +39,7 @@ def _no_cache(resp):
 from web_platform.routes import bp as platform_bp
 app.register_blueprint(platform_bp)
 
-# 管理后台（用例/元素/页面对象 上传与管理）：独立蓝图
+# 用例管理（用例/元素/页面对象与用例包 上传）：独立蓝图
 from web_platform.admin_routes import bp as admin_bp
 app.register_blueprint(admin_bp)
 

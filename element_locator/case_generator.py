@@ -36,7 +36,7 @@ PROBE_STEP_TYPES = {'wait_element', 'assert_gone', 'if_click'}
 
 
 def list_case_files():
-    """枚举现有用例文件（test_*.py）；排除管理后台自动生成的历史备份"""
+    """枚举现有用例文件（test_*.py）；排除用例管理自动生成的历史备份"""
     if not os.path.isdir(CASES_DIR):
         return []
     return sorted(f for f in os.listdir(CASES_DIR)
@@ -45,7 +45,7 @@ def list_case_files():
 
 
 def list_page_files():
-    """枚举现有页面对象文件；排除管理后台自动生成的历史备份"""
+    """枚举现有页面对象文件；排除用例管理自动生成的历史备份"""
     if not os.path.isdir(PAGES_DIR):
         return []
     return sorted(f for f in os.listdir(PAGES_DIR)
@@ -437,7 +437,7 @@ def append_code_to_method(case_file, method_name, step, gen_page_method=False, i
 
     path = os.path.join(CASES_DIR, case_file)
     if not os.path.exists(path):
-        return {'ok': False, 'msg': '用例文件 %s 不存在（可在测试平台管理后台上传，或在 cases/app_ui/android/demoProject/ 下按框架格式创建）' % case_file}
+        return {'ok': False, 'msg': '用例文件 %s 不存在（可在测试平台「用例管理」上传，或在 cases/app_ui/android/demoProject/ 下按框架格式创建）' % case_file}
     content = _read(path)
 
     m = re.search(r'^%sdef %s\(self\):' % (IND, re.escape(method_name)), content, re.MULTILINE)

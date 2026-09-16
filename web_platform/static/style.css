@@ -247,12 +247,6 @@ img.thumb:hover { transform: scale(1.05); border-color: var(--accent); }
 #lightbox .lb-close { position: absolute; top: 18px; right: 24px; background: rgba(255, 255, 255, .12); color: #fff; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 15px; cursor: pointer; }
 #lightbox .lb-close:hover { background: rgba(255, 255, 255, .25); }
 
-/* ---------- 管理后台：文件列表固定高度内滚（筛选不改变页面高度，滚动位置稳定） ---------- */
-.card .tblwrap.fixed-height { max-height: 52vh; overflow: auto; }
-.admin-file-path { white-space: nowrap; }
-#fileList td { white-space: nowrap; }
-#fileList td:nth-child(2) { max-width: 520px; overflow: hidden; text-overflow: ellipsis; }
-
 h4 { color: var(--ink); margin: 12px 0 8px; }
 
 /* ---------- 日间/夜间模式切换（theme.js 注入悬浮按钮，Mac/iPhone 简约风图标） ---------- */

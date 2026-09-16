@@ -55,9 +55,13 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+ADMIN_META_FILE = {}   # platform fixture 填充：测试平台进程使用的元数据文件路径（供用例断言）
+
+
 @pytest.fixture(scope='session')
 def platform(tmp_path_factory):
     meta_path = tmp_path_factory.mktemp('admin_meta') / 'admin_meta.json'
+    ADMIN_META_FILE['path'] = str(meta_path)
     env = dict(os.environ, WEB_PLATFORM_PORT=str(PORT), PYTHONIOENCODING='utf-8',
                ADMIN_META_PATH=str(meta_path))
     # 启动前清理端口占用者：上一个会话若 teardown 失败留下孤儿进程，
@@ -334,15 +338,15 @@ def test_entry_scripts_clean():
     subprocess.run(['bash', '-n', main], check=True)
     subprocess.run(['bash', '-n', runsh], check=True)
 
-# ---------------------------------------------------------------- 管理后台
+# ---------------------------------------------------------------- 用例管理（上传）
 def test_admin_upload_list_delete(platform):
-    """上传→列表→覆盖保护→删除 全链路（本机模式无口令）"""
+    """上传落盘 + 语法校验拒绝（本机模式无口令）"""
     import io
     leftover = os.path.join(ROOT, 'cases/demoProject/api/test_admin_upload.py')
     if os.path.isfile(leftover):
         os.remove(leftover)
     boundary = '----dbg'
-    payload = ('# 管理后台上传用例\n'
+    payload = ('# 用例管理上传用例\n'
                'from common.hamcrest.hamcrest import assert_that\n\n\n'
                'class TestAdminUpload:\n'
                '    def test_admin_upload_case(self):\n'
@@ -366,18 +370,8 @@ def test_admin_upload_list_delete(platform):
     code, body_resp, _ = http('POST', '/api/admin/upload', raw_body=body2,
                               headers={'Content-Type': 'multipart/form-data; boundary=' + boundary})
     assert json.loads(body_resp)['ok'] is False and '语法' in json.loads(body_resp)['msg']
-    # 列表可见
-    code, body_resp, _ = http('GET', '/api/admin/files?kind=cases')
-    paths = [f['path'] for f in json.loads(body_resp)['files']]
-    assert 'cases/demoProject/api/test_admin_upload.py' in paths
-    # 删除（v2 接口：path 为相对项目根的完整路径）
-    code, body_resp, _ = http('DELETE', '/api/admin/file?path=cases%2FdemoProject%2Fapi%2Ftest_admin_upload.py')
-    assert json.loads(body_resp)['ok']
-    assert not os.path.isfile(os.path.join(ROOT, 'cases/demoProject/api/test_admin_upload.py'))
-    # 列表可见性（统一列表）
-    code, body_resp, _ = http('GET', '/api/admin/files?kind=cases')
-    paths = [f['path'] for f in json.loads(body_resp)['files']]
-    assert 'cases/demoProject/api/test_admin_upload.py' not in paths
+    # 清理（文件列表已按需求下线，直接按落盘路径清理）
+    os.remove(os.path.join(ROOT, 'cases/demoProject/api/test_admin_upload.py'))
 
 
 def test_admin_upload_rejects(platform):
@@ -419,21 +413,30 @@ def test_admin_token_protected(platform):
                 break
             except Exception:
                 _t.sleep(0.3)
-        req = urllib.request.Request(base2 + '/api/admin/files?kind=cases')
+        req = urllib.request.Request(base2 + '/api/admin/upload_zip_content',
+                                     data=b'{}', method='POST',
+                                     headers={'Content-Type': 'application/json'})
         try:
             resp = no_proxy.open(req, timeout=5)
             code = resp.getcode()
         except urllib.error.HTTPError as e:
             code = e.code
         assert code == 401, '无口令应被拒: %s' % code
-        req2 = urllib.request.Request(base2 + '/api/admin/files?kind=cases',
-                                      headers={'X-Admin-Token': 'secret123'})
-        resp2 = no_proxy.open(req2, timeout=5)
-        assert resp2.getcode() == 200
+        req2 = urllib.request.Request(base2 + '/api/admin/upload_zip_content',
+                                      data=b'{}', method='POST',
+                                      headers={'X-Admin-Token': 'secret123',
+                                               'Content-Type': 'application/json'})
+        try:
+            resp2 = no_proxy.open(req2, timeout=5)
+            code2 = resp2.getcode()
+        except urllib.error.HTTPError as e:
+            code2 = e.code
+        # 带正确口令：通过鉴权（400 = 空用例包被参数校验拒绝，而非 401）
+        assert code2 == 400, '带口令应通过鉴权(400), 实际 %s' % code2
     finally:
         proc.terminate()
 
-# ---------------------------------------------------------------- 方案A：文件管理增强
+# ---------------------------------------------------------------- 方案A：上传增强
 def _upload(platform, filename, content, kind='cases', subdir='demoProject/api', force=False, uploader='测试员A', force_admin=False):
     boundary = '----dbg'
     body = (('--%s\r\nContent-Disposition: form-data; name="kind"\r\n\r\n%s\r\n'
@@ -452,27 +455,6 @@ def _upload(platform, filename, content, kind='cases', subdir='demoProject/api',
     return code, json.loads(resp)
 
 
-def test_admin_files_unified_list_and_types(platform):
-    """统一列表：类型/上传人/受保护标记（TC-078 增强）"""
-    leftover = os.path.join(ROOT, 'cases/demoProject/api/test_admin_v2.py')
-    if os.path.isfile(leftover):
-        os.remove(leftover)
-    code, d = _upload(platform, 'test_admin_v2.py', b'pass\n')
-    assert d['ok'] and d['path'] == 'cases/demoProject/api/test_admin_v2.py'
-    code, body, _ = http('GET', '/api/admin/files')
-    d = json.loads(body)
-    f = next(x for x in d['files'] if x['path'] == 'cases/demoProject/api/test_admin_v2.py')
-    assert f['file_type'] == 'case' and f['type_label'] == '测试用例' and f['uploader'] == '测试员A'
-    # 框架公共文件：conftest 受保护
-    cf = next(x for x in d['files'] if x['path'].endswith('conftest.py'))
-    assert cf['file_type'] == 'framework' and cf['is_protected'] and cf['uploader'] == '框架'
-    # 类型筛选
-    code, body, _ = http('GET', '/api/admin/files?type=framework')
-    assert all(f['file_type'] == 'framework' for f in json.loads(body)['files'])
-    # 清理：与其他 admin 用例一致，避免残留文件污染用例树
-    os.remove(leftover)
-
-
 def test_admin_overwrite_backup(platform):
     """覆盖上传：409 带原上传人 → force 后自动生成时间戳备份（3.3/4.3）"""
     import glob as _glob
@@ -488,90 +470,10 @@ def test_admin_overwrite_backup(platform):
     target_dir = os.path.join(ROOT, 'cases/demoProject/api')
     backups = [f for f in os.listdir(target_dir) if f.startswith('test_admin_backup_') and f.endswith('_backup.py')]
     assert len(backups) == 1, '应生成一个时间戳备份'
-    code, body, _ = http('GET', '/api/admin/files')
-    f = next(x for x in json.loads(body)['files'] if x['path'] == 'cases/demoProject/api/test_admin_backup.py')
-    assert f['uploader'] == '测试员B' and len(f['backups']) == 1
+    # 元数据登记：上传人与备份历史（文件列表已下线，读 admin_meta.json 验证）
+    meta = json.load(open(ADMIN_META_FILE['path'], encoding='utf-8'))
+    m = meta.get('cases/demoProject/api/test_admin_backup.py', {})
+    assert m.get('uploader') == '测试员B' and len(m.get('backups', [])) == 1
     # 清理
     os.remove(os.path.join(target_dir, 'test_admin_backup.py'))
     os.remove(os.path.join(target_dir, backups[0]))
-
-
-def test_admin_protected_delete_denied(platform):
-    """受保护文件：删除/重命名默认 403；force_admin 显式放行（4.4）"""
-    # 上传一个非 test_ 前缀用例文件 → 自动归类为受保护框架文件
-    if os.path.isfile(os.path.join(ROOT, 'cases/app_ui/conftest_custom.py')):
-        os.remove(os.path.join(ROOT, 'cases/app_ui/conftest_custom.py'))
-    code, d = _upload(platform, 'conftest_custom.py', b'# custom\n', subdir='app_ui')
-    assert d['ok'] is False and '仅管理员' in d['msg'], d  # 框架文件默认禁止上传
-    code, d = _upload(platform, 'conftest_custom.py', b'# custom\n', subdir='app_ui', force_admin=True)
-    assert d['ok'], d
-    assert d['path'] == 'cases/app_ui/conftest_custom.py'
-    rel = d['path']
-    code, body, _ = http('DELETE', '/api/admin/file?path=' + urllib.parse.quote(rel, safe=''))
-    d = json.loads(body)
-    assert code == 403 and '仅管理员' in d['msg'], d
-    code, body, _ = http('POST', '/api/admin/rename',
-                         body={'path': rel, 'new_name': 'conftest_custom2.py'})
-    assert code == 403 and '仅管理员' in json.loads(body)['msg']
-    # 批量删除同样默认跳过受保护文件
-    code, body, _ = http('POST', '/api/admin/batch_delete', body={'paths': [rel]})
-    d = json.loads(body)
-    assert rel in d['denied'] and not d['deleted']
-    # force_admin 显式放行后可删除
-    code, body, _ = http('POST', '/api/admin/batch_delete',
-                         body={'paths': [rel], 'force_admin': True})
-    d = json.loads(body)
-    assert d['ok'] and rel in d['deleted']
-    assert not os.path.isfile(os.path.join(ROOT, rel))
-
-
-def test_admin_rename_and_folder(platform):
-    """重命名 + 新建文件夹"""
-    # 上次中断可能留下的产物先清干净，保证用例幂等（目标文件已存在会让 rename 失败）
-    for leftover in ('cases/demoProject/api/test_admin_rename.py',
-                     'cases/demoProject/api/test_admin_renamed.py'):
-        if os.path.isfile(os.path.join(ROOT, leftover)):
-            os.remove(os.path.join(ROOT, leftover))
-    code, d = _upload(platform, 'test_admin_rename.py', b'pass\n')
-    assert d['ok']
-    code, body, _ = http('POST', '/api/admin/rename',
-                         body={'path': 'cases/demoProject/api/test_admin_rename.py',
-                               'new_name': 'test_admin_renamed.py'})
-    assert json.loads(body)['ok']
-    assert os.path.isfile(os.path.join(ROOT, 'cases/demoProject/api/test_admin_renamed.py'))
-    code, body, _ = http('POST', '/api/admin/folder', body={'kind': 'cases', 'subdir': 'demoProject/tmp_dir'})
-    assert json.loads(body)['ok']
-    assert os.path.isdir(os.path.join(ROOT, 'cases/demoProject/tmp_dir'))
-    code, body, _ = http('POST', '/api/admin/folder', body={'kind': 'cases', 'subdir': 'demoProject/tmp_dir'})
-    assert code == 409
-    os.rmdir(os.path.join(ROOT, 'cases/demoProject/tmp_dir'))
-    os.remove(os.path.join(ROOT, 'cases/demoProject/api/test_admin_renamed.py'))
-
-
-def test_admin_batch_download_and_delete(platform):
-    """批量下载 zip 与批量删除（受保护自动跳过）"""
-    import io as _io
-    if os.path.isfile(os.path.join(ROOT, 'cases/demoProject/api/test_admin_batch1.py')):
-        os.remove(os.path.join(ROOT, 'cases/demoProject/api/test_admin_batch1.py'))
-    code, d = _upload(platform, 'test_admin_batch1.py', b'pass\n')
-    assert d['ok']
-    # 批量下载（包含一个受保护文件验证不报错）
-    import urllib.request as _ur
-    import urllib.parse as _up
-    opener = _ur.build_opener(_ur.ProxyHandler({}))
-    url = BASE + '/api/admin/download_batch?paths=' + _up.quote(
-        'cases/demoProject/api/test_admin_batch1.py,cases/app_ui/conftest.py', safe='')
-    with opener.open(url, timeout=30) as resp:
-        assert resp.getcode() == 200
-        import zipfile as _zf
-        zf = _zf.ZipFile(_io.BytesIO(resp.read()))
-        assert 'demoProject/api/test_admin_batch1.py' in zf.namelist()
-    # 批量删除：受保护文件默认跳过
-    code, body, _ = http('POST', '/api/admin/batch_delete',
-                         body={'paths': ['cases/demoProject/api/test_admin_batch1.py',
-                                         'cases/app_ui/conftest.py']})
-    d = json.loads(body)
-    assert d['ok'] and 'cases/demoProject/api/test_admin_batch1.py' in d['deleted']
-    assert 'cases/app_ui/conftest.py' in d['denied']
-    assert os.path.isfile(os.path.join(ROOT, 'cases/app_ui/conftest.py'))
-    assert not os.path.isfile(os.path.join(ROOT, 'cases/demoProject/api/test_admin_batch1.py'))

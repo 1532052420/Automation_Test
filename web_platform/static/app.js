@@ -66,9 +66,9 @@ function renderSidebar(active) {
   if (!sb) return;
   const items = [
     ['/', '📊', '首页'],
-    ['/run', '🚀', '执行'],
+    ['/run', '🚀', '执行用例'],
     ['/report', '📈', '测试报告'],
-    ['/admin', '🗂', '管理后台'],
+    ['/admin', '🗂', '用例管理'],
     ['/locator', '🎯', '元素定位器'],
   ];
   sb.innerHTML =

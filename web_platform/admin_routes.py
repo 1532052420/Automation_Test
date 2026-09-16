@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Web 执行平台 · 管理后台（用例 / 页面对象 / 元素 上传与文件管理 · 方案A）
+"""Web 执行平台 · 用例管理（用例 / 页面对象 / 元素 与用例包上传 · 方案A）
 
 功能：统一文件列表（类型/上传人/受保护标记）、上传（py_compile/yaml/json 校验、
 覆盖确认与历史备份）、下载（单个/批量zip）、重命名、新建文件夹、删除（受保护拦截）、
@@ -21,7 +21,7 @@ import sys
 import time
 import zipfile
 
-from flask import Blueprint, jsonify, render_template, request, send_file
+from flask import Blueprint, jsonify, render_template, request
 
 from web_platform.runtime_config import BASE_DIR
 
@@ -37,19 +37,6 @@ _UPLOAD_TARGETS = {
     'elements': os.path.join(BASE_DIR, 'page_objects', 'app_ui', 'android', 'demoProject', 'elements'),
     'pages': os.path.join(BASE_DIR, 'page_objects', 'app_ui', 'android', 'demoProject', 'pages'),
 }
-# 统一列表的类型定义：code -> (显示名, 目录, 文件名规范)
-TYPE_DEFS = {
-    'case': {'label': '测试用例', 'base': _UPLOAD_TARGETS['cases'], 'base_kind': 'cases',
-             'name_re': re.compile(r'^test_[A-Za-z0-9_]+\.py$')},
-    'framework': {'label': '框架公共文件', 'base': _UPLOAD_TARGETS['cases'], 'base_kind': 'cases',
-                  'name_re': re.compile(r'^(?!test_)[A-Za-z_][A-Za-z0-9_]*\.py$')},
-    'page': {'label': '页面对象', 'base': _UPLOAD_TARGETS['pages'], 'base_kind': 'pages',
-             'name_re': re.compile(r'^[A-Za-z_][A-Za-z0-9_]*\.py$')},
-    'element': {'label': '元素定位', 'base': _UPLOAD_TARGETS['elements'], 'base_kind': 'elements',
-                'name_re': re.compile(r'^[A-Za-z_][A-Za-z0-9_]*\.(py|yaml|json)$')},
-}
-PROTECTED_TYPES = {'framework'}  # 受保护：删除/重命名仅管理员
-TYPE_LABELS = {k: v['label'] for k, v in TYPE_DEFS.items()}
 _NAME_RULES = {
     'cases': r'^test_[A-Za-z0-9_]+\.py$',
     'pages': r'^[A-Za-z_][A-Za-z0-9_]*\.py$',
@@ -99,19 +86,8 @@ def _check_token():
     if not token:
         return 'off'
     if request.headers.get('X-Admin-Token', '') != token:
-        raise AdminError('访问口令不正确（管理后台已启用口令保护）')
+        raise AdminError('访问口令不正确（用例管理已启用口令保护）')
     return 'on'
-
-
-def _classify(rel_to_base, base_kind):
-    """按目录归属与文件名判定类型；cases 下非 test_ 前缀的 py 为受保护框架文件"""
-    filename = os.path.basename(rel_to_base)
-    if base_kind == 'cases':
-        code = 'case' if filename.startswith('test_') else 'framework'
-        return code, code in PROTECTED_TYPES
-    if base_kind == 'pages':
-        return 'page', False
-    return 'element', False
 
 
 def _resolve_managed_path(full_rel):
@@ -348,52 +324,6 @@ def page_admin():
     return render_template('admin.html')
 
 
-@bp.route('/api/admin/files')
-def api_admin_files():
-    """统一文件列表：跨 cases/pages/elements 三个受管目录，含类型/上传人/受保护标记"""
-    try:
-        auth = _check_token()
-    except AdminError as e:
-        return jsonify({'ok': False, 'msg': str(e)}), 401
-    type_filter = request.args.get('type', '')
-    meta = _load_meta()
-    now = int(time.time())
-    files, seen = [], set()
-    for type_code, conf in TYPE_DEFS.items():
-        base = conf['base']
-        if not os.path.isdir(base):
-            continue
-        for dirpath, dirnames, filenames in os.walk(base):
-            dirnames[:] = [d for d in dirnames if d != '__pycache__' and not d.startswith('.')]
-            for fn in sorted(filenames):
-                if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*\.(py|yaml|json)$', fn):
-                    continue
-                full = os.path.join(dirpath, fn)
-                rel_to_base = os.path.relpath(full, base).replace(os.sep, '/')
-                full_rel = os.path.relpath(full, ROOT).replace(os.sep, '/')
-                if full_rel in seen:
-                    continue
-                seen.add(full_rel)
-                code, protected = _classify(rel_to_base, conf['base_kind'])
-                st = os.stat(full)
-                m = _meta_of(meta, full_rel)
-                files.append({
-                    'path': full_rel,
-                    'file_type': code,
-                    'type_label': TYPE_LABELS[code],
-                    'is_protected': protected,
-                    'size': st.st_size,
-                    'mtime': int(st.st_mtime),
-                    'uploader': m.get('uploader', '框架'),
-                    'uploaded_at': m.get('uploaded_at', now),
-                    'backups': m.get('backups', []),
-                })
-    if type_filter:
-        files = [f for f in files if f['file_type'] == type_filter]
-    files.sort(key=lambda x: x['path'])
-    return jsonify({'ok': True, 'auth': auth, 'files': files})
-
-
 @bp.route('/api/admin/upload', methods=['POST'])
 def api_admin_upload():
     try:
@@ -436,7 +366,7 @@ def api_admin_upload_zip_content():
 
 @bp.route('/api/admin/upload_package', methods=['POST'])
 def api_admin_upload_package():
-    """用例包入库（multipart 上传 .zip）：管理后台「📦 上传用例包」入口。
+    """用例包入库（multipart 上传 .zip）：用例管理「📦 上传用例包」入口。
     zip 内一级目录须为 cases/ pages/ elements/（与定位器「⬇ 下载用例包」产出一致）。"""
     try:
         auth = _check_token()
@@ -457,160 +387,3 @@ def api_admin_upload_package():
         (request.form.get('uploader') or 'admin').strip()[:32])
     payload['auth'] = auth
     return jsonify(payload), status
-
-
-@bp.route('/api/admin/download')
-def api_admin_download():
-    try:
-        _check_token()
-    except AdminError as e:
-        return jsonify({'ok': False, 'msg': str(e)}), 401
-    try:
-        abs_path, _, _ = _resolve_managed_path(request.args.get('path', ''))
-    except AdminError as e:
-        return jsonify({'ok': False, 'msg': str(e)}), 400
-    if not os.path.isfile(abs_path):
-        return jsonify({'ok': False, 'msg': '文件不存在'}), 404
-    return send_file(abs_path, as_attachment=True)
-
-
-@bp.route('/api/admin/download_batch')
-def api_admin_download_batch():
-    try:
-        _check_token()
-    except AdminError as e:
-        return jsonify({'ok': False, 'msg': str(e)}), 401
-    paths = (request.args.get('paths') or '').split(',')
-    buf = io.BytesIO()
-    count = 0
-    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for rel in paths:
-            try:
-                abs_path, _, rel_to_base = _resolve_managed_path(rel)
-            except AdminError:
-                continue
-            if os.path.isfile(abs_path):
-                zf.write(abs_path, rel_to_base)
-                count += 1
-    if not count:
-        return jsonify({'ok': False, 'msg': '没有可下载的文件'}), 404
-    buf.seek(0)
-    # Flask 1.x 用 attachment_filename（download_name 是 2.0+ 参数）
-    return send_file(buf, as_attachment=True, mimetype='application/zip',
-                     attachment_filename='files_%s.zip' % time.strftime('%Y%m%d_%H%M%S'))
-
-
-@bp.route('/api/admin/rename', methods=['POST'])
-def api_admin_rename():
-    try:
-        _check_token()
-    except AdminError as e:
-        return jsonify({'ok': False, 'msg': str(e)}), 401
-    body = request.get_json(force=True, silent=True) or {}
-    try:
-        abs_path, kind, rel_to_base = _resolve_managed_path(body.get('path', ''))
-    except AdminError as e:
-        return jsonify({'ok': False, 'msg': str(e)}), 400
-    _, protected = _classify(rel_to_base, kind)
-    if protected and not _protected_allowed(bool(body.get('force_admin'))):
-        return jsonify({'ok': False, 'msg': '框架公共文件，仅管理员可操作'}), 403
-    new_name = os.path.basename(body.get('new_name') or '')
-    try:
-        _validate_name(kind, new_name)
-    except AdminError as e:
-        return jsonify({'ok': False, 'msg': str(e)}), 400
-    new_path = os.path.join(os.path.dirname(abs_path), new_name)
-    if os.path.isfile(new_path):
-        return jsonify({'ok': False, 'msg': '目标文件名已存在: %s' % new_name}), 409
-    old_rel = os.path.relpath(abs_path, ROOT).replace(os.sep, '/')
-    os.rename(abs_path, new_path)
-    meta = _load_meta()
-    if old_rel in meta:
-        meta[os.path.relpath(new_path, ROOT).replace(os.sep, '/')] = meta.pop(old_rel)
-        _save_meta(meta)
-    return jsonify({'ok': True, 'msg': '已重命名为 %s' % new_name})
-
-
-@bp.route('/api/admin/folder', methods=['POST'])
-def api_admin_folder():
-    try:
-        _check_token()
-    except AdminError as e:
-        return jsonify({'ok': False, 'msg': str(e)}), 401
-    body = request.get_json(force=True, silent=True) or {}
-    kind = body.get('kind', '')
-    subdir = (body.get('subdir') or '').strip().strip('/')
-    if kind not in _NAME_RULES:
-        return jsonify({'ok': False, 'msg': '未知类型'}), 400
-    if not subdir or not re.match(r'^[A-Za-z0-9_/-]+$', subdir) or '..' in subdir:
-        return jsonify({'ok': False, 'msg': '目录名不合法（字母/数字/_/-，可含子层级）'}), 400
-    target_dir = os.path.normpath(os.path.join(_UPLOAD_TARGETS[kind], subdir))
-    norm_base = os.path.normpath(_UPLOAD_TARGETS[kind])
-    if target_dir != norm_base and not target_dir.startswith(norm_base + os.sep):
-        return jsonify({'ok': False, 'msg': '目标路径越界'}), 400
-    if os.path.isdir(target_dir):
-        return jsonify({'ok': False, 'msg': '目录已存在: %s' % subdir}), 409
-    os.makedirs(target_dir, exist_ok=True)
-    return jsonify({'ok': True, 'msg': '已创建目录 %s' % subdir})
-
-
-@bp.route('/api/admin/batch_delete', methods=['POST'])
-def api_admin_batch_delete():
-    try:
-        _check_token()
-    except AdminError as e:
-        return jsonify({'ok': False, 'msg': str(e)}), 401
-    body = request.get_json(force=True, silent=True) or {}
-    paths = body.get('paths') or []
-    force_admin = bool(body.get('force_admin'))
-    if not paths:
-        return jsonify({'ok': False, 'msg': '未选择文件'}), 400
-    meta = _load_meta()
-    deleted, denied, missing = [], [], []
-    for rel in paths:
-        try:
-            abs_path, kind, rel_to_base = _resolve_managed_path(rel)
-        except AdminError:
-            missing.append(rel)
-            continue
-        _, protected = _classify(rel_to_base, kind)
-        if protected and not _protected_allowed(force_admin):
-            denied.append(rel)
-            continue
-        if not os.path.isfile(abs_path):
-            missing.append(rel)
-            continue
-        os.remove(abs_path)
-        meta.pop(os.path.relpath(abs_path, ROOT).replace(os.sep, '/'), None)
-        deleted.append(rel)
-    _save_meta(meta)
-    msg_parts = ['已删除 %d 个' % len(deleted)]
-    if denied:
-        msg_parts.append('受保护跳过 %d 个（框架公共文件仅管理员可操作）' % len(denied))
-    if missing:
-        msg_parts.append('不存在 %d 个' % len(missing))
-    return jsonify({'ok': True, 'deleted': deleted, 'denied': denied, 'missing': missing,
-                    'msg': '；'.join(msg_parts)})
-
-
-@bp.route('/api/admin/file', methods=['DELETE'])
-def api_admin_delete():
-    """单文件删除；受保护文件（框架公共文件）仅管理员可操作"""
-    try:
-        _check_token()
-    except AdminError as e:
-        return jsonify({'ok': False, 'msg': str(e)}), 401
-    try:
-        abs_path, kind, rel_to_base = _resolve_managed_path(request.args.get('path', ''))
-    except AdminError as e:
-        return jsonify({'ok': False, 'msg': str(e)}), 400
-    _, protected = _classify(rel_to_base, kind)
-    if protected and not _protected_allowed(request.args.get('force_admin') == 'true'):
-        return jsonify({'ok': False, 'msg': '框架公共文件，仅管理员可操作'}), 403
-    if not os.path.isfile(abs_path):
-        return jsonify({'ok': False, 'msg': '文件不存在'}), 404
-    os.remove(abs_path)
-    meta = _load_meta()
-    meta.pop(os.path.relpath(abs_path, ROOT).replace(os.sep, '/'), None)
-    _save_meta(meta)
-    return jsonify({'ok': True, 'msg': '已删除 %s' % rel_to_base})
