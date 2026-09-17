@@ -557,6 +557,18 @@ function onShotClick(e) {
     if (!pt) return;
     state.coordPoint = pt;
     highlightBounds([pt[0] - 45, pt[1] - 45, pt[0] + 45, pt[1] + 45]);
+    // 中间「选中元素」窗口同步显示坐标（虚拟节点，不进元素树）——点「添加测试用例」即可录入
+    const vnode = {
+      uid: -1,
+      text: '⌖ 坐标 (' + pt[0] + ', ' + pt[1] + ')',
+      center: [pt[0], pt[1]],
+      bounds: '[' + (pt[0] - 45) + ',' + (pt[1] - 45) + '][' + (pt[0] + 45) + ',' + (pt[1] + 45) + ']',
+      bounds_num: [pt[0] - 45, pt[1] - 45, pt[0] + 45, pt[1] + 45],
+      class: '⌖ 坐标点',
+      clickable: true,
+    };
+    state.selNode = vnode; state.selUid = null; state.hitCands = null;
+    renderDetail(vnode);
     showToast('⌖ 已选坐标 (' + pt[0] + ', ' + pt[1] + ') · 点「添加测试用例」将以「坐标点击」录入；双击 = 真机点这个点');
     return;
   }
@@ -574,6 +586,18 @@ function onShotDblClick(e) {
     if (!pt) return;
     state.coordPoint = pt;
     highlightBounds([pt[0] - 45, pt[1] - 45, pt[0] + 45, pt[1] + 45]);
+    // 双击后中间窗口同样显示坐标，便于直接录步骤
+    const vnode = {
+      uid: -1,
+      text: '⌖ 坐标 (' + pt[0] + ', ' + pt[1] + ')',
+      center: [pt[0], pt[1]],
+      bounds: '[' + (pt[0] - 45) + ',' + (pt[1] - 45) + '][' + (pt[0] + 45) + ',' + (pt[1] + 45) + ']',
+      bounds_num: [pt[0] - 45, pt[1] - 45, pt[0] + 45, pt[1] + 45],
+      class: '⌖ 坐标点',
+      clickable: true,
+    };
+    state.selNode = vnode; state.selUid = null; state.hitCands = null;
+    renderDetail(vnode);
     tapOnDevice(pt, '⌖ 坐标 (' + pt[0] + ', ' + pt[1] + ')');
     showToast('⌖ 已在设备上点击 (' + pt[0] + ', ' + pt[1] + ') · 可点「添加测试用例」以「坐标点击」录入');
     return;
@@ -1024,16 +1048,19 @@ async function loadPages() {
   state.elementsAll = r.elements || {};
 }
 async function openModal() {
-  if (!state.selNode) { alert('请先在截图或元素树里选中一个元素'); return; }
-  const node = state.selNode;
-  // 自动名称：优先 resource-id 末段，其次 text 截断
+  // ⌖ 坐标模式：选了精确坐标即可打开（不需要树里有选中元素）
+  const coordPick = state.coordMode && state.coordPoint;
+  if (!state.selNode && !coordPick) { alert('请先在截图或元素树里选中一个元素（或开启坐标模式点选坐标）'); return; }
+  const node = state.selNode || {};
+  // 自动名称：优先 resource-id 末段，其次 text 截断；坐标模式用 coord_x_y
   let auto = '';
   const rid = node['resource-id'] || '';
-  if (rid && rid.includes('/')) auto = rid.split('/').pop();
+  if (coordPick) auto = 'coord_' + state.coordPoint[0] + '_' + state.coordPoint[1];
+  else if (rid && rid.includes('/')) auto = rid.split('/').pop();
   else if (node.text && node.text.trim()) auto = node.text.trim().replace(/\s+/g, '_').slice(0, 20);
   else auto = 'element_' + state.selUid;
   $('el-name').value = auto;
-  const loc = selectedLocator() || { type: 'ID', value: node['resource-id'] || '' };
+  const loc = (!coordPick && selectedLocator()) || { type: 'ID', value: (!coordPick && node['resource-id']) || '' };
   // 定位方式下拉：框架 Locator_Type
   $('el-type').innerHTML = ['ID', 'XPATH', 'ACCESSIBILITY_ID', 'ANDROID_UIAUTOMATOR', 'CLASS_NAME', 'NAME']
     .map(t => '<option value="' + t + '"' + (t === loc.type ? ' selected' : '') + '>' + t + '</option>').join('');
@@ -1058,7 +1085,9 @@ async function openModal() {
     $('el-op-param').value = state.coordPoint[0] + ',' + state.coordPoint[1];
   }
   // 步骤描述自动预填：优先元素文本（报告更友好），无文本则留空由后端按元素名生成
-  $('el-op-comment').value = autoStepComment('click', node.text);  // 默认按「点击」生成；切类型时自动跟随
+  $('el-op-comment').value = coordPick
+    ? '点击坐标(' + state.coordPoint[0] + ', ' + state.coordPoint[1] + ')'
+    : autoStepComment('click', node.text);  // 默认按「点击」生成；切类型时自动跟随
   opCommentAuto = true;
   $('el-comment').value = '';
   $('el-case-comment').value = '';
@@ -1081,6 +1110,13 @@ async function openModal() {
   }
   document.querySelector('input[name="el-purpose"][value="all"]').checked = true;
   onPurposeChange();
+  // ⌖ 坐标模式：最后再回填「坐标点击」与坐标（必须在 onOpTypeChange 之后，否则参数会被默认值清掉）
+  if (state.coordMode && state.coordPoint) {
+    $('el-op-type').value = 'tap';
+    $('el-op-param').value = state.coordPoint[0] + ', ' + state.coordPoint[1];
+    $('el-op-comment').value = '点击坐标(' + state.coordPoint[0] + ', ' + state.coordPoint[1] + ')';
+    paramAuto = false;   // 用户选的是具体坐标，不让自动预填逻辑覆盖
+  }
   $('modal-mask').style.display = 'flex';
 }
 /* ---- 新建文件输入（元素文件 / 用例文件）：选「➕ 新建…」时显示 ---- */
