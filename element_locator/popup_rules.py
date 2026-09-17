@@ -34,6 +34,16 @@ _ELEM_RE = re.compile(
 _OPTIONS_BLOCK_RE = re.compile(r'^[ \t]*RULE_OPTIONS = \{.*?^[ \t]*\}[ \t]*$',
                                re.MULTILINE | re.DOTALL)
 
+# 渲染头注释（_render_options 每次都会写）；重写前须先清掉旧份，否则反复登记/删除会堆叠
+_HEADER_FIRST_LINE = '    # 规则附加约束（元素定位器「登记随机弹窗」自动维护，手工编辑请保持语法）：'
+_HEADER_RE = re.compile(r'^[ \t]*' + re.escape(_HEADER_FIRST_LINE.strip()) + r'\n(?:[ \t]*#[^\n]*\n)*',
+                        re.MULTILINE)
+
+
+def _strip_rendered_headers(content):
+    """移除所有由 _render_options 生成过的头注释块（含其后的 # 说明行）"""
+    return _HEADER_RE.sub('', content)
+
 
 def _read(path):
     with open(path, 'r', encoding='utf-8') as f:
@@ -107,10 +117,11 @@ def parse_rules():
 
 
 def _upsert_options(content, name, entry):
-    """更新/新增 name 的约束项并整体重渲染 RULE_OPTIONS 块。"""
+    """更新/新增 name 的约束项并整体重渲染 RULE_OPTIONS 块（先清旧注释头，防反复登记堆叠）。"""
     options = _parse_options(content)
     options[name] = entry
     new_block = _render_options(options)
+    content = _strip_rendered_headers(content)
     m = _OPTIONS_BLOCK_RE.search(content)
     if m:
         return content[:m.start()] + new_block + content[m.end():]
@@ -118,6 +129,7 @@ def _upsert_options(content, name, entry):
 
 
 def _remove_options(content, name):
+    content = _strip_rendered_headers(content)
     m = _OPTIONS_BLOCK_RE.search(content)
     if not m:
         return content

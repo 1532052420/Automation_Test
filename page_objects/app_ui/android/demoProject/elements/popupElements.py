@@ -20,6 +20,7 @@ class PopupElements:
         self.popup_checkin_close = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/btnClose', wait_type=Wait_By.VISIBILITY_OF)  # 随机弹窗·签到弹窗关闭按钮（任务中心/广场签到弹窗通用）
         self.popup_recharge_exit_close = CreateElement.create(Locator_Type.XPATH, '//android.widget.ImageView[@clickable=\'true\' and not(@resource-id)]', wait_type=Wait_By.PRESENCE_OF_ELEMENT_LOCATED, wait_seconds=1)  # 随机弹窗·充值页返回挽留弹窗关闭×（无ID；仅在RechargeKCoinActivity内扫描，配合RULE_OPTIONS活动约束）
         self.popup_promo_close = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/iv_close', wait_type=Wait_By.VISIBILITY_OF)  # 随机弹窗·限时充值优惠弹窗关闭按钮（个人页/充值后概率弹出，右上角×）
+        self.popup_btn_close_close = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/btn_close', wait_type=Wait_By.PRESENCE_OF_ELEMENT_LOCATED, wait_seconds=1, desc='音乐人升级弹窗关闭按钮')  # 音乐人升级弹窗关闭按钮
 
     # 规则附加约束（可选）：元素名 -> {anchor: 弹窗特征(类型,值)——场上出现特征才点关闭,
     # activity: 仅在该活动页内扫描, cooldown: 同规则点击冷却秒数}
@@ -27,14 +28,20 @@ class PopupElements:
     # ★ 锚点很重要：同一个关闭按钮 id（如 btnClose）会被登录弹层等非弹窗界面复用，
     #   不加锚点会把它们误当弹窗关掉（实测踩坑：误关登录弹层导致登录用例失败）
 
-    # 规则附加约束（元素定位器「登记随机弹窗」自动维护，手工编辑请保持语法）：
-    #   anchor   关闭按钮与弹窗特征成对出现才点关闭——同一个关闭按钮 id 常被非弹窗界面复用，无锚点会误关
-    #   activity 仅在该活动页内扫描；cooldown 同规则点击冷却秒数（默认 2）
+
+
+
+
+
 
     # 规则附加约束（元素定位器「登记随机弹窗」自动维护，手工编辑请保持语法）：
     #   anchor   关闭按钮与弹窗特征成对出现才点关闭——同一个关闭按钮 id 常被非弹窗界面复用，无锚点会误关
     #   activity 仅在该活动页内扫描；cooldown 同规则点击冷却秒数（默认 2）
     RULE_OPTIONS = {
+        'popup_btn_close_close': {
+            'cooldown': 2,
+            'anchor': ('XPATH', '//*[@text="知道了"]'),
+        },
         'popup_checkin_close': {
             'cooldown': 2,
             'anchor': ('xpath', "//*[contains(@text,'今日签到')]"),
@@ -49,6 +56,11 @@ class PopupElements:
             'anchor': ('id', 'com.recordlife.kuaige:id/bg'),
         },
     }
+
+
+
+
+
 
 
 
