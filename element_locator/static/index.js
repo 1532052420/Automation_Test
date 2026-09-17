@@ -175,6 +175,7 @@ async function init() {
   $('btn-modal-save').addEventListener('click', () => onSaveElement(false));
   $('btn-modal-save-continue').addEventListener('click', () => onSaveElement(true));
   // 树 Diff 开关 / 定位器体检 / 会话步骤撤销
+  initDialog();
   $('btn-tree-diff').addEventListener('click', toggleTreeDiff);
   $('btn-locate-check').addEventListener('click', runLocateCheck);
   $('btn-undo-step').addEventListener('click', undoLastStep);
@@ -559,6 +560,43 @@ function onShotDblClick(e) {
   selectNode(r.hit.uid);
   showHitToast(r.hit, r.cands.length, ' · 已在设备上真实点击');
   tapOnDevice(r.hit.center, r.hit.text || r.hit['resource-id'] || '双击元素');
+}
+
+/* ---------- 居中对话框：替代浏览器原生 alert/confirm（原生弹窗贴页面顶部，不在视觉中心） ---------- */
+let _dlgResolve = null;
+function _dlgShown() { return $('ui-dlg-mask').style.display !== 'none'; }
+function _dlgClose(val) {
+  const mask = $('ui-dlg-mask');
+  if (mask) mask.style.display = 'none';
+  const r = _dlgResolve; _dlgResolve = null;
+  if (r) r(val);
+}
+function uiDialog(msg, opts) {
+  opts = opts || {};
+  $('ui-dlg-title').textContent = opts.title || '提示';
+  $('ui-dlg-msg').textContent = msg == null ? '' : String(msg);
+  $('ui-dlg-ok').textContent = opts.okText || '确定';
+  const cancelBtn = $('ui-dlg-cancel');
+  cancelBtn.style.display = (opts.cancel === false) ? 'none' : '';
+  $('ui-dlg-mask').style.display = 'flex';
+  cancelBtn.blur(); $('ui-dlg-ok').focus();
+  return new Promise(resolve => { _dlgResolve = resolve; });
+}
+function uiAlert(msg, opts) {
+  return uiDialog(msg, Object.assign({ title: '提示', okText: '好', cancel: false }, opts || {}));
+}
+function uiConfirm(msg, opts) {
+  return uiDialog(msg, Object.assign({ title: '请确认', okText: '确定' }, opts || {}));
+}
+function initDialog() {
+  $('ui-dlg-ok').addEventListener('click', () => _dlgClose(true));
+  $('ui-dlg-cancel').addEventListener('click', () => _dlgClose(false));
+  $('ui-dlg-mask').addEventListener('click', e => { if (e.target === $('ui-dlg-mask')) _dlgClose(false); });
+  document.addEventListener('keydown', e => {
+    if (!_dlgShown()) return;
+    if (e.key === 'Escape') { e.preventDefault(); _dlgClose(false); }
+    else if (e.key === 'Enter') { e.preventDefault(); _dlgClose(true); }
+  });
 }
 
 /* ---------- 底部提示（通用）：6 秒自动消失，pointer-events:none 不阻挡任何操作 ---------- */
@@ -1823,7 +1861,7 @@ async function onSaveElement(continueMode) {
   // 同名（同文件）覆盖确认：防止误覆盖已有元素
   const fname = $('el-file').value;
   if (name && (state.elementsAll[fname] || []).indexOf(name) >= 0) {
-    if (!confirm('元素库文件 ' + fname + ' 里已有同名元素「' + name + '」，保存将覆盖更新原定义。\n\n' +
+    if (!await uiConfirm('元素库文件 ' + fname + ' 里已有同名元素「' + name + '」，保存将覆盖更新原定义。\n\n' +
       '点「确定」= 覆盖更新\n点「取消」= 不保存')) return;
   }
   let r = await saveElement(true);

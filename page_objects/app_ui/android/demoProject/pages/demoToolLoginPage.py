@@ -102,3 +102,12 @@ class DemoToolLoginPage:
         time.sleep(1)
         self.appOperator.get_screenshot(tag)
 
+    def click_sss(self):
+        """点击「12枚勋章」"""
+        self.appOperator.click(self._elements.sss)
+
+    def click_btnStarlightValue(self):
+        """点击「btnStarlightValue」"""
+        self.appOperator.click(self._elements.btnStarlightValue)
+
+

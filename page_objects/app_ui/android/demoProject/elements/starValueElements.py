@@ -21,3 +21,4 @@ class StarValueElements:
         self.appBarLayout = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/appBarLayout', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)
         self.element_10 = CreateElement.create(Locator_Type.XPATH, '//*[@class="android.widget.ImageButton"]', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)
         self.Appium_Settings = CreateElement.create(Locator_Type.XPATH, '//*[@text="Appium Settings"]', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)
+        self.btnStarlightValue = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/btnStarlightValue', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)

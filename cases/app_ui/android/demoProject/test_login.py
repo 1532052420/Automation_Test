@@ -65,6 +65,12 @@ class TestDemoToolLogin:
 
         # 10. 断言登录成功（登录成功 toast 为主要依据；成败截图入 allure，截图即存证）
         page.assert_login_success()
+        # 星光值标签
+        page.click_btnStarlightValue()
+        # 点击sss
+        page.click_sss()
+        # 点击btnStarlightValue
+        page.click_btnStarlightValue()
 
     def teardown_class(self):
         self.appOperator.reset_app()

@@ -58,6 +58,8 @@ class Test1StarValue:
         page.click_appBarLayout()
         # 点击element_10
         page.click_element_10()
+        # 点击btnStarlightValue
+        page.click_btnStarlightValue()
 
     def test_gift_card_no_response(self):
         page = self.page

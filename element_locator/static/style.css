@@ -604,3 +604,25 @@ html.night .pp-rule-main span { color: #d1d5db; }
 html.night .pp-rule-main .pp-opt { color: #9ca3af; }
 html.night .pp-rule-main .pp-opt em { color: #fbbf24; }
 html.night .pp-del { background: rgba(239,68,68,.16); color: #fca5a5; border-color: rgba(239,68,68,.5); }
+
+/* ---------- 居中对话框（替代浏览器原生 alert/confirm：原生弹窗贴页面顶部） ---------- */
+.ui-dlg-mask { position: fixed; inset: 0; z-index: 1600; display: flex; align-items: center; justify-content: center;
+  background: rgba(17, 24, 39, .42); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
+.ui-dlg { width: 460px; max-width: 92vw; border-radius: 16px; overflow: hidden;
+  background: rgba(252, 252, 253, .98); color: #111827;
+  box-shadow: 0 18px 48px rgba(17, 24, 39, .30), 0 2px 8px rgba(17, 24, 39, .12);
+  animation: uiDlgIn .16s ease-out; }
+@keyframes uiDlgIn { from { opacity: 0; transform: translateY(6px) scale(.985); } to { opacity: 1; transform: none; } }
+.ui-dlg-title { padding: 16px 20px 0; font-size: 15px; font-weight: 600; }
+.ui-dlg-msg { padding: 8px 20px 18px; font-size: 13.5px; line-height: 1.65; color: #374151; white-space: pre-line; }
+.ui-dlg-foot { padding: 0 16px 14px; display: flex; justify-content: flex-end; gap: 10px; }
+.ui-dlg-btn { padding: 8px 20px; border-radius: 10px; border: 1px solid rgba(127,127,127,.35);
+  background: rgba(127,127,127,.08); color: #374151; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.ui-dlg-btn:hover { background: rgba(127,127,127,.16); }
+.ui-dlg-btn.primary { border-color: transparent; background: #2563eb; color: #fff; }
+.ui-dlg-btn.primary:hover { background: #1d4ed8; }
+html.night .ui-dlg { background: rgba(44, 44, 48, .98); color: #f3f4f6; }
+html.night .ui-dlg-msg { color: #d1d5db; }
+html.night .ui-dlg-btn { color: #e5e7eb; border-color: rgba(255,255,255,.2); background: rgba(255,255,255,.08); }
+html.night .ui-dlg-btn:hover { background: rgba(255,255,255,.16); }
+html.night .ui-dlg-btn.primary { background: #3b82f6; color: #fff; }

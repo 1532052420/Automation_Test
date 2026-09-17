@@ -24,7 +24,7 @@ try {
   if (window.self !== window.top) _de.classList.add('embedded');
 } catch (e) { /* 隐私模式等场景忽略 */ }
 </script>
-<link rel="stylesheet" href="static/style.css?v=49">
+<link rel="stylesheet" href="static/style.css?v=50">
 </head>
 <body>
 <div id="embed-bar" class="embed-bar"></div>
@@ -281,7 +281,17 @@ try {
 <div id="help-tip" class="help-tip" style="display:none"></div>
 
 <div id="hit-toast" class="hit-toast" style="display:none" aria-live="polite"></div>
+<div id="ui-dlg-mask" class="ui-dlg-mask" style="display:none">
+  <div class="ui-dlg" role="alertdialog" aria-modal="true" aria-labelledby="ui-dlg-title">
+    <div class="ui-dlg-title" id="ui-dlg-title">提示</div>
+    <div class="ui-dlg-msg" id="ui-dlg-msg"></div>
+    <div class="ui-dlg-foot">
+      <button id="ui-dlg-cancel" class="ui-dlg-btn" type="button">取消</button>
+      <button id="ui-dlg-ok" class="ui-dlg-btn primary" type="button">确定</button>
+    </div>
+  </div>
+</div>
 <script src="/static/theme.js"></script>
-<script src="static/index.js?v=58"></script>
+<script src="static/index.js?v=59"></script>
 </body>
 </html>

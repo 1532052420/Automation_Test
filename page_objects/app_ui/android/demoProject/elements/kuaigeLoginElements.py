@@ -37,3 +37,5 @@ class KuaigeLoginElements:
         self.agree_protocol = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/ivCheck', wait_type=Wait_By.VISIBILITY_OF)
         # 登录成功字段/文案（含 toast 与页面文本，contains 兼容两种）
         self.text_login_success = CreateElement.create(Locator_Type.XPATH, '//*[contains(@text,"登录成功")]', wait_type=Wait_By.PRESENCE_OF_ELEMENT_LOCATED)
+        self.btnStarlightValue = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/btnStarlightValue', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)
+        self.sss = CreateElement.create(Locator_Type.XPATH, '//*[@text="12枚勋章"]', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)

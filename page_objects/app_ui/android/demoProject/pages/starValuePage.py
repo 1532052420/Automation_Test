@@ -177,4 +177,8 @@ class StarValuePage:
         """点击「element_10」"""
         self.appOperator.click(self._elements.element_10)
 
+    def click_btnStarlightValue(self):
+        """点击「btnStarlightValue」"""
+        self.appOperator.click(self._elements.btnStarlightValue)
+
 
