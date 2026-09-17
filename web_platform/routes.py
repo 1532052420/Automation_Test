@@ -67,6 +67,12 @@ def page_report():
     return render_template('report.html')
 
 
+@bp.route('/perf')
+def page_perf():
+    """⚡ 性能压测（HTTP 接口压测，独立模块）"""
+    return render_template('perf.html')
+
+
 # ---------------------------------------------------------------- API
 @bp.route('/api/status')
 def api_status():
@@ -102,6 +108,70 @@ def api_recording_config():
         return jsonify({'ok': True, 'config': recording_config.load_recording_config()})
     ok, msg, _effective = recording_config.save_recording_config(request.get_json(silent=True) or {})
     return jsonify({'ok': ok, 'msg': msg}), (200 if ok else 400)
+
+
+# ---------------------------------------------------------------- 性能压测（HTTP 接口压测）
+@bp.route('/api/perf/config', methods=['GET', 'POST'])
+def api_perf_config():
+    """压测配置：GET 返回表单结构 + 当前值；POST 校验后整体落盘 YAML（非法值不落盘）"""
+    from web_platform import perf_config, perf_runner
+    if request.method == 'GET':
+        return jsonify({'ok': True, 'schema': perf_config.SCHEMA,
+                        'values': perf_config.read_config(),
+                        'venv_ready': perf_runner.venv_ready()})
+    ok, msg = perf_config.write_config(request.get_json(silent=True) or {})
+    return jsonify({'ok': ok, 'msg': msg}), (200 if ok else 400)
+
+
+@bp.route('/api/perf/run', methods=['POST'])
+def api_perf_start():
+    """启动压测（默认用当前已保存配置；body 带 values 则先保存再跑）"""
+    from web_platform import perf_runner
+    data = request.get_json(silent=True) or {}
+    ok, msg, run_id = perf_runner.start_run(data.get('values'))
+    return jsonify({'ok': ok, 'msg': msg, 'run_id': run_id}), (200 if ok else 400)
+
+
+@bp.route('/api/perf/stop', methods=['POST'])
+def api_perf_stop():
+    from web_platform import perf_runner
+    data = request.get_json(silent=True) or {}
+    ok, msg = perf_runner.stop_run((data.get('run_id') or '').strip())
+    return jsonify({'ok': ok, 'msg': msg}), (200 if ok else 400)
+
+
+@bp.route('/api/perf/runs')
+def api_perf_runs():
+    from web_platform import perf_runner
+    return jsonify({'ok': True, 'runs': perf_runner.list_runs()})
+
+
+@bp.route('/api/perf/run/<run_id>')
+def api_perf_run(run_id):
+    from web_platform import perf_runner
+    t = perf_runner.get_run(run_id)
+    return jsonify({'ok': bool(t), 'run': t}) if t else (jsonify({'ok': False, 'msg': '任务不存在'}), 404)
+
+
+@bp.route('/api/perf/run/<run_id>/log')
+def api_perf_log(run_id):
+    from web_platform import perf_runner
+    try:
+        offset = int(request.args.get('offset', 0))
+    except ValueError:
+        offset = 0
+    lines, total = perf_runner.read_log(run_id, offset)
+    return jsonify({'ok': True, 'lines': lines, 'offset': offset + len(lines), 'total': total})
+
+
+@bp.route('/perf/report/<run_id>')
+def page_perf_report(run_id):
+    """在线查看压测报告（HTML 由压测引擎生成，收进 run 目录）"""
+    from web_platform import perf_runner
+    t = perf_runner.get_run(run_id)
+    if not t or not t.get('report'):
+        return '报告未生成（压测结束或失败时可能没有报告）', 404
+    return send_file(os.path.join(BASE_DIR, t['report']))
 
 
 @bp.route('/api/devices')

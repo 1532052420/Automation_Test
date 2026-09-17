@@ -28,3 +28,7 @@ gui-test-screenshots/
 
 # WorkBuddy 个人工作日志不入库（.workbuddy/skills/ 为项目级 skill，照常入库）
 .workbuddy/memory/
+# 压测运行产物（报告/原始数据/日志），不入库
+reports/
+.venv/
+__pycache__/

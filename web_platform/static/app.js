@@ -70,6 +70,7 @@ function renderSidebar(active) {
     ['/report', '📈', '测试报告'],
     ['/admin', '🗂', '用例管理'],
     ['/locator', '🎯', '元素定位器'],
+    ['/perf', '⚡', '性能压测'],
   ];
   sb.innerHTML =
     '<div class="brand"><div class="logo">🤖</div><div>AppUI 自动化<br><small>测试平台 v<span id="brandVer">…</span></small></div></div>' +
@@ -650,6 +651,121 @@ async function openReportFor(runId, btn) {
   }
 }
 
+/* ---------------- 性能压测页 ---------------- */
+let perfSchema = [], perfValues = {}, perfRunId = '', perfLogOffset = 0, perfTimer = null;
+
+function perfInputId(f) {
+  return 'pf_' + (f.section ? f.section.replace(/\./g, '_') + '__' : '') + f.key;
+}
+function perfCollect() {
+  const out = {};
+  perfSchema.forEach(g => g.fields.forEach(f => {
+    const el = document.getElementById(perfInputId(f));
+    if (!el) return;
+    const fk = (f.section ? f.section + '.' : '') + f.key;
+    out[fk] = (f.type === 'bool') ? el.checked : el.value;
+  }));
+  return out;
+}
+function perfRenderForm() {
+  const box = $('#perfForm');
+  box.innerHTML = perfSchema.map(g => {
+    const fields = g.fields.map(f => {
+      const id = perfInputId(f);
+      const fk = (f.section ? f.section + '.' : '') + f.key;
+      const v = perfValues[fk];
+      let input = '';
+      if (f.type === 'select') {
+        input = '<select id="' + id + '">' + f.options.map(o =>
+          '<option value="' + o + '"' + (String(v) === o ? ' selected' : '') + '>' + o + '</option>').join('') + '</select>';
+      } else if (f.type === 'bool') {
+        input = '<label style="display:flex;align-items:center;gap:6px;font-weight:400">' +
+          '<input type="checkbox" id="' + id + '"' + (v ? ' checked' : '') + '> ' + f.label + '</label>';
+      } else if (f.type === 'dict') {
+        const txt = Object.keys(v || {}).map(k => k + ': ' + (v[k] === undefined ? '' : v[k])).join('\n');
+        input = '<textarea id="' + id + '" placeholder="每行一条：名: 值">' + (txt || '') + '</textarea>';
+      } else if (f.type === 'text') {
+        input = '<textarea id="' + id + '">' + (v === undefined || v === null ? '' : v) + '</textarea>';
+      } else {
+        input = '<input type="text" id="' + id + '" value="' + (v === undefined || v === null ? '' : v) + '">';
+      }
+      const wide = (f.type === 'dict' || f.type === 'text') ? ' wide' : '';
+      const tip = f.help ? ' <span class="muted" style="font-size:11.5px">' + f.help + '</span>' : '';
+      const label = f.type === 'bool' ? '' : '<label>' + f.label + tip + '</label>';
+      return '<div class="field' + wide + '">' + label + input + '</div>';
+    }).join('');
+    return '<div class="perf-group"><h4>' + g.icon + ' ' + g.group + '</h4><div class="gdesc">' + g.desc +
+      '</div><div class="perf-fields">' + fields + '</div></div>';
+  }).join('');
+}
+function perfResult(msg, ok) {
+  const el = $('#perfResult');
+  el.className = 'el-result ' + (ok ? 'ok' : 'err');
+  el.textContent = msg;
+}
+async function perfStart() {
+  const r = await (await fetch('/api/perf/run', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values: perfCollect() }),
+  })).json();
+  if (!r.ok) { perfResult(r.msg || '启动失败', false); return; }
+  perfRunId = r.run_id; perfLogOffset = 0;
+  $('#perfLog').textContent = '';
+  $('#btnPerfReport').style.display = 'none';
+  perfResult(r.msg, true);
+  perfTimer = setInterval(perfPoll, 1500);
+  perfPoll();
+}
+async function perfStop() {
+  if (!perfRunId) return;
+  const r = await (await fetch('/api/perf/stop', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ run_id: perfRunId }),
+  })).json();
+  perfResult(r.msg, r.ok);
+}
+async function perfPoll() {
+  if (!perfRunId) return;
+  const st = await (await fetch('/api/perf/run/' + perfRunId)).json();
+  const lg = await (await fetch('/api/perf/run/' + perfRunId + '/log?offset=' + perfLogOffset)).json();
+  if (lg.lines && lg.lines.length) {
+    $('#perfLog').textContent += lg.lines.join('\n') + '\n';
+    $('#perfLog').scrollTop = $('#perfLog').scrollHeight;
+    perfLogOffset = lg.offset;
+  }
+  if (!st.ok) return;
+  const run = st.run;
+  const badge = { RUNNING: '<span class="badge run">运行中</span>', FINISHED: '<span class="badge ok">已完成</span>',
+    FAILED: '<span class="badge bad">失败</span>', STOPPED: '<span class="badge stop">已停止</span>' }[run.status] || run.status;
+  $('#perfStatus').innerHTML = badge + ' · ' + run.run_id + ' · ' + Math.round(run.duration_ms / 1000) + 's'
+    + (run.error ? ' · ' + run.error : '');
+  if (run.status !== 'RUNNING') {
+    clearInterval(perfTimer); perfTimer = null;
+    if (run.report) { $('#btnPerfReport').style.display = ''; perfResult('压测结束，报告已生成', true); }
+    else perfResult('压测结束（未生成报告，请查看日志）', false);
+  }
+}
+async function initPerf() {
+  renderSidebar('/perf');
+  const r = await (await fetch('/api/perf/config')).json();
+  perfSchema = r.schema || []; perfValues = r.values || {};
+  perfRenderForm();
+  $('#perfEnv').textContent = r.venv_ready
+    ? '压测环境就绪（perf_test/.venv · Python 3.13 + locust，与平台主环境隔离）'
+    : '⚠️ 压测环境未就绪：执行 python3 -m venv perf_test/.venv && perf_test/.venv/bin/pip install -r perf_test/requirements-perf.txt';
+  $('#btnPerfStart').addEventListener('click', perfStart);
+  $('#btnPerfStop').addEventListener('click', perfStop);
+  $('#btnPerfSave').addEventListener('click', async () => {
+    const r2 = await (await fetch('/api/perf/config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(perfCollect()),
+    })).json();
+    perfResult(r2.msg || (r2.ok ? '已保存' : '保存失败'), r2.ok);
+    if (r2.ok) { const rf = await (await fetch('/api/perf/config')).json(); perfValues = rf.values; perfRenderForm(); }
+  });
+  $('#btnPerfReport').addEventListener('click', () => { if (perfRunId) location.href = '/perf/report/' + perfRunId; });
+}
+
 /* ---------------- 页面分发 ---------------- */
 document.addEventListener('DOMContentLoaded', () => {
   const page = document.body.dataset.page;
@@ -657,4 +773,5 @@ document.addEventListener('DOMContentLoaded', () => {
   else if (page === 'run') initRun();
   else if (page === 'detail') initRunDetail();
   else if (page === 'report') initReport();
+  else if (page === 'perf') initPerf();
 });

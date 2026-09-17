@@ -1,0 +1,58 @@
+# =============================================================================
+# HTTP 接口性能压测配置（由平台「⚡ 性能压测」页面维护，手工编辑请保持语法）
+# 模式：staircase 阶梯递增加压 / pulse 瞬时脉冲峰值
+# 依赖：perf_test/.venv（Python 3.13 + locust 2.x），与平台主环境隔离
+# =============================================================================
+
+mode: staircase
+
+# ------------------------------------------------------------------ 通用参数
+common:
+  host: "http://127.0.0.1:8899"
+  vu: 10
+  run_time: 10s
+  spawn_rate: 10.0
+  loop_count: 0
+  wait_time_min: 0.1
+  wait_time_max: 0.3
+
+# ------------------------------------------------------------------ 请求定义
+request:
+  path: /
+  method: GET
+  timeout: 10
+  validate_status: true
+  headers:
+    Accept: "*/*"
+  params:
+  body: ""
+  dynamic_fields:
+    random_user_id:
+      enabled: false
+      field_name: userId
+      digits: 16
+      as_string: true
+
+# ------------------------------------------------------- 阶梯递增加压（staircase）
+staircase:
+  start_users: 5
+  step_users: 5
+  step_duration: 3
+  ramp_duration: 5s
+  spawn_rate: 10.0
+
+# ------------------------------------------------------- 瞬时脉冲峰值（pulse）
+pulse:
+  baseline_users: 2
+  peak_users: 5
+  peak_duration: 3
+  pulse_interval: 10
+  peak_spawn_rate: 10.0
+  baseline_spawn_rate: 2.0
+
+# ------------------------------------------------------------------ 报告
+report:
+  output_path: reports/load_test_report.html
+  capture_response_body: true
+  response_body_max_len: 300
+  max_samples: 2000
