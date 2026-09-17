@@ -6,21 +6,26 @@
 <title>性能压测 · AppUI 自动化测试平台</title>
 <link rel="stylesheet" href="/static/style.css">
 <style>
-  .perf-group { border: 1px solid var(--border, rgba(127,127,127,.25)); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
-  .perf-group h4 { margin: 0 0 2px; font-size: 14px; font-weight: 600; }
-  .perf-group .gdesc { font-size: 12px; color: #6b7280; margin-bottom: 10px; }
+  /* 日/夜间模式：与平台同契约（html.day=日间，默认夜间），全部走主题变量，不写死颜色 */
+  .perf-group { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+  .perf-group h4 { margin: 0 0 2px; font-size: 14px; font-weight: 600; color: var(--ink); }
+  .perf-group .gdesc { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
   .perf-fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .perf-fields .field.wide { grid-column: 1 / -1; }
-  .perf-fields textarea { width: 100%; min-height: 78px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; }
+  .perf-fields textarea { width: 100%; min-height: 78px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px;
+    background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
   .perf-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  .perf-status { font-size: 13px; }
-  .perf-log { background: #0f172a; color: #d1d5db; border-radius: 8px; padding: 10px 12px; font-family: ui-monospace, Menlo, Consolas, monospace;
-    font-size: 12px; line-height: 1.5; max-height: 320px; overflow-y: auto; white-space: pre-wrap; }
-  .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
-  .badge.run { background: rgba(59,130,246,.15); color: #1d4ed8; }
-  .badge.ok { background: rgba(34,197,94,.15); color: #15803d; }
-  .badge.bad { background: rgba(239,68,68,.15); color: #b91c1c; }
-  .badge.stop { background: rgba(245,158,11,.18); color: #b45309; }
+  .perf-status { font-size: 13px; color: var(--ink2); }
+  /* 日志/代码区沿用平台约定：深底浅字（--dark 日间同样保持深色，更易读） */
+  .perf-log { background: var(--dark); color: #d1d5db; border-radius: 8px; padding: 10px 12px;
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.5;
+    max-height: 320px; overflow-y: auto; white-space: pre-wrap; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600;
+    background: rgba(128,128,128,.14); }
+  .badge.run { color: var(--run); }
+  .badge.ok { color: var(--ok-text); }
+  .badge.bad { color: var(--bad-text); }
+  .badge.stop { color: var(--stop); }
 </style>
 </head>
 <body data-page="perf">
@@ -54,6 +59,7 @@
     <div class="perf-log" id="perfLog">（未开始）</div>
   </div>
 </main>
+<script src="/static/theme.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>
