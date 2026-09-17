@@ -1,13 +1,16 @@
-/* 测试平台 · 日间/夜间模式切换（悬浮按钮，Mac/iPhone 简约风日/月图标，所有页面通用）
-   默认夜间（黑色居多，即原深色主题）；日间模式白色居多（html.day 变量覆盖，见 style.css）
-   选择存 localStorage['platform_theme']，刷新/重开保持
-   按钮图标：日间显示月亮（点击切夜间），夜间显示太阳（点击切日间）；图标颜色随主题自适应
+/* 自动化测试平台 · 日间/夜间模式切换（所有页面通用）
+   默认**日间**（Apple 官网即浅色为底）；夜间为 html.night 覆盖，见 style.css。
+   选择存 localStorage['platform_theme']，刷新/重开保持。
+
+   【首帧不闪】本脚本置于 <head>（样式表之前），并在脚本求值时就同步挂好 html 上的
+   主题类，因此第一帧就是正确主题，不会出现"先白后黑"或"先黑后白"的闪烁。
+   悬浮按钮的创建推迟到 DOMContentLoaded（那时 body 才存在）。
 
    【全局生效】元素定位器（/locator/）也加载本脚本，与平台共用同一个存储键，
-   因此任一处切换，平台与定位器主题同步变化。
-   两端 CSS 契约默认态相反，故同时驱动两个标记：
-     · 平台   style.css —— html.day = 日间（默认夜间）
-     · 定位器 style.css —— html.night = 夜间（默认日间） */
+   因此任一处切换，平台与定位器主题同步变化。两端 CSS 契约不同：
+     · 平台   style.css —— 默认日间，html.night = 夜间
+     · 定位器 style.css —— 默认日间，html.night = 夜间
+   契约现已统一，故只驱动 night 一个类；day 类同时挂上，供历史选择器兼容。 */
 (function () {
   const KEY = 'platform_theme';
   /* SF Symbols 风格：细线太阳 / 实心月牙 */
@@ -19,20 +22,19 @@
 
   function apply(mode) {
     const root = document.documentElement;
-    const isDay = mode === 'day';
-    // 同时驱动两端契约（默认态相反）：平台 .day 与定位器 .night 互为反向
-    root.classList.toggle('day', isDay);
+    const isDay = mode !== 'night';
     root.classList.toggle('night', !isDay);
+    root.classList.toggle('day', isDay);
     const fab = document.getElementById('theme-fab');
     if (fab) {
       fab.innerHTML = isDay ? ICON_MOON : ICON_SUN;
-      fab.title = isDay ? '切换到夜间模式（黑色）' : '切换到日间模式（白色）';
+      fab.title = isDay ? '切换到夜间模式' : '切换到日间模式';
     }
   }
 
   function current() {
-    try { if (localStorage.getItem(KEY) === 'day') return 'day'; } catch (e) { /* 忽略 */ }
-    return 'night';
+    try { if (localStorage.getItem(KEY) === 'night') return 'night'; } catch (e) { /* 忽略 */ }
+    return 'day';
   }
 
   function toggle() {
@@ -41,10 +43,14 @@
     apply(m);
   }
 
+  // 立即生效（脚本在 <head>，先于样式表与首帧）
+  apply(current());
+
   function init() {
     // 被平台 iframe 嵌入时不再注入按钮（避免父子各一个切换按钮）；
     // 主题标记仍照常同步，因此嵌入态一样跟随全局
-    if (!document.documentElement.classList.contains('embedded')) {
+    if (!document.documentElement.classList.contains('embedded')
+        && !document.getElementById('theme-fab')) {
       const fab = document.createElement('button');
       fab.id = 'theme-fab';
       fab.className = 'theme-fab';

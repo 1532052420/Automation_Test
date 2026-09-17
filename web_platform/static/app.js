@@ -1,7 +1,18 @@
-/* App UI 自动化测试平台 v1.6 · 前端逻辑 */
+/* 自动化测试平台 · 前端逻辑
+   ------------------------------------------------------------------
+   页面分发：body[data-page] → initXxx()（见文件末尾）
+   共享件（APP UI 与接口测试共用，避免两套重复实现）：
+     api / postJson / del      统一请求（自动解析 JSON + 兜底错误信息）
+     esc                       唯一转义函数
+     statusBadge               状态徽章（run 大写 / allure 小写归一）
+     runStatsHtml / runMetaHtml 任务概要渲染
+     renderCaseTree / setAllChecked / selectedCases  用例树
+     pollTask                  执行面板（Run 状态 + 进度 + 实时日志 + 停止）
+     evHtml                    文本证据（接口请求-响应留痕）折叠块
+   ------------------------------------------------------------------ */
 'use strict';
 
-/* ---------------- 基础工具 ---------------- */
+/* ================= 基础工具 ================= */
 async function api(url, opts) {
   const res = await fetch(url, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts));
   const data = await res.json().catch(() => ({ ok: false, msg: '响应解析失败(' + res.status + ')' }));
@@ -17,6 +28,52 @@ function esc(s) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
+/* 可选元素读写：同一份渲染逻辑要同时服务多个页面，元素缺失时静默跳过而不是抛错 */
+function setText(sel, text) { const el = $(sel); if (el) el.textContent = text; }
+function setHtml(sel, html) { const el = $(sel); if (el) el.innerHTML = html; }
+
+/* ---------------- 线性图标（SF Symbols 风格） ----------------
+   24 网格 / currentColor 描边 / 1.7 线宽 / 圆角端点。
+   统一从这里取，避免彩色 emoji 破坏单色视觉（Apple 官网不出现彩色 emoji）。 */
+const ICONS = {
+  flask: '<path d="M9.5 3h5M10.6 3v5.6L5.9 17.2A2.4 2.4 0 0 0 8 21h8a2.4 2.4 0 0 0 2.1-3.8L13.4 8.6V3"/>'
+       + '<path d="M7.8 14.4h8.4"/>',
+  check: '<path d="M4.5 12.8 9.6 18 19.5 6.8"/>',
+  close: '<path d="M6.2 6.2 17.8 17.8M17.8 6.2 6.2 17.8"/>',
+  target: '<circle cx="12" cy="12" r="8.3"/><circle cx="12" cy="12" r="3.3"/>',
+  folder: '<path d="M3.2 7.6a2 2 0 0 1 2-2h3.4l1.9 2.3h8.3a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2H5.2a2 2 0 0 1-2-2Z"/>',
+  chart: '<path d="M4 20h16"/><path d="M7.5 20v-5.6M12 20V6.4M16.5 20v-9"/>',
+  doc: '<path d="M6.6 3.6h6.6L18.6 9v11.4H6.6Z"/><path d="M13.2 3.6V9h5.4"/>',
+  hand: '<path d="M20 11.6H8.4l3.5-3.5-1.3-1.3L5 12l5.6 5.2 1.3-1.3-3.5-3.5H20Z"/>',
+  /* AppUI 二级菜单用：设置 / 录屏 / 用例清单 */
+  gear: '<circle cx="12" cy="12" r="3.1"/>'
+      + '<path d="M12 2.9v2.3M12 18.8v2.3M2.9 12h2.3M18.8 12h2.3M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6"/>',
+  film: '<rect x="3.2" y="5.2" width="17.6" height="13.6" rx="2.4"/><path d="M10 9.2l4.6 2.8L10 14.8Z"/>',
+  list: '<path d="M8.6 6.4h11.2M8.6 12h11.2M8.6 17.6h11.2"/>'
+      + '<path d="M4.3 6.4h.01M4.3 12h.01M4.3 17.6h.01"/>',
+  /* 首页模块入口用：取景框（元素定位器）/ 闪电（性能压测）；上传（用例管理） */
+  upload: '<path d="M12 15.2V4.2M8.2 8 12 4.2 15.8 8"/>'
+        + '<path d="M4.5 15.5v2.9a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.9"/>',
+  scan: '<path d="M4 8.2V6a2 2 0 0 1 2-2h2.2M15.8 4H18a2 2 0 0 1 2 2v2.2M20 15.8V18a2 2 0 0 1-2 2h-2.2M8.2 20H6a2 2 0 0 1-2-2v-2.2"/>'
+      + '<circle cx="12" cy="12" r="3.1"/>',
+  bolt: '<path d="M13.2 2.8 5.8 13.2h4.9L10.8 21.2 18.2 10.8h-4.9Z"/>',
+  /* AppUI 编排/套件用：流程（编排）/ 层叠（套件） */
+  flow: '<circle cx="5.4" cy="6" r="2.3"/><circle cx="18.6" cy="18" r="2.3"/>'
+      + '<path d="M7.7 6.9c6.2 1.5 5.5 7.4 8.8 9.6"/>',
+  layers: '<path d="M12 3.4 21 8.4 12 13.4 3 8.4Z"/>'
+        + '<path d="m4.6 12.2-1.6.9 9 5 9-5-1.6-.9"/>',
+};
+function icon(name, size) {
+  const n = size || 24;
+  return '<svg viewBox="0 0 24 24" width="' + n + '" height="' + n + '" fill="none"' +
+    ' stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+    (ICONS[name] || '') + '</svg>';
+}
+/* 空态图标：大号单色线性图标 + 一句人话说明 */
+function emptyHtml(ico, msg) {
+  return '<div class="empty"><span class="eico">' + icon(ico, 34) + '</span>' + msg + '</div>';
+}
+
 /* 状态徽章：run 状态为大写（PASSED…），用例/步骤状态来自 allure 为小写（passed…），
    统一转大写复用同一套 .st-* 样式；broken→ERROR、skipped/unknown→PENDING */
 function statusBadge(st) {
@@ -24,18 +81,33 @@ function statusBadge(st) {
   const cls = { BROKEN: 'ERROR', SKIPPED: 'PENDING', UNKNOWN: 'PENDING' }[s] || s;
   return '<span class="status st-' + esc(cls) + '">' + esc(s) + '</span>';
 }
-/* run 统计：带标签的 通过/失败/异常 三个数值 */
+/* run 统计：带标签的 共/通过/失败/异常 */
 function runStatsHtml(t) {
-  return '<span>共 <b>' + (t.total || 0) + '</b> 条</span>' +
+  return '<span>共 <b>' + (t.total || 0) + '</b></span>' +
     '<span>通过 <b class="num-ok">' + (t.passed || 0) + '</b></span>' +
     '<span>失败 <b class="num-bad">' + (t.failed || 0) + '</b></span>' +
     '<span>异常 <b class="num-err">' + (t.error || 0) + '</b></span>';
+}
+/* run 概要（执行面板 / 详情页共用）：接口任务展示环境与标记，设备任务展示设备与 App */
+function runMetaHtml(t, withStart) {
+  const isApi = t.kind === 'api';
+  return '<span>状态 ' + statusBadge(t.status) + '</span>' +
+    '<span>类型 <b>' + (isApi ? '接口' : '设备') + '</b></span>' +
+    (isApi
+      ? '<span>环境 <b>' + esc(t.env || '-') + '</b></span>'
+      : '<span>设备 <b>' + esc(t.device_model || t.device_desc || '-') + ' / ' + esc(t.udid || '-') + '</b></span>' +
+        '<span>App <b>' + esc(t.app_package || '-') + '</b></span>') +
+    (withStart ? '<span>开始 <b>' + fmtTime(t.start_time) + '</b></span>' : '') +
+    runStatsHtml(t) +
+    (t.marker ? '<span>标记 <b>' + esc(t.marker) + '</b></span>' : '') +
+    (t.owner ? '<span>发起 <b>' + esc(t.owner) + '</b></span>' : '');
 }
 function fmtTime(s) { return s ? String(s).replace('T', ' ').slice(0, 19) : '-'; }
 
 let _toastTimer = null;
 function toast(msg, ok = true) {
   const el = $('#toast');
+  if (!el) return;
   el.textContent = msg;
   el.className = ok ? 'ok' : 'bad';
   el.classList.add('show');
@@ -43,13 +115,14 @@ function toast(msg, ok = true) {
   _toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
 }
 
-/* 自绘确认模态（替代原生 confirm） */
+/* 自绘确认模态（替代原生 confirm）；页面没有模态骨架时退回原生 confirm */
 function confirmModal(title, msg, danger) {
+  const mask = $('#mask');
+  if (!mask) return Promise.resolve(window.confirm(title + '\n\n' + msg));
   return new Promise((resolve) => {
-    const mask = $('#mask'), mTitle = $('#mTitle'), mMsg = $('#mMsg'),
-          btnOk = $('#mOk'), btnCancel = $('#mCancel');
-    mTitle.textContent = title;
-    mMsg.textContent = msg;
+    const btnOk = $('#mOk'), btnCancel = $('#mCancel');
+    $('#mTitle').textContent = title;
+    $('#mMsg').textContent = msg;
     btnOk.className = danger ? 'danger' : '';
     btnOk.textContent = danger ? '删除' : '确定';
     mask.classList.add('show');
@@ -60,40 +133,25 @@ function confirmModal(title, msg, danger) {
   });
 }
 
-/* ---------------- 侧边栏（全局） ---------------- */
+/* ================= 顶部全局导航（Apple globalnav 风格，全站共用） =================
+   导航项与结构来自共用的 nav.js（元素定位器也用它），样式来自共用的 nav.css；
+   这里只负责平台特有的右侧状态条（设备 / Appium / 更新日志入口）。 */
 function renderSidebar(active) {
-  const sb = $('#sidebar');
-  if (!sb) return;
-  const items = [
-    ['/', '📊', '首页'],
-    ['/run', '🚀', '执行用例'],
-    ['/report', '📈', '测试报告'],
-    ['/admin', '🗂', '用例管理'],
-    ['/locator', '🎯', '元素定位器'],
-    ['/perf', '⚡', '性能压测'],
-  ];
-  sb.innerHTML =
-    '<div class="brand"><div class="logo">🤖</div><div>AppUI 自动化<br><small>测试平台 v<span id="brandVer">…</span></small></div></div>' +
-    '<nav>' + items.map(([href, ico, name]) =>
-      '<a href="' + href + '" class="' + (href === active ? 'on' : '') + '"><span class="ico">' + ico + '</span>' + name + '</a>'
-    ).join('') + '</nav>' +
+  const nav = $('#sidebar');
+  if (!nav) return;
+  PlatformNav.render(nav, active,
     '<div class="foot">' +
     '<span><i class="dot ok" id="dotDevice"></i>设备 <span id="footDevice">…</span></span>' +
     '<span><i class="dot ok" id="dotAppium"></i>Appium <span id="footAppium">…</span></span>' +
-    '<button class="ghost mini" id="btnChangelog" title="查看各版本更新时间与变更内容">📋 更新日志 v<span id="clVer">…</span></button>' +
-    '</div>';
+    '<button class="ghost mini" id="btnChangelog" title="查看各版本更新时间与变更内容">更新日志 v<span id="clVer">…</span></button>' +
+    '</div>');
   const clBtn = $('#btnChangelog');
   if (clBtn) clBtn.addEventListener('click', showChangelog);
   pollFootStatus();
   setInterval(pollFootStatus, 10000);
 }
 
-/* ---------------- 更新日志（左下角入口） ---------------- */
-function escHtml(s) {
-  return String(s == null ? '' : s).replace(/[&<>"]/g,
-    c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
-}
-
+/* ================= 更新日志（右上角入口） ================= */
 async function showChangelog() {
   const d = await api('/api/changelog');
   if (!d.ok) return toast('更新日志加载失败', false);
@@ -103,7 +161,7 @@ async function showChangelog() {
     mask.className = 'mask';
     mask.id = 'clMask';
     mask.innerHTML =
-      '<div class="modal clmodal"><h4>📋 更新日志</h4>' +
+      '<div class="modal clmodal"><h4>更新日志</h4>' +
       '<div class="cllist" id="clList"></div>' +
       '<div class="mops"><button id="clClose">关闭</button></div></div>';
     document.body.appendChild(mask);
@@ -111,11 +169,11 @@ async function showChangelog() {
   }
   $('#clList').innerHTML = (d.entries || []).map(e =>
     '<div class="clitem' + (e.version === d.version ? ' cur' : '') + '">' +
-      '<div class="clhead"><b>v' + escHtml(e.version) + '</b>' +
-      '<span class="cltime">' + escHtml(e.time) + '</span>' +
+      '<div class="clhead"><b>v' + esc(e.version) + '</b>' +
+      '<span class="cltime">' + esc(e.time) + '</span>' +
       (e.version === d.version ? '<span class="clbadge">当前版本</span>' : '') + '</div>' +
-      (e.title ? '<div class="cltitle">' + escHtml(e.title) + '</div>' : '') +
-      '<ul>' + (e.changes || []).map(c => '<li>' + escHtml(c) + '</li>').join('') + '</ul>' +
+      (e.title ? '<div class="cltitle">' + esc(e.title) + '</div>' : '') +
+      '<ul>' + (e.changes || []).map(c => '<li>' + esc(c) + '</li>').join('') + '</ul>' +
     '</div>').join('');
   $('#clClose').onclick = () => mask.classList.remove('show');
   mask.classList.add('show');
@@ -124,10 +182,8 @@ async function showChangelog() {
 async function pollFootStatus() {
   try {
     const st = await api('/api/status');
-    // 版本号（平台与元素定位器统一，来自后端 changelog.py 单一数据源）
-    const bv = $('#brandVer'), cv = $('#clVer');
-    if (bv) bv.textContent = st.version || '?';
-    if (cv) cv.textContent = st.version || '?';
+    // 版本号只保留「更新日志」按钮一处（品牌区不再显示），统一来自后端 changelog.py
+    setText('#clVer', st.version || '?');
     const d = $('#dotDevice'), f = $('#footDevice');
     if (d) {
       const on = st.device_online > 0;
@@ -146,16 +202,130 @@ async function pollFootStatus() {
       d2.className = 'dot ' + (st.appium.ok ? 'ok' : 'bad');
       f2.textContent = st.appium.ok ? '正常' : '不可用';
     }
-  } catch (e) {}
+  } catch (e) { /* 状态条失败不打断页面 */ }
 }
 
-/* ---------------- 首页 ---------------- */
-async function initIndex() {
+/* ================= 用例树（执行页 / 接口测试页共用） ================= */
+function renderCaseTree(tree, boxSel, emptyTip) {
+  const box = $(boxSel);
+  if (!box) return;
+  if (!tree || !tree.length) {
+    box.innerHTML = emptyHtml('folder', esc(emptyTip || '没有可执行用例'));
+    return;
+  }
+  let html = '<ul>';
+  tree.forEach(f => {
+    html += '<li data-file="' + esc(f.file) + '"><label class="chk">' +
+      '<input type="checkbox" data-file="' + esc(f.file) + '" class="ck-file">' +
+      '<span class="file">' + esc(f.file.split('/').pop()) + '</span> ' +
+      '<span class="path">' + esc(f.file) + '</span></label><ul>';
+    f.methods.forEach(m => {
+      const node = f.file + '::' + f.class_name + '::' + m;
+      // data-key：小写全文（文件+类+方法），供顶部搜索框过滤
+      const key = (f.file + ' ' + f.class_name + ' ' + m).toLowerCase();
+      html += '<li data-key="' + esc(key) + '"><label class="chk">' +
+        '<input type="checkbox" data-node="' + esc(node) + '" class="ck-node">' +
+        '<span class="cls">' + esc(f.class_name) + '::' + esc(m) + '</span></label></li>';
+    });
+    html += '</ul></li>';
+  });
+  box.innerHTML = html + '</ul>';
+}
+
+/* 文件级勾选框联动其下全部方法（事件委托；每个容器只绑一次，避免重复渲染后监听器堆积） */
+function bindTreeSync(boxSel) {
+  const box = $(boxSel);
+  if (!box || box.dataset.syncBound) return;
+  box.dataset.syncBound = '1';
+  box.addEventListener('change', (e) => {
+    if (!e.target.classList.contains('ck-file')) return;
+    const prefix = e.target.dataset.file + '::';
+    box.querySelectorAll('input[data-node]').forEach(n => {
+      if (n.dataset.node.startsWith(prefix)) n.checked = e.target.checked;
+    });
+  });
+}
+
+function setAllChecked(v, boxSel) {
+  document.querySelectorAll((boxSel || '#caseTree') + ' input[type=checkbox]').forEach(n => n.checked = v);
+}
+function selectedCases(boxSel) {
+  return Array.from(document.querySelectorAll((boxSel || '#caseTree') + ' .ck-node:checked'))
+    .map(n => n.dataset.node);
+}
+
+/* ================= 执行面板（APP UI 与接口测试共用） ================= */
+let _pollTimer = null, _logOffset = 0;
+
+function pollTask(runId) {
+  clearInterval(_pollTimer); _logOffset = 0;
+  const box = $('#logBox');
+  if (box) box.innerHTML = '';
+  _pollTimer = setInterval(async () => {
+    const d = await api('/api/run/' + runId);
+    if (!d.ok) { clearInterval(_pollTimer); return; }
+    const t = d.task;
+    setText('#runIdNow', t.run_id);
+    setHtml('#runStatusNow', statusBadge(t.status));
+    setText('#runEnvNow', t.kind === 'api' ? (t.env || '-') : (t.device_model || t.device_desc || '-'));
+    setHtml('#runStatsNow', runStatsHtml(t));
+    const done = t.passed + t.failed + t.error + t.skipped;
+    const bar = $('#runProgress');
+    if (bar) bar.style.width = (t.total ? Math.min(100, Math.round(done / t.total * 100)) : 0) + '%';
+    const stop = $('#btnStop');
+    if (stop) stop.disabled = !(t.status === 'RUNNING' || t.status === 'PENDING');
+    const go = $('#btnGoDetail');
+    if (go) go.onclick = () => { location.href = '/runs/' + runId; };
+    const lg = await api('/api/run/' + runId + '/log?offset=' + _logOffset);
+    if (lg.ok) { _logOffset = lg.offset; renderLog(lg.lines); }
+    if (t.status !== 'RUNNING' && t.status !== 'PENDING') {
+      clearInterval(_pollTimer);
+      if (t.error_msg) toast('任务异常: ' + t.error_msg, false);
+      else toast('任务结束: ' + t.status + ' → 去「测试报告」查看用例明细', t.status === 'PASSED');
+    }
+  }, 1500);
+}
+
+function renderLog(lines, boxSel) {
+  const box = $(boxSel || '#logBox');
+  if (!box || !lines.length) return;
+  const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+  lines.forEach(l => {
+    let cls = '';
+    if (/断言「.+」失败|FAILED|ERROR|TimeoutException|AssertionError/.test(l)) cls = 'fail';
+    else if (/断言「.+」通过|PASSED/.test(l)) cls = 'pass';
+    else if (/toast「.+」未出现|WARNING/.test(l)) cls = 'warn';
+    else if (/^[-=]+$|^platform darwin|^cachedir|^rootdir|^plugins/.test(l)) cls = 'dim';
+    const div = document.createElement('div');
+    if (cls) div.className = cls;
+    div.textContent = l;
+    box.appendChild(div);
+  });
+  if (nearBottom) box.scrollTop = box.scrollHeight;
+}
+
+async function stopRun() {
+  const runId = $('#runIdNow').textContent;
+  if (!runId || runId === '-') return;
+  const d = await postJson('/api/run/' + runId + '/stop', {});
+  toast(d.msg || '停止信号已发送', d.ok);
+}
+
+/* ================= 首页（模块导航；执行总览已迁至测试报告页顶部） ================= */
+function initIndex() {
   renderSidebar('/');
-  const refresh = async () => { await refreshStats(); await loadRunsTable('#recentList', true, 10); };
-  $('#btnClearAll').addEventListener('click', clearAllRuns);
-  await refresh();
-  setInterval(refresh, 8000);
+  // 入口卡片的圆形线性图标：data-ico 声明图标名，这里统一注入
+  document.querySelectorAll('.card-icon .ico[data-ico]').forEach(el => {
+    el.innerHTML = icon(el.dataset.ico, 34);
+  });
+}
+
+/* 统计卡右上角的淡色线性图标：图标定义只在 app.js 一处，模板只声明用哪个（测试报告页用） */
+function initStatIcons() {
+  document.querySelectorAll('.stat[data-ico]').forEach(el => {
+    const box = el.querySelector('.bgico');
+    if (box) box.innerHTML = icon(el.dataset.ico, 42);
+  });
 }
 
 async function refreshStats() {
@@ -164,27 +334,38 @@ async function refreshStats() {
     const runs = d.runs || [];
     const pass = runs.filter(r => r.status === 'PASSED').length;
     const fail = runs.filter(r => r.status === 'FAILED' || r.status === 'ERROR').length;
-    $('#cardRuns').textContent = runs.length;
-    $('#cardPass').textContent = pass;
-    $('#cardFail').textContent = fail;
-    $('#cardRate').textContent = runs.length ? Math.round(pass / runs.length * 100) + '%' : '—';
-  } catch (e) {}
+    setText('#cardRuns', runs.length);
+    setText('#cardPass', pass);
+    setText('#cardFail', fail);
+    setText('#cardRate', runs.length ? Math.round(pass / runs.length * 100) + '%' : '—');
+  } catch (e) { /* 统计失败不打断页面 */ }
 }
 
-/* ---------------- 执行记录渲染（首页/执行页共用） ----------------
-   设备列显示真实型号（runner 启动时从 adb 取，如 FGD AL00=华为）；
-   旧历史记录无 device_model 时回退显示 conf 别名 device_desc */
+/* ================= 执行记录渲染（首页/报告页共用） =================
+   设备列：设备任务显示真实型号（runner 启动时从 adb 取，如 FGD AL00=华为）；
+   旧历史记录无 device_model 时回退显示 conf 别名 device_desc。
+   接口任务没有设备，同一列改显示「接口 · 环境」，App 列改显示项目名。 */
+function runTarget(r) {
+  return r.kind === 'api' ? ('接口 · ' + (r.env || '-')) : (r.device_model || r.device_desc || '-');
+}
+function runSubject(r) {
+  if (r.kind === 'api') {
+    const parts = String(r.conf_file || '').split('/');
+    return parts.length > 1 ? parts[1] : (parts[0] || '-');
+  }
+  return (r.app_package || '-').split('.').pop();
+}
+
 function runRowHtml(r, withOps) {
-  const dev = r.device_model || r.device_desc || '-';
   return '<tr>' +
     '<td><a class="runlink" href="/runs/' + esc(r.run_id) + '">' + esc(r.run_id) + '</a></td>' +
     '<td>' + fmtTime(r.start_time) + '</td>' +
-    '<td title="' + esc(dev) + ' · ' + esc(r.udid || '') + '">' + esc(dev) + '</td>' +
-    '<td title="' + esc(r.app_package) + '">' + esc((r.app_package || '-').split('.').pop()) + '</td>' +
-    '<td><b>' + r.total + '</b> / <span style="color:#4ade80">' + r.passed + '</span> / <span style="color:#ff8787">' + r.failed + '</span></td>' +
+    '<td title="' + esc(r.udid || r.conf_file || '') + '">' + esc(runTarget(r)) + '</td>' +
+    '<td title="' + esc(r.app_package || r.conf_file || '') + '">' + esc(runSubject(r)) + '</td>' +
+    '<td><b>' + r.total + '</b> / <span class="num-ok">' + r.passed + '</span> / <span class="num-bad">' + r.failed + '</span></td>' +
     '<td>' + statusBadge(r.status) + '</td>' +
     (withOps ? '<td><div class="ops">' +
-      '<a class="btn ghost mini" style="text-decoration:none" href="/runs/' + esc(r.run_id) + '">详情</a>' +
+      '<a class="btn ghost mini" href="/runs/' + esc(r.run_id) + '">详情</a>' +
       '<button class="ghost mini" onclick="openReportFor(\'' + esc(r.run_id) + '\', this)">报告</button>' +
       '<button class="mini danger-ghost" onclick="deleteRunFor(\'' + esc(r.run_id) + '\')">删除</button>' +
       '</div></td>' : '') +
@@ -195,22 +376,22 @@ function renderRunRows(sel, runs, withOps) {
   const tbody = $(sel);
   if (!tbody) return;
   if (!runs.length) {
-    tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><span class="eico">🗂️</span>暂无执行记录<br>' +
-      '<a class="runlink" href="/run">去执行页开始第一次测试 →</a></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7">' +
+      emptyHtml('folder', '暂无执行记录<br><a class="runlink" href="/run">去执行页开始第一次测试 →</a>') +
+      '</td></tr>';
     return;
   }
   tbody.innerHTML = runs.map(r => runRowHtml(r, withOps)).join('');
 }
 
-/* 首页：只取最近 N 条，无分页 */
 async function loadRunsTable(sel, withOps, limit) {
   const d = await api('/api/runs');
   renderRunRows(sel, (d.runs || []).slice(0, limit || 100), withOps);
 }
 
-/* ---------------- 分页（每页 10 条） ---------------- */
+/* ================= 分页（每页 10 条） ================= */
 const PAGE_SIZE = 10;
-let _runsPage = 1, _reportPage = 1;
+let _reportPage = 1;
 
 function renderPager(sel, page, pages, onPage, total) {
   const el = $(sel);
@@ -235,9 +416,10 @@ function renderPager(sel, page, pages, onPage, total) {
     b.addEventListener('click', () => onPage(parseInt(b.dataset.p, 10))));
 }
 
-/* 执行页：执行记录已并入测试报告页，这里不再需要分页版加载；
-   保留 renderPager/分页状态供报告页使用 */
-async function loadRunsPaged() {}
+/* 详情占位（报告页内嵌区 / 独立详情页共用文案） */
+function detailPlaceholder() {
+  return emptyHtml('hand', '从上方列表选择一条执行记录查看详情');
+}
 
 async function deleteRunFor(runId) {
   const yes = await confirmModal('删除执行记录', '将删除 ' + runId + ' 的全部数据（Allure 结果、日志），不可恢复。', true);
@@ -247,8 +429,7 @@ async function deleteRunFor(runId) {
   if (d.ok && _activeDetailRun === runId) {
     clearInterval(_detailTimer); _detailTimer = null;
     _activeDetailRun = null;
-    const box = $('#runDetail');
-    if (box) box.innerHTML = '<div class="empty"><span class="eico">👈</span>从上方列表选择一条执行记录查看详情</div>';
+    setHtml('#runDetail', detailPlaceholder());
     // run_detail 独立页：删完回到报告页（当前 run 已不存在）
     if (document.body.dataset.page === 'detail') { location.href = '/report'; return; }
   }
@@ -263,33 +444,190 @@ async function clearAllRuns() {
   if (d.ok && _activeDetailRun) {
     clearInterval(_detailTimer); _detailTimer = null;
     _activeDetailRun = null;
-    const box = $('#runDetail');
-    if (box) box.innerHTML = '<div class="empty"><span class="eico">👈</span>从上方列表选择一条执行记录查看详情</div>';
+    setHtml('#runDetail', detailPlaceholder());
   }
   refreshAfterOps();
 }
 
 function refreshAfterOps() {
   const page = document.body.dataset.page;
-  if (page === 'index') { refreshStats(); loadRunsTable('#recentList', true, 10); }
-  else if (page === 'report') { loadReportList(); }
+  if (page === 'report') { refreshStats(); loadRunsTable('#recentList', true, 10); loadReportList(); }
 }
 
-/* ---------------- 执行页（配置+设备+用例+记录 合并） ---------------- */
+/* ================= APP UI 执行页 ================= */
 async function initRun() {
   renderSidebar('/run');
+  initRunPanels();
   await loadExecDefaults();
-  await loadCaseTree();
   await loadRecordingConfig();
+  const tree = await api('/api/cases');
+  renderCaseTree(tree.ok ? tree.tree : [], '#caseTree', 'cases/app_ui 下没有可执行用例');
+  bindTreeSync('#caseTree');
   $('#btnStart').addEventListener('click', startRun);
   $('#btnStop').addEventListener('click', stopRun);
   $('#btnSelectAll').addEventListener('click', () => setAllChecked(true));
   $('#btnSelectNone').addEventListener('click', () => setAllChecked(false));
   $('#confSel').addEventListener('change', () => loadExecDefaults($('#confSel').value));
   $('#btnRecSave').addEventListener('click', saveRecordingConfig);
+  initElementsPanel();
+  adminPanelInit();   // 用例管理面板（原独立模块并入，绑定见 admin.js）
+  appTestingInit();   // 用例编排 / 测试套件面板（绑定见 app_testing.js）
 }
 
-/* ---------------- 录屏配置（失败证据视频的开关与时间参数，存 config/recording.conf） ---------------- */
+/* ---------------- 左侧二级菜单：hash 深链 + 记住上次所在面板 ---------------- */
+const RUN_PANELS = ['elements', 'exec', 'rec', 'cases', 'orch', 'suites', 'admin'];
+function showRunPanel(name) {
+  if (!RUN_PANELS.includes(name)) name = 'exec';
+  RUN_PANELS.forEach(p => {
+    const sec = $('#panel-' + p);
+    if (sec) sec.hidden = (p !== name);
+  });
+  document.querySelectorAll('#subnav a').forEach(a =>
+    a.classList.toggle('on', a.dataset.panel === name));
+  try { localStorage.setItem('appui_panel', name); } catch (e) { /* 隐私模式忽略 */ }
+}
+function initRunPanels() {
+  document.querySelectorAll('#subnav a').forEach(a => {
+    if (a.dataset.icon) a.insertAdjacentHTML('afterbegin', icon(a.dataset.icon, 18));
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      showRunPanel(a.dataset.panel);
+      history.replaceState(null, '', '#' + a.dataset.panel);
+    });
+  });
+  let start = (location.hash || '').replace('#', '');
+  if (!RUN_PANELS.includes(start)) {
+    try { start = localStorage.getItem('appui_panel') || ''; } catch (e) { start = ''; }
+  }
+  showRunPanel(start);
+}
+
+/* ================= 元素管理（元素库列表 / 编辑 / 复制 / 删除） =================
+   数据源与元素定位器、执行框架同一份元素库（page_objects/.../elements/*.py）；
+   编辑/复制走后端 /api/appui/elements/save，写回复用定位器同一套行生成逻辑。 */
+let _elements = [], _elFiles = [], _elTypes = [], _elWaits = [];
+let _elModalMode = 'edit', _elModalOrig = null;
+
+async function loadElements() {
+  const d = await api('/api/appui/elements');
+  if (!d.ok) return toast(d.msg || '元素列表加载失败', false);
+  _elements = d.elements || [];
+  _elFiles = d.files || [];
+  _elTypes = d.locator_types || ['ID', 'XPATH'];
+  _elWaits = d.wait_types || ['VISIBILITY_OF'];
+  renderElements();
+}
+
+function renderElements() {
+  const kw = ($('#elSearch').value || '').trim().toLowerCase();
+  const list = kw ? _elements.filter(e =>
+    [e.name, e.value, e.desc, e.type, e.file].some(v =>
+      String(v || '').toLowerCase().includes(kw))) : _elements;
+  const fmtDate = ts => {
+    if (!ts) return '-';
+    const d = new Date(ts * 1000), p = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  };
+  $('#elTbody').innerHTML = list.map(e =>
+    '<tr>' +
+    '<td><b>' + esc(e.name) + '</b><br><span class="el-file">' + esc(e.file) + '</span></td>' +
+    '<td>' + esc(e.type) + '</td>' +
+    '<td>' + esc(e.desc || '-') + '</td>' +
+    '<td><span class="el-preview" title="' + esc(e.value) + '">' + esc(e.value) + '</span></td>' +
+    '<td><span class="usage-num' + (e.usage_count ? '' : ' zero') + '">' + e.usage_count + '</span></td>' +
+    '<td>' + fmtDate(e.created_at) + '</td>' +
+    '<td><div class="ops">' +
+    '<button class="ghost mini" data-act="edit" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">编辑</button>' +
+    '<button class="ghost mini" data-act="copy" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">复制</button>' +
+    '<button class="mini danger-ghost" data-act="del" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">删除</button>' +
+    '</div></td></tr>').join('');
+  $('#elEmpty').style.display = list.length ? 'none' : '';
+}
+
+function fillSelect(sel, options, val) {
+  sel.innerHTML = options.map(o =>
+    '<option value="' + esc(o) + '"' + (o === val ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
+}
+
+/* 编辑 / 复制共用一个弹窗：编辑 = 名称可改（改名=删旧增新）+ 文件固定；
+   复制 = 预填原元素内容、名称留待修改 + 目标文件可选。 */
+function openElModal(mode, name, file) {
+  const el = _elements.find(e => e.name === name && e.file === file) || {};
+  _elModalMode = mode;
+  _elModalOrig = mode === 'edit' ? name : null;
+  $('#elModalTitle').textContent = mode === 'edit' ? '✎ 编辑元素' : '⧉ 复制元素';
+  $('#elMName').value = mode === 'edit' ? (el.name || '') : '';
+  $('#elMName').placeholder = mode === 'copy' ? '新元素名称（不能与已有元素同名）' : '';
+  fillSelect($('#elMType'), _elTypes, el.type || 'ID');
+  fillSelect($('#elMWait'), _elWaits, el.wait_type || 'VISIBILITY_OF');
+  $('#elMValue').value = el.value || '';
+  $('#elMWaitSec').value = el.wait_seconds || 6;
+  $('#elMDesc').value = el.desc || '';
+  fillSelect($('#elMFile'), _elFiles, mode === 'edit' ? (el.file || _elFiles[0]) : (file || _elFiles[0]));
+  $('#elMFile').disabled = (mode === 'edit');   // 编辑不挪窝：换文件=先删后增，容易把页面引用弄丢
+  $('#elMFileWrap').style.display = mode === 'edit' ? 'none' : '';
+  $('#elMask').classList.add('show');
+}
+
+async function saveElModal() {
+  const name = $('#elMName').value.trim();
+  const value = $('#elMValue').value.trim();
+  if (!name) return toast('请填写元素名称', false);
+  if (!value) return toast('请填写定位值', false);
+  const btn = $('#elMSave');
+  btn.disabled = true; btn.textContent = '保存中…';
+  try {
+    const d = await postJson('/api/appui/elements/save', {
+      file: $('#elMFile').value,
+      orig_name: _elModalOrig,
+      name: name,
+      locator_type: $('#elMType').value,
+      value: value,
+      wait_type: $('#elMWait').value,
+      wait_seconds: $('#elMWaitSec').value,
+      desc: $('#elMDesc').value.trim(),
+    });
+    toast(d.msg || (d.ok ? '已保存' : '保存失败'), !!d.ok);
+    if (d.ok) {
+      $('#elMask').classList.remove('show');
+      await loadElements();
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = '保存';
+  }
+}
+
+async function deleteElement(name, file) {
+  const yes = await confirmModal('删除元素',
+    '将从 ' + file + ' 中删除元素 ' + name + ' 的定义。若页面方法仍在引用它，执行时会找不到元素。确定删除？', true);
+  if (!yes) return;
+  const d = await postJson('/api/appui/elements/delete', { file: file, name: name });
+  toast(d.msg || (d.ok ? '已删除' : '删除失败'), !!d.ok);
+  if (d.ok) loadElements();
+}
+
+function onElTableClick(e) {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const name = btn.dataset.name, file = btn.dataset.file;
+  if (btn.dataset.act === 'edit') openElModal('edit', name, file);
+  else if (btn.dataset.act === 'copy') openElModal('copy', name, file);
+  else if (btn.dataset.act === 'del') deleteElement(name, file);
+}
+
+function initElementsPanel() {
+  $('#btnElRefresh').addEventListener('click', loadElements);
+  $('#elSearch').addEventListener('input', renderElements);
+  $('#elTbody').addEventListener('click', onElTableClick);
+  $('#elMCancel').addEventListener('click', () => $('#elMask').classList.remove('show'));
+  $('#elMSave').addEventListener('click', saveElModal);
+  $('#elMask').addEventListener('click', (e) => {
+    if (e.target === $('#elMask')) $('#elMask').classList.remove('show');
+  });
+  loadElements();
+}
+
+/* ================= 录屏配置（失败证据视频的开关与时间参数，存 config/recording.conf） ================= */
 async function loadRecordingConfig() {
   try {
     const d = await api('/api/recording/config');
@@ -315,15 +653,9 @@ async function saveRecordingConfig() {
     keep_on_success: $('#recKeep').checked,
     required: $('#recRequired').checked,
   };
-  try {
-    const r = await fetch('/api/recording/config', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const d = await r.json();
-    toast(d.msg || (d.ok ? '已保存' : '保存失败'), !!d.ok);
-    if (d.ok) loadRecordingConfig();   // 回读校准（含边界裁剪后的值）
-  } catch (e) { toast('保存失败：' + e, false); }
+  const d = await postJson('/api/recording/config', payload);
+  toast(d.msg || (d.ok ? '已保存' : '保存失败'), !!d.ok);
+  if (d.ok) loadRecordingConfig();   // 回读校准（含边界裁剪后的值）
 }
 
 async function loadExecDefaults(conf) {
@@ -341,46 +673,14 @@ async function loadExecDefaults(conf) {
   // 设备状态卡：在线状态以 adb 实测为准（device_online），conf 里的 udid 仅作预填
   const online = !!d.defaults.device_online;
   $('#devState').innerHTML =
-    '<span class="pill ' + (online ? 'ok' : 'bad') + '">' + (online ? '● 设备在线' : '● 未检测到在线设备') + '</span>' +
+    '<span class="pill ' + (online ? 'ok' : 'bad') + '">' + (online ? '设备在线' : '未检测到在线设备') + '</span>' +
     '<span>设备 <b>' + esc(d.defaults.udid || '-') + '</b>' +
-    (!online && d.defaults.udid ? ' <span class="muted" style="font-size:12px">(conf 预填，未连接)</span>' : '') + '</span>' +
+    (!online && d.defaults.udid ? ' <span class="muted">(conf 预填，未连接)</span>' : '') + '</span>' +
     '<span>型号 <b>' + esc(d.defaults.model || '-') + '</b></span>' +
-    '<span>Appium <b>' + (d.defaults.appium_ok ? '<span style="color:#4ade80">正常</span>' : '<span style="color:#ff8787">不可用</span>') + '</b></span>' +
+    '<span>Appium <b>' + (d.defaults.appium_ok ? '正常' : '不可用') + '</b></span>' +
     '<span>服务 <b>' + esc(d.defaults.server || '-') + '</b></span>' +
     (d.defaults.occupied ? '<span class="pill bad">有任务执行中</span>' : '');
 }
-
-async function loadCaseTree() {
-  const d = await api('/api/cases');
-  const box = $('#caseTree');
-  if (!d.ok || !(d.tree || []).length) {
-    box.innerHTML = '<div class="empty"><span class="eico">📂</span>cases/app_ui 下没有可执行用例</div>';
-    return;
-  }
-  let html = '<ul>';
-  d.tree.forEach(f => {
-    html += '<li><label class="chk"><input type="checkbox" data-file="' + esc(f.file) + '" class="ck-file">' +
-      '<span class="file">' + esc(f.file.split('/').pop()) + '</span> <span class="muted">' + esc(f.file) + '</span></label><ul>';
-    f.methods.forEach(m => {
-      const node = f.file + '::' + f.class_name + '::' + m;
-      html += '<li><label class="chk"><input type="checkbox" data-node="' + esc(node) + '" class="ck-node">' +
-        '<span class="cls">' + esc(f.class_name) + '::' + esc(m) + '</span></label></li>';
-    });
-    html += '</ul></li>';
-  });
-  html += '</ul>';
-  box.innerHTML = html;
-  box.addEventListener('change', (e) => {
-    if (e.target.classList.contains('ck-file')) {
-      Array.from(box.querySelectorAll('input[data-node]')).forEach(n => {
-        if (n.dataset.node.startsWith(e.target.dataset.file + '::')) n.checked = e.target.checked;
-      });
-    }
-  });
-}
-
-function setAllChecked(v) { document.querySelectorAll('#caseTree input[type=checkbox]').forEach(n => n.checked = v); }
-function selectedCases() { return Array.from(document.querySelectorAll('#caseTree .ck-node:checked')).map(n => n.dataset.node); }
 
 async function startRun() {
   const conf = $('#confSel').value;
@@ -389,7 +689,7 @@ async function startRun() {
   if (!cases.length) return toast('请至少勾选一个用例', false);
   const btn = $('#btnStart');
   btn.disabled = true; btn.textContent = '启动中…';
-  const body = {
+  const d = await postJson('/api/run', {
     conf_file: conf,
     case_nodes: cases,
     overrides: {
@@ -397,9 +697,8 @@ async function startRun() {
       appPackage: $('#inPackage').value.trim(),
       appActivity: $('#inActivity').value.trim(),
     },
-  };
-  const d = await postJson('/api/run', body);
-  btn.disabled = false; btn.textContent = '🚀 开始执行';
+  });
+  btn.disabled = false; btn.textContent = '开始执行';
   if (!d.ok) return toast(d.msg || '启动失败', false);
   $('#execArea').style.display = 'block';
   $('#execArea').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -407,66 +706,19 @@ async function startRun() {
   pollTask(d.run_id);
 }
 
-let _pollTimer = null, _logOffset = 0;
-function pollTask(runId) {
-  clearInterval(_pollTimer); _logOffset = 0;
-  const box = $('#logBox'); box.innerHTML = '';
-  _pollTimer = setInterval(async () => {
-    const d = await api('/api/run/' + runId);
-    if (!d.ok) { clearInterval(_pollTimer); return; }
-    const t = d.task;
-    $('#runIdNow').textContent = t.run_id;
-    $('#runStatusNow').innerHTML = statusBadge(t.status);
-    $('#runStatsNow').textContent = '共 ' + t.total + ' · 通过 ' + t.passed + ' · 失败 ' + t.failed + ' · 异常 ' + (t.error || 0);
-    const done = t.passed + t.failed + t.error + t.skipped;
-    $('#runProgress').style.width = (t.total ? Math.min(100, Math.round(done / t.total * 100)) : 0) + '%';
-    $('#btnStop').disabled = !(t.status === 'RUNNING' || t.status === 'PENDING');
-    $('#btnGoDetail').onclick = () => location.href = '/runs/' + runId;
-    const lg = await api('/api/run/' + runId + '/log?offset=' + _logOffset);
-    if (lg.ok) { _logOffset = lg.offset; renderLog(lg.lines); }
-    if (t.status !== 'RUNNING') {
-      clearInterval(_pollTimer);
-      if (t.error_msg) toast('任务异常: ' + t.error_msg, false);
-      else toast('任务结束: ' + t.status + ' → 去「测试报告」查看用例明细与截图', t.status === 'PASSED');
-    }
-  }, 1500);
-}
+/* ================= 接口测试页 =================
+   接口测试已整体移植 testhub_platform 功能（接口管理/套件/定时任务/环境），
+   页面初始化由 static/api_testing.js 接管；这里不再保留旧 pytest 选例逻辑。 */
 
-function renderLog(lines, boxSel) {
-  const box = boxSel ? $(boxSel) : $('#logBox');
-  if (!box || !lines.length) return;
-  const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
-  lines.forEach(l => {
-    let cls = '';
-    if (/断言「.+」失败|FAILED|ERROR|TimeoutException|AssertionError/.test(l)) cls = 'fail';
-    else if (/断言「.+」通过|PASSED/.test(l)) cls = 'pass';
-    else if (/toast「.+」未出现|WARNING/.test(l)) cls = 'warn';
-    else if (/^[-=]+$|^platform darwin|^cachedir|^rootdir|^plugins/.test(l)) cls = 'dim';
-    const div = document.createElement('div');
-    if (cls) div.className = cls;
-    div.textContent = l;
-    box.appendChild(div);
-  });
-  if (nearBottom) box.scrollTop = box.scrollHeight;
-}
-
-async function stopRun() {
-  const runId = $('#runIdNow').textContent;
-  if (!runId || runId === '-') return;
-  const d = await postJson('/api/run/' + runId + '/stop', {});
-  toast(d.msg || '停止信号已发送', d.ok);
-}
-
-/* ---------------- 执行详情页 ---------------- */
+/* ================= 执行详情页 ================= */
 let _detailTimer = null;
 
 async function initRunDetail() {
   renderSidebar('/run');
-  const runId = document.body.dataset.runId;
-  await renderRunDetail('#detailBody', runId);
+  await renderRunDetail('#detailBody', document.body.dataset.runId);
 }
 
-/* ---------------- 详情组件：run 概要 + 用例执行记录 + 断言截图 + 执行日志 ----------------
+/* ================= 详情组件：run 概要 + 用例执行记录 + 证据 + 执行日志 =================
    自建视图，直接解析 allure-results；报告页「详情」与 run_detail 页共用 */
 let _activeDetailRun = null, _activeSel = null;
 
@@ -476,28 +728,39 @@ function shotHtml(runId, shot) {
     ' onclick="openLightbox(\'' + src + '\', \'' + esc(shot.name || shot.source) + '\')">';
 }
 
+/* 文本证据折叠块：接口用例的请求-响应留痕、失败原因等 */
+function evHtml(texts) {
+  if (!texts || !texts.length) return '';
+  return texts.map(t =>
+    '<details class="ev"><summary>' + esc(t.name || '文本证据') + '</summary>' +
+    '<pre>' + esc(t.content || '（空）') + '</pre></details>').join('');
+}
+
 function caseRowHtml(runId, c, idx) {
   const dur = c.duration_ms ? (c.duration_ms / 1000).toFixed(1) + 's' : '-';
   const steps = c.steps || [];
   const shots = c.screenshots || [];
+  const texts = c.texts || [];
   const stepHtml = steps.length ? '<ul class="steps">' + steps.map(s => {
     const ss = s.attachments || [];
     return '<li class="st-' + esc(s.status) + '"><span class="sico">' +
       (s.status === 'passed' ? '✓' : s.status === 'failed' ? '✗' : '○') + '</span>' +
       esc(s.name) +
       (ss.length ? '<span class="shots">' + ss.map(a => shotHtml(runId, a)).join('') + '</span>' : '') +
+      evHtml(s.texts) +
       '</li>';
   }).join('') + '</ul>' : '';
   const errHtml = c.error_message ? '<div class="err">' + esc(c.error_message) + '</div>' : '';
   const oldShots = (!steps.length && shots.length)
     ? '<div class="shots">' + shots.map(a => shotHtml(runId, a)).join('') + '</div>' : '';
-  const none = (!steps.length && !shots.length)
-    ? '<p class="muted">该用例无步骤/截图数据（旧版执行记录，仅保留统计）</p>' : '';
+  const none = (!steps.length && !shots.length && !texts.length)
+    ? '<p class="muted">该用例无步骤/截图/文本数据（旧版执行记录，仅保留统计）</p>' : '';
+  const evCount = texts.length ? ' · ' + texts.length + ' 文' : '';
   return '<tr class="case-row"><td class="xpand"><button class="ghost mini" data-t="' + idx + '">展开</button></td>' +
     '<td>' + esc(c.name) + '</td><td>' + statusBadge(c.status) + '</td>' +
-    '<td class="muted">' + dur + '</td><td>' + shots.length + ' 图</td></tr>' +
+    '<td class="muted">' + dur + '</td><td class="muted">' + shots.length + ' 图' + evCount + '</td></tr>' +
     '<tr class="detail-row" data-t="' + idx + '" style="display:none"><td colspan="5">' +
-    stepHtml + errHtml + oldShots + none + '</td></tr>';
+    stepHtml + errHtml + evHtml(texts) + oldShots + none + '</td></tr>';
 }
 
 async function renderRunDetail(sel, runId) {
@@ -511,7 +774,7 @@ async function renderRunDetail(sel, runId) {
     api('/api/run/' + runId + '/cases'),
   ]);
   if (!d.ok) {
-    box.innerHTML = '<div class="card"><div class="empty"><span class="eico">🫥</span>' + esc(d.msg || '任务不存在') + '</div></div>';
+    box.innerHTML = '<div class="card">' + emptyHtml('doc', esc(d.msg || '任务不存在')) + '</div>';
     return;
   }
   const t = d.task;
@@ -524,53 +787,43 @@ async function renderRunDetail(sel, runId) {
     '<button class="ghost mini" onclick="openReportFor(\'' + esc(runId) + '\', this)">打开报告</button>' +
     '<button class="mini danger-ghost" onclick="deleteRunFor(\'' + esc(runId) + '\')">删除本记录</button>' +
     '</div></div>' +
-    '<div class="meta"><span>状态 ' + statusBadge(t.status) + '</span>' +
-    '<span>设备 <b>' + esc(t.device_model || t.device_desc) + ' / ' + esc(t.udid) + '</b></span>' +
-    '<span>App <b>' + esc(t.app_package) + '</b></span>' +
-    '<span>开始 <b>' + fmtTime(t.start_time) + '</b></span>' +
-    runStatsHtml(t) +
-    (running ? '<span class="pill ok">执行中</span>' : '') + '</div>' +
-    (t.error_msg ? '<p class="mt" style="color:#ff8787">' + esc(t.error_msg) + '</p>' : '') +
-    (cases.length ? '<div class="tblwrap mt"><table><thead><tr><th></th><th>用例</th><th>结果</th><th>耗时</th><th>截图</th></tr></thead><tbody>' +
+    '<div class="meta" id="detailMeta">' + runMetaHtml(t, true) + '</div>' +
+    (t.error_msg ? '<p class="mt" style="color:var(--bad-text)">' + esc(t.error_msg) + '</p>' : '') +
+    (cases.length ? '<div class="tblwrap mt"><table><thead><tr><th></th><th>用例</th><th>结果</th><th>耗时</th><th>证据</th></tr></thead><tbody>' +
       cases.map((c2, i) => caseRowHtml(runId, c2, i)).join('') +
       '</tbody></table></div>' :
-      '<div class="empty mt"><span class="eico">📄</span>该 run 没有用例数据（allure-results 缺失或已删除）</div>') +
+      '<div class="mt">' + emptyHtml('doc', '该 run 没有用例数据（allure-results 缺失或已删除）') + '</div>') +
     '</div>' +
     '<div class="card"><div class="cardhead"><h3>执行日志 <span class="muted" id="logCount"></span></h3></div>' +
     '<div class="logbox" id="detailLogBox"></div></div>';
-  // 用例行展开/收起（事件委托，避免 8s 轮询重建后按钮失效）
+  // 用例行展开/收起（事件委托，避免轮询重建后按钮失效）
   box.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-t]');
-    if (b) {
-      const tr = box.querySelector('tr.detail-row[data-t="' + b.dataset.t + '"]');
-      if (tr) tr.style.display = tr.style.display === 'none' ? '' : 'none';
-    }
+    if (!b) return;
+    const tr = box.querySelector('tr.detail-row[data-t="' + b.dataset.t + '"]');
+    if (tr) tr.style.display = tr.style.display === 'none' ? '' : 'none';
   });
   // 日志：全量加载；RUNNING 时增量轮询
   const lg0 = await api('/api/run/' + runId + '/log?offset=0');
-  if (lg0.ok) { $('#logCount').textContent = '共 ' + lg0.lines.length + ' 行'; renderLog(lg0.lines, '#detailLogBox'); }
-  if (running) {
-    let off = lg0.ok ? lg0.offset : 0;
-    _detailTimer = setInterval(async () => {
-      const lg = await api('/api/run/' + runId + '/log?offset=' + off);
-      if (lg.ok) { off = lg.offset; $('#logCount').textContent = '共 ' + off + ' 行'; renderLog(lg.lines, '#detailLogBox'); }
-      const st = await api('/api/run/' + runId);
-      if (st.ok && st.task.status !== 'RUNNING' && st.task.status !== 'PENDING') {
-        clearInterval(_detailTimer); _detailTimer = null;
-        renderRunDetail(_activeSel, runId); // 收尾：刷新最终状态与用例
-      } else if (st.ok) {
-        const tb = box.querySelector('.meta');
-        if (tb) {
-          const t2 = st.task;
-          tb.innerHTML = '<span>状态 ' + statusBadge(t2.status) + '</span>' +
-            '<span>设备 <b>' + esc(t2.device_model || t2.device_desc) + ' / ' + esc(t2.udid) + '</b></span>' +
-            '<span>App <b>' + esc(t2.app_package) + '</b></span>' +
-            runStatsHtml(t2) +
-            '<span class="pill ok">执行中</span>';
-        }
-      }
-    }, 3000);
-  }
+  if (lg0.ok) { setText('#logCount', '共 ' + lg0.lines.length + ' 行'); renderLog(lg0.lines, '#detailLogBox'); }
+  if (!running) return;
+  let off = lg0.ok ? lg0.offset : 0;
+  _detailTimer = setInterval(async () => {
+    const lg = await api('/api/run/' + runId + '/log?offset=' + off);
+    if (lg.ok) {
+      off = lg.offset;
+      setText('#logCount', '共 ' + off + ' 行');
+      renderLog(lg.lines, '#detailLogBox');
+    }
+    const st = await api('/api/run/' + runId);
+    if (!st.ok) return;
+    if (st.task.status !== 'RUNNING' && st.task.status !== 'PENDING') {
+      clearInterval(_detailTimer); _detailTimer = null;
+      renderRunDetail(_activeSel, runId);   // 收尾：刷新最终状态与用例
+    } else {
+      setHtml('#detailMeta', runMetaHtml(st.task, true));
+    }
+  }, 3000);
 }
 
 async function showRunDetail(runId) {
@@ -584,39 +837,42 @@ async function showRunDetail(runId) {
 function openLightbox(src, name) {
   let lb = $('#lightbox');
   if (!lb) { lb = document.createElement('div'); lb.id = 'lightbox'; document.body.appendChild(lb); }
-  lb.innerHTML = '<img src="' + src + '" alt=""><button class="lb-close">✕</button>';
+  lb.innerHTML = '<img src="' + src + '" alt="' + esc(name) + '"><button class="lb-close">✕</button>';
   lb.classList.add('show');
   lb.onclick = () => lb.classList.remove('show');
 }
 
-/* ---------------- 测试报告页 ---------------- */
+/* ================= 测试报告页（含执行总览：统计卡 + 最近执行） ================= */
 async function initReport() {
   renderSidebar('/report');
   $('#btnClearAll3').addEventListener('click', clearAllRuns);
-  await loadReportList();
+  initStatIcons();
+  setHtml('#runDetail', detailPlaceholder());
+  await Promise.all([refreshStats(), loadRunsTable('#recentList', true, 10), loadReportList()]);
+  setInterval(() => { refreshStats(); loadRunsTable('#recentList', true, 10); }, 8000);
   setInterval(loadReportList, 8000);
 }
 
-/* 报告页：列表分页 */
 async function loadReportList() {
   const d = await api('/api/runs');
   const tb = $('#reportList');
+  if (!tb) return;
   const runs = d.runs || [];
   if (!runs.length) {
-    tb.innerHTML = '<tr><td colspan="6"><div class="empty"><span class="eico">📈</span>暂无执行记录，先生成一次执行</div></td></tr>';
-    const pg = $('#reportPager'); if (pg) pg.innerHTML = '';
+    tb.innerHTML = '<tr><td colspan="6">' +
+      emptyHtml('chart', '暂无执行记录，先生成一次执行') + '</td></tr>';
+    setHtml('#reportPager', '');
     return;
   }
   const pages = Math.max(1, Math.ceil(runs.length / PAGE_SIZE));
-  if (_reportPage > pages) _reportPage = pages;
-  if (_reportPage < 1) _reportPage = 1;
+  _reportPage = Math.min(Math.max(1, _reportPage), pages);
   const slice = runs.slice((_reportPage - 1) * PAGE_SIZE, _reportPage * PAGE_SIZE);
   tb.innerHTML = slice.map(r =>
     '<tr><td><a class="runlink" href="/runs/' + esc(r.run_id) + '">' + esc(r.run_id) + '</a></td>' +
     '<td>' + fmtTime(r.start_time) + '</td>' +
     '<td>' + statusBadge(r.status) + '</td>' +
-    '<td class="muted">' + esc(r.allure_dir || '-') + '</td>' +
-    '<td>' + (r.report_dir ? '<span style="color:#4ade80">已生成</span>' : '<span class="muted">未生成</span>') + '</td>' +
+    '<td class="muted">' + esc(runTarget(r)) + '</td>' +
+    '<td>' + (r.report_dir ? '<span class="num-ok">已生成</span>' : '<span class="muted">未生成</span>') + '</td>' +
     '<td><div class="ops">' +
     '<button class="ghost mini" onclick="showRunDetail(\'' + esc(r.run_id) + '\')">详情</button>' +
     '<button class="ghost mini" onclick="openReportFor(\'' + esc(r.run_id) + '\', this)">打开报告</button>' +
@@ -634,7 +890,7 @@ async function openReportFor(runId, btn) {
   if (Date.now() < _openReportLockUntil) return;
   _openReportLockUntil = Date.now() + 5000;
   const orig = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ 打开中…'; }
+  if (btn) { btn.disabled = true; btn.textContent = '打开中…'; }
   const started = Date.now();
   try {
     toast('正在生成/打开 ' + runId + ' 的报告…');
@@ -651,7 +907,7 @@ async function openReportFor(runId, btn) {
   }
 }
 
-/* ---------------- 性能压测页 ---------------- */
+/* ================= 性能压测页 ================= */
 let perfSchema = [], perfValues = {}, perfRunId = '', perfLogOffset = 0, perfTimer = null;
 
 function perfInputId(f) {
@@ -667,6 +923,20 @@ function perfCollect() {
   }));
   return out;
 }
+/* show_if 字段可见性：加压策略参数随「压测模式」二选一显示（隐藏字段的值仍随表单一起提交/保存） */
+function perfFieldVisible(f) {
+  if (!f.show_if) return true;
+  const modeEl = document.getElementById('pf_mode');
+  return !modeEl || modeEl.value === f.show_if;
+}
+function perfApplyVisibility() {
+  perfSchema.forEach(g => g.fields.forEach(f => {
+    if (!f.show_if) return;
+    const el = document.getElementById(perfInputId(f));
+    const wrap = el && el.closest('.field');
+    if (wrap) wrap.style.display = perfFieldVisible(f) ? '' : 'none';
+  }));
+}
 function perfRenderForm() {
   const box = $('#perfForm');
   box.innerHTML = perfSchema.map(g => {
@@ -679,35 +949,40 @@ function perfRenderForm() {
         input = '<select id="' + id + '">' + f.options.map(o =>
           '<option value="' + o + '"' + (String(v) === o ? ' selected' : '') + '>' + o + '</option>').join('') + '</select>';
       } else if (f.type === 'bool') {
-        input = '<label style="display:flex;align-items:center;gap:6px;font-weight:400">' +
-          '<input type="checkbox" id="' + id + '"' + (v ? ' checked' : '') + '> ' + f.label + '</label>';
+        input = '<label class="chk"><input type="checkbox" id="' + id + '"' + (v ? ' checked' : '') + '> ' + esc(f.label) + '</label>';
       } else if (f.type === 'dict') {
         const txt = Object.keys(v || {}).map(k => k + ': ' + (v[k] === undefined ? '' : v[k])).join('\n');
-        input = '<textarea id="' + id + '" placeholder="每行一条：名: 值">' + (txt || '') + '</textarea>';
+        input = '<textarea id="' + id + '" placeholder="每行一条：名: 值">' + esc(txt) + '</textarea>';
       } else if (f.type === 'text') {
-        input = '<textarea id="' + id + '">' + (v === undefined || v === null ? '' : v) + '</textarea>';
+        input = '<textarea id="' + id + '">' + esc(v === undefined || v === null ? '' : v) + '</textarea>';
       } else {
-        input = '<input type="text" id="' + id + '" value="' + (v === undefined || v === null ? '' : v) + '">';
+        input = '<input type="text" id="' + id + '" value="' + esc(v === undefined || v === null ? '' : v) + '">';
       }
       const wide = (f.type === 'dict' || f.type === 'text') ? ' wide' : '';
-      const tip = f.help ? ' <span class="muted" style="font-size:11.5px">' + f.help + '</span>' : '';
-      const label = f.type === 'bool' ? '' : '<label>' + f.label + tip + '</label>';
+      const tip = f.help ? ' <span class="muted">' + esc(f.help) + '</span>' : '';
+      const label = f.type === 'bool' ? '' : '<label>' + esc(f.label) + tip + '</label>';
       return '<div class="field' + wide + '">' + label + input + '</div>';
     }).join('');
-    return '<div class="perf-group"><h4>' + g.icon + ' ' + g.group + '</h4><div class="gdesc">' + g.desc +
-      '</div><div class="perf-fields">' + fields + '</div></div>';
+    const head = '<h4>' + esc(g.group) + '</h4><div class="gdesc">' + esc(g.desc) + '</div>';
+    const body = '<div class="perf-fields">' + fields + '</div>';
+    /* 高级组收进折叠区（details.adv 为平台全局样式），默认收起，展开才见全部低频项 */
+    return g.advanced
+      ? '<details class="adv perf-group-adv"><summary>高级参数（默认即可，无需改动）</summary>' +
+        '<div class="perf-group">' + head + body + '</div></details>'
+      : '<div class="perf-group">' + head + body + '</div>';
   }).join('');
+  const modeSel = document.getElementById('pf_mode');
+  if (modeSel) modeSel.addEventListener('change', perfApplyVisibility);
+  perfApplyVisibility();
 }
 function perfResult(msg, ok) {
   const el = $('#perfResult');
+  if (!el) return;
   el.className = 'el-result ' + (ok ? 'ok' : 'err');
   el.textContent = msg;
 }
 async function perfStart() {
-  const r = await (await fetch('/api/perf/run', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values: perfCollect() }),
-  })).json();
+  const r = await postJson('/api/perf/run', { values: perfCollect() });
   if (!r.ok) { perfResult(r.msg || '启动失败', false); return; }
   perfRunId = r.run_id; perfLogOffset = 0;
   $('#perfLog').textContent = '';
@@ -718,27 +993,27 @@ async function perfStart() {
 }
 async function perfStop() {
   if (!perfRunId) return;
-  const r = await (await fetch('/api/perf/stop', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ run_id: perfRunId }),
-  })).json();
+  const r = await postJson('/api/perf/stop', { run_id: perfRunId });
   perfResult(r.msg, r.ok);
 }
 async function perfPoll() {
   if (!perfRunId) return;
-  const st = await (await fetch('/api/perf/run/' + perfRunId)).json();
-  const lg = await (await fetch('/api/perf/run/' + perfRunId + '/log?offset=' + perfLogOffset)).json();
-  if (lg.lines && lg.lines.length) {
-    $('#perfLog').textContent += lg.lines.join('\n') + '\n';
-    $('#perfLog').scrollTop = $('#perfLog').scrollHeight;
+  const [st, lg] = await Promise.all([
+    api('/api/perf/run/' + perfRunId),
+    api('/api/perf/run/' + perfRunId + '/log?offset=' + perfLogOffset),
+  ]);
+  if (lg.ok && lg.lines && lg.lines.length) {
+    const box = $('#perfLog');
+    box.textContent += lg.lines.join('\n') + '\n';
+    box.scrollTop = box.scrollHeight;
     perfLogOffset = lg.offset;
   }
   if (!st.ok) return;
   const run = st.run;
   const badge = { RUNNING: '<span class="badge run">运行中</span>', FINISHED: '<span class="badge ok">已完成</span>',
     FAILED: '<span class="badge bad">失败</span>', STOPPED: '<span class="badge stop">已停止</span>' }[run.status] || run.status;
-  $('#perfStatus').innerHTML = badge + ' · ' + run.run_id + ' · ' + Math.round(run.duration_ms / 1000) + 's'
-    + (run.error ? ' · ' + run.error : '');
+  $('#perfStatus').innerHTML = badge + ' · ' + esc(run.run_id) + ' · ' + Math.round(run.duration_ms / 1000) + 's'
+    + (run.error ? ' · ' + esc(run.error) : '');
   if (run.status !== 'RUNNING') {
     clearInterval(perfTimer); perfTimer = null;
     if (run.report) { $('#btnPerfReport').style.display = ''; perfResult('压测结束，报告已生成', true); }
@@ -747,26 +1022,27 @@ async function perfPoll() {
 }
 async function initPerf() {
   renderSidebar('/perf');
-  const r = await (await fetch('/api/perf/config')).json();
+  const r = await api('/api/perf/config');
   perfSchema = r.schema || []; perfValues = r.values || {};
   perfRenderForm();
-  $('#perfEnv').textContent = r.venv_ready
+  setText('#perfEnv', r.venv_ready
     ? '压测环境就绪（perf_test/.venv · Python 3.13 + locust，与平台主环境隔离）'
-    : '⚠️ 压测环境未就绪：执行 python3 -m venv perf_test/.venv && perf_test/.venv/bin/pip install -r perf_test/requirements-perf.txt';
+    : '压测环境未就绪：执行 python3 -m venv perf_test/.venv && perf_test/.venv/bin/pip install -r perf_test/requirements-perf.txt');
   $('#btnPerfStart').addEventListener('click', perfStart);
   $('#btnPerfStop').addEventListener('click', perfStop);
   $('#btnPerfSave').addEventListener('click', async () => {
-    const r2 = await (await fetch('/api/perf/config', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(perfCollect()),
-    })).json();
+    const r2 = await postJson('/api/perf/config', perfCollect());
     perfResult(r2.msg || (r2.ok ? '已保存' : '保存失败'), r2.ok);
-    if (r2.ok) { const rf = await (await fetch('/api/perf/config')).json(); perfValues = rf.values; perfRenderForm(); }
+    if (r2.ok) {
+      const rf = await api('/api/perf/config');
+      perfValues = rf.values || {};
+      perfRenderForm();
+    }
   });
   $('#btnPerfReport').addEventListener('click', () => { if (perfRunId) location.href = '/perf/report/' + perfRunId; });
 }
 
-/* ---------------- 页面分发 ---------------- */
+/* ================= 页面分发 ================= */
 document.addEventListener('DOMContentLoaded', () => {
   const page = document.body.dataset.page;
   if (page === 'index') initIndex();
@@ -774,4 +1050,5 @@ document.addEventListener('DOMContentLoaded', () => {
   else if (page === 'detail') initRunDetail();
   else if (page === 'report') initReport();
   else if (page === 'perf') initPerf();
+  /* api-test 页由 static/api_testing.js 自行初始化 */
 });

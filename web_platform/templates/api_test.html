@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>接口测试 · 自动化测试平台</title>
+<script src="/static/theme.js"></script>
+<link rel="stylesheet" href="/static/nav.css">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-page="api-test">
+<header class="gnav" id="sidebar"></header>
+<main>
+  <div class="pagehead">
+    <h1>接口测试</h1>
+    <p class="sub">接口管理 · 调试执行 · 测试套件 · 定时任务 · 环境变量 —— 用例数据统一 YAML 存储（预留数据库迁移）。</p>
+  </div>
+
+  <!-- 统计条 -->
+  <div class="stats" id="dashStats"></div>
+
+  <!-- 标签页 -->
+  <div class="apitabs" id="apitabs">
+    <a data-tab="requests" class="on">接口管理</a>
+    <a data-tab="suites">测试套件</a>
+    <a data-tab="tasks">定时任务</a>
+    <a data-tab="envs">环境与通知</a>
+  </div>
+
+  <!-- ============ 接口管理 ============ -->
+  <section id="tab-requests">
+    <div class="apilayout">
+      <div class="card apitree">
+        <div class="cardhead">
+          <h3>接口库</h3>
+          <div class="ops">
+            <button class="ghost mini" id="btnNewProject">新建项目</button>
+            <button class="ghost mini" id="btnNewCollection">新建集合</button>
+            <button class="mini" id="btnNewRequest">新建接口</button>
+          </div>
+        </div>
+        <input type="search" id="apiSearch" placeholder="搜索接口 / 集合…" style="margin-bottom:10px">
+        <div id="apiTree" class="apitree-box">加载中…</div>
+      </div>
+      <div class="apiedit">
+        <div class="card" id="reqEditor" style="display:none">
+          <div class="cardhead">
+            <h3 id="reqTitle">接口</h3>
+            <div class="ops">
+              <button class="ghost mini" id="btnReqHistory">执行历史</button>
+              <button id="btnReqSave">保存</button>
+              <button class="mini" id="btnReqSend" style="background:var(--ok);color:#fff">发送</button>
+            </div>
+          </div>
+          <div class="fields" style="grid-template-columns:130px 1fr">
+            <div class="field"><label>方式</label><select id="reqMethod"></select></div>
+            <div class="field"><label>地址（支持 {{变量}} 与 ${函数}）</label>
+              <input type="text" id="reqUrl" placeholder="http://127.0.0.1:8080/api-testing/mock/echo"></div>
+          </div>
+          <div class="field mt"><label>名称</label><input type="text" id="reqName" placeholder="接口名称"></div>
+
+          <details class="adv mt" open>
+            <summary>请求头 / 查询参数</summary>
+            <div class="mt" id="reqHeaders"></div>
+            <button class="ghost mini mt" id="btnAddHeader">+ 请求头</button>
+            <div class="mt" id="reqParams"></div>
+            <button class="ghost mini mt" id="btnAddParam">+ 查询参数</button>
+          </details>
+
+          <details class="adv mt">
+            <summary>请求体</summary>
+            <div class="fields mt" style="grid-template-columns:180px 1fr">
+              <div class="field"><label>类型</label>
+                <select id="reqBodyType">
+                  <option value="none">无</option><option value="json">JSON</option>
+                  <option value="raw">Raw</option><option value="form-data">Form-Data</option>
+                  <option value="x-www-form-urlencoded">x-www-form-urlencoded</option>
+                </select></div>
+              <div class="field"><label>内容</label><textarea id="reqBody" rows="5"
+                placeholder='{"username": "admin"}'></textarea></div>
+            </div>
+          </details>
+
+          <details class="adv mt">
+            <summary>断言</summary>
+            <div class="mt" id="reqAssertions"></div>
+            <button class="ghost mini mt" id="btnAddAssertion">+ 断言</button>
+          </details>
+        </div>
+        <div class="card" id="reqWelcome">
+          <div class="empty">从左侧选择一个接口，或「新建接口」开始调试</div>
+        </div>
+
+        <div class="card" id="respArea" style="display:none">
+          <div class="cardhead">
+            <h3>响应</h3>
+            <div class="meta">
+              <span>状态 <b id="respStatus">-</b></span>
+              <span>耗时 <b id="respTime">-</b></span>
+              <span id="respAssertSummary"></span>
+            </div>
+          </div>
+          <pre class="logbox" id="respBody" style="height:auto;max-height:320px">-</pre>
+          <div id="respAssertions" class="mt"></div>
+        </div>
+
+        <div class="card" id="histArea" style="display:none">
+          <div class="cardhead"><h3>执行历史</h3>
+            <div class="ops"><button class="ghost mini" id="btnHistClose">收起</button></div></div>
+          <div class="tblwrap"><table><thead><tr>
+            <th>时间</th><th>状态码</th><th>耗时(ms)</th><th>断言</th><th>错误</th>
+          </tr></thead><tbody id="histTbody"></tbody></table></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 测试套件 ============ -->
+  <section id="tab-suites" hidden>
+    <div class="card">
+      <div class="cardhead">
+        <h3>测试套件</h3>
+        <div class="ops">
+          <select id="suiteProjectSel" style="width:auto"></select>
+          <button class="mini" id="btnNewSuite">新建套件</button>
+        </div>
+      </div>
+      <div class="tblwrap"><table><thead><tr>
+        <th>套件</th><th>请求数</th><th>执行环境</th><th>操作</th>
+      </tr></thead><tbody id="suiteTbody"></tbody></table></div>
+    </div>
+    <div class="card" id="suiteDetail" style="display:none">
+      <div class="cardhead">
+        <h3 id="suiteDetailTitle">套件</h3>
+        <div class="ops">
+          <select id="suiteEnvSel" style="width:auto"></select>
+          <button id="btnSuiteRun">执行套件</button>
+        </div>
+      </div>
+      <p class="muted">按顺序执行启用的请求；套件内可覆盖断言。添加请求后可调整顺序与启用状态。</p>
+      <div class="tblwrap mt"><table><thead><tr>
+        <th style="width:60px">顺序</th><th>请求</th><th>方式</th><th>地址</th>
+        <th>启用</th><th>操作</th>
+      </tr></thead><tbody id="suiteReqTbody"></tbody></table></div>
+      <div class="treebar mt">
+        <select id="suiteAddReqSel" style="flex:1"></select>
+        <button class="ghost mini" id="btnSuiteAddReq">添加到套件</button>
+      </div>
+      <h4 class="mt">执行记录</h4>
+      <div class="tblwrap"><table><thead><tr>
+        <th>#</th><th>状态</th><th>开始时间</th><th>结果(通过/总数)</th><th>发起人</th><th>操作</th>
+      </tr></thead><tbody id="execTbody"></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- ============ 定时任务 ============ -->
+  <section id="tab-tasks" hidden>
+    <div class="card">
+      <div class="cardhead">
+        <h3>定时任务</h3>
+        <div class="ops"><button class="mini" id="btnNewTask">新建任务</button></div>
+      </div>
+      <p class="muted">调度器每 60 秒检查一次到期任务（CRON / 固定间隔 / 单次执行），执行结果写入任务日志。</p>
+      <div class="tblwrap mt"><table><thead><tr>
+        <th>任务</th><th>类型</th><th>触发器</th><th>下次运行</th><th>状态</th>
+        <th>统计(成功/总)</th><th>操作</th>
+      </tr></thead><tbody id="taskTbody"></tbody></table></div>
+    </div>
+    <div class="card">
+      <div class="cardhead"><h3>任务执行日志</h3>
+        <div class="ops"><button class="ghost mini" id="btnLogsRefresh">刷新</button></div></div>
+      <div class="tblwrap"><table><thead><tr>
+        <th>任务</th><th>触发</th><th>状态</th><th>开始</th><th>结束</th><th>错误</th>
+      </tr></thead><tbody id="taskLogTbody"></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- ============ 环境与通知 ============ -->
+  <section id="tab-envs" hidden>
+    <div class="card">
+      <div class="cardhead">
+        <h3>环境变量</h3>
+        <div class="ops"><button class="mini" id="btnNewEnv">新建环境</button></div>
+      </div>
+      <p class="muted">请求里用 <code>{{变量名}}</code> 引用；同时只激活一个环境（用于调试默认环境，套件/任务可显式指定）。</p>
+      <div class="tblwrap mt"><table><thead><tr>
+        <th>环境</th><th>作用域</th><th>变量</th><th>激活</th><th>操作</th>
+      </tr></thead><tbody id="envTbody"></tbody></table></div>
+    </div>
+    <div class="card">
+      <div class="cardhead"><h3>任务通知</h3></div>
+      <div class="fields">
+        <div class="field wide"><label>Webhook 地址（任务结束 POST JSON）</label>
+          <input type="text" id="setWebhook" placeholder="https://example.com/hook"></div>
+        <div class="field wide"><label>通知邮箱（逗号分隔）</label>
+          <input type="text" id="setEmails" placeholder="a@x.com, b@x.com"></div>
+        <div class="field"><label>SMTP 服务器</label><input type="text" id="setSmtpHost" placeholder="smtp.example.com"></div>
+        <div class="field"><label>SMTP 端口</label><input type="text" id="setSmtpPort" placeholder="465"></div>
+        <div class="field"><label>SMTP 账号</label><input type="text" id="setSmtpUser"></div>
+        <div class="field"><label>SMTP 密码</label><input type="password" id="setSmtpPass"></div>
+      </div>
+      <div class="mt" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+        <label class="chk"><input type="checkbox" id="setNotifyFail" checked> 失败时通知</label>
+        <label class="chk"><input type="checkbox" id="setNotifyOk"> 成功时通知</label>
+        <button class="ghost mini" id="btnSaveSettings" style="margin-left:auto">保存通知设置</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="toast"></div>
+<div class="mask" id="mask">
+  <div class="modal">
+    <h4 id="mTitle"></h4>
+    <p id="mMsg"></p>
+    <div class="mops"><button class="ghost" id="mCancel">取消</button><button id="mOk">确定</button></div>
+  </div>
+</div>
+<!-- 通用小表单弹窗（项目/集合/环境/任务 编辑） -->
+<div class="mask" id="formMask">
+  <div class="modal envmodal" id="formModal">
+    <h4 id="fmTitle">编辑</h4>
+    <div id="fmBody"></div>
+    <div class="mops mt"><button class="ghost" id="fmCancel">取消</button><button id="fmSave">保存</button></div>
+  </div>
+</div>
+
+<script src="/static/nav.js"></script>
+<script src="/static/app.js"></script>
+<script src="/static/api_testing.js"></script>
+</body>
+</html>

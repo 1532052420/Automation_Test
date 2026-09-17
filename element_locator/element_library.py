@@ -5,8 +5,24 @@ GUI 元素定位器 · 元素库读写
     self.<name> = CreateElement.create(Locator_Type.<TYPE>, '<value>', wait_type=Wait_By.<WAIT>)
 支持：追加新元素 / 同名覆盖（替换原行）
 """
+import keyword
 import os
 import re
+
+# 元素名允许中文（PEP 3131）：self.<名> 属性访问在 Python 3 合法，
+# 页面方法 click_<名> 等派生名同样合法。仅排除 Python 关键字（obj.class 是语法错误）。
+NAME_RE = re.compile(r'^[A-Za-z_\u4e00-\u9fff][A-Za-z0-9_\u4e00-\u9fff]*$')
+# 长度上限：元素名会派生页面方法名（click_<名>）与报告步骤名，过长影响可读性
+NAME_MAX_LEN = 64
+# 解析/定位元素行的 name 字符类（与 NAME_RE 保持同一字符集）
+_NAME_CLS = r'[A-Za-z_\u4e00-\u9fff][A-Za-z0-9_\u4e00-\u9fff]*'
+
+
+def is_valid_element_name(name):
+    """元素名合法性：字母/中文/下划线开头，后续可含数字；≤64 字符；排除 Python 关键字"""
+    name = name or ''
+    return (len(name) <= NAME_MAX_LEN and bool(NAME_RE.match(name))
+            and not keyword.iskeyword(name))
 
 ELEMENTS_DIR = 'page_objects/app_ui/android/demoProject/elements'
 # 默认新建元素文件名（用户也可选择写进已有文件）
@@ -96,23 +112,31 @@ def list_element_names(filename=None):
         p = os.path.join(ELEMENTS_DIR, f)
         if not os.path.exists(p):
             continue
-        names.extend(re.findall(r'^\s*self\.([A-Za-z_][A-Za-z0-9_]*)\s*=', _read(p), re.MULTILINE))
+        names.extend(re.findall(r'^\s*self\.(%s)\s*=' % _NAME_CLS, _read(p), re.MULTILINE))
     return names
 
 
-def find_duplicate(locator_type, value):
+def find_duplicate(locator_type, value, elements_dir=None):
     """跨元素文件查找相同「定位方式 + 定位值」的已存在元素（重复元素检测）。
-    返回 {'name':..., 'filename':...} 或 None。文件里存的定位值是转义后的，比对时同样转义。"""
+    返回 {'name':..., 'filename':...} 或 None。文件里存的定位值是转义后的，比对时同样转义。
+    elements_dir：目标目录覆盖（与 add_element 一致——写进哪个目录就在哪个目录查重，
+    测试指向临时库时不会误查真实元素库，弹窗规则库同理）。"""
     locator_type = (locator_type or '').upper()
     escaped = _escape(value)
-    for f in list_element_files():
-        p = os.path.join(ELEMENTS_DIR, f)
-        if not os.path.exists(p):
-            continue
-        pat = re.compile(
-            r'^\s*self\.([A-Za-z_][A-Za-z0-9_]*)\s*=\s*CreateElement\.create\(\s*'
-            r'Locator_Type\.(\w+)\s*,\s*\'((?:[^\'\\]|\\.)*)\'',
-            re.MULTILINE)
+    scan_dir = elements_dir or ELEMENTS_DIR
+    if not os.path.isdir(scan_dir):
+        return None
+    # 直接枚举目标目录（不能用 list_element_files()——它读全局 ELEMENTS_DIR 的清单，
+    # 扫描目录与其不一致时会漏掉目标目录里的文件）
+    files = sorted(f for f in os.listdir(scan_dir)
+                   if f.endswith('.py') and f != '__init__.py' and f != POPUP_FILE
+                   and not is_generated_backup(f))
+    pat = re.compile(
+        r'^\s*self\.(%s)\s*=\s*CreateElement\.create\(\s*'
+        r'Locator_Type\.(\w+)\s*,\s*\'((?:[^\'\\]|\\.)*)\'' % _NAME_CLS,
+        re.MULTILINE)
+    for f in files:
+        p = os.path.join(scan_dir, f)
         for m in pat.finditer(_read(p)):
             if m.group(2).upper() == locator_type and m.group(3) == escaped:
                 return {'name': m.group(1), 'filename': f}
@@ -158,14 +182,15 @@ def add_element(filename, name, locator_type, value, wait_type='VISIBILITY_OF', 
     与 RULE_OPTIONS 写进同一份可替换路径——测试时整体指向临时副本，不碰真实文件）。
     返回 {'ok': bool, 'content': 文件最新内容, 'action': 'added'|'updated'|'created', 'msg': 说明}
     """
-    if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', name):
-        return {'ok': False, 'msg': '元素名称不合法（只允许字母/数字/下划线，且不能以数字开头）'}
+    if not is_valid_element_name(name):
+        return {'ok': False, 'msg': '元素名称不合法（允许中文/字母/数字/下划线，不能以数字开头，'
+                                    '不能是 Python 关键字）'}
     if not value:
         return {'ok': False, 'msg': '定位值不能为空'}
     locator_type = locator_type.upper()
 
     if check_dup:
-        dup = find_duplicate(locator_type, value)
+        dup = find_duplicate(locator_type, value, elements_dir=elements_dir)
         if dup and dup['name'] != name:
             return {'ok': False, 'duplicate': dup,
                     'msg': '发现已有元素 %s（%s）使用相同定位，是否直接使用已有元素？'
@@ -210,7 +235,7 @@ def add_element(filename, name, locator_type, value, wait_type='VISIBILITY_OF', 
                 'msg': '元素 %s 已添加到 %s' % (name, filename)}
 
     # 2b) 在最后一个 self.xxx = ... 行之后插入（整行匹配，避免把新行插到「等号后」截断原行）
-    last_elem = list(re.finditer(r'^[ \t]*self\.[A-Za-z_][A-Za-z0-9_]*\s*=.*$', after, re.MULTILINE))
+    last_elem = list(re.finditer(r'^[ \t]*self\.%s\s*=.*$' % _NAME_CLS, after, re.MULTILINE))
     if last_elem:
         idx = body_start + last_elem[-1].end()
         content = content[:idx] + '\n' + new_line + content[idx:]

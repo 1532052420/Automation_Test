@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-"""App UI 自动化测试平台 · Web 入口（Flask :8080）
+"""自动化测试平台 · Web 入口（Flask :8080）
 
+覆盖 APP UI（设备）与 API（接口）两类自动化用例，共用一套执行器。
 启动：.venv/bin/python web_platform/app.py
 入口：./run.sh platform
 """
@@ -43,6 +44,16 @@ app.register_blueprint(platform_bp)
 from web_platform.admin_routes import bp as admin_bp
 app.register_blueprint(admin_bp)
 
+# 接口测试（testhub_platform 功能移植：YAML 存储 + 定时任务调度）
+from web_platform.api_testing.routes import bp as api_testing_bp
+app.register_blueprint(api_testing_bp)
+from web_platform.api_testing import scheduler as api_task_scheduler
+api_task_scheduler.start_scheduler()
+
+# AppUI 用例编排 / 测试用例 / 测试套件（testhub_platform app_automation 移植：复用 runner 链路）
+from web_platform.app_testing.routes import bp as app_testing_bp
+app.register_blueprint(app_testing_bp)
+
 # 元素定位器并入平台（原 8001 独立服务取消）：挂载到 /locator 子路径。
 # DispatcherMiddleware 会剥掉 /locator 前缀并处理 /locator → /locator/ 补斜杠跳转，
 # 定位器自身的路由（/api/*、/static/*）完全不用改；其前端已改为相对路径请求。
@@ -52,6 +63,6 @@ app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {'/locator': locator_app})
 
 
 if __name__ == '__main__':
-    print('App UI 自动化测试平台已启动: http://127.0.0.1:%d/' % PLATFORM_CFG.port)
+    print('自动化测试平台已启动: http://127.0.0.1:%d/' % PLATFORM_CFG.port)
     print('  若 8080 被占用，可用环境变量 WEB_PLATFORM_PORT=<端口> 覆盖')
     app.run(host='127.0.0.1', port=PLATFORM_CFG.port, debug=False)

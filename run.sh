@@ -64,7 +64,7 @@ free_port() {
 
 # 「在线」判定必须校验服务身份，不能只看端口有 HTTP 响应：
 # curl -s 对 404 也返回成功，曾经导致任意服务占住 8080 就被误判成"平台已在运行"。
-platform_up() { curl -sf --max-time 2 "http://127.0.0.1:${PLATFORM_PORT}/api/status" 2>/dev/null | grep -q 'app-ui-platform'; }
+platform_up() { curl -sf --max-time 2 "http://127.0.0.1:${PLATFORM_PORT}/api/status" 2>/dev/null | grep -q 'automation-test-platform'; }
 appium_up()   { curl -sf --max-time 2 "http://127.0.0.1:${APPIUM_PORT}/wd/hub/status" 2>/dev/null | grep -q '"ready"'; }
 
 # 轮询等待判定函数返回真（不再用固定 sleep 猜）

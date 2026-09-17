@@ -3,12 +3,16 @@
 
 职责（对齐技术方案）：
 - 创建执行任务（run_id，独立目录 output/runs/{run_id}/）
-- 准备 pytest 前置（pytest.ini、config/app_ui_tmp 设备文件、Appium 校验）
+- 准备 pytest 前置（pytest.ini、执行上下文文件、前置校验）
 - subprocess 独立进程跑 pytest（不阻塞 Web，浏览器关闭不影响执行）
 - 实时收集日志（内存环形缓冲 + 落盘）
 - 状态机 PENDING / RUNNING / PASSED / FAILED / STOPPED / ERROR
 - 停止（进程组 SIGTERM → 超时 SIGKILL）
 - 结果解析与归档（result.json）
+
+支持两类任务（kind）：
+- app_ui：设备自动化。前置校验 Appium / adb 在线 / App 已安装，写 config/app_ui_tmp/<pid> 设备文件。
+两类任务只有「前置校验 + 上下文文件」不同，其余机制完全共用。
 
 约束：第一版串行，同一时刻只允许 1 个执行任务；设备配置仅取第一台。
 """
@@ -139,6 +143,10 @@ class ExecutionManager(object):
         return {
             'run_id': task['run_id'],
             'status': task['status'],
+            'kind': task.get('kind', 'app_ui'),
+            'env': task.get('env', ''),
+            'owner': task.get('owner', ''),
+            'marker': task.get('marker', ''),
             'start_time': task['start_time'],
             'end_time': task['end_time'],
             'conf_file': task['conf_file'],
@@ -179,18 +187,25 @@ class ExecutionManager(object):
         return {'ok': False, 'msg': '任务不存在或日志不可用'}
 
     # ------------------------------------------------------------------ 创建
-    def start_run(self, conf_file, case_nodes, overrides=None):
+    def start_run(self, conf_file, case_nodes, overrides=None,
+                  owner='', marker='', timeout_minutes=None):
         """创建并启动一个执行任务。case_nodes 为用例节点路径列表（文件/类/方法级）。
+
+        APP UI 设备自动化专用执行器（接口测试已由 api_testing 模块独立承接）。
         overrides={udid?, appPackage?, appActivity?} 覆盖式生效（仅本次执行，不写回 conf 文件）。
+        owner 为发起人（多人共用平台时区分谁跑的）；marker 为 pytest 标记表达式（-m）；
+        timeout_minutes 覆盖默认任务超时。
         返回 (ok, run_id 或错误信息)。"""
         if not case_nodes:
             return False, '请至少选择一个用例'
         if not conf_file:
             return False, '请选择设备配置文件(conf)'
         with self._start_lock:
-            return self._start_run_locked(conf_file, case_nodes, overrides)
+            return self._start_run_locked(conf_file, case_nodes, overrides,
+                                          owner, marker, timeout_minutes)
 
-    def _start_run_locked(self, conf_file, case_nodes, overrides):
+    def _start_run_locked(self, conf_file, case_nodes, overrides=None,
+                          owner='', marker='', timeout_minutes=None):
         """启动主体（持有 _start_lock：校验与任务注册串行，互斥检查才会命中并发请求）"""
         with self._lock:
             for t in self._tasks.values():
@@ -206,7 +221,12 @@ class ExecutionManager(object):
         except Exception as e:
             return False, 'pytest.ini 准备失败: %s' % e
 
-        # 2. 解析设备配置（取第一台设备，第一版单选）
+        # 2. 前置校验（放在建目录之前，失败不留孤儿目录）
+        device_info = None
+        current_capabilities = {}
+        device_model = ''
+        final_udid = ''
+        # 2.1 解析设备配置（取第一台设备，第一版单选）
         devices_info = parse_devices_info(conf_file)
         if not devices_info:
             return False, '配置文件 %s 解析不到设备信息' % conf_file
@@ -216,14 +236,14 @@ class ExecutionManager(object):
             return False, '设备 %s 没有可用的 desired_capabilities' % device_info['device_desc']
         current_capabilities = capabilities[0]
 
-        # 2.1 应用执行参数覆盖（udid/包名/Activity，仅本次执行生效）
+        # 2.2 应用执行参数覆盖（udid/包名/Activity，仅本次执行生效）
         overrides = {k: str(v).strip() for k, v in (overrides or {}).items()
                      if v and str(v).strip()}
         for key in ('udid', 'appPackage', 'appActivity'):
             if overrides.get(key):
                 current_capabilities[key] = overrides[key]
 
-        # 3. 前置校验（放在建目录之前，失败不留孤儿目录）
+        # 3. 前置校验
         # 3.1 Appium 可用
         ok, msg = check_appium(device_info['server_ip'], device_info['server_port'])
         if not ok:
@@ -238,7 +258,8 @@ class ExecutionManager(object):
         if final_udid not in online:
             return False, '设备 %s 不在线（当前在线: %s）' % (
                 final_udid, ', '.join(sorted(online)) or '无')
-        device_model = next((d.get('model') or '' for d in online_devices if d['udid'] == final_udid), '')
+        device_model = next((d.get('model') or '' for d in online_devices
+                             if d['udid'] == final_udid), '')
 
         # 3.3 被测 App 是否已安装——未装时 Appium 深处只报 "Activity class does not exist"，
         # 难以定位；这里提前给出明确提示（换新设备最常见的坑：设备是干净的，App 没装）
@@ -266,25 +287,28 @@ class ExecutionManager(object):
             return False, '创建运行目录失败: %s' % e
         log_path = os.path.join(log_dir, 'test_%s.log' % run_id)
 
-        # 5. 写 config/app_ui_tmp/<本进程PID> 设备文件（pytest 的 os.getppid() 即本进程）
-        tmp_files = [os.path.join(APP_UI_TMP_DIR, str(os.getpid())),
-                     os.path.join(APP_UI_TMP_DIR, '%s_current_desired_capabilities' % os.getpid())]
+        # 5. 写本次执行的上下文文件（框架按约定读的全局文件）
+        tmp_files = []
         try:
+            # APP UI：pytest 侧用 os.getppid() 找本进程写入的设备文件
+            tmp_files = [os.path.join(APP_UI_TMP_DIR, str(os.getpid())),
+                         os.path.join(APP_UI_TMP_DIR, '%s_current_desired_capabilities' % os.getpid())]
             os.makedirs(APP_UI_TMP_DIR, exist_ok=True)
             self._write_json(tmp_files[0], device_info)
             self._write_json(tmp_files[1], current_capabilities)
         except Exception as e:
-            return False, '写设备临时文件失败: %s' % e
+            return False, '写执行临时文件失败: %s' % e
 
         task = {
             'run_id': run_id, 'status': 'PENDING',
+            'kind': 'app_ui', 'owner': owner, 'marker': marker,
             'start_time': _now_str(), 'end_time': None,
             'conf_file': conf_file,
-            'device_desc': device_info['device_desc'],
+            'device_desc': device_info['device_desc'] if device_info else '',
             'device_model': device_model,
             'app_package': current_capabilities.get('appPackage', ''),
             'udid': final_udid,
-            'overrides': overrides,
+            'overrides': overrides or {},
             'case_nodes': list(case_nodes),
             'total': len(case_nodes), 'passed': 0, 'failed': 0,
             'error': 0, 'skipped': 0,
@@ -305,9 +329,13 @@ class ExecutionManager(object):
         # 6. 组装 pytest 命令并启动子进程（独立进程组，便于整组停止）
         #    --log-cli-level=INFO：appOperator 的 操作日志(点击/输入/toast/断言)实时打到 stdout，
         #    平台实时日志框与 logs/test.log 双通道收集
+        #    注意：接口任务不需要额外参数——环境通过第 5 步写入的 config/tmp/env.json 传递，
+        #    与 run_api_test.py 的 -e 语义一致（-e 是它的 argparse 参数，不是 pytest 参数）。
         pytest_args = [PYTHON_BIN, '-u', '-m', 'pytest', '-c', 'config/pytest.ini',
                        '-v', '--log-cli-level=INFO',
                        '--alluredir', os.path.relpath(allure_dir, BASE_DIR).replace(os.sep, '/')]
+        if marker:
+            pytest_args += ['-m', marker]
         pytest_args += list(case_nodes)
         try:
             proc = subprocess.Popen(
@@ -329,7 +357,14 @@ class ExecutionManager(object):
 
         task['process'] = proc
         task['status'] = 'RUNNING'
-        task['deadline'] = time.time() + RUN_TIMEOUT_SECONDS
+        # 超时可按任务覆盖（接口任务通常远短于设备任务）；下限 1 分钟防误填
+        try:
+            timeout_s = int(timeout_minutes) * 60 if timeout_minutes else RUN_TIMEOUT_SECONDS
+        except (TypeError, ValueError):
+            timeout_s = RUN_TIMEOUT_SECONDS
+        timeout_s = max(60, timeout_s)
+        task['timeout_seconds'] = timeout_s
+        task['deadline'] = time.time() + timeout_s
 
         # 7. 后台线程：读日志流、统计进度、等进程结束、定终态、归档；看门狗独立计时防挂起
         threading.Thread(target=self._monitor, args=(task,), daemon=True).start()
@@ -368,8 +403,9 @@ class ExecutionManager(object):
             task['status'] = 'STOPPED'
         elif task.get('timed_out'):
             task['status'] = 'ERROR'
-            task['error_msg'] = ('执行超时(%d分钟)被强制停止，疑似设备/驱动挂起(uiautomator 崩溃或连接无响应)，'
-                                 '请查看日志最后输出与 Appium 服务日志(logs/appium.log)' % (RUN_TIMEOUT_SECONDS // 60))
+            task['error_msg'] = ('执行超时(%d分钟)被强制停止，疑似设备/驱动挂起(uiautomator 崩溃或连接无响应)或接口服务无响应，'
+                                 '请查看日志最后输出与 Appium 服务日志(logs/appium.log)'
+                                 % ((task.get('timeout_seconds') or RUN_TIMEOUT_SECONDS) // 60))
         elif exit_code == 0:
             task['status'] = 'PASSED'
         else:
@@ -421,8 +457,8 @@ class ExecutionManager(object):
         self._cleanup_device_tmp_files(task)
 
     def _cleanup_device_tmp_files(self, task):
-        """任务结束后清理本平台进程写入的设备临时文件（config/app_ui_tmp/<pid>*），
-        避免多次执行后脏文件堆积；运行中的任务不清理（pytest 子进程还要读取）"""
+        """任务结束后清理本平台进程写入的执行上下文临时文件（config/app_ui_tmp/<pid>*、
+        config/tmp/env.json），避免多次执行后脏文件堆积；运行中的任务不清理（pytest 子进程还要读取）"""
         if task.get('status') in ('PENDING', 'RUNNING'):
             return
         for f in task.get('tmp_files') or []:

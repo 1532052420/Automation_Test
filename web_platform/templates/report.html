@@ -3,31 +3,51 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>测试报告 · AppUI 自动化测试平台</title>
+<title>测试报告 · 自动化测试平台</title>
+<script src="/static/theme.js"></script>
+<link rel="stylesheet" href="/static/nav.css">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body data-page="report">
-<div class="sidebar" id="sidebar"></div>
+<header class="gnav" id="sidebar"></header>
 <main>
   <div class="pagehead">
-    <h1>📈 测试报告</h1>
-    <span class="sub">按 run 独立的 Allure 报告，历史互不覆盖</span>
-    <div class="actions"><button class="danger" id="btnClearAll3">🗑 清空全部数据</button></div>
+    <h1>测试报告</h1>
+    <p class="sub">执行总览 + 按 run 独立的 Allure 报告，历史互不覆盖。「详情」查看用例执行记录与证据，「打开报告」生成并起本地报告服务。</p>
+    <div class="actions"><button class="danger" id="btnClearAll3">清空全部数据</button></div>
   </div>
+
+  <!-- 执行总览（自首页迁入）：统计卡 + 最近执行 -->
+  <div class="stats">
+    <div class="stat s-blue" data-ico="flask"><span class="bgico"></span><div class="num" id="cardRuns">—</div><div class="label">总执行次数</div></div>
+    <div class="stat s-green" data-ico="check"><span class="bgico"></span><div class="num" id="cardPass">—</div><div class="label">通过</div></div>
+    <div class="stat s-red" data-ico="close"><span class="bgico"></span><div class="num" id="cardFail">—</div><div class="label">失败 / 异常</div></div>
+    <div class="stat s-slate" data-ico="target"><span class="bgico"></span><div class="num" id="cardRate">—</div><div class="label">成功率</div></div>
+  </div>
+
   <div class="card">
-    <h3>报告列表</h3>
-    <p class="muted" style="margin-bottom:12px">「详情」= 查看该次执行的用例执行记录（用例/步骤/断言截图）与执行日志；「打开报告」= 生成并以 allure 起本地报告服务；「删除数据」= 删除该 run 的全部数据。</p>
+    <h3>最近执行</h3>
     <div class="tblwrap">
       <table>
-        <thead><tr><th>Run ID</th><th>时间</th><th>状态</th><th>Allure 数据</th><th>报告</th><th>操作</th></tr></thead>
+        <thead><tr><th>Run ID</th><th>开始时间</th><th>目标</th><th>对象</th><th>共/过/失</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="recentList"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>报告列表</h3>
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>Run ID</th><th>时间</th><th>状态</th><th>目标</th><th>报告</th><th>操作</th></tr></thead>
         <tbody id="reportList"></tbody>
       </table>
     </div>
     <div class="pager" id="reportPager"></div>
   </div>
   <div class="card mt">
-    <div class="cardhead"><h3>用例执行记录</h3><span class="sub">点上方 run 的「详情」加载该次执行的用例、步骤、断言通过/失败截图与执行日志</span></div>
-    <div id="runDetail"><div class="empty"><span class="eico">👈</span>从上方列表选择一条执行记录查看详情</div></div>
+    <div class="cardhead"><h3>用例执行记录</h3><span class="sub">点上方 run 的「详情」加载该次执行的用例、步骤、证据与执行日志</span></div>
+    <div id="runDetail"></div>
   </div>
 </main>
 <div id="toast"></div>
@@ -38,7 +58,7 @@
     <div class="mops"><button class="ghost" id="mCancel">取消</button><button id="mOk">确定</button></div>
   </div>
 </div>
-<script src="/static/theme.js"></script>
+<script src="/static/nav.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

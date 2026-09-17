@@ -3,72 +3,211 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>执行 · AppUI 自动化测试平台</title>
+<title>AppUI 自动化 · 自动化测试平台</title>
+<script src="/static/theme.js"></script>
+<link rel="stylesheet" href="/static/nav.css">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body data-page="run">
-<div class="sidebar" id="sidebar"></div>
+<header class="gnav" id="sidebar"></header>
 <main>
-  <div class="pagehead">
-    <h1>🚀 执行用例</h1>
-    <span class="sub">选配置 → 勾用例 → 开始执行（设备与 Appium 状态见右侧栏）</span>
-  </div>
+  <div class="runlayout">
+    <!-- 左侧二级菜单（深色通栏，图标由 app.js 按 data-icon 注入） -->
+    <aside class="subnav" id="subnav">
+      <div class="subnav-label">AppUI 自动化</div>
+      <a href="#elements" data-panel="elements" data-icon="target" class="on">元素管理</a>
+      <a href="#exec" data-panel="exec" data-icon="gear">执行配置</a>
+      <a href="#rec" data-panel="rec" data-icon="film">录屏配置</a>
+      <a href="#cases" data-panel="cases" data-icon="list">选择用例</a>
+      <a href="#orch" data-panel="orch" data-icon="flow">用例编排</a>
+      <a href="#suites" data-panel="suites" data-icon="layers">测试套件</a>
+      <a href="#admin" data-panel="admin" data-icon="upload">用例管理</a>
+    </aside>
 
-  <div class="card">
-    <h3>执行配置</h3>
-    <div class="devgrid" id="devState" style="margin-bottom:14px">加载中…</div>
-    <div class="mt">
-      <div class="field" style="max-width:520px;margin-bottom:14px">
-        <label>默认配置来源（conf，选中即按它填充下方参数，也可手动修改）</label>
-        <select id="confSel"></select>
-      </div>
-      <div class="fields">
-        <div class="field"><label>设备编号（udid）</label><input type="text" id="inUdid" placeholder="自动填充当前设备"></div>
-        <div class="field"><label>应用包名（appPackage）</label><input type="text" id="inPackage" placeholder="如 com.recordlife.kuaige"></div>
-        <div class="field"><label>启动 Activity</label><input type="text" id="inActivity" placeholder="如 com.recordlife.kuaige.feature.main.MainActivity"></div>
-      </div>
-      <p class="muted mt">以上参数仅对本次执行生效（不写回 conf 文件）；留空 = 用默认值。</p>
-    </div>
-  </div>
+    <!-- 右侧面板区 -->
+    <div class="submain">
 
-  <div class="card">
-    <h3>🎥 录屏配置 <span class="muted" style="font-size:12px;font-weight:400">失败自动生成 [失败前 N 秒, 失败后 M 秒] 证据视频；保存后下次执行生效</span></h3>
-    <div class="fields" style="grid-template-columns:repeat(4,1fr)">
-      <div class="field"><label>失败前保留秒数（0~60）</label><input type="text" id="recBefore" placeholder="5"></div>
-      <div class="field"><label>失败后继续录制秒数（0~60）</label><input type="text" id="recAfter" placeholder="5"></div>
-      <div class="field"><label>单段录制上限秒（3~180）</label><input type="text" id="recMaxSeg" placeholder="180"></div>
-      <div class="field"><label>录制码率 bps（100万~2000万）</label><input type="text" id="recBitRate" placeholder="4000000"></div>
-    </div>
-    <div class="mt" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
-      <label class="chk"><input type="checkbox" id="recEnabled"> 启用自动录屏</label>
-      <label class="chk"><input type="checkbox" id="recKeep"> 成功后保留原始视频</label>
-      <label class="chk"><input type="checkbox" id="recRequired"> 录屏失败时终止用例（默认仅告警）</label>
-      <button class="ghost mini" id="btnRecSave" style="margin-left:auto">💾 保存录屏配置</button>
-    </div>
-    <p class="muted mt" style="font-size:12px">录屏时机固定为每条用例 setup 执行前启动（覆盖启动 App 现场），不做配置；证据视频随失败明细挂在测试报告里。</p>
-  </div>
+      <!-- 元素管理 -->
+      <section class="panel" id="panel-elements">
+        <div class="card">
+          <h3>元素管理 <span class="muted">元素库与元素定位器共用同一份数据，编辑实时生效</span></h3>
+          <div class="treebar">
+            <input type="search" id="elSearch" placeholder="搜索：名称 / 定位值 / 标签 / 类型 / 文件">
+            <button class="ghost mini" id="btnElRefresh">刷新</button>
+          </div>
+          <div class="tblwrap">
+            <table>
+              <thead><tr>
+                <th>名称</th><th>类型</th><th>标签</th><th>预览</th>
+                <th>使用次数</th><th>创建时间</th><th>操作</th>
+              </tr></thead>
+              <tbody id="elTbody"></tbody>
+            </table>
+          </div>
+          <div id="elEmpty" class="empty" style="display:none">元素库为空 —— 到「元素定位器」截图点选采集元素</div>
+        </div>
+      </section>
 
-  <div class="card">
-    <h3>选择用例（cases/app_ui）</h3>
-    <div style="display:flex;gap:10px;margin-bottom:12px">
-      <button class="ghost mini" id="btnSelectAll">全选</button>
-      <button class="ghost mini" id="btnSelectNone">全不选</button>
-      <button id="btnStart">🚀 开始执行</button>
-    </div>
-    <div class="tree" id="caseTree">加载中…</div>
-  </div>
+      <!-- 执行配置 -->
+      <section class="panel" id="panel-exec" hidden>
+        <div class="card">
+          <h3>执行配置</h3>
+          <div class="devgrid" id="devState" style="margin-bottom:14px">加载中…</div>
+          <div class="mt">
+            <div class="field" style="max-width:520px;margin-bottom:14px">
+              <label>默认配置来源（conf，选中即按它填充下方参数，也可手动修改）</label>
+              <select id="confSel"></select>
+            </div>
+            <div class="fields">
+              <div class="field"><label>设备编号（udid）</label><input type="text" id="inUdid" placeholder="自动填充当前设备"></div>
+              <div class="field"><label>应用包名（appPackage）</label><input type="text" id="inPackage" placeholder="如 com.recordlife.kuaige"></div>
+              <div class="field"><label>启动 Activity</label><input type="text" id="inActivity" placeholder="如 com.recordlife.kuaige.feature.main.MainActivity"></div>
+            </div>
+            <p class="muted mt">以上参数仅对本次执行生效（不写回 conf 文件）；留空 = 用默认值。</p>
+          </div>
+        </div>
+      </section>
 
-  <div class="card" id="execArea" style="display:none">
-    <h3>执行中</h3>
-    <div class="meta">
-      <span>Run <b id="runIdNow">-</b></span>
-      <span>状态 <span id="runStatusNow">-</span></span>
-      <span><b id="runStatsNow">-</b></span>
-      <span style="margin-left:auto"><button class="danger mini" id="btnStop">⏹ 停止执行</button>
-      <button class="ghost mini" id="btnGoDetail">查看详情</button></span>
+      <!-- 录屏配置 -->
+      <section class="panel" id="panel-rec" hidden>
+        <div class="card">
+          <h3>录屏配置 <span class="muted">失败自动生成 [失败前 N 秒, 失败后 M 秒] 证据视频；保存后下次执行生效</span></h3>
+          <div class="fields" style="grid-template-columns:repeat(4,1fr)">
+            <div class="field"><label>失败前保留秒数（0~60）</label><input type="text" id="recBefore" placeholder="5"></div>
+            <div class="field"><label>失败后继续录制秒数（0~60）</label><input type="text" id="recAfter" placeholder="5"></div>
+            <div class="field"><label>单段录制上限秒（3~180）</label><input type="text" id="recMaxSeg" placeholder="180"></div>
+            <div class="field"><label>录制码率 bps（100万~2000万）</label><input type="text" id="recBitRate" placeholder="4000000"></div>
+          </div>
+          <div class="mt" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+            <label class="chk"><input type="checkbox" id="recEnabled"> 启用自动录屏</label>
+            <label class="chk"><input type="checkbox" id="recKeep"> 成功后保留原始视频</label>
+            <label class="chk"><input type="checkbox" id="recRequired"> 录屏失败时终止用例（默认仅告警）</label>
+            <button class="ghost mini" id="btnRecSave" style="margin-left:auto">保存录屏配置</button>
+          </div>
+          <p class="muted mt">录屏时机固定为每条用例 setup 执行前启动（覆盖启动 App 现场），不做配置；证据视频随失败明细挂在测试报告里。</p>
+        </div>
+      </section>
+
+      <!-- 选择用例（含执行面板） -->
+      <section class="panel" id="panel-cases" hidden>
+        <div class="card">
+          <h3>选择用例（cases/app_ui）</h3>
+          <div class="treebar">
+            <button class="ghost mini" id="btnSelectAll">全选</button>
+            <button class="ghost mini" id="btnSelectNone">全不选</button>
+            <button id="btnStart" style="margin-left:auto">开始执行</button>
+          </div>
+          <div class="tree" id="caseTree">加载中…</div>
+        </div>
+
+        <div class="card" id="execArea" style="display:none">
+          <div class="cardhead">
+            <h3>执行中</h3>
+            <div class="ops">
+              <button class="ghost mini" id="btnGoDetail">查看详情</button>
+              <button class="danger mini" id="btnStop">停止执行</button>
+            </div>
+          </div>
+          <div class="meta">
+            <span>Run <b id="runIdNow">-</b></span>
+            <span>状态 <span id="runStatusNow">-</span></span>
+            <span>目标 <b id="runEnvNow">-</b></span>
+            <span id="runStatsNow"></span>
+          </div>
+          <div class="bar mt"><i id="runProgress"></i></div>
+          <div class="logbox mt" id="logBox"></div>
+        </div>
+      </section>
+
+      <!-- 用例管理（原独立模块并入）：上传用例包 zip，覆盖确认 + 自动备份 -->
+      <section class="panel" id="panel-admin" hidden>
+        <div class="card" id="authCard" style="display:none">
+          <h3>访问口令</h3>
+          <p class="muted">服务端已启用口令保护（环境变量 ADMIN_TOKEN），请输入团队口令：</p>
+          <div class="mt" style="display:flex;gap:8px;max-width:420px">
+            <input type="password" id="inToken" placeholder="团队口令">
+            <button id="btnToken">保存</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>上传用例包（zip） <span class="muted">元素定位器「下载用例包」的产物，平台自动识别入库；框架公共文件受保护</span></h3>
+          <div class="fields">
+            <div class="field"><label>用例包 zip（元素定位器「下载用例包」的产物）</label>
+              <div class="filepick">
+                <input type="file" id="upPkgFile" accept=".zip">
+                <button type="button" class="filepick-btn" data-for="upPkgFile">选择 zip</button>
+                <span class="filepick-name" data-name-for="upPkgFile">未选择文件</span>
+              </div>
+            </div>
+            <div class="field"><label>上传人（用于追溯）</label>
+              <input type="text" id="upPkgUploader" placeholder="你的名字">
+            </div>
+          </div>
+          <div class="mt">
+            <button id="btnUploadPkg">上传用例包</button>
+          </div>
+          <p class="muted mt">zip 内文件须落在受管目录：用例 <code>cases/app_ui/android/demoProject/</code>、
+            页面 <code>page_objects/app_ui/android/demoProject/pages/</code>、元素 <code>…/elements/</code>
+            （定位器「保存测试用例包」导出的 zip 即此结构，其余文件自动忽略）。
+            三件套一次性入库：先整体做语法校验，全部通过才落盘；同名文件自动备份历史版本。</p>
+        </div>
+      </section>
+
+      <!-- 用例编排（testhub SceneBuilder 移植：左选树 → 中有序步骤 → 右保存） -->
+      <section class="panel" id="panel-orch" hidden>
+        <div class="card">
+          <h3>用例编排 <span class="muted">把 cases/app_ui 的用例方法编排为有序步骤，执行时按顺序跑</span></h3>
+          <div class="orchlayout">
+            <div class="orchcol">
+              <div class="orchcol-title">用例方法 <span class="muted">点击加入步骤</span></div>
+              <input type="search" id="orchSearch" placeholder="搜索方法 / 类 / 文件">
+              <div class="orchtree" id="orchTree">加载中…</div>
+            </div>
+            <div class="orchcol orchcol-mid">
+              <div class="orchcol-title">编排步骤 <span class="muted">拖拽调整顺序</span></div>
+              <div class="orchsteps" id="orchSteps"></div>
+            </div>
+            <div class="orchcol">
+              <div class="orchcol-title">用例信息</div>
+              <div class="orchform">
+                <select id="orchSel"><option value="">＋ 新建用例</option></select>
+                <div class="field"><label>用例名称</label><input type="text" id="orchName" placeholder="如：登录冒烟"></div>
+                <div class="field"><label>描述</label><input type="text" id="orchDesc" placeholder="用例目的（可选）"></div>
+                <div class="field"><label>创建人</label><input type="text" id="orchBy" placeholder="你的名字（可选）"></div>
+                <div class="orchmeta" id="orchMeta"></div>
+                <div class="orchops">
+                  <button class="ghost mini" id="btnOrchRun" disabled>执行此用例</button>
+                  <button id="btnOrchSave">保存用例</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 测试套件（testhub SuiteList 移植：列表 + 双栏选用例拖拽排序 + 一键执行） -->
+      <section class="panel" id="panel-suites" hidden>
+        <div class="card">
+          <h3>测试套件 <span class="muted">有序用例集合，按顺序批量执行并统计结果</span></h3>
+          <div class="treebar">
+            <button class="ghost mini" id="btnSuiteRefresh">刷新</button>
+            <button id="btnSuiteNew" style="margin-left:auto">新建套件</button>
+          </div>
+          <div class="tblwrap">
+            <table>
+              <thead><tr>
+                <th>套件</th><th>用例</th><th>状态</th><th>最近结果</th>
+                <th>通过 / 失败</th><th>最后执行</th><th>操作</th>
+              </tr></thead>
+              <tbody id="suiteTbody"></tbody>
+            </table>
+          </div>
+          <div id="suiteEmpty" class="empty" style="display:none">还没有测试套件 —— 点「新建套件」把用例编排成批</div>
+        </div>
+      </section>
+
     </div>
-    <div class="bar mt"><i id="runProgress"></i></div>
-    <div class="logbox mt" id="logBox"></div>
   </div>
 </main>
 <div id="toast"></div>
@@ -79,7 +218,53 @@
     <div class="mops"><button class="ghost" id="mCancel">取消</button><button id="mOk">确定</button></div>
   </div>
 </div>
-<script src="/static/theme.js"></script>
+<!-- 元素 编辑/复制 弹窗 -->
+<div class="mask" id="elMask">
+  <div class="modal envmodal">
+    <h4 id="elModalTitle">编辑元素</h4>
+    <div class="fields" style="grid-template-columns:1fr 1fr">
+      <div class="field"><label>元素名称（中文/字母/数字/下划线）</label><input type="text" id="elMName" autocomplete="off"></div>
+      <div class="field"><label>定位方式</label><select id="elMType"></select></div>
+      <div class="field wide"><label>定位值</label><input type="text" id="elMValue" autocomplete="off"></div>
+      <div class="field"><label>等待方式</label><select id="elMWait"></select></div>
+      <div class="field"><label>等待时间(秒)</label><input type="number" id="elMWaitSec" min="1" max="600" step="1" value="6"></div>
+      <div class="field wide"><label>标签 / 备注（写进行尾注释，报告与回看更友好，可不填）</label><input type="text" id="elMDesc" autocomplete="off"></div>
+      <div class="field wide" id="elMFileWrap"><label>写入元素文件（复制目标）</label><select id="elMFile"></select></div>
+    </div>
+    <div class="mops mt">
+      <button class="ghost" id="elMCancel">取消</button>
+      <button id="elMSave">保存</button>
+    </div>
+  </div>
+</div>
+<!-- 套件 编辑/新建 弹窗：左可选用例 + 右已选用例（拖拽排序，testhub SuiteList 双栏交互） -->
+<div class="mask" id="suiteMask">
+  <div class="modal suitemodal">
+    <h4 id="suiteModalTitle">新建套件</h4>
+    <div class="fields" style="grid-template-columns:2fr 3fr">
+      <div class="field"><label>套件名称</label><input type="text" id="suMName" placeholder="如：回归冒烟"></div>
+      <div class="field"><label>描述</label><input type="text" id="suMDesc" placeholder="套件用途（可选）"></div>
+    </div>
+    <div class="suitelayout">
+      <div class="orchcol">
+        <div class="orchcol-title">可选用例 <span class="muted">点击加入</span></div>
+        <input type="search" id="suMSearch" placeholder="搜索用例">
+        <div class="orchtree" id="suMAvail"></div>
+      </div>
+      <div class="orchcol">
+        <div class="orchcol-title">已选用例 <span class="muted">按此顺序执行，可拖拽排序</span></div>
+        <div class="orchsteps" id="suMSelected"></div>
+      </div>
+    </div>
+    <div class="mops mt">
+      <button class="ghost" id="suMCancel">取消</button>
+      <button id="suMSave">保存</button>
+    </div>
+  </div>
+</div>
+<script src="/static/nav.js"></script>
+<script src="/static/admin.js"></script>
+<script src="/static/app_testing.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

@@ -21,6 +21,7 @@ from web_platform.runtime_config import (
     check_appium,
     find_free_port,
     list_devices_conf_files,
+    list_markers,
     parse_devices_info,
     scan_case_tree,
 )
@@ -45,6 +46,15 @@ def _cleanup_report_services():
 
 # 用例节点白名单：文件路径/类/方法（pytest nodeid），杜绝 API 直调注入任意 pytest 参数
 _NODE_RE = re.compile(r'^[A-Za-z0-9_\./:\u4e00-\u9fff-]+$')
+
+# 标记表达式白名单：只放行标记名、空格、括号与 and/or/not，杜绝注入任意 pytest 参数
+_MARKER_RE = re.compile(r'^[A-Za-z0-9_\s(),]+$')
+
+
+def _valid_nodes(case_nodes):
+    """返回不合法的用例节点列表（空 = 全部合法）"""
+    return [str(c) for c in case_nodes
+            if str(c).startswith('-') or '..' in str(c) or not _NODE_RE.match(str(c))]
 
 # ---------------------------------------------------------------- 页面
 @bp.route('/')
@@ -73,6 +83,12 @@ def page_perf():
     return render_template('perf.html')
 
 
+@bp.route('/api-test')
+def page_api_test():
+    """🔌 接口测试（接口自动化用例执行，与 APP UI 共用执行器）"""
+    return render_template('api_test.html')
+
+
 # ---------------------------------------------------------------- API
 @bp.route('/api/status')
 def api_status():
@@ -83,7 +99,7 @@ def api_status():
     running = runner.manager.running_task()
     return jsonify({
         'ok': True,
-        'service': 'app-ui-platform',
+        'service': 'automation-test-platform',
         'version': APP_VERSION,
         'confs': confs,
         'device_online': len(online),
@@ -174,6 +190,53 @@ def page_perf_report(run_id):
     return send_file(os.path.join(BASE_DIR, t['report']))
 
 
+# ---------------------------------------------------------------- AppUI 元素管理（元素库可视化维护）
+@bp.route('/api/appui/elements')
+def api_appui_elements():
+    """元素列表：解析元素库（与定位器/框架同一份数据源），附使用次数与创建时间。
+    ?kw= 关键字过滤（名称/定位值/标签/类型/文件）。"""
+    from web_platform import element_manager
+    kw = (request.args.get('kw') or '').strip().lower()
+    elements = element_manager.list_elements()
+    if kw:
+        def _hit(e):
+            return any(kw in str(e.get(k, '')).lower() for k in ('name', 'value', 'desc', 'type', 'file'))
+        elements = [e for e in elements if _hit(e)]
+    elements.sort(key=lambda e: (e['file'], e['name']))
+    return jsonify({'ok': True, 'elements': elements,
+                    'files': element_manager.list_element_files(),
+                    'locator_types': element_manager.LOCATOR_TYPES,
+                    'wait_types': element_manager.WAIT_TYPES})
+
+
+@bp.route('/api/appui/elements/save', methods=['POST'])
+def api_appui_elements_save():
+    """编辑（同名覆盖/改名）与复制元素：写回走 element_library，与定位器同一套格式与重复检测"""
+    from web_platform import element_manager
+    d = request.get_json(silent=True) or {}
+    ok, payload = element_manager.save_element(
+        (d.get('file') or '').strip(),
+        (d.get('name') or '').strip(),
+        d.get('locator_type') or 'ID',
+        d.get('value') or '',
+        wait_type=d.get('wait_type') or 'VISIBILITY_OF',
+        wait_seconds=d.get('wait_seconds'),
+        desc=d.get('desc') or '',
+        orig_name=(d.get('orig_name') or '').strip() or None)
+    return jsonify({'ok': ok, **payload}), (200 if ok else 400)
+
+
+@bp.route('/api/appui/elements/delete', methods=['POST'])
+def api_appui_elements_delete():
+    """删除元素（从元素文件移除该行定义）"""
+    from web_platform import element_manager
+    d = request.get_json(silent=True) or {}
+    ok, msg = element_manager.delete_element((d.get('file') or '').strip(),
+                                             (d.get('name') or '').strip())
+    return jsonify({'ok': ok, 'msg': msg}), (200 if ok else 400)
+
+
+# ---------------------------------------------------------------- 接口测试（testhub 移植版见 api_testing 蓝图）
 @bp.route('/api/devices')
 def api_devices():
     adb = adb_devices()
@@ -242,16 +305,16 @@ def api_exec_defaults():
 
 @bp.route('/api/run', methods=['POST'])
 def api_start_run():
+    """启动 APP UI 测试任务（kind='app_ui'）"""
     data = request.get_json(force=True, silent=True) or {}
     conf_file = (data.get('conf_file') or '').strip()
-    case_nodes = data.get('case_nodes') or []
-    case_nodes = [c for c in case_nodes if c and str(c).strip()]
-    bad_nodes = [str(c) for c in case_nodes
-                 if str(c).startswith('-') or '..' in str(c) or not _NODE_RE.match(str(c))]
+    case_nodes = [c for c in (data.get('case_nodes') or []) if c and str(c).strip()]
+    bad_nodes = _valid_nodes(case_nodes)
     if bad_nodes:
         return jsonify({'ok': False, 'msg': '用例节点不合法: %s' % bad_nodes[0]}), 400
     overrides = data.get('overrides') or {}
-    ok, result = runner.manager.start_run(conf_file, case_nodes, overrides)
+    ok, result = runner.manager.start_run(conf_file, case_nodes, overrides,
+                                          owner=(data.get('owner') or '').strip()[:40])
     if not ok:
         return jsonify({'ok': False, 'msg': result}), 409 if '正在运行' in result else 400
     return jsonify({'ok': True, 'run_id': result})

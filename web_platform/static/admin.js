@@ -37,11 +37,11 @@ async function adminUpload(force) {
   if (d.exists) {
     // 同名覆盖确认：展示原上传人与修改时间，确认后自动备份
     const m = d.meta || {};
-    const yes = await confirmModal('⚠️ 覆盖同名文件',
+    const yes = await confirmModal('覆盖同名文件',
       '该文件已存在，原上传人：' + (m.uploader || '框架') +
       '，修改时间：' + fmtDate(m.modify_time) +
       '。确认将覆盖旧文件，系统自动备份历史版本。', true);
-    if (yes) { $('#btnUpload').textContent = '⏳ 上传中…'; await adminUpload(true); $('#btnUpload').textContent = '⬆ 上传'; }
+    if (yes) { $('#btnUpload').textContent = '上传中…'; await adminUpload(true); $('#btnUpload').textContent = '上传'; }
     return;
   }
   toast(d.msg || (d.ok ? '上传成功' : '上传失败'), d.ok);
@@ -56,14 +56,14 @@ async function adminUploadPackage() {
   fd.append('uploader', $('#upPkgUploader').value.trim() || 'admin');
   fd.append('file', fileInput.files[0]);
   const btn = $('#btnUploadPkg');
-  btn.textContent = '⏳ 入库中…'; btn.disabled = true;
+  btn.textContent = '入库中…'; btn.disabled = true;
   try {
     const d = await adminApi('/api/admin/upload_package', {method: 'POST', body: fd});
     if (d.needToken) { $('#authCard').style.display = ''; return toast('请先输入访问口令', false); }
     toast(d.msg || (d.ok ? '用例包已入库' : '入库失败'), d.ok);
     if (d.ok) fileInput.value = '';
   } finally {
-    btn.textContent = '📦 上传用例包'; btn.disabled = false;
+    btn.textContent = '上传用例包'; btn.disabled = false;
   }
 }
 
@@ -85,16 +85,15 @@ function initFilePick() {
   });
 }
 
-/* ---------------- 初始化 ---------------- */
-function adminInit() {
-  renderSidebar('/admin');
+/* ---------------- 初始化 ----------------
+   用例管理已并入 AppUI 自动化页（#panel-admin 面板），不再有独立页面：
+   由 app.js 的 initRun() 调用 adminPanelInit() 完成绑定，本文件不再自启动。 */
+function adminPanelInit() {
+  if (!$('#btnUploadPkg')) return;   // 非 AppUI 页（无该面板）直接跳过
   initFilePick();
-  $('#btnUpload').addEventListener('click', () => adminUpload(false));
   $('#btnUploadPkg').addEventListener('click', adminUploadPackage);
   $('#btnToken').addEventListener('click', () => {
     localStorage.setItem('adminToken', $('#inToken').value.trim());
     toast('口令已保存到本机浏览器');
   });
 }
-
-document.addEventListener('DOMContentLoaded', adminInit);

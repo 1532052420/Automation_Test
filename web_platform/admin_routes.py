@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
-"""Web 执行平台 · 用例管理（用例 / 页面对象 / 元素 与用例包上传 · 方案A）
+"""Web 执行平台 · 用例管理（用例包 zip 整体入库 · 方案A）
 
-功能：统一文件列表（类型/上传人/受保护标记）、上传（py_compile/yaml/json 校验、
-覆盖确认与历史备份）、下载（单个/批量zip）、重命名、新建文件夹、删除（受保护拦截）、
-批量删除。文件元数据（上传人/备份记录）存储于 output/admin_meta.json，
+功能：用例包（元素定位器「下载用例包」产物）整体入库——
+zip 解析 → 受管目录校验 → 逐文件语法校验 → 两阶段统一落盘（同名自动备份历史版本）。
+文件元数据（上传人/备份记录）存储于 output/admin_meta.json，
 二期账号体系落地后可平移到 file_manage 数据表。
+单文件上传已按需求移除：散文件入库统一走元素定位器「保存测试用例包」链路。
 
 安全约定：
-- 上传仅限 .py/.yaml/.json，上传前 py_compile 或 yaml/json 解析校验（错误带行号）
+- 上传前 py_compile 或 yaml/json 解析校验（错误带行号）
 - 目标路径严格限制在 cases/ 与 page_objects 指定目录内，杜绝路径穿越
 - 受保护文件（框架公共文件，如 conftest.py）删除/重命名需管理员权限
   （本机模式即管理员；启用 ADMIN_TOKEN 后需请求头 X-Admin-Token 匹配）
@@ -21,7 +22,7 @@ import sys
 import time
 import zipfile
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, redirect, request
 
 from web_platform.runtime_config import BASE_DIR
 
@@ -32,6 +33,7 @@ MAX_UPLOAD_BYTES = 200 * 1024
 META_PATH = os.environ.get('ADMIN_META_PATH') or os.path.join(
     BASE_DIR, 'output', 'admin_meta.json')
 
+# 受管目录（用例包 zip 内文件必须落在其中之一；_resolve_managed_path 按此判定归属）
 _UPLOAD_TARGETS = {
     'cases': os.path.join(BASE_DIR, 'cases'),
     'elements': os.path.join(BASE_DIR, 'page_objects', 'app_ui', 'android', 'demoProject', 'elements'),
@@ -64,20 +66,6 @@ def _save_meta(meta):
     os.makedirs(os.path.dirname(META_PATH), exist_ok=True)
     with open(META_PATH, 'w', encoding='utf-8') as f:
         f.write(json.dumps(meta, ensure_ascii=False, indent=1))
-
-
-def _meta_of(meta, full_rel):
-    return meta.get(full_rel, {})
-
-
-def _protected_allowed(force_admin=False):
-    """受保护文件（框架公共文件）操作权限：默认拒绝，防止误删框架。
-    放行条件：口令模式下管理员令牌匹配；或本机模式下显式 force_admin=true
-    （操作者明确知道自己在动框架文件）。"""
-    token = os.environ.get('ADMIN_TOKEN', '').strip()
-    if token:
-        return request.headers.get('X-Admin-Token', '') == token
-    return bool(force_admin)
 
 
 def _check_token():
@@ -149,18 +137,6 @@ def _rm_quiet(path):
         pass
 
 
-def _target_dir(kind, subdir):
-    """受管子目录内的目标目录；越界返回 (None, 错误信息)"""
-    sub = (subdir or '').strip().strip('/')
-    if sub and (not re.match(r'^[A-Za-z0-9_/-]+$', sub) or '..' in sub):
-        return None, '子目录不合法: %r' % subdir
-    target_dir = os.path.normpath(os.path.join(_UPLOAD_TARGETS[kind], sub))
-    norm_base = os.path.normpath(_UPLOAD_TARGETS[kind])
-    if target_dir != norm_base and not target_dir.startswith(norm_base + os.sep):
-        return None, '目标路径越界'
-    return target_dir, None
-
-
 def _stage_file(target, content, ext):
     """写 .uploading 临时文件并做语法校验；失败抛 AdminError（临时文件已清理）。
     只动临时文件、不碰原文件 —— 便于多文件先整体校验、再统一落盘。"""
@@ -190,49 +166,6 @@ def _commit_file(target, tmp, meta, full_rel, uploader):
     m['uploaded_at'] = int(time.time())
     os.replace(tmp, target)
     return backed
-
-
-def write_managed_file(kind, filename, content, subdir='', force=False,
-                       uploader='admin', force_admin=False, meta=None):
-    """单文件入库：校验名与目录 → 暂存+语法校验 → 落盘（覆盖前备份、登记元数据）。
-    返回 (payload, status)；status=409 表示同名文件已存在且未允许覆盖（供前端弹确认框）。"""
-    meta = {} if meta is None else meta
-    try:
-        _validate_name(kind, filename)
-    except AdminError as e:
-        # cases 下非 test_ 前缀的 py = 框架公共文件，仅管理员可上传（4.4）
-        if kind == 'cases' and re.match(r'^(?!test_)[A-Za-z_][A-Za-z0-9_]*\.py$', filename):
-            if not _protected_allowed(force_admin):
-                return {'ok': False,
-                        'msg': '框架公共文件（非 test_ 前缀 py）仅管理员可上传，'
-                               '请携带管理员凭据（force_admin=true 或管理员令牌）'}, 403
-        else:
-            return {'ok': False, 'msg': str(e)}, 400
-    target_dir, err = _target_dir(kind, subdir)
-    if err:
-        return {'ok': False, 'msg': err}, 400
-    content = content.encode('utf-8') if isinstance(content, str) else content
-    if len(content) > MAX_UPLOAD_BYTES:
-        return {'ok': False, 'msg': '文件过大（限 200KB）'}, 400
-    target = os.path.join(target_dir, filename)
-    full_rel = os.path.relpath(target, ROOT).replace(os.sep, '/')
-    exists = os.path.isfile(target)
-    if exists and not force:
-        m = _meta_of(meta, full_rel)
-        st = os.stat(target)
-        # 未勾选覆盖：返回已存在文件的元信息，供前端弹确认框（覆盖交互 3.3）
-        return {'ok': False, 'exists': True,
-                'meta': {'uploader': m.get('uploader', '框架'),
-                         'uploaded_at': m.get('uploaded_at', int(st.st_mtime)),
-                         'modify_time': int(st.st_mtime)}}, 409
-    try:
-        tmp = _stage_file(target, content, os.path.splitext(filename)[1])
-    except AdminError as e:
-        return {'ok': False, 'msg': str(e)}, 400
-    backed = _commit_file(target, tmp, meta, full_rel, uploader)
-    return {'ok': True, 'path': full_rel, 'filename': filename, 'backed_up': backed,
-            'msg': ('已覆盖上传 %s（旧文件已自动备份）' if backed else '已上传 %s') % filename
-                   + '，平台已自动识别'}, 200
 
 
 # ---------------- 用例包（元素定位器三件套）整体入库 ----------------
@@ -321,30 +254,8 @@ def _read_package_zip(zf):
 
 @bp.route('/admin')
 def page_admin():
-    return render_template('admin.html')
-
-
-@bp.route('/api/admin/upload', methods=['POST'])
-def api_admin_upload():
-    try:
-        auth = _check_token()
-    except AdminError as e:
-        return jsonify({'ok': False, 'msg': str(e)}), 401
-    f = request.files.get('file')
-    if f is None or not f.filename:
-        return jsonify({'ok': False, 'msg': '未选择文件'}), 400
-    meta = _load_meta()
-    payload, status = write_managed_file(
-        request.form.get('kind', ''), os.path.basename(f.filename), f.read(),
-        subdir=request.form.get('subdir', ''),
-        force=request.form.get('force') == 'true',
-        uploader=(request.form.get('uploader') or 'admin').strip()[:32],
-        force_admin=request.form.get('force_admin') == 'true',
-        meta=meta)
-    if status == 200:
-        _save_meta(meta)
-        payload['auth'] = auth
-    return jsonify(payload), status
+    """用例管理页已并入 AppUI 自动化页（二级菜单「用例管理」）；旧链接 302 过去"""
+    return redirect('/run#admin')
 
 
 @bp.route('/api/admin/upload_zip_content', methods=['POST'])

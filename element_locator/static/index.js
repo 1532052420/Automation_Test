@@ -108,14 +108,6 @@ function setupEmbedBar() {
   nb.target = '_blank';
   nb.rel = 'noopener';
   bar.appendChild(nb);
-  const lab = document.createElement('span');
-  lab.className = 'bar-label';
-  lab.textContent = '📂 快速打开';
-  bar.appendChild(lab);
-  ['open-case-sel', 'open-ele-sel', 'open-page-sel'].forEach(id => {
-    const el = $(id);
-    if (el) { el.style.maxWidth = '160px'; bar.appendChild(el); }
-  });
   // 右侧设备组：📱 前缀标识 + 切换下拉 + 状态，成组靠右不换行（D2 修复）
   const group = document.createElement('span');
   group.className = 'dev-group';
@@ -124,17 +116,23 @@ function setupEmbedBar() {
   devTag.textContent = '📱 设备';
   group.appendChild(devTag);
   const devSel = $('device-sel');
-  if (devSel) { devSel.style.maxWidth = '180px'; group.appendChild(devSel); }
+  // 不再限宽：设备下拉要完整显示 serial（截断后同型号多台无法区分）
+  if (devSel) group.appendChild(devSel);
   const dv = $('dev-info');
   if (dv) { dv.style.marginLeft = '0'; group.appendChild(dv); }
   bar.appendChild(group);
 }
 
+/* 顶部全局菜单栏：结构与样式来自平台共用的 nav.js / nav.css（导航项单一数据源，
+   与平台各页完全一致，加页面只改 nav.js 一处）。内嵌在平台 iframe 时由 nav.css 隐藏。 */
+function renderTopNav() {
+  const el = document.getElementById('gnav');
+  if (el && window.PlatformNav) window.PlatformNav.render(el, '/locator');
+}
+
 async function init() {
+  renderTopNav();
   setupEmbedBar();
-  // 「返回平台」链接跟随实际访问地址（写死 127.0.0.1 的话，局域网同事点了会指向他自己机器）
-  const bp = document.querySelector('.back-platform');
-  if (bp) bp.href = location.origin + '/';   // 定位器已内嵌平台，同端口同源，返回平台即站点根
   // 先加载设备下拉并确定 state.serial（恢复上次选中），status/refresh 都按它请求
   await loadDevices();
   const st = await fetch('api/status?serial=' + encodeURIComponent(state.serial || '')).then(r => r.json()).catch(() => null);
@@ -143,7 +141,7 @@ async function init() {
   if (st && st.version) $('app-version').textContent = st.version;
   if (st && st.ok) {
     state.serial = st.serial || state.serial;
-    devInfo.textContent = '📱 ' + st.device.model + ' · Android ' + st.device.platformVersion;
+    devInfo.innerHTML = devInfoHtml(st.device, st.serial);
     devInfo.className = 'dev-info ok';
   } else {
     devInfo.textContent = st ? st.msg : '连接失败';
@@ -290,69 +288,6 @@ function bindColumnResizers() {
   });
 }
 
-/* ---------- 顶部快速打开：用例 / 元素定位 / 页面操作 文件编辑 ---------- */
-async function loadHeaderOpeners() {
-  const cs = await fetch('api/cases').then(r => r.json()).catch(() => null);
-  const caseSel = $('open-case-sel');
-  if (cs && cs.ok && caseSel) {
-    caseSel.innerHTML = '<option value="">📂 打开用例…</option>' +
-      (cs.case_info || []).map(c => '<option value="' + esc(c.file) + '">' + esc(c.file) + '</option>').join('');
-  }
-  const lib = await fetch('api/library').then(r => r.json()).catch(() => null);
-  const eleSel = $('open-ele-sel');
-  if (lib && lib.ok && eleSel) {
-    eleSel.innerHTML = '<option value="">🗂 打开元素文件…</option>' +
-      (lib.files || []).map(f => '<option value="' + esc(f) + '">' + esc(f) + '</option>').join('');
-  }
-  const pg = await fetch('api/pages').then(r => r.json()).catch(() => null);
-  const pageSel = $('open-page-sel');
-  if (pg && pg.ok && pageSel) {
-    pageSel.innerHTML = '<option value="">🧩 打开页面操作…</option>' +
-      (pg.pages || []).map(f => '<option value="' + esc(f) + '">' + esc(f) + '</option>').join('');
-  }
-}
-
-// 当前打开的文件（{kind, filename}），保存时用
-let viewFile = null;
-
-async function onOpenHdrFile(kind, filename) {
-  if (!filename) return;
-  const q = { case: 'case=', element: 'element=', page: 'page=' }[kind];
-  const r = await fetch('api/file_content?' + q + encodeURIComponent(filename)).then(r => r.json()).catch(() => null);
-  if (!r || !r.ok) { alert((r && r.msg) || '读取失败'); return; }
-  viewFile = { kind: kind, filename: filename };
-  $('view-title').textContent = '📄 ' + r.title;
-  $('view-content').value = r.content;
-  setViewStatus('可直接修改，点「💾 保存修改」写回文件（保存前自动做语法检查）', '');
-  $('view-mask').style.display = 'flex';
-}
-
-function setViewStatus(msg, cls) {
-  const el = $('view-status');
-  el.textContent = msg;
-  el.className = 'hint' + (cls ? ' ' + cls : '');
-}
-
-async function onSaveHdrFile() {
-  if (!viewFile) return;
-  const btn = $('btn-view-save');
-  btn.disabled = true; btn.textContent = '保存中…';
-  setViewStatus('正在保存…', '');
-  const r = await fetch('api/save_file', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ kind: viewFile.kind, filename: viewFile.filename, content: $('view-content').value }),
-  }).then(r => r.json()).catch(() => null);
-  btn.disabled = false; btn.textContent = '💾 保存修改';
-  if (!r || !r.ok) {
-    setViewStatus((r && r.msg) || '保存失败：服务异常', 'bad');
-    alert((r && r.msg) || '保存失败：服务异常');
-    return;
-  }
-  setViewStatus('✓ ' + r.msg, 'ok');
-  // 元素/用例/页面文件可能被手改，刷新相关下拉与状态
-  loadHeaderOpeners(); loadLibraryFiles(); loadCaseFiles(); loadPages();
-}
-
 /* ---------- 字段帮助：鼠标移到「?」即显示该字段有什么用 ---------- */
 const HELP_TIP_W = 330;
 function bindHelpIcons() {
@@ -397,12 +332,18 @@ function bindHelpIcons() {
 }
 
 /* ---------- 多设备切换 ---------- */
-/* 设备下拉选项文案：同型号多台设备（如同一台手机的 USB+WiFi 双通道）靠 serial 尾段区分 */
+/* 设备下拉选项文案：完整 serial，不做截断（同型号多台设备靠它区分，截断后无法分辨） */
 function deviceOptionText(d) {
-  let tail = d.serial || '';
-  if (tail.length > 9) tail = '…' + tail.slice(-8);
-  return d.model + ' · Android ' + d.platformVersion + '（' + tail + '）';
+  return d.model + ' · Android ' + d.platformVersion + '（' + (d.serial || '') + '）';
 }
+
+/* 设备信息展示：型号+系统版本一行，设备ID（serial）单独一行完整显示。
+   抽出来是因为 init() 与 refresh() 两处都要写同一份内容，避免改一处漏一处。 */
+function devInfoHtml(device, serial) {
+  return '📱 ' + esc(device.model) + ' · Android ' + esc(device.platformVersion) +
+    '<br><span class="dev-id" title="设备ID（adb serial）">' + esc(serial || '') + '</span>';
+}
+
 async function loadDevices() {
   const sel = $('device-sel');
   if (!sel) return;
@@ -489,8 +430,7 @@ async function refresh() {
     // 注意：上面发生掉线回退时已写入「⚠ 已掉线」警告，这里不能再覆盖掉它
     if (r.device && !r.fallback) {
       const dv = $('dev-info');
-      dv.textContent = '📱 ' + r.device.model + ' · Android ' + r.device.platformVersion;
-      dv.title = r.device.model + '（' + (r.serial || '') + '）';
+      dv.innerHTML = devInfoHtml(r.device, r.serial);
       dv.className = 'dev-info ok';
     }
     // 统一分配 uid（DFS 先父后子，tree 与 all 顺序一致）

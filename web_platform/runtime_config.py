@@ -19,6 +19,14 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 CASES_APP_UI_DIR = os.path.join(BASE_DIR, 'cases', 'app_ui')
 DEMO_CONFIG_DIR = os.path.join(BASE_DIR, 'config', 'demoProject')
+PYTEST_CONF = os.path.join(BASE_DIR, 'config', 'pytest.conf')
+
+
+# 项目名 / 环境名白名单：只允许字母数字下划线，从根上杜绝路径穿越
+_NAME_RE = re.compile(r'^[A-Za-z0-9_]{1,32}$')
+
+# 服务地址：只允许 http(s)，且不含空白（防把注释/换行写进 conf）
+_URL_RE = re.compile(r'^https?://\S+$')
 
 
 def _split_values(value):
@@ -101,13 +109,15 @@ def parse_devices_info(conf_file):
     return devices.get_devices_info()
 
 
-def scan_case_tree():
-    """扫描 cases/app_ui 下所有 test_*.py，返回用例树：
-    [{'file': 相对项目根路径, 'class_name': 类名, 'methods': [test_方法名, ...]}]"""
+def scan_case_tree(root_dir=None):
+    """扫描 root_dir（默认 cases/app_ui）下所有 test_*.py，返回用例树：
+    [{'file': 相对项目根路径, 'class_name': 类名, 'methods': [test_方法名, ...]}]
+"""
+    root = root_dir or CASES_APP_UI_DIR
     tree = []
-    if not os.path.isdir(CASES_APP_UI_DIR):
+    if not os.path.isdir(root):
         return tree
-    for dirpath, dirnames, filenames in os.walk(CASES_APP_UI_DIR):
+    for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d != '__pycache__' and not d.startswith('.')]
         for fn in sorted(filenames):
             if not (fn.startswith('test_') and fn.endswith('.py')):
@@ -130,6 +140,35 @@ def scan_case_tree():
                     if methods:
                         tree.append({'file': rel, 'class_name': node.name, 'methods': methods})
     return tree
+
+
+def list_markers():
+    """解析 config/pytest.conf 的 markers= 段，返回 [{'name','desc'}]。
+    选项自动生成，使用者不必手写 pytest 标记名。"""
+    markers = []
+    if not os.path.isfile(PYTEST_CONF):
+        return markers
+    try:
+        with open(PYTEST_CONF, 'r', encoding='utf-8') as f:
+            in_markers = False
+            for raw in f:
+                line = raw.rstrip('\n')
+                if re.match(r'^\s*markers\s*=', line):
+                    in_markers = True
+                    continue
+                if not in_markers:
+                    continue
+                if not line.strip():
+                    continue
+                if not line.startswith((' ', '\t')):   # 缩进结束即离开 markers 段
+                    break
+                name, _, desc = line.strip().partition(':')
+                name = name.strip()
+                if name:
+                    markers.append({'name': name, 'desc': desc.strip()})
+    except Exception:
+        return []
+    return markers
 
 
 def adb_devices():

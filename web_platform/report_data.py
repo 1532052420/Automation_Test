@@ -14,6 +14,12 @@ RUNS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 
 _IMG_TYPES = ('image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'image/bmp')
 
+# 文本证据（接口的请求-响应留痕、失败原因等）；pytest 自动附的日志类附件按名剔除
+_TEXT_TYPES = ('text/plain', 'application/json', 'text/csv', 'text/html', 'text/xml',
+               'application/xml')
+_TEXT_SKIP_NAMES = ('log', 'stdout', 'stderr')
+_TEXT_LIMIT = 20000
+
 
 def run_results_dir(run_id):
     return os.path.join(RUNS_DIR, run_id, 'allure-results')
@@ -29,6 +35,35 @@ def _pick_images(attachments):
         if not source or (a.get('type') or '') not in _IMG_TYPES:
             continue
         out.append({'name': a.get('name') or '', 'type': a.get('type') or '', 'source': source})
+    return out
+
+
+def _pick_texts(attachments, rdir):
+    """挑文本附件并读出正文（接口请求-响应留痕、失败原因等），供详情页折叠展示。
+
+    pytest 每个用例都会自动附 log/stdout/stderr，按名剔除，避免噪声淹没真正的证据。
+    读取失败/超大一律降级为空正文，绝不让单条脏附件毁掉整个详情页。
+    """
+    if not attachments:
+        return []
+    out = []
+    for a in attachments:
+        source = a.get('source') or ''
+        name = a.get('name') or ''
+        if not source or name in _TEXT_SKIP_NAMES:
+            continue
+        if (a.get('type') or '') not in _TEXT_TYPES:
+            continue
+        content = ''
+        path = os.path.join(rdir, source)
+        try:
+            if os.path.isfile(path):
+                with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read(_TEXT_LIMIT)
+        except Exception:
+            content = ''
+        out.append({'name': name, 'type': a.get('type') or '', 'source': source,
+                    'content': content})
     return out
 
 
@@ -49,8 +84,10 @@ def _collect_step_images(steps):
 def list_run_cases(run_id):
     """解析该 run 的用例明细：allure 每个用例一个 *-result.json。
 
-    返回 [{name, full_name, status, start, stop, duration_ms, steps, screenshots, error_message}]。
+    返回 [{name, full_name, status, start, stop, duration_ms, steps, screenshots, texts,
+    error_message}]。
     steps 为空说明是旧 run（step 包裹之前）——降级用 screenshots 直接展示断言截图。
+    texts 为接口用例的请求-响应留痕 / 失败原因等文本证据（APP UI 侧通常为空）。
     目录不存在/无数据返回 []，页面显示空态。
     """
     rdir = run_results_dir(run_id)
@@ -72,6 +109,7 @@ def list_run_cases(run_id):
                 'start': s.get('start'),
                 'stop': s.get('stop'),
                 'attachments': _pick_images(s.get('attachments')),
+                'texts': _pick_texts(s.get('attachments'), rdir),
             })
         sd = d.get('statusDetails') or {}
         start = d.get('start') or 0
@@ -85,6 +123,7 @@ def list_run_cases(run_id):
             'duration_ms': max(0, stop - start),
             'steps': steps,
             'screenshots': _pick_images(d.get('attachments')) or _collect_step_images(raw_steps),
+            'texts': _pick_texts(d.get('attachments'), rdir),
             'error_message': sd.get('message') or '',
         })
     return cases

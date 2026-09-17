@@ -32,3 +32,11 @@ gui-test-screenshots/
 reports/
 .venv/
 __pycache__/
+
+# 运行时数据（YAML 存储层的实时数据，不入库）
+config/api_testing/
+config/app_testing/
+
+# AI 工具本地产物 / 上传临时残片
+.workbuddy-ai/
+*.uploading

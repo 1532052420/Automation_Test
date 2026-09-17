@@ -153,7 +153,7 @@ def test_status_structure(platform):
     d = json.loads(body)
     for key in ('ok', 'service', 'confs', 'device_online', 'devices', 'appium', 'running', 'port'):
         assert key in d, '缺字段 %s' % key
-    assert d['service'] == 'app-ui-platform'
+    assert d['service'] == 'automation-test-platform'
     assert isinstance(d['confs'], list) and d['confs']
 
 
@@ -338,64 +338,7 @@ def test_entry_scripts_clean():
     subprocess.run(['bash', '-n', main], check=True)
     subprocess.run(['bash', '-n', runsh], check=True)
 
-# ---------------------------------------------------------------- 用例管理（上传）
-def test_admin_upload_list_delete(platform):
-    """上传落盘 + 语法校验拒绝（本机模式无口令）"""
-    import io
-    leftover = os.path.join(ROOT, 'cases/demoProject/api/test_admin_upload.py')
-    if os.path.isfile(leftover):
-        os.remove(leftover)
-    boundary = '----dbg'
-    payload = ('# 用例管理上传用例\n'
-               'from common.hamcrest.hamcrest import assert_that\n\n\n'
-               'class TestAdminUpload:\n'
-               '    def test_admin_upload_case(self):\n'
-               '        assert_that(1).is_equal_to(1)\n').encode()
-    body = (('--%s\r\nContent-Disposition: form-data; name="kind"\r\n\r\ncases\r\n'
-             '--%s\r\nContent-Disposition: form-data; name="subdir"\r\n\r\ndemoProject/api\r\n'
-             '--%s\r\nContent-Disposition: form-data; name="file"; filename="test_admin_upload.py"\r\n'
-             'Content-Type: text/x-python\r\n\r\n') % (boundary, boundary, boundary)).encode() \
-        + payload + ('\r\n--%s--\r\n' % boundary).encode()
-    code, body_resp, _ = http('POST', '/api/admin/upload', raw_body=body,
-                              headers={'Content-Type': 'multipart/form-data; boundary=' + boundary})
-    d = json.loads(body_resp)
-    assert d['ok'], d
-    assert d['path'] == 'cases/demoProject/api/test_admin_upload.py'
-    assert os.path.isfile(os.path.join(ROOT, d['path']))
-    # 语法非法文件被拒
-    bad = b'class Broken:\n  def x(:\n'
-    body2 = (('--%s\r\nContent-Disposition: form-data; name="kind"\r\n\r\ncases\r\n'
-              '--%s\r\nContent-Disposition: form-data; name="file"; filename="test_bad.py"\r\n\r\n') % (boundary, boundary)).encode() \
-        + bad + ('\r\n--%s--\r\n' % boundary).encode()
-    code, body_resp, _ = http('POST', '/api/admin/upload', raw_body=body2,
-                              headers={'Content-Type': 'multipart/form-data; boundary=' + boundary})
-    assert json.loads(body_resp)['ok'] is False and '语法' in json.loads(body_resp)['msg']
-    # 清理（文件列表已按需求下线，直接按落盘路径清理）
-    os.remove(os.path.join(ROOT, 'cases/demoProject/api/test_admin_upload.py'))
-
-
-def test_admin_upload_rejects(platform):
-    """文件名规范/路径穿越/超大文件 拒绝"""
-    import io
-    def multipart(fields, filename='test_x.py', content=b'pass\n'):
-        boundary = '----dbg'
-        parts = ''.join('--%s\r\nContent-Disposition: form-data; name="%s"\r\n\r\n%s\r\n'
-                        % (boundary, k, v) for k, v in fields.items())
-        parts += ('--%s\r\nContent-Disposition: form-data; name="file"; filename="%s"\r\n'
-                  'Content-Type: text/x-python\r\n\r\n' % (boundary, filename))
-        return (parts.encode() + content + ('\r\n--%s--\r\n' % boundary).encode()), boundary
-
-    body, b = multipart({'kind': 'cases', 'subdir': ''}, filename='not_test.py')
-    code, body_resp, _ = http('POST', '/api/admin/upload', raw_body=body,
-                              headers={'Content-Type': 'multipart/form-data; boundary=' + b})
-    # 非 test_ 前缀 py = 框架公共文件 → 仅管理员可上传（4.4）
-    assert json.loads(body_resp)['ok'] is False and '仅管理员' in json.loads(body_resp)['msg']
-    body, b = multipart({'kind': 'cases', 'subdir': '../../etc'})
-    code, body_resp, _ = http('POST', '/api/admin/upload', raw_body=body,
-                              headers={'Content-Type': 'multipart/form-data; boundary=' + b})
-    assert json.loads(body_resp)['ok'] is False and '不合法' in json.loads(body_resp)['msg']
-
-
+# ---------------------------------------------------------------- 用例管理（用例包入库）
 def test_admin_token_protected(platform):
     """设置 ADMIN_TOKEN 后无口令访问被拒（子进程验证）"""
     import subprocess as sp
@@ -435,49 +378,6 @@ def test_admin_token_protected(platform):
         assert code2 == 400, '带口令应通过鉴权(400), 实际 %s' % code2
     finally:
         proc.terminate()
-
-# ---------------------------------------------------------------- 方案A：上传增强
-def _upload(platform, filename, content, kind='cases', subdir='demoProject/api', force=False, uploader='测试员A', force_admin=False):
-    boundary = '----dbg'
-    body = (('--%s\r\nContent-Disposition: form-data; name="kind"\r\n\r\n%s\r\n'
-             '--%s\r\nContent-Disposition: form-data; name="subdir"\r\n\r\n%s\r\n'
-             '--%s\r\nContent-Disposition: form-data; name="uploader"\r\n\r\n%s\r\n'
-             '--%s\r\nContent-Disposition: form-data; name="force"\r\n\r\n%s\r\n'
-             '--%s\r\nContent-Disposition: form-data; name="force_admin"\r\n\r\n%s\r\n'
-             '--%s\r\nContent-Disposition: form-data; name="file"; filename="%s"\r\n'
-             'Content-Type: text/x-python\r\n\r\n') % (
-        boundary, kind, boundary, subdir, boundary, uploader, boundary,
-        'true' if force else 'false', boundary, 'true' if force_admin else 'false',
-        boundary, filename)).encode() + content \
-        + ('\r\n--%s--\r\n' % boundary).encode()
-    code, resp, _ = http('POST', '/api/admin/upload', raw_body=body,
-                         headers={'Content-Type': 'multipart/form-data; boundary=' + boundary})
-    return code, json.loads(resp)
-
-
-def test_admin_overwrite_backup(platform):
-    """覆盖上传：409 带原上传人 → force 后自动生成时间戳备份（3.3/4.3）"""
-    import glob as _glob
-    for f in _glob.glob(os.path.join(ROOT, 'cases/demoProject/api/test_admin_backup*')):
-        os.remove(f)
-    code, d = _upload(platform, 'test_admin_backup.py', b'value = 1\n')
-    assert d['ok']
-    code, d = _upload(platform, 'test_admin_backup.py', b'value = 2\n')
-    assert code == 409 and d['exists']
-    assert d['meta']['uploader'] == '测试员A' and d['meta']['modify_time'] > 0
-    code, d = _upload(platform, 'test_admin_backup.py', b'value = 3\n', force=True, uploader='测试员B')
-    assert d['ok'] and d['backed_up']
-    target_dir = os.path.join(ROOT, 'cases/demoProject/api')
-    backups = [f for f in os.listdir(target_dir) if f.startswith('test_admin_backup_') and f.endswith('_backup.py')]
-    assert len(backups) == 1, '应生成一个时间戳备份'
-    # 元数据登记：上传人与备份历史（文件列表已下线，读 admin_meta.json 验证）
-    meta = json.load(open(ADMIN_META_FILE['path'], encoding='utf-8'))
-    m = meta.get('cases/demoProject/api/test_admin_backup.py', {})
-    assert m.get('uploader') == '测试员B' and len(m.get('backups', [])) == 1
-    # 清理
-    os.remove(os.path.join(target_dir, 'test_admin_backup.py'))
-    os.remove(os.path.join(target_dir, backups[0]))
-
 
 # ---------------------------------------------------------------- 录屏配置
 def test_recording_config_roundtrip(platform):

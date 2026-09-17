@@ -10,37 +10,31 @@
 <script>
 /* 首帧前恢复主题：夜间模式在样式表加载前同步挂 night 类 + 给根节点上深色底，
    双保险保证第一帧就是深色（日间模式由 CSS 的 color-scheme:light 覆回，见 style.css）。
-   主题与测试平台共用 localStorage['platform_theme']——两端任一处切换即全局生效；
-   平台契约 html.day=日间（默认夜间），定位器契约 html.night=夜间（默认日间），
-   默认态相反，故这里是「非 day 即 night」。
-   内嵌检测：被平台 iframe 嵌入时挂 embedded 类，首帧即隐藏自带侧栏（避免与平台侧栏形成双栏），
-   侧栏里的功能件（刷新/快速打开/设备状态）由 index.js 移到顶部工具条。 */
+   主题与测试平台共用 localStorage['platform_theme']——两端任一处切换即全局生效。
+   两端契约现已统一：默认**日间**，html.night = 夜间。故这里只认显式的 'night'，
+   键缺失/为 'day' 都走日间（此前是「非 day 即 night」，平台改默认后会造成
+   平台亮、定位器暗的错位）。 */
 try {
   var _de = document.documentElement;
-  if (localStorage.getItem('platform_theme') !== 'day') {
+  if (localStorage.getItem('platform_theme') === 'night') {
     _de.classList.add('night');
     _de.style.background = '#101012';
   }
   if (window.self !== window.top) _de.classList.add('embedded');
 } catch (e) { /* 隐私模式等场景忽略 */ }
 </script>
+<link rel="stylesheet" href="/static/nav.css">
 <link rel="stylesheet" href="static/style.css?v=50">
 </head>
 <body>
+<header class="gnav" id="gnav"></header>
 <div id="embed-bar" class="embed-bar"></div>
 <aside class="side">
-  <a class="back-platform" href="/">🏠 返回平台</a>
   <div class="brand">🎯
     <div class="bt">App 元素定位器
       <span id="app-version" class="ver">v3.3</span>
       <small>截图点选 → 一键写进元素库</small>
     </div>
-  </div>
-  <div class="side-sec">
-    <div class="side-label">📂 快速打开</div>
-    <select id="open-case-sel" class="hdr-select" title="选择用例文件打开编辑"><option value="">打开用例…</option></select>
-    <select id="open-ele-sel" class="hdr-select" title="选择元素定位文件打开编辑"><option value="">打开元素文件…</option></select>
-    <select id="open-page-sel" class="hdr-select" title="选择页面操作文件打开编辑"><option value="">打开页面操作…</option></select>
   </div>
   <button id="btn-refresh" class="btn primary side-btn">🔄 刷新</button>
   <button id="btn-tree-diff" class="btn ghost side-btn" title="每次刷新与上一次元素树对比：🟢 新增 / 🔴 消失（快速发现跳转与弹窗）">🟢 树对比：开</button>
@@ -125,7 +119,7 @@ try {
         <!-- 第一栏：元素 -->
         <section class="flow-col" id="col-element">
           <div class="col-head">① 元素 <span class="hint">入库必需</span></div>
-          <label>元素名称 <span class="help-icon" data-help="元素在代码里的引用名，生成 self.元素名 = CreateElement.create(...)；用例、页面方法都靠它找到这个元素，三件套以它为纽带。命名：字母/数字/下划线，不能以数字开头。已按截图元素自动推荐，可改。">?</span>
+          <label>元素名称 <span class="help-icon" data-help="元素在代码里的引用名，生成 self.元素名 = CreateElement.create(...)；用例、页面方法都靠它找到这个元素，三件套以它为纽带。命名：支持中文/字母/数字/下划线，不能以数字开头，不能是 Python 关键字。已按截图元素自动推荐，可改。">?</span>
             <input id="el-name" type="text" placeholder="如: search_btn">
           </label>
           <label>定位方式 <span class="help-icon" data-help="用什么方式找这个元素。ID = 资源 id（最稳最快，首选）；XPATH = 表达式（按文本/层级找）；ACCESSIBILITY_ID = 无障碍标签；其他少用。定位器已按元素特点给出候选，一般不用改。">?</span>
@@ -265,19 +259,6 @@ try {
   </div>
 </div>
 
-<!-- 顶部快速打开·文件编辑 弹窗 -->
-<div id="view-mask" class="modal-mask" style="display:none">
-  <div class="modal modal-wide">
-    <div class="modal-title"><span id="view-title">文件</span> <span id="view-status" class="hint"></span>
-      <button id="btn-view-save" class="btn small primary" style="float:right; margin-right:6px">💾 保存修改</button>
-      <button id="btn-view-close" class="btn small" style="float:right">关闭</button>
-    </div>
-    <div class="modal-body">
-      <textarea id="view-content" class="view-content" spellcheck="false" wrap="off"></textarea>
-    </div>
-  </div>
-</div>
-
 <!-- 字段帮助气泡（点击问号显示） -->
 <div id="help-tip" class="help-tip" style="display:none"></div>
 
@@ -292,7 +273,8 @@ try {
     </div>
   </div>
 </div>
+<script src="/static/nav.js"></script>
 <script src="/static/theme.js"></script>
-<script src="static/index.js?v=60"></script>
+<script src="static/index.js?v=62"></script>
 </body>
 </html>

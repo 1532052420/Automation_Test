@@ -3,54 +3,64 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>性能压测 · AppUI 自动化测试平台</title>
+<title>性能压测 · 自动化测试平台</title>
+<script src="/static/theme.js"></script>
+<link rel="stylesheet" href="/static/nav.css">
 <link rel="stylesheet" href="/static/style.css">
 <style>
-  /* 日/夜间模式：与平台同契约（html.day=日间，默认夜间），全部走主题变量，不写死颜色 */
-  .perf-group { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
-  .perf-group h4 { margin: 0 0 2px; font-size: 14px; font-weight: 600; color: var(--ink); }
-  .perf-group .gdesc { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
-  .perf-fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  /* 压测页专属样式（其余一律走全局 style.css，避免重复定义主题与控件外观） */
+  .perf-group { background: var(--panel2); border: 1px solid var(--line-soft); border-radius: 14px; padding: 16px 18px; margin-bottom: 14px; }
+  .perf-group h4 { margin: 0 0 3px; font-size: 15px; font-weight: 600; color: var(--ink); }
+  .perf-group .gdesc { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; }
+  /* 高级参数折叠区：summary 走全局 details.adv 样式，这里只管外框与内部留白 */
+  .perf-group-adv { margin-bottom: 14px; }
+  .perf-group-adv > summary { margin-bottom: 10px; }
+  .perf-group-adv .perf-group { margin-bottom: 0; background: var(--panel); }
+  .perf-fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
   .perf-fields .field.wide { grid-column: 1 / -1; }
-  .perf-fields textarea { width: 100%; min-height: 78px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px;
-    background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+  .perf-fields textarea { min-height: 82px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; }
   .perf-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .perf-status { font-size: 13px; color: var(--ink2); }
-  /* 日志/代码区沿用平台约定：深底浅字（--dark 日间同样保持深色，更易读） */
-  .perf-log { background: var(--dark); color: #d1d5db; border-radius: 8px; padding: 10px 12px;
-    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.5;
-    max-height: 320px; overflow-y: auto; white-space: pre-wrap; }
-  .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600;
-    background: rgba(128,128,128,.14); }
+  /* 日志区沿用平台约定：深底浅字（两套主题都保持深色，更易读） */
+  .perf-log {
+    background: var(--dark); color: var(--dark-ink); border-radius: 14px; padding: 16px 18px;
+    font: 12px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    max-height: 340px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+  }
+  .badge {
+    display: inline-block; padding: 2px 10px; border-radius: 980px;
+    font-size: 12px; font-weight: 600; background: rgba(128, 128, 128, .14);
+  }
   .badge.run { color: var(--run); }
   .badge.ok { color: var(--ok-text); }
   .badge.bad { color: var(--bad-text); }
   .badge.stop { color: var(--stop); }
+  @media (max-width: 1000px) { .perf-fields { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body data-page="perf">
-<div class="sidebar" id="sidebar"></div>
+<header class="gnav" id="sidebar"></header>
 <main>
   <div class="pagehead">
-    <h1>⚡ 性能压测</h1>
-    <span class="sub">HTTP 接口压测（阶梯递增 / 瞬时脉冲）· 配置项全在下方，保存后点「开始压测」</span>
+    <h1>性能压测</h1>
+    <p class="sub">HTTP 接口压测（阶梯递增 / 瞬时脉冲）。只需填「核心配置」并按模式填加压参数，其余默认即可。</p>
   </div>
 
   <div class="card">
     <h3>运行状态</h3>
     <div class="perf-actions">
-      <button id="btnPerfStart" class="btn primary">▶ 开始压测</button>
-      <button id="btnPerfStop" class="btn">■ 停止</button>
-      <button id="btnPerfSave" class="btn">💾 保存配置</button>
-      <button id="btnPerfReport" class="btn" style="display:none">📊 查看报告</button>
+      <button id="btnPerfStart">开始压测</button>
+      <button class="ghost" id="btnPerfStop">停止</button>
+      <button class="ghost" id="btnPerfSave">保存配置</button>
+      <button class="ghost" id="btnPerfReport" style="display:none">查看报告</button>
       <span class="perf-status" id="perfStatus">就绪</span>
     </div>
     <p class="muted mt" id="perfEnv">环境检查中…</p>
-    <div id="perfResult" class="el-result" style="margin-top:8px"></div>
+    <div id="perfResult" class="el-result mt"></div>
   </div>
 
   <div class="card">
-    <h3>压测配置 <span class="muted" style="font-size:12px;font-weight:400">单一数据源：perf_test/config/load_test_config.yaml</span></h3>
+    <h3>压测配置 <span class="muted">单一数据源：perf_test/config/load_test_config.yaml</span></h3>
     <div id="perfForm">加载中…</div>
   </div>
 
@@ -59,7 +69,8 @@
     <div class="perf-log" id="perfLog">（未开始）</div>
   </div>
 </main>
-<script src="/static/theme.js"></script>
+<div id="toast"></div>
+<script src="/static/nav.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

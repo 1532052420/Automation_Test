@@ -7,4 +7,3 @@ from page_objects.app_ui.wait_type import Wait_Type as Wait_By
 
 class AaaaElements:
     def __init__(self):
-        self.aaaaa = CreateElement.create(Locator_Type.XPATH, '//*[@text="快歌"]', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)

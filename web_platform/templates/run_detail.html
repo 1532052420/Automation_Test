@@ -3,11 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>执行详情 · AppUI 自动化测试平台</title>
+<title>执行详情 · 自动化测试平台</title>
+<script src="/static/theme.js"></script>
+<link rel="stylesheet" href="/static/nav.css">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body data-page="detail" data-run-id="{{ run_id }}">
-<div class="sidebar" id="sidebar"></div>
+<header class="gnav" id="sidebar"></header>
 <main>
   <div class="pagehead">
     <h1 id="detailTitle">用例执行记录 · {{ run_id }}</h1>
@@ -23,7 +25,7 @@
     <div class="mops"><button class="ghost" id="mCancel">取消</button><button id="mOk">确定</button></div>
   </div>
 </div>
-<script src="/static/theme.js"></script>
+<script src="/static/nav.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>
