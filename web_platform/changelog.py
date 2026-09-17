@@ -10,10 +10,18 @@
 两端不再各自硬编码版本号。
 """
 
-APP_VERSION = '4.8'
+APP_VERSION = '4.9'
 
 # 最新版本在最前；time 精确到秒（YYYY-MM-DD HH:MM:SS）
 CHANGELOG = [
+    {
+        'version': '4.9',
+        'time': '2026-09-17 10:28:34',
+        'title': '清理误录步骤：移除星光值用例里的「点击 Appium_Settings」',
+        'changes': [
+            '清理：test_1_star_value 用例与 StarValuePage 页面对象里误录的「点击 Appium_Settings」步骤（采集时把 Appium 调试界面当成业务页面），用例只保留真实业务操作',
+        ],
+    },
     {
         'version': '4.8',
         'time': '2026-09-17 09:41:27',
