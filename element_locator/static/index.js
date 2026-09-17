@@ -18,6 +18,8 @@ const state = {
   goneSigs: [],           // 本次刷新相对上次「消失」的元素签名
   undoStack: [],          // 本次会话「添加到用例」步骤的撤销栈（LIFO，存 add_code 返回的文件快照）
   tempCase: null,         // 临时用例区（新建文件模式）：步骤先累积在内存，「保存」才打包 zip，全程不写框架
+  coordMode: false,       // ⌖ 坐标模式：点截图选精确坐标（不再命中容器节点），用于无障碍盲区（自绘弹层等）
+  coordPoint: null,       // 坐标模式下最后选中的点 [x, y]（设备坐标）
 };
 // 右侧教学：搜索时展开所有分类，否则默认收起（点分类标题展开）
 var tutExpandAll = false;
@@ -177,6 +179,7 @@ async function init() {
   // 树 Diff 开关 / 定位器体检 / 会话步骤撤销
   initDialog();
   $('btn-tree-diff').addEventListener('click', toggleTreeDiff);
+  $('btn-coord-mode').addEventListener('click', toggleCoordMode);
   $('btn-locate-check').addEventListener('click', runLocateCheck);
   $('btn-undo-step').addEventListener('click', undoLastStep);
   // 临时用例未导出时，离开页面前提醒（防误关丢失已录步骤）
@@ -515,21 +518,23 @@ async function refresh() {
 
 /* ---------- 截图点击命中 ---------- */
 // 由点击事件算出命中的最内层元素 + 所有包含该点的候选（按面积升序）
-function hitFromEvent(e) {
-  if (!state.all.length) return null;
+/* 截图点击 → 设备坐标：PNG 像素 → XML 顶部对齐坐标（华为机底部导航条差值，见 hitFromEvent 注释） */
+function shotPointFromEvent(e) {
   const img = $('shot');
   const rect = img.getBoundingClientRect();
   if (rect.width <= 0) return null;
-  // 点击换算：先按截图(PNG)实际像素定位，再映射到 uiautomator XML 坐标。
-  // 关键：PNG 尺寸(如720x1600)与 XML 尺寸(如720x1536)可能不一致——
-  // 华为机的 PNG 底部多了虚拟导航条(64px)，XML 是顶部对齐的内容区坐标。
-  // 所以宽度同值，高度用 PNG 像素点亮的 y，超过 XML 高度部分按导航条处理。
   const natW = img.naturalWidth || state.width;
   const natH = img.naturalHeight || state.height;
-  const pngX = (e.clientX - rect.left) / rect.width * natW;
-  const pngY = (e.clientY - rect.top) / rect.height * natH;
-  const px = pngX;                          // 宽同值
-  const py = Math.min(pngY, state.height);  // 顶部对齐同值，多余的底部是导航条
+  const px = (e.clientX - rect.left) / rect.width * natW;
+  const py = Math.min((e.clientY - rect.top) / rect.height * natH, state.height);
+  return [Math.round(px), Math.round(py)];
+}
+
+function hitFromEvent(e) {
+  if (!state.all.length) return null;
+  const pt = shotPointFromEvent(e);
+  if (!pt) return null;
+  const px = pt[0], py = pt[1];
   // 收集所有包含该点的元素，按面积升序（越小越内层），作为候选列表
   const cands = [];
   for (const n of state.all) {
@@ -546,6 +551,15 @@ function hitFromEvent(e) {
   return { hit: cands[0].node, cands: cands.map(c => c.node) };
 }
 function onShotClick(e) {
+  // ⌖ 坐标模式：选的就是这个点，不再命中容器节点（用于无障碍盲区，如自绘弹层选项）
+  if (state.coordMode) {
+    const pt = shotPointFromEvent(e);
+    if (!pt) return;
+    state.coordPoint = pt;
+    highlightBounds([pt[0] - 45, pt[1] - 45, pt[0] + 45, pt[1] + 45]);
+    showToast('⌖ 已选坐标 (' + pt[0] + ', ' + pt[1] + ') · 点「添加测试用例」将以「坐标点击」录入；双击 = 真机点这个点');
+    return;
+  }
   const r = hitFromEvent(e);
   if (!r) return;
   state.hitCands = r.cands;
@@ -554,6 +568,16 @@ function onShotClick(e) {
 }
 // 双击执行器：双击截图 = 在设备上真实点击该元素（验证定位是否准确）
 function onShotDblClick(e) {
+  // ⌖ 坐标模式：双击 = 真机点这个精确点
+  if (state.coordMode) {
+    const pt = shotPointFromEvent(e);
+    if (!pt) return;
+    state.coordPoint = pt;
+    highlightBounds([pt[0] - 45, pt[1] - 45, pt[0] + 45, pt[1] + 45]);
+    tapOnDevice(pt, '⌖ 坐标 (' + pt[0] + ', ' + pt[1] + ')');
+    showToast('⌖ 已在设备上点击 (' + pt[0] + ', ' + pt[1] + ') · 可点「添加测试用例」以「坐标点击」录入');
+    return;
+  }
   const r = hitFromEvent(e);
   if (!r) return;
   state.hitCands = r.cands;
@@ -1028,6 +1052,11 @@ async function openModal() {
   $('el-op-type').value = 'click';
   $('el-op-param').value = '';
   paramAuto = true;  // 打开弹窗重置为「自动预填」状态
+  // ⌖ 坐标模式：默认「坐标点击」并回填最后选中的点
+  if (state.coordMode && state.coordPoint) {
+    $('el-op-type').value = 'tap';
+    $('el-op-param').value = state.coordPoint[0] + ',' + state.coordPoint[1];
+  }
   // 步骤描述自动预填：优先元素文本（报告更友好），无文本则留空由后端按元素名生成
   $('el-op-comment').value = autoStepComment('click', node.text);  // 默认按「点击」生成；切类型时自动跟随
   opCommentAuto = true;
@@ -1150,6 +1179,16 @@ async function saveElement(checkDup) {
   return r;
 }
 /* 用途单选：① 仅元素 → ②③栏熄灭；② 元素+用例 → ③栏只生成用例行；③ 三件套全联动 */
+/* ⌖ 坐标模式：点截图选精确坐标（无障碍盲区场景，如自绘弹层的选项） */
+function toggleCoordMode() {
+  state.coordMode = !state.coordMode;
+  if (!state.coordMode) state.coordPoint = null;
+  $('btn-coord-mode').textContent = state.coordMode ? '⌖ 坐标模式：开' : '⌖ 坐标模式：关';
+  showToast(state.coordMode
+    ? '⌖ 坐标模式已开启：现在点截图选的就是精确坐标（不再命中元素）；双击 = 真机点该点'
+    : '⌖ 坐标模式已关闭：恢复元素命中');
+}
+
 function onPurposeChange() {
   const p = purposeValue();
   const popup = p === 'popup';
