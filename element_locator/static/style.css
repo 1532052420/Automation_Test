@@ -584,3 +584,23 @@ html.night .su-btn { background: rgba(59,130,246,.18); border-color: rgba(59,130
 @keyframes hitToastIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
 html.night .hit-toast { background: rgba(44, 44, 48, .95); color: #f3f4f6;
   border-color: rgba(255, 255, 255, .18); box-shadow: 0 8px 26px rgba(0, 0, 0, .55), 0 2px 6px rgba(0, 0, 0, .4); }
+
+/* ---------- 用途③：登记随机弹窗 · 已有规则列表 ---------- */
+.pp-rules { max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.pp-empty { font-size: 12px; color: #6b7280; padding: 8px 2px; }
+.pp-rule { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px;
+  background: rgba(127,127,127,.08); border: 1px solid rgba(127,127,127,.22); }
+.pp-rule-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; font-size: 12px; }
+.pp-rule-main b { font-size: 12.5px; }
+.pp-rule-main span { color: #374151; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp-rule-main .pp-opt { color: #6b7280; font-size: 11.5px; }
+.pp-rule-main .pp-opt em { font-style: normal; color: #b45309; font-weight: 600; }
+.pp-rule-main .pp-cmt { color: #9ca3af; font-size: 11.5px; }
+.pp-del { flex-shrink: 0; width: 24px; height: 24px; border-radius: 6px; border: 1px solid rgba(239,68,68,.4);
+  background: rgba(239,68,68,.1); color: #b91c1c; font-size: 14px; line-height: 1; cursor: pointer; }
+.pp-del:hover { background: rgba(239,68,68,.2); }
+html.night .pp-rule { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.18); }
+html.night .pp-rule-main span { color: #d1d5db; }
+html.night .pp-rule-main .pp-opt { color: #9ca3af; }
+html.night .pp-rule-main .pp-opt em { color: #fbbf24; }
+html.night .pp-del { background: rgba(239,68,68,.16); color: #fca5a5; border-color: rgba(239,68,68,.5); }

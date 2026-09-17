@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import device
 import element_library
 import case_generator
+import popup_rules
 from tutorials import TUTORIALS, search_tutorials
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
@@ -267,6 +268,38 @@ def api_locate_check():
     r = device.locate_check(serial, data.get('locator_type'), (data.get('locator_value') or '').strip())
     r['serial'] = serial
     return jsonify(r)
+
+
+# ---------------------------------------------------------------- 随机弹窗规则库
+@app.route('/api/popup_rules')
+def api_popup_rules():
+    """随机弹窗规则列表（popupElements.py 的关闭按钮 + 锚点/冷却/活动页约束）"""
+    return jsonify({'ok': True, 'rules': popup_rules.parse_rules()})
+
+
+@app.route('/api/add_popup_rule', methods=['POST'])
+def api_add_popup_rule():
+    """登记/更新一条弹窗规则。POST {name, locator_type, locator_value, anchor_type?,
+    anchor_value?, cooldown?, activity?, comment?}；成功后前端可再调 /api/locate_check 实查。"""
+    data = request.get_json(silent=True) or {}
+    r = popup_rules.add_rule(
+        (data.get('name') or '').strip(),
+        (data.get('locator_type') or '').strip(),
+        (data.get('locator_value') or '').strip(),
+        anchor_type=(data.get('anchor_type') or '').strip() or None,
+        anchor_value=(data.get('anchor_value') or '').strip() or None,
+        cooldown=data.get('cooldown'),
+        activity=(data.get('activity') or '').strip() or None,
+        comment=(data.get('comment') or '').strip() or None,
+    )
+    return jsonify(r)
+
+
+@app.route('/api/delete_popup_rule', methods=['POST'])
+def api_delete_popup_rule():
+    """删除一条弹窗规则（元素行 + RULE_OPTIONS 约束一起移除）"""
+    data = request.get_json(silent=True) or {}
+    return jsonify(popup_rules.delete_rule((data.get('name') or '').strip()))
 
 
 @app.route('/api/pages')

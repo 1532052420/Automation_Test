@@ -24,7 +24,7 @@ try {
   if (window.self !== window.top) _de.classList.add('embedded');
 } catch (e) { /* 隐私模式等场景忽略 */ }
 </script>
-<link rel="stylesheet" href="static/style.css?v=48">
+<link rel="stylesheet" href="static/style.css?v=49">
 </head>
 <body>
 <div id="embed-bar" class="embed-bar"></div>
@@ -117,6 +117,7 @@ try {
         <span class="fs-label">保存到哪一步：</span>
         <label class="purpose"><input type="radio" name="el-purpose" value="only" checked> <span class="help-icon" data-help="只把元素写进元素库（先攒元素，之后统一写用例）。右侧②③栏熄灭不可用。">?</span> ① 仅元素</label>
         <label class="purpose"><input type="radio" name="el-purpose" value="all"> <span class="help-icon" data-help="三件套一次完成（推荐）：元素入库 + 用例行追加 + 页面操作方法自动生成/更新到目标用例的页面文件。用例、元素、操作缺一不可，选这个就不会漏。目标用例选「➕ 新建…」并填用例名时：步骤存入临时用例（未入库）——「保存并继续」继续累积，「保存」导出全部步骤的 zip。">?</span> ② 元素 + 用例 + 操作（推荐）</label>
+        <label class="purpose"><input type="radio" name="el-purpose" value="popup"> <span class="help-icon" data-help="把当前选中的元素登记为「随机弹窗关闭规则」：写进 popupElements.py 规则库（不进普通元素库、不写用例）。用例执行时框架在元素等待的间隙按规则被动扫描，偶遇弹窗就截图存证并自动关闭——不为弹窗写用例，正常用例"无感"。建议配锚点防误关。">?</span> 🎯 ③ 登记随机弹窗</label>
       </div>
 
       <div class="flow-cols">
@@ -200,6 +201,45 @@ try {
           <div class="pv-title">页面方法代码 <span class="hint">实时 · 选③时生成 · 方法名=操作类型+元素名，自动写入上面的页面文件</span></div>
           <pre id="el-code-preview" class="el-content mini"></pre>
         </section>
+
+        <!-- 弹窗规则栏：用途③（登记随机弹窗）专用，与三件套流程互斥显示 -->
+        <section class="flow-col" id="col-popup" style="display:none">
+          <div class="col-head">③ 登记随机弹窗 <span class="hint">写进弹窗规则库，不进普通元素库</span></div>
+          <label>规则名 <span class="help-icon" data-help="规则在 popupElements.py 里的引用名（popup_xxx_close 风格）。同名再次登记 = 覆盖更新该规则。">?</span>
+            <input id="pp-name" type="text" placeholder="如: popup_promo_close">
+          </label>
+          <label>关闭按钮定位 <span class="help-icon" data-help="弹窗的关闭按钮（×/以后再说/跳过），已按当前选中元素预填。ID 优先（最稳最快）；自绘 View 无 id 时用 XPATH。执行时框架按此定位找按钮并点击关闭。">?</span>
+            <select id="pp-type">
+              <option value="ID">ID（资源 id，首选）</option>
+              <option value="XPATH">XPATH（表达式）</option>
+            </select>
+          </label>
+          <label>定位值 <span class="help-icon" data-help="关闭按钮的具体定位值，与上方定位方式配套。">?</span>
+            <input id="pp-value" type="text" placeholder="如: com.recordlife.kuaige:id/btnClose">
+          </label>
+          <label>锚点（强烈建议） <span class="help-icon" data-help="弹窗的特征元素：同一个关闭按钮 id 常被登录弹层等非弹窗界面复用，不配锚点会把它们误当弹窗关掉（实测踩坑）。取弹窗的标题文案或背景 id：在元素树里点选弹窗标题 → 看它的定位写法，抄到这里。XPATH 文本锚点示例：//*[contains(@text,'今日签到')]。留空 = 全页面扫描（仅当关闭按钮 id 全局唯一时才安全）。">?</span>
+            <select id="pp-anchor-type">
+              <option value="">不配锚点（仅 id 唯一时安全）</option>
+              <option value="XPATH">XPATH（弹窗文案，推荐）</option>
+              <option value="ID">ID（弹窗背景/容器 id）</option>
+            </select>
+          </label>
+          <label>锚点定位值 <span class="help-icon" data-help="与锚点方式配套的具体值。场上出现该特征才允许点关闭——把「误关」概率压到零。">?</span>
+            <input id="pp-anchor-value" type="text" placeholder="如: //*[contains(@text,'今日签到')]">
+          </label>
+          <label>冷却秒数 <span class="help-icon" data-help="同一条规则两次点击关闭的最小间隔（默认 2 秒）。防「关了又弹」时疯狂连点。">?</span>
+            <input id="pp-cooldown" type="number" min="1" max="60" step="1" value="2">
+          </label>
+          <label>活动页约束（可选） <span class="help-icon" data-help="该弹窗只在特定 Activity 内出现时填（如 .feature.recharge.RechargeKCoinActivity），其他页面跳过扫描。不确定就留空。">?</span>
+            <input id="pp-activity" type="text" placeholder="如: .feature.recharge.RechargeKCoinActivity（可不填）">
+          </label>
+          <label>备注 <span class="help-icon" data-help="这条规则对应什么弹窗（如「签到弹窗-任务中心/广场通用」），写在规则行尾注释里。可不填。">?</span>
+            <input id="pp-comment" type="text" placeholder="如: 签到弹窗-关闭按钮（可不填）">
+          </label>
+          <div class="pv-title">已有规则 <span class="hint">popupElements.py · 点 × 删除</span></div>
+          <div id="pp-rules" class="pp-rules"></div>
+          <div id="pp-result" class="el-result"></div>
+        </section>
       </div>
 
       <!-- 已有元素复用面板：命中重复定位时显示，默认直接复用（防元素库膨胀） -->
@@ -242,6 +282,6 @@ try {
 
 <div id="hit-toast" class="hit-toast" style="display:none" aria-live="polite"></div>
 <script src="/static/theme.js"></script>
-<script src="static/index.js?v=57"></script>
+<script src="static/index.js?v=58"></script>
 </body>
 </html>

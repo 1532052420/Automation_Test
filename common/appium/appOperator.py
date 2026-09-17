@@ -9,6 +9,7 @@ from appium.webdriver.webdriver import WebDriver
 from appium.webdriver.webelement import WebElement
 from common.dateTimeTool import DateTimeTool
 from common.httpclient.doRequest import DoRequest
+from common.appium.popup_handler import PopupHandler
 from page_objects.createElement import CreateElement
 from page_objects.app_ui.locator_type import Locator_Type
 from page_objects.app_ui.wait_type import Wait_Type  as Wait_By
@@ -72,6 +73,9 @@ class AppOperator:
         self._doRequest.setHeaders({'Content-Type':'application/json'})
         self._driver=driver
         self._session_id=driver.session_id
+        # 隐式等待归零：框架的等待全部是显式等待（WebDriverWait/自写轮询）；
+        # 归零后"扫弹窗"的 find_elements 找不到目标时立即返回空列表，轮询零成本
+        self._driver.implicitly_wait(0)
         # 获得设备支持的性能数据类型
         self._performance_types=ujson.loads(self._doRequest.post_with_form('/session/'+self._session_id+'/appium/performanceData/types').body)['value']
         # 当前窗口大小/位置：UiAutomator2 等移动端驱动不支持这两个命令（Appium 3 直接返回
@@ -79,6 +83,9 @@ class AppOperator:
         # 不能让整个 session 构造在这里中断（否则所有 APP 用例在 setup 阶段即报错）。
         self._window_size=self._safe_window(self.get_window_size)
         self._window_rect=self._safe_window(self.get_window_rect)
+        # 随机弹窗自动处理：寄生在元素等待轮询里（操作入口先扫一次 + getElement 四段式探针）
+        # 规则库：page_objects/.../elements/popupElements.py；开关：config/popup.conf 或环境变量 POPUP_AUTO_CLOSE=0
+        self.popup=PopupHandler(driver,logger=logger)
 
     @staticmethod
     def _safe_window(fn):
@@ -124,12 +131,14 @@ class AppOperator:
         with allure.step('点击元素 %s'%desc):
             t0=time.time()
             try:
+                self.popup.scan()   # 操作入口先扫一次随机弹窗（兜住上一步延迟弹出的）
                 webElement=self._change_element_to_webElement_type(element)
                 if webElement:
                     try:
                         webElement.click()
                     except StaleElementReferenceException:
                         # uiautomator2 8.x 元素缓存严格：find 与 click 之间界面刷新(如 toast 消失)会使引用失效，重定位一次再点
+                        self.popup.scan()   # 重试前再扫一次（兜住点击前刚弹出的弹窗）
                         webElement=self._change_element_to_webElement_type(element)
                         if webElement:
                             webElement.click()
@@ -162,6 +171,7 @@ class AppOperator:
         with allure.step('输入 %s 「%s」'%(desc,text)):
             t0=time.time()
             try:
+                self.popup.scan()   # 操作入口先扫一次随机弹窗
                 webElement=self._change_element_to_webElement_type(element)
                 if webElement:
                     webElement.clear()
@@ -1420,12 +1430,73 @@ class AppOperator:
         end_y=self._window_size['height']*0.99
         self._driver.swipe(start_x,start_y,end_x,end_y,duration)
 
+    def _find_once(self,elementInfo):
+        """按元素名片的等待方式做一次『不加等待』的查找；未命中/状态不满足返回 None。
+        只服务 getElement 的立即探针：任何异常都归一为 None（下一阶段显式等待接管）。"""
+        locator_type=elementInfo.locator_type
+        locator_value=elementInfo.locator_value
+        wait_type = elementInfo.wait_type
+        wait_expected_value = elementInfo.wait_expected_value
+        try:
+            if wait_type == Wait_By.TITLE_IS:
+                return self._driver if self._driver.title == wait_expected_value else None
+            if wait_type == Wait_By.TITLE_CONTAINS:
+                return self._driver if (wait_expected_value or '') in (self._driver.title or '') else None
+            if wait_type == Wait_By.PRESENCE_OF_ELEMENT_LOCATED:
+                elements = self._driver.find_elements(locator_type, locator_value)
+                return elements[0] if elements else None
+            if wait_type == Wait_By.ELEMENT_TO_BE_CLICKABLE:
+                for el in self._driver.find_elements(locator_type, locator_value):
+                    if el.is_displayed() and el.is_enabled():
+                        return el
+                return None
+            if wait_type == Wait_By.ELEMENT_LOCATED_TO_BE_SELECTED:
+                for el in self._driver.find_elements(locator_type, locator_value):
+                    if el.is_selected():
+                        return el
+                return None
+            if wait_type == Wait_By.VISIBILITY_OF:
+                for el in self._driver.find_elements(locator_type, locator_value):
+                    if el.is_displayed():
+                        return el
+                return None
+            return self._driver.find_element(locator_type, locator_value)
+        except Exception:
+            return None
+
+    def _find_all_once(self,elementInfo):
+        """批量版立即探针：未命中返回 None（语义同 _find_once）。"""
+        locator_type=elementInfo.locator_type
+        locator_value=elementInfo.locator_value
+        wait_type = elementInfo.wait_type
+        try:
+            if wait_type == Wait_By.PRESENCE_OF_ELEMENT_LOCATED:
+                elements = self._driver.find_elements(locator_type, locator_value)
+            elif wait_type == Wait_By.VISIBILITY_OF:
+                elements = [el for el in self._driver.find_elements(locator_type, locator_value) if el.is_displayed()]
+            else:
+                elements = self._driver.find_elements(locator_type, locator_value)
+            return elements if elements else None
+        except Exception:
+            return None
+
     def getElement(self,elementInfo):
         """
-        定位单个元素
+        定位单个元素，四段式时序（兼顾 toast 短命元素与弹窗遮挡两类场景）：
+        ①立即探针：命中直接返回（零延迟，保住存活 1~3s 的 toast）；
+        ②未命中→扫一次随机弹窗（弹窗是独立窗口，不关掉下层元素永远找不到）；
+        ③再探针一次（弹窗刚关、元素立即可见）；
+        ④仍未命中→按 wait_seconds 进显式等待（真慢页面）。
         :param elementInfo:
         :return:
         """
+        instant = self._find_once(elementInfo)          # ① 立即探针：toast 在这命中
+        if instant is not None:
+            return instant
+        self.popup.scan()                               # ② 扫随机弹窗
+        instant = self._find_once(elementInfo)          # ③ 弹窗关掉后再探一次
+        if instant is not None:
+            return instant
         webElement=None
         locator_type=elementInfo.locator_type
         locator_value=elementInfo.locator_value
@@ -1462,10 +1533,17 @@ class AppOperator:
 
     def getElements(self,elementInfo):
         """
-        定位多个元素
+        定位多个元素：四段式时序同 getElement（①探针 ②扫弹窗 ③再探针 ④显式等待）。
         :param elementInfo:
         :return:
         """
+        instant = self._find_all_once(elementInfo)
+        if instant:
+            return instant
+        self.popup.scan()
+        instant = self._find_all_once(elementInfo)
+        if instant:
+            return instant
         webElements=None
         locator_type=elementInfo.locator_type
         locator_value=elementInfo.locator_value

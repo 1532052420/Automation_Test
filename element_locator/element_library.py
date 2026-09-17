@@ -11,6 +11,9 @@ import re
 ELEMENTS_DIR = 'page_objects/app_ui/android/demoProject/elements'
 # 默认新建元素文件名（用户也可选择写进已有文件）
 DEFAULT_FILE = 'locator_gui_elements.py'
+# 随机弹窗规则库（element_locator/popup_rules.py 专管）：不是普通元素文件——
+# 从「写入元素文件」下拉隔离，避免常规元素误写进弹窗规则（会被执行引擎当作关闭按钮自动点击）
+POPUP_FILE = 'popupElements.py'
 
 # 用例管理覆盖上传时自动生成的历史备份 xxx_<时间戳>_backup.py（见 web_platform/admin_routes.py）。
 # 这类文件与正式文件内容可能完全相同、且会定义同类名，绝不能出现在任何"可选文件"清单里：
@@ -74,11 +77,12 @@ def element_line(name, locator_type, value, wait_type='VISIBILITY_OF', wait_seco
 
 
 def list_element_files():
-    """枚举现有元素库文件（含默认新文件）"""
+    """枚举现有元素库文件（含默认新文件；弹窗规则库 popupElements.py 不在此列——由 popup_rules 专管）"""
     files = []
     if os.path.isdir(ELEMENTS_DIR):
         files = sorted(f for f in os.listdir(ELEMENTS_DIR)
-                       if f.endswith('.py') and f != '__init__.py' and not is_generated_backup(f))
+                       if f.endswith('.py') and f != '__init__.py' and f != POPUP_FILE
+                       and not is_generated_backup(f))
     if DEFAULT_FILE not in files:
         files.insert(0, DEFAULT_FILE)
     return files
@@ -143,13 +147,15 @@ def _write(path, content):
 
 
 def add_element(filename, name, locator_type, value, wait_type='VISIBILITY_OF', wait_seconds=None,
-                comment=None, check_dup=True):
+                comment=None, check_dup=True, elements_dir=None):
     """
     向元素库文件添加/覆盖元素。
     wait_seconds：显式等待超时秒数（None/非法 = 默认 6）。
     comment：元素备注（生成行行尾 # 注释，可空）。
     check_dup=True 时先做重复检测：库中已有相同定位（且非同名覆盖）→ 不落盘，
     返回 {'ok': False, 'duplicate': {...}}，由前端决定「使用已有元素」还是「强制新建」。
+    elements_dir：目标目录覆盖（默认 ELEMENTS_DIR；弹窗规则库 popup_rules 借此把元素行
+    与 RULE_OPTIONS 写进同一份可替换路径——测试时整体指向临时副本，不碰真实文件）。
     返回 {'ok': bool, 'content': 文件最新内容, 'action': 'added'|'updated'|'created', 'msg': 说明}
     """
     if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', name):
@@ -165,7 +171,7 @@ def add_element(filename, name, locator_type, value, wait_type='VISIBILITY_OF', 
                     'msg': '发现已有元素 %s（%s）使用相同定位，是否直接使用已有元素？'
                            % (dup['name'], dup['filename'])}
 
-    path = os.path.join(ELEMENTS_DIR, filename)
+    path = os.path.join(elements_dir or ELEMENTS_DIR, filename)
     new_line = element_line(name, locator_type, value, wait_type, wait_seconds, comment)
 
     if not os.path.exists(path):

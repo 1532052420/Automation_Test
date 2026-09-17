@@ -985,6 +985,7 @@ async function openModal() {
   $('el-file').value = state.defaultEleFile || 'locator_gui_elements.py';
   // 用途默认：直接选②（三件套一次完成：选已有用例或新建都可以）
   document.querySelector('input[name="el-purpose"][value="only"]').checked = true;
+  onPurposeChange();   // 栏位显示复位（上次若用了用途③，弹窗栏要藏回、三件套栏恢复）
   $('el-op-type').innerHTML = opTypeOptions();
   $('el-op-type').value = 'click';
   $('el-op-param').value = '';
@@ -1113,11 +1114,115 @@ async function saveElement(checkDup) {
 /* 用途单选：① 仅元素 → ②③栏熄灭；② 元素+用例 → ③栏只生成用例行；③ 三件套全联动 */
 function onPurposeChange() {
   const p = purposeValue();
-  $('col-case').classList.toggle('dim', p === 'only');
-  $('col-op').classList.toggle('dim', p === 'only');
+  const popup = p === 'popup';
+  $('col-popup').style.display = popup ? '' : 'none';
+  ['col-element', 'col-case', 'col-op'].forEach(id => {
+    $(id).style.display = popup ? 'none' : '';
+    $(id).classList.toggle('dim', !popup && p === 'only');
+  });
+  if (popup) { ppPrefill(); loadPopupRules(); return; }
   if (p !== 'only') { onOpTypeChange(); onCaseFileChange(); }
   else { renderStepsList([]); updateOpNote(); }
   updatePreview();
+}
+
+/* ---- 用途③：登记随机弹窗（写 popupElements.py 规则库，不进普通元素库） ---- */
+function ppPrefill() {
+  // 关闭按钮 = 当前选中元素；规则名按元素名推荐（popup_xxx_close）
+  const name = $('el-name').value.trim();
+  if (!$('pp-value').value.trim()) {
+    $('pp-type').value = $('el-type').value === 'XPATH' ? 'XPATH' : 'ID';
+    $('pp-value').value = $('el-value').value.trim();
+  }
+  if (!$('pp-name').value.trim() && name) $('pp-name').value = 'popup_' + name + '_close';
+}
+async function loadPopupRules() {
+  const box = $('pp-rules');
+  try {
+    const r = await (await fetch('api/popup_rules')).json();
+    if (!r.ok) { box.innerHTML = '<div class="pp-empty">规则库读取失败</div>'; return; }
+    renderPopupRules(r.rules || []);
+  } catch (e) { box.innerHTML = '<div class="pp-empty">规则库读取失败：' + esc(String(e)) + '</div>'; }
+}
+function renderPopupRules(rules) {
+  const box = $('pp-rules');
+  if (!rules.length) { box.innerHTML = '<div class="pp-empty">还没有规则——选中弹窗关闭按钮后点「保存」即可登记第一条</div>'; return; }
+  box.innerHTML = rules.map(r => {
+    const loc = r.locator_type + ' · ' + truncate(r.locator_value, 34);
+    const opt = [
+      r.anchor ? '锚点 ' + truncate(r.anchor.value, 22) : '<em>无锚点（谨慎）</em>',
+      '冷却 ' + r.cooldown + 's',
+      r.activity ? '仅 ' + truncate(r.activity, 26) : null,
+    ].filter(Boolean).join(' · ');
+    return '<div class="pp-rule"><div class="pp-rule-main"><b>' + esc(r.name) + '</b>'
+      + '<span>' + esc(loc) + '</span><span class="pp-opt">' + opt + '</span>'
+      + (r.comment ? '<span class="pp-cmt">' + esc(truncate(r.comment, 30)) + '</span>' : '')
+      + '</div><button class="pp-del" data-name="' + esc(r.name) + '" title="删除该规则">×</button></div>';
+  }).join('');
+}
+$('pp-rules').addEventListener('click', async (e) => {
+  const btn = e.target.closest('.pp-del');
+  if (!btn) return;
+  const name = btn.dataset.name;
+  if (!confirm('删除弹窗规则「' + name + '」？执行时将不再自动关闭该弹窗。')) return;
+  const r = await (await fetch('api/delete_popup_rule', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })).json();
+  showToast(r.ok ? '🗑 规则「' + name + '」已删除' : '删除失败：' + r.msg);
+  if (r.ok) renderPopupRules(r.rules || []);
+  showPpResult(r.ok ? '规则 ' + name + ' 已删除' : (r.msg || '删除失败'), r.ok);
+});
+function showPpResult(msg, ok) {
+  const box = $('pp-result');
+  box.className = 'el-result ' + (ok ? 'ok' : 'err');
+  box.textContent = msg;
+}
+async function savePopupRule(continueMode) {
+  const name = $('pp-name').value.trim();
+  const value = $('pp-value').value.trim();
+  if (!name) { showPpResult('规则名不能为空', false); return; }
+  if (!value) { showPpResult('关闭按钮定位值不能为空——请先在截图上点选弹窗的关闭按钮', false); return; }
+  const payload = {
+    name,
+    locator_type: $('pp-type').value,
+    locator_value: value,
+    anchor_type: $('pp-anchor-type').value || '',
+    anchor_value: $('pp-anchor-value').value.trim(),
+    cooldown: parseInt($('pp-cooldown').value, 10) || 2,
+    activity: $('pp-activity').value.trim(),
+    comment: $('pp-comment').value.trim(),
+  };
+  if (payload.anchor_type && !payload.anchor_value) {
+    showPpResult('选了锚点方式但没填锚点定位值——或补齐、或改回「不配锚点」', false);
+    return;
+  }
+  let r;
+  try {
+    r = await (await fetch('api/add_popup_rule', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })).json();
+  } catch (e) { showPpResult('保存失败：' + esc(String(e)), false); return; }
+  if (!r.ok) { showPpResult(r.msg || '保存失败', false); return; }
+  renderPopupRules(r.rules || []);
+  // 保存后立即体检：实查当前页面该关闭按钮是否命中（登记 ≠ 有效，当场验证）
+  let check = '';
+  try {
+    const c = await (await fetch('api/locate_check', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locator_type: payload.locator_type, locator_value: payload.locator_value }),
+    })).json();
+    if (c.ok) check = c.found
+      ? (c.count === 1 ? ' · ✅ 体检：唯一命中' : ' · ⚠️ 体检：命中 ' + c.count + ' 处')
+      : ' · ❌ 体检：当前页面未命中（弹窗不在屏时属正常）';
+  } catch (e) { /* 体检失败不拦截登记 */ }
+  if (continueMode) {
+    showPpResult('✅ 规则 ' + name + ' 已登记' + check + '。可继续登记下一条（在截图上点选下一个关闭按钮）', true);
+  } else {
+    $('modal-mask').style.display = 'none';
+    showToast('🎯 弹窗规则「' + name + '」已登记' + check + ' · 用例执行时被动生效');
+  }
 }
 /* 操作下拉分组渲染（见名知意：基本操作 / 断言 / 长流程·等待与分支） */
 function opTypeOptions() {
@@ -1667,6 +1772,8 @@ async function tempCaseExportZip() {
 async function onSaveElement(continueMode) {
   const purpose = purposeValue();
   if (!purpose) return;
+  // 用途③：登记随机弹窗——写规则库，与元素库/用例三件套完全无关
+  if (purpose === 'popup') { await savePopupRule(continueMode); return; }
   const name = $('el-name').value.trim();
   if (purpose !== 'only') {
     // 防误操作：「写入元素文件」与「目标用例文件」的新建状态必须同步——
