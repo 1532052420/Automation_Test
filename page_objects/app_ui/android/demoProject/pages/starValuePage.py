@@ -177,8 +177,4 @@ class StarValuePage:
         """点击「element_10」"""
         self.appOperator.click(self._elements.element_10)
 
-    def click_Appium_Settings(self):
-        """点击「Appium_Settings」"""
-        self.appOperator.click(self._elements.Appium_Settings)
-
 
