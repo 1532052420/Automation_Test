@@ -936,10 +936,10 @@ async function renderCaseList() {
   $('#clTbody').innerHTML = list.map(c => {
     const reg = c.case;
     const name = reg ? reg.name : c.method;
-    const sub = (reg && reg.description) ? reg.description : (c.file + ' · ' + c.class + ' · ' + c.method);
+    const sub = (reg && reg.description) ? reg.description : '';   // 用例列只显示名称+描述，不显示文件路径
     return '<tr><td><b>' + esc(name) + '</b>' +
       (reg ? '' : ' <span class="proj-status" title="尚未登记到平台，可在「移动项目」时登记">未登记</span>') +
-      '<div class="path">' + esc(sub) + '</div></td>' +
+      (sub ? '<div class="path">' + esc(sub) + '</div>' : '') + '</td>' +
       '<td>' + esc(reg ? (projName(reg.project_id) || '未分组') : '—') + '</td>' +
       '<td>' + (c.step_count || 0) + ' 步<div class="path">' + esc(c.file.split('/').pop()) + '</div></td>' +
       '<td>' + esc((reg && reg.created_by) || '—') + '</td>' +
@@ -1238,7 +1238,8 @@ async function appTestingInit() {
   $('#clSearch').addEventListener('input', renderCaseList);
   $('#clProj').addEventListener('change', renderCaseList);
   $('#btnClRefresh').addEventListener('click', renderCaseList);
-  $('#btnClNew').addEventListener('click', openCnModal);
+  /* 新建用例：跳转元素定位器（截图点选 → 添加测试用例弹窗在定位器内完成） */
+  $('#btnClNew').addEventListener('click', () => { location.href = '/locator'; });
 
   /* ---- 移动用例到项目 弹窗 ---- */
   $('#mvSave').addEventListener('click', () => saveCaseMove().catch(e => toast(e.message, false)));
