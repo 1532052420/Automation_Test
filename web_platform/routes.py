@@ -284,6 +284,31 @@ def api_cases():
     return jsonify({'ok': True, 'tree': scan_case_tree()})
 
 
+@bp.route('/api/cases/cn-name', methods=['POST'])
+def api_case_cn_name():
+    """设置用例文件中文名：写入文件头「# 用例中文名：xxx」——
+    与元素中文名同款映射方案；选择用例面板与元素定位器的用例文件下拉同步显示。cn 留空 = 清除映射。"""
+    d = request.get_json(force=True, silent=True) or {}
+    rel = (d.get('file') or '').strip().replace('\\', '/')
+    cn = (d.get('cn_name') or '').strip()[:60]
+    base = os.path.realpath(BASE_DIR)
+    if not rel.startswith('cases/app_ui') or not os.path.basename(rel).startswith('test_') \
+            or not rel.endswith('.py') or '..' in rel:
+        return jsonify({'ok': False, 'msg': '用例文件不合法'}), 400
+    path = os.path.realpath(os.path.join(base, rel))
+    if not path.startswith(os.path.join(base, 'cases/app_ui')) or not os.path.isfile(path):
+        return jsonify({'ok': False, 'msg': '用例文件不存在'}), 400
+    with open(path, 'r', encoding='utf-8') as f:
+        lines = f.read().splitlines(True)
+    kept = [l for l in lines if not re.match(r'^#\s*用例中文名[：:]', l)]
+    if cn:
+        pos = 1 if kept and kept[0].startswith('# -*-') else 0
+        kept = kept[:pos] + ['# 用例中文名：' + cn + '\n'] + kept[pos:]
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(''.join(kept))
+    return jsonify({'ok': True, 'cn_name': cn})
+
+
 @bp.route('/api/confs')
 def api_confs():
     confs = []

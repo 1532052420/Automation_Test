@@ -397,6 +397,9 @@ def case_files_info():
         if not os.path.exists(p):
             continue
         content = _read(p)
+        # 用例中文名映射（与平台选择用例同源）：文件头「# 用例中文名：xxx」
+        m_cn = re.search(r'^#\s*用例中文名[：:]\s*(.+?)\s*$', content, re.MULTILINE)
+        cn_name = m_cn.group(1).strip() if m_cn else ''
         for cls_name, block in _class_blocks(content):
             methods = re.findall(r'^%sdef (\w+)\(' % IND, block, re.MULTILINE)
             msteps = {}
@@ -408,6 +411,7 @@ def case_files_info():
             page_file, elements_file = resolve_page(page_class)
             infos.append({'file': f, 'class': cls_name, 'methods': methods,
                           'method_steps': msteps,
+                          'cn_name': cn_name,
                           'page_class': page_class, 'page_file': page_file,
                           'elements_file': elements_file,
                           'page_ambiguous': hits if len(hits) > 1 else []})

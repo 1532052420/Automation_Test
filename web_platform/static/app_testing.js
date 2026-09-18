@@ -937,12 +937,16 @@ async function renderCaseList() {
     const reg = c.case;
     const name = reg ? reg.name : c.method;
     const sub = (reg && reg.description) ? reg.description : '';   // 用例列只显示名称+描述，不显示文件路径
-    return '<tr><td><b>' + esc(name) + '</b>' +
+    const file = c.file.split('/').pop();
+    /* 列宽固定（table-layout:fixed），超长内容 .clip 单行截断，title 悬停看全称 */
+    return '<tr><td><div class="clip" title="' + esc(name) + '"><b>' + esc(name) + '</b>' +
       (reg ? '' : ' <span class="proj-status" title="尚未登记到平台，可在「移动项目」时登记">未登记</span>') +
-      (sub ? '<div class="path">' + esc(sub) + '</div>' : '') + '</td>' +
-      '<td>' + esc(reg ? (projName(reg.project_id) || '未分组') : '—') + '</td>' +
-      '<td>' + (c.step_count || 0) + ' 步<div class="path">' + esc(c.file.split('/').pop()) + '</div></td>' +
-      '<td>' + esc((reg && reg.created_by) || '—') + '</td>' +
+      '</div>' +
+      (sub ? '<div class="path clip" title="' + esc(sub) + '">' + esc(sub) + '</div>' : '') + '</td>' +
+      '<td class="clip" title="' + esc(reg ? (projName(reg.project_id) || '未分组') : '—') + '">' +
+      esc(reg ? (projName(reg.project_id) || '未分组') : '—') + '</td>' +
+      '<td>' + (c.step_count || 0) + ' 步<div class="path clip" title="' + esc(file) + '">' + esc(file) + '</div></td>' +
+      '<td class="clip" title="' + esc((reg && reg.created_by) || '—') + '">' + esc((reg && reg.created_by) || '—') + '</td>' +
       '<td>' + (reg ? fmtTs(reg.created_at) : '—') + '</td>' +
       '<td class="ops">' +
       '<button class="mini" data-mvnode="' + esc(c.node) + '">移动项目</button>' +

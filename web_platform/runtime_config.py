@@ -111,7 +111,9 @@ def parse_devices_info(conf_file):
 
 def scan_case_tree(root_dir=None):
     """扫描 root_dir（默认 cases/app_ui）下所有 test_*.py，返回用例树：
-    [{'file': 相对项目根路径, 'class_name': 类名, 'methods': [test_方法名, ...]}]
+    [{'file': 相对项目根路径, 'class_name': 类名, 'methods': [test_方法名, ...],
+      'cn_name': 文件头「# 用例中文名：xxx」映射（无则 ''，元素管理同款中文名方案）,
+      'mtime': 文件更新时间戳, 'method_descs': {方法: docstring 首行（场景描述）}}]
 """
     root = root_dir or CASES_APP_UI_DIR
     tree = []
@@ -133,12 +135,27 @@ def scan_case_tree(root_dir=None):
                 mod = ast.parse(src)
             except SyntaxError:
                 continue
+            m_cn = re.search(r'^#\s*用例中文名[：:]\s*(.+?)\s*$', src, re.MULTILINE)
+            cn_name = m_cn.group(1).strip() if m_cn else ''
+            try:
+                mtime = int(os.path.getmtime(path))
+            except OSError:
+                mtime = 0
             for node in mod.body:
                 if isinstance(node, ast.ClassDef):
-                    methods = [n.name for n in node.body
-                               if isinstance(n, ast.FunctionDef) and n.name.startswith('test_')]
+                    methods, descs = [], {}
+                    for n in node.body:
+                        if isinstance(n, ast.FunctionDef) and n.name.startswith('test_'):
+                            methods.append(n.name)
+                            try:
+                                doc = ast.get_docstring(n)
+                            except Exception:
+                                doc = None
+                            if doc and doc.strip():
+                                descs[n.name] = doc.strip().splitlines()[0][:120]
                     if methods:
-                        tree.append({'file': rel, 'class_name': node.name, 'methods': methods})
+                        tree.append({'file': rel, 'class_name': node.name, 'methods': methods,
+                                     'method_descs': descs, 'cn_name': cn_name, 'mtime': mtime})
     return tree
 
 

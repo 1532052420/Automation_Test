@@ -6,7 +6,7 @@
      esc                       唯一转义函数
      statusBadge               状态徽章（run 大写 / allure 小写归一）
      runStatsHtml / runMetaHtml 任务概要渲染
-     renderCaseTree / setAllChecked / selectedCases  用例树
+     loadCaseSelectPanel / setAllChecked / selectedCases  选择用例列表
      pollTask                  执行面板（Run 状态 + 进度 + 实时日志 + 停止）
      evHtml                    文本证据（接口请求-响应留痕）折叠块
    ------------------------------------------------------------------ */
@@ -226,45 +226,100 @@ async function pollFootStatus() {
   } catch (e) { /* 状态条失败不打断页面 */ }
 }
 
-/* ================= 用例树（执行页 / 接口测试页共用） ================= */
-function renderCaseTree(tree, boxSel, emptyTip) {
-  const box = $(boxSel);
-  if (!box) return;
-  if (!tree || !tree.length) {
-    box.innerHTML = emptyHtml('folder', esc(emptyTip || '没有可执行用例'));
-    return;
-  }
-  let html = '<ul>';
-  tree.forEach(f => {
-    html += '<li data-file="' + esc(f.file) + '"><label class="chk">' +
-      '<input type="checkbox" data-file="' + esc(f.file) + '" class="ck-file">' +
-      '<span class="file">' + esc(f.file.split('/').pop()) + '</span> ' +
-      '<span class="path">' + esc(f.file) + '</span></label><ul>';
-    f.methods.forEach(m => {
-      const node = f.file + '::' + f.class_name + '::' + m;
-      // data-key：小写全文（文件+类+方法），供顶部搜索框过滤
-      const key = (f.file + ' ' + f.class_name + ' ' + m).toLowerCase();
-      html += '<li data-key="' + esc(key) + '"><label class="chk">' +
-        '<input type="checkbox" data-node="' + esc(node) + '" class="ck-node">' +
-        '<span class="cls">' + esc(f.class_name) + '::' + esc(m) + '</span></label></li>';
-    });
-    html += '</ul></li>';
-  });
-  box.innerHTML = html + '</ul>';
+/* ================= 选择用例（testhub 式列表：所属项目筛选 + 搜索 + 命名 + 单执行） =================
+   数据源：/api/cases（scan_case_tree：文件/方法/docstring/中文名映射/mtime）
+         + app_testing 登记实体（node→项目归属，供「所属项目」筛选）。 */
+let _caseRows = [];       // 选择用例表行 [{node, file, cls, method, cn_name, mtime, desc, ent}]
+let _caseCnFile = null;   // 命名弹窗当前操作的用例文件
+
+async function loadCaseSelectPanel() {
+  const [tree, ents, projs] = await Promise.all([
+    api('/api/cases'), api(AT_PREFIX + '/api/cases'), api(AT_PREFIX + '/api/projects')]);
+  const treeList = tree.ok ? tree.tree : [];
+  const entities = ents.ok ? (ents.results || []) : [];
+  const projects = projs.ok ? (projs.results || []) : [];
+  const entByNode = {};
+  entities.forEach(e => { if (e.node) entByNode[e.node] = e; });
+  _caseRows = [];
+  treeList.forEach(f => (f.methods || []).forEach(m => {
+    const node = f.file + '::' + f.class_name + '::' + m;
+    _caseRows.push({ node, file: f.file, cls: f.class_name, method: m,
+                     cn_name: f.cn_name || '', mtime: f.mtime || 0,
+                     desc: (f.method_descs || {})[m] || '', ent: entByNode[node] || null });
+  }));
+  /* 所属项目下拉：全部 / 未登记 / 各项目（数据源 = 项目管理） */
+  const sel = $('#caseProj');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">所属项目：全部</option>' +
+    '<option value="__none__">未登记</option>' +
+    projects.map(p => '<option value="' + p.id + '">' + esc(p.name) + '</option>').join('');
+  if (cur) sel.value = cur;
+  renderCaseTable();
 }
 
-/* 文件级勾选框联动其下全部方法（事件委托；每个容器只绑一次，避免重复渲染后监听器堆积） */
-function bindTreeSync(boxSel) {
-  const box = $(boxSel);
-  if (!box || box.dataset.syncBound) return;
-  box.dataset.syncBound = '1';
-  box.addEventListener('change', (e) => {
-    if (!e.target.classList.contains('ck-file')) return;
-    const prefix = e.target.dataset.file + '::';
-    box.querySelectorAll('input[data-node]').forEach(n => {
-      if (n.dataset.node.startsWith(prefix)) n.checked = e.target.checked;
-    });
+function renderCaseTable() {
+  const kw = ($('#caseSearch').value || '').trim().toLowerCase();
+  const pf = $('#caseProj').value;
+  const list = _caseRows.filter(r => {
+    const reg = r.ent;
+    const inProj = !pf || (pf === '__none__' ? !reg : !!(reg && +reg.project_id === +pf));
+    const hay = [r.method, r.file, r.cls, r.cn_name, reg && reg.name, reg && reg.description];
+    return inProj && (!kw || hay.some(v => String(v || '').toLowerCase().includes(kw)));
   });
+  const fmtDate = ts => {
+    if (!ts) return '-';
+    const d = new Date(ts * 1000), p = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  };
+  $('#caseTbody').innerHTML = list.map(r => {
+    const reg = r.ent;
+    const fileLabel = r.cn_name ? r.cn_name + '（' + r.file.split('/').pop() + '）' : r.file.split('/').pop();
+    return '<tr>' +
+      '<td><input type="checkbox" data-node="' + esc(r.node) + '" class="ck-node"></td>' +
+      '<td><b>' + esc((reg && reg.name) || r.method) + '</b>' +
+        (reg ? '' : ' <span class="proj-status" title="尚未登记到项目，点「命名」旁可先登记归属">未登记</span>') +
+        '<div class="path">' + esc(fileLabel + ' · ' + r.cls) + '</div></td>' +
+      '<td>' + esc((reg && reg.description) || r.desc || '—') + '</td>' +
+      '<td>' + fmtDate(r.mtime) + '</td>' +
+      '<td class="ops"><button class="ghost mini" data-act="cn" data-file="' + esc(r.file) + '" data-cn="' + esc(r.cn_name) + '">命名</button>' +
+      '<button class="mini" data-runone="' + esc(r.node) + '">执行</button></td></tr>';
+  }).join('');
+  $('#caseEmpty').style.display = list.length ? 'none' : '';
+}
+
+function openCaseCnModal(file, cn) {
+  _caseCnFile = file;
+  $('#caseCnFile').textContent = '用例文件：' + file;
+  $('#caseCnInput').value = cn || '';
+  $('#caseCnMask').classList.add('show');
+  $('#caseCnInput').focus();
+}
+
+async function saveCaseCn() {
+  const cn = ($('#caseCnInput').value || '').trim();
+  const d = await postJson('/api/cases/cn-name', { file: _caseCnFile, cn_name: cn });
+  toast(d.ok ? (cn ? '已映射中文名「' + cn + '」，元素定位器同步显示' : '已清除中文名映射') : (d.msg || '保存失败'), !!d.ok);
+  if (d.ok) {
+    $('#caseCnMask').classList.remove('show');
+    await loadCaseSelectPanel();
+  }
+}
+
+/* 单用例执行：走与「开始执行」同一 /api/run（单节点） */
+async function runOneCase(node) {
+  const conf = $('#confSel').value;
+  if (!conf) return toast('请先在「设备配置」确认默认配置来源(conf)', false);
+  const d = await postJson('/api/run', {
+    conf_file: conf, case_nodes: [node],
+    overrides: { udid: $('#inUdid').value.trim(), appPackage: $('#inPackage').value.trim(),
+                 appActivity: $('#inActivity').value.trim() },
+  });
+  if (!d.ok) return toast(d.msg || '执行失败', false);
+  toast('已开始执行 → Run ' + d.run_id, true);
+  document.querySelector('[data-panel="cases"]').click();
+  const execArea = $('#execArea');
+  if (execArea) execArea.style.display = '';
+  pollTask(d.run_id);
 }
 
 function setAllChecked(v, boxSel) {
@@ -481,13 +536,24 @@ async function initRun() {
   initRunPanels();
   await loadExecDefaults();
   await loadRecordingConfig();
-  const tree = await api('/api/cases');
-  renderCaseTree(tree.ok ? tree.tree : [], '#caseTree', 'cases/app_ui 下没有可执行用例');
-  bindTreeSync('#caseTree');
+  await loadCaseSelectPanel();
   $('#btnStart').addEventListener('click', startRun);
   $('#btnStop').addEventListener('click', stopRun);
   $('#btnSelectAll').addEventListener('click', () => setAllChecked(true));
   $('#btnSelectNone').addEventListener('click', () => setAllChecked(false));
+  $('#caseProj').addEventListener('change', renderCaseTable);
+  $('#caseSearch').addEventListener('input', renderCaseTable);
+  $('#btnCaseRefresh').addEventListener('click', loadCaseSelectPanel);
+  $('#caseTbody').addEventListener('click', e => {
+    const cn = e.target.closest('[data-act=cn]'), run = e.target.closest('[data-runone]');
+    if (cn) return openCaseCnModal(cn.dataset.file, cn.dataset.cn);
+    if (run) return runOneCase(run.dataset.runone);
+  });
+  $('#caseCnSave').addEventListener('click', () => saveCaseCn().catch(e => toast(e.message, false)));
+  $('#caseCnCancel').addEventListener('click', () => $('#caseCnMask').classList.remove('show'));
+  $('#caseCnMask').addEventListener('click', e => {
+    if (e.target === e.currentTarget) e.currentTarget.classList.remove('show');
+  });
   $('#confSel').addEventListener('change', () => loadExecDefaults($('#confSel').value));
   $('#btnRecSave').addEventListener('click', saveRecordingConfig);
   initElementsPanel();

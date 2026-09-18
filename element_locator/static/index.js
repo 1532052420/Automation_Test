@@ -1506,10 +1506,14 @@ async function loadCaseFiles() {
   state.caseFiles = r.case_info || [];
   const sel = $('el-case-file');
   const cur = sel.value;
+  /* 用例文件下拉：有中文名映射的显示「中文名（文件名）」（与平台选择用例同步） */
+  const cnMap = {};
+  (state.caseFiles || []).forEach(c => { if (c.cn_name && !cnMap[c.file]) cnMap[c.file] = c.cn_name; });
   const files = [];
   (state.caseFiles || []).forEach(c => { if (files.indexOf(c.file) < 0) files.push(c.file); });
   // 「➕ 新建…」永远在最后：选择后显示 test_ 前缀锁定输入行（保存走「保存测试用例包」）
-  sel.innerHTML = files.map(f => '<option value="' + esc(f) + '">' + esc(f) + '</option>').join('')
+  sel.innerHTML = files.map(f => '<option value="' + esc(f) + '">' +
+    esc(cnMap[f] ? cnMap[f] + '（' + f + '）' : f) + '</option>').join('')
     + '<option value="' + NEW_FILE_OPT + '">➕ 新建用例文件…</option>';
   // 预选优先级：用户处于「新建」模式（含临时用例会话）> 用户已显式选中的有效用例 > 第一个
   if (cur === NEW_FILE_OPT) sel.value = NEW_FILE_OPT;
