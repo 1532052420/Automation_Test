@@ -165,6 +165,7 @@ def api_add_element():
         wait_seconds=wait_seconds,
         comment=(data.get('comment') or '').strip(),
         check_dup=bool(check_dup),
+        cn_name=(data.get('cn_name') or '').strip() or None,
     )
     # 命中重复元素时附带「已被哪些用例使用」，前端复用面板展示（默认直接复用，防元素库膨胀）
     if r.get('duplicate') and not r.get('ok'):

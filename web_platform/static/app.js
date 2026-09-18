@@ -553,16 +553,20 @@ async function loadElements() {
 function renderElements() {
   const kw = ($('#elSearch').value || '').trim().toLowerCase();
   const list = kw ? _elements.filter(e =>
-    [e.name, e.value, e.desc, e.type, e.file].some(v =>
+    [e.name, e.cn_name, e.value, e.desc, e.type, e.file].some(v =>
       String(v || '').toLowerCase().includes(kw))) : _elements;
   const fmtDate = ts => {
     if (!ts) return '-';
     const d = new Date(ts * 1000), p = n => String(n).padStart(2, '0');
     return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
   };
-  $('#elTbody').innerHTML = list.map(e =>
-    '<tr>' +
-    '<td><b>' + esc(e.name) + '</b><br><span class="el-file">' + esc(e.file) + '</span></td>' +
+  $('#elTbody').innerHTML = list.map(e => {
+    /* 名称列：有中文名 → 主行中文、副行代码名；无 → 主行代码名、副行文件名（旧行为） */
+    const nameCell = e.cn_name
+      ? '<b>' + esc(e.cn_name) + '</b><br><span class="el-file">' + esc(e.name) + '</span>'
+      : '<b>' + esc(e.name) + '</b><br><span class="el-file">' + esc(e.file) + '</span>';
+    return '<tr>' +
+    '<td>' + nameCell + '</td>' +
     '<td>' + esc(e.type) + '</td>' +
     '<td>' + esc(e.desc || '-') + '</td>' +
     '<td><span class="el-preview" title="' + esc(e.value) + '">' + esc(e.value) + '</span></td>' +
@@ -572,7 +576,8 @@ function renderElements() {
     '<button class="ghost mini" data-act="edit" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">编辑</button>' +
     '<button class="ghost mini" data-act="copy" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">复制</button>' +
     '<button class="mini danger-ghost" data-act="del" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">删除</button>' +
-    '</div></td></tr>').join('');
+    '</div></td></tr>';
+  }).join('');
   $('#elEmpty').style.display = list.length ? 'none' : '';
 }
 
@@ -590,6 +595,7 @@ function openElModal(mode, name, file) {
   $('#elModalTitle').textContent = mode === 'edit' ? '✎ 编辑元素' : '⧉ 复制元素';
   $('#elMName').value = mode === 'edit' ? (el.name || '') : '';
   $('#elMName').placeholder = mode === 'copy' ? '新元素名称（不能与已有元素同名）' : '';
+  $('#elMCnName').value = mode === 'edit' ? (el.cn_name || '') : '';
   fillSelect($('#elMType'), _elTypes, el.type || 'ID');
   fillSelect($('#elMWait'), _elWaits, el.wait_type || 'VISIBILITY_OF');
   $('#elMValue').value = el.value || '';
@@ -613,6 +619,7 @@ async function saveElModal() {
       file: $('#elMFile').value,
       orig_name: _elModalOrig,
       name: name,
+      cn_name: $('#elMCnName').value.trim(),
       locator_type: $('#elMType').value,
       value: value,
       wait_type: $('#elMWait').value,

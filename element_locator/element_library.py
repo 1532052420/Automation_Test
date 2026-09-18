@@ -69,9 +69,11 @@ def _escape(value):
 DEFAULT_WAIT_SECONDS = 6   # 元素默认显式等待秒数（个别慢页面元素保存时可单独指定更长等待）
 
 
-def element_line(name, locator_type, value, wait_type='VISIBILITY_OF', wait_seconds=None, comment=None):
+def element_line(name, locator_type, value, wait_type='VISIBILITY_OF', wait_seconds=None, comment=None, cn_name=None):
     """wait_seconds：显式等待超时秒数（默认 6，见 DEFAULT_WAIT_SECONDS）；
     comment：元素备注，写在生成行行尾注释（# ...），方便回看元素是什么。
+    cn_name：元素中文名（元素管理/报告的显示名），写进 desc= 参数——
+    CreateElement.create 的 desc 即"元素中文说明"；有中文名时行尾注释为「中文名 · 备注」。
     传正整数时显式写进生成行，所见即所得；不传/非法则用默认 6。"""
     line = '%sself.%s = CreateElement.create(Locator_Type.%s, \'%s\', wait_type=Wait_By.%s' % (
         INDENT, name, locator_type, _escape(value), wait_type)
@@ -83,12 +85,15 @@ def element_line(name, locator_type, value, wait_type='VISIBILITY_OF', wait_seco
         sec = DEFAULT_WAIT_SECONDS
     line += ', wait_seconds=%d' % sec
     comment_text = str(comment).strip() if comment and str(comment).strip() else ''
-    if comment_text:
+    cn_text = str(cn_name).strip() if cn_name and str(cn_name).strip() else ''
+    desc_text = cn_text or comment_text
+    if desc_text:
         # 业务名称：报告步骤/日志优先显示它（appOperator._element_desc 读取）
-        line += ", desc='%s'" % _escape(comment_text)
+        line += ", desc='%s'" % _escape(desc_text)
     line += ')'
-    if comment_text:
-        line += '  # %s' % comment_text.replace('\n', ' ')
+    tail = (cn_text + (' · ' + comment_text if comment_text else '')) if cn_text else comment_text
+    if tail:
+        line += '  # %s' % tail.replace('\n', ' ')
     return line
 
 
@@ -171,7 +176,7 @@ def _write(path, content):
 
 
 def add_element(filename, name, locator_type, value, wait_type='VISIBILITY_OF', wait_seconds=None,
-                comment=None, check_dup=True, elements_dir=None):
+                comment=None, check_dup=True, elements_dir=None, cn_name=None):
     """
     向元素库文件添加/覆盖元素。
     wait_seconds：显式等待超时秒数（None/非法 = 默认 6）。
@@ -197,7 +202,7 @@ def add_element(filename, name, locator_type, value, wait_type='VISIBILITY_OF', 
                            % (dup['name'], dup['filename'])}
 
     path = os.path.join(elements_dir or ELEMENTS_DIR, filename)
-    new_line = element_line(name, locator_type, value, wait_type, wait_seconds, comment)
+    new_line = element_line(name, locator_type, value, wait_type, wait_seconds, comment, cn_name=cn_name)
 
     if not os.path.exists(path):
         # 新建文件

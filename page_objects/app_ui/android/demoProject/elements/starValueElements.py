@@ -22,3 +22,5 @@ class StarValueElements:
         self.element_10 = CreateElement.create(Locator_Type.XPATH, '//*[@class="android.widget.ImageButton"]', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)
         self.Appium_Settings = CreateElement.create(Locator_Type.XPATH, '//*[@text="Appium Settings"]', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)
         self.btnStarlightValue = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/btnStarlightValue', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)
+        self.元素库 = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/ivAudio', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6, desc='元素库')  # 元素库
+        self.这是中文的元素名称 = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/btnCancel', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6, desc='元素备注')  # 元素备注

@@ -181,4 +181,13 @@ class StarValuePage:
         """点击「btnStarlightValue」"""
         self.appOperator.click(self._elements.btnStarlightValue)
 
+    def click_元素库(self):
+        """点击「ivAudio」"""
+        self.appOperator.click(self._elements.元素库)
+
+    def click_这是中文的元素名称(self):
+        """步骤描述"""
+        self.appOperator.click(self._elements.这是中文的元素名称)
+
+
 

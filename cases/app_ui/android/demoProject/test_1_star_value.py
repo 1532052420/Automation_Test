@@ -56,10 +56,12 @@ class Test1StarValue:
         page.click_tvTitle()
         # 点击appBarLayout
         page.click_appBarLayout()
-        # 点击element_10
-        page.click_element_10()
         # 点击btnStarlightValue
         page.click_btnStarlightValue()
+        # 点击元素库
+        page.click_元素库()
+        # 用例备注
+        page.click_这是中文的元素名称()
 
     def test_gift_card_no_response(self):
         page = self.page

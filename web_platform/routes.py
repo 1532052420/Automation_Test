@@ -251,7 +251,8 @@ def api_appui_elements_save():
         wait_type=d.get('wait_type') or 'VISIBILITY_OF',
         wait_seconds=d.get('wait_seconds'),
         desc=d.get('desc') or '',
-        orig_name=(d.get('orig_name') or '').strip() or None)
+        orig_name=(d.get('orig_name') or '').strip() or None,
+        cn_name=(d.get('cn_name') or '').strip() or None)
     return jsonify({'ok': ok, **payload}), (200 if ok else 400)
 
 

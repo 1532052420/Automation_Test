@@ -128,6 +128,8 @@ def list_elements():
             name = m.group('name')
             elements.append({
                 'name': name,
+                # 元素中文名（desc= 参数首段）：元素管理/报告的显示名；旧元素缺省为空
+                'cn_name': (desc.split(' · ')[0].strip() if desc else ''),
                 'type': m.group('type'),
                 'value': _parse_value(m.group('value_str')),
                 'wait_type': wt.group(1) if wt else 'VISIBILITY_OF',
@@ -160,7 +162,7 @@ def delete_element(filename, name):
 
 
 def save_element(filename, name, locator_type, value, wait_type='VISIBILITY_OF',
-                 wait_seconds=None, desc='', orig_name=None):
+                 wait_seconds=None, desc='', orig_name=None, cn_name=None):
     """编辑（同名整行替换 / 改名 = 删旧增新）与复制（落到任意受管元素文件）。
 
     返回 (ok, payload)；payload 携带 duplicate 供前端提示改用已有元素。
@@ -193,7 +195,8 @@ def save_element(filename, name, locator_type, value, wait_type='VISIBILITY_OF',
                         wait_type=wait_type, wait_seconds=wait_seconds,
                         comment=(desc or '').strip() or None,
                         check_dup=not (orig_name == name),
-                        elements_dir=ELEMENTS_DIR)
+                        elements_dir=ELEMENTS_DIR,
+                        cn_name=(cn_name or '').strip() or None)
     except Exception as e:
         return False, {'msg': '写入元素库失败: %s' % e}
     if not r.get('ok'):

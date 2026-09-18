@@ -1000,6 +1000,8 @@ async function openModal() {
   else if (node.text && node.text.trim()) auto = node.text.trim().replace(/\s+/g, '_').slice(0, 20);
   else auto = 'element_' + state.selUid;
   $('el-name').value = auto;
+  // 元素中文名：节点有中文文案时自动预填（元素管理/测试报告的显示名）
+  $('el-cn-name').value = (node.text && /[\u4e00-\u9fa5]/.test(node.text)) ? node.text.trim().slice(0, 20) : '';
   const loc = (!coordPick && selectedLocator()) || { type: 'ID', value: (!coordPick && node['resource-id']) || '' };
   // 定位方式下拉：框架 Locator_Type
   $('el-type').innerHTML = ['ID', 'XPATH', 'ACCESSIBILITY_ID', 'ANDROID_UIAUTOMATOR', 'CLASS_NAME', 'NAME']
@@ -1146,6 +1148,7 @@ async function saveElement(checkDup) {
     wait_type: $('el-wait').value,
     wait_seconds: (isNaN(waitSec) || waitSec < 1) ? '' : waitSec,  // 空 = 沿用框架默认 30
     comment: $('el-comment').value.trim(),                          // 元素备注 → 元素行行尾注释
+    cn_name: $('el-cn-name').value.trim(),                          // 元素中文名 → desc= 参数（元素管理显示名）
     check_dup: checkDup ? 1 : 0,
   };
   if (!payload.name || !payload.value) { showElResult('元素名称和定位值不能为空', false); return null; }
@@ -1413,12 +1416,16 @@ function elementLinePreview() {
   const name = $('el-name').value.trim() || '<元素名>';
   const val = $('el-value').value.trim();
   const sec = parseInt($('el-wait-sec').value, 10);
+  const cn = $('el-cn-name').value.trim();
+  const c = $('el-comment').value.trim();
   let line = "self." + name + " = CreateElement.create(Locator_Type." + $('el-type').value
     + ", '" + escQ(val) + "', wait_type=Wait_By." + $('el-wait').value;
   if (!isNaN(sec) && sec >= 1) line += ", wait_seconds=" + sec;
+  const descText = cn || c;   // desc= 参数：中文名优先，其次备注（与后端 element_line 同规则）
+  if (descText) line += ", desc='" + escQ(descText) + "'";
   line += ')';
-  const c = $('el-comment').value.trim();
-  if (c) line += '  # ' + c;
+  const tail = cn ? (cn + (c ? ' · ' + c : '')) : c;
+  if (tail) line += '  # ' + tail;
   return line;
 }
 /* 用例栏：将插入到目标方法的注释行 + 代码行（注释=步骤描述，留空后端自动生成） */
