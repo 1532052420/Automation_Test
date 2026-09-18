@@ -21,7 +21,7 @@ from flask import Blueprint, jsonify, request
 from web_platform import runner
 from web_platform.app_testing import codegen
 from web_platform.api_testing.yaml_store import YamlStore
-from web_platform.runtime_config import BASE_DIR, list_devices_conf_files
+from web_platform.runtime_config import BASE_DIR, list_devices_conf_files, scan_case_tree
 
 bp = Blueprint('app_testing', __name__, url_prefix='/app-testing')
 
@@ -99,22 +99,28 @@ def _clean_case_body(d, cid=None):
     project_id, err = _clean_project_id(d.get('project_id'))
     if err:
         return None, err
+    node = str(d.get('node') or '').strip()[:300]
     elements_file = (d.get('elements_file') or '').strip()
-    if not elements_file:
+    if not elements_file and not node:
         return None, '请选择元素文件（元素来自元素定位器采集的元素库）'
-    if elements_file not in _element_files():
+    if elements_file and elements_file not in _element_files():
         return None, '元素文件不存在: %s' % elements_file
     steps, err = _clean_steps(d.get('steps'), elements_file)
     if err:
         return None, err
-    return {'name': name[:100],
+    payload = {'name': name[:100],
             'description': (d.get('description') or '').strip()[:500],
             'created_by': (d.get('created_by') or '').strip()[:40],
             'project_id': project_id,
-            'elements_file': elements_file,
+            'elements_file': elements_file or None,
             'app_package': (d.get('app_package') or '').strip()[:120] or None,
             'app_activity': (d.get('app_activity') or '').strip()[:160] or None,
-            'steps': steps}, ''
+            'steps': steps}
+    # 仅登记模式：请求带 node 时原样保留（POST/PUT 不再重复编译生成框架文件），
+    # 供「新建用例弹窗 / 移动到项目」把框架里已有的用例登记回平台（用例列表与项目管理）。
+    if node:
+        payload['node'] = node
+    return payload, ''
 
 
 def _compile_and_store(case):
@@ -245,6 +251,8 @@ def api_cases():
     if err:
         return _bad(err)
     case = cases_store.create(payload)
+    if payload.get('node'):                    # 仅登记模式：用例已在框架文件中，不重复编译
+        return _ok(case=cases_store.get(case['id']))
     node, err = _compile_and_store(case)
     if err:
         cases_store.delete(case['id'])          # 编译失败不落半成品
@@ -271,10 +279,56 @@ def api_case_detail(cid):
     if err:
         return _bad(err)
     updated = cases_store.update(cid, payload)
+    if payload.get('node'):                    # 仅登记模式：只同步信息，不重复编译
+        return _ok(case=cases_store.get(cid))
     node, err = _compile_and_store(updated)
     if err:
         return _bad(err)
     return _ok(case=cases_store.get(cid))
+
+
+@bp.route('/api/cases/<int:cid>/project', methods=['PUT'])
+def api_case_project(cid):
+    """只改用例项目归属（测试用例列表「移动项目」）：不动步骤、不触发编译。"""
+    if not cases_store.get(cid):
+        return _bad('用例不存在', 404)
+    d = request.get_json(force=True, silent=True) or {}
+    project_id, err = _clean_project_id(d.get('project_id'))
+    if err:
+        return _bad(err)
+    return _ok(case=cases_store.update(cid, {'project_id': project_id}))
+
+
+@bp.route('/api/cases/framework')
+def api_cases_framework():
+    """框架 AppUI 测试用例列表（测试用例模块数据源）：cases/app_ui 下每个 test 方法一行，
+    按 node 与平台已登记用例合并——名称/项目/创建人/描述取登记信息，未登记行 case=null。
+    所有行都可直接执行（node 即 pytest 节点），登记不是执行的前置条件。"""
+    reg_by_node = {c['node']: c for c in cases_store.list() if c.get('node')}
+    try:
+        from element_locator.case_generator import case_files_info
+        step_by_method = {(i['file'], i['class'], m): len(v or [])
+                          for i in case_files_info()
+                          for m, v in (i.get('method_steps') or {}).items()}
+    except Exception:
+        step_by_method = {}                    # 定位器子应用不可用时只缺步骤数，不阻塞列表
+    rows = []
+    for item in scan_case_tree():
+        for m in item['methods']:
+            node = '%s::%s::%s' % (item['file'], item['class_name'], m)
+            reg = reg_by_node.get(node)
+            rows.append({
+                'node': node, 'file': item['file'],
+                'class': item['class_name'], 'method': m,
+                'step_count': step_by_method.get((item['file'], item['class_name'], m), 0),
+                'case': {'id': reg['id'], 'name': reg['name'],
+                         'project_id': reg.get('project_id'),
+                         'created_by': reg.get('created_by'),
+                         'description': reg.get('description'),
+                         'created_at': reg.get('created_at')} if reg else None,
+            })
+    rows.sort(key=lambda r: r['node'])
+    return _ok(results=rows)
 
 
 @bp.route('/api/cases/<int:cid>/run', methods=['POST'])

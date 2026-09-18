@@ -198,7 +198,7 @@
       <!-- 测试用例（testhub TestCaseList 移植）：编排用例实体列表 -->
       <section class="panel" id="panel-caselist" hidden>
         <div class="card">
-          <h3>测试用例 <span class="muted">编排保存的用例实体，可反复执行或继续编排</span></h3>
+          <h3>测试用例 <span class="muted">框架 cases/app_ui 全部测试用例 · 可执行 / 移动到项目 · 已登记可编排</span></h3>
           <div class="treebar">
             <select id="clProj" style="max-width:170px" title="按项目筛选"><option value="">全部项目</option></select>
             <input type="search" id="clSearch" placeholder="搜索用例名称 / 描述 / 创建人">
@@ -213,7 +213,7 @@
               <tbody id="clTbody"></tbody>
             </table>
           </div>
-          <div id="clEmpty" class="empty" style="display:none">还没有测试用例 —— 点「＋ 新建用例」从设备截图拾取元素快速创建，或到「用例编排」串步骤</div>
+          <div id="clEmpty" class="empty" style="display:none">框架里还没有 AppUI 测试用例 —— 用上方「＋ 新建用例」从设备截图录制，或到元素定位器保存用例包</div>
         </div>
       </section>
 
@@ -384,6 +384,23 @@
     <div class="mops mt"><button id="pjdClose">关闭</button></div>
   </div>
 </div>
+<!-- 移动用例到项目 弹窗（已登记 = 只改归属；未登记 = 顺带登记到平台，框架文件不动） -->
+<div class="mask" id="caseMoveMask">
+  <div class="modal envmodal">
+    <h4 id="mvTitle">移动用例到项目</h4>
+    <p class="muted" id="mvWho" style="font-size:12px; margin:4px 0 10px; word-break:break-all"></p>
+    <div class="fields" style="grid-template-columns:1fr 1fr">
+      <div class="field wide"><label>移动到项目</label><select id="mvProj"></select></div>
+      <div class="field" id="mvNameWrap" style="display:none"><label>登记用例名称</label><input type="text" id="mvName" placeholder="默认取方法名，可改"></div>
+      <div class="field" id="mvByWrap" style="display:none"><label>创建人</label><input type="text" id="mvBy" placeholder="你的名字（可选）"></div>
+    </div>
+    <p class="muted" style="font-size:11px" id="mvHint">未登记的框架用例会在移动时自动登记（只登记信息，不动框架文件）</p>
+    <div class="mops mt">
+      <button class="ghost" id="mvCancel">取消</button>
+      <button id="mvSave">确定</button>
+    </div>
+  </div>
+</div>
 <!-- 新建用例 弹窗（测试用例模块 · 三栏：左 设备截图可缩放 · 中 元素坐标定位 · 右 元素+用例+页面操作；底部右下角固定 取消/保存） -->
 <div class="mask" id="caseNewMask">
   <div class="modal cnew-modal">
@@ -395,6 +412,16 @@
         <button class="ghost mini" id="btnCnZoomIn" title="放大">＋</button>
         <button class="ghost mini" id="btnCnZoomReset" title="恢复默认大小">适应</button>
         <button class="mini" id="btnCnShot">从设备截图</button>
+      </div>
+    </div>
+    <!-- ④ 项目登记条（弹窗顶部）：填了用例名称才登记到用例列表与项目管理，留空只写框架代码 -->
+    <div style="flex:0 0 auto; display:flex; gap:14px; align-items:flex-end; padding:8px 0; border-bottom:1px dashed var(--line-soft)">
+      <div style="flex:0 0 auto; font-size:13px; font-weight:700; padding-bottom:8px">④ 项目 <span class="muted" style="font-weight:400">登记到测试用例列表与项目管理 · 名称留空则不登记</span></div>
+      <div class="fields" style="flex:1; grid-template-columns:1.1fr .9fr .8fr 1.4fr; gap:10px">
+        <div class="field"><label>用例名称</label><input type="text" id="cnRegName" placeholder="如：快歌登录"></div>
+        <div class="field"><label>项目</label><select id="cnRegProj"></select></div>
+        <div class="field"><label>创建人</label><input type="text" id="cnRegBy" placeholder="你的名字"></div>
+        <div class="field"><label>描述</label><input type="text" id="cnRegDesc" placeholder="用例说明（可选）"></div>
       </div>
     </div>
     <div class="cnew-body">
@@ -416,14 +443,9 @@
           <button class="ghost mini" id="btnCnApply" style="width:100%">回显到右侧表单 →</button>
         </div>
       </div>
-      <!-- 右：元素 + 用例 + 页面操作（完全照搬定位器「添加测试用例」，横改竖） -->
+      <!-- 右：元素 + 用例 + 页面操作（照搬定位器添加用例弹窗，横改竖；④ 项目登记在弹窗顶部） -->
       <div class="cnright">
-        <div class="cn-purpose">
-          <span class="muted">保存到哪一步：</span>
-          <label class="chk"><input type="radio" name="cnPurpose" value="only"> ① 仅元素</label>
-          <label class="chk"><input type="radio" name="cnPurpose" value="all" checked> ② 元素 + 用例 + 操作（推荐）</label>
-        </div>
-        <div class="cn-col-title mt">① 元素 <span class="muted">入库必需</span></div>
+        <div class="cn-col-title">① 元素 <span class="muted">入库必需</span></div>
         <div class="fields" style="grid-template-columns:1fr 1fr">
           <div class="field"><label>元素名称</label><input type="text" id="cnElName" placeholder="如：登录按钮"></div>
           <div class="field"><label>定位方式</label><select id="cnElLocType"></select></div>

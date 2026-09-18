@@ -85,6 +85,8 @@ function fillProjectSelects() {
   fill($('#suMProj'), [{ v: '', t: '— 未分组 —' }].concat(projOpts));
   fill($('#clProj'), [{ v: '', t: '全部项目' }, { v: 'none', t: '未分组' }].concat(projOpts));
   fill($('#suiteProj'), [{ v: '', t: '全部项目' }, { v: 'none', t: '未分组' }].concat(projOpts));
+  fill($('#cnRegProj'), [{ v: '', t: '— 未分组 —' }].concat(projOpts));   // 新建用例弹窗 ④ 项目
+  fill($('#mvProj'), [{ v: '', t: '— 未分组 —' }].concat(projOpts));      // 移动用例到项目弹窗
 }
 
 function matchProj(item, filterVal) {
@@ -225,12 +227,6 @@ const CN_NEW_FILE = '__new__';
 const cnEscQ = (s) => String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 function cnCapFirst(s) { s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 function cnCapCamel(s) { return String(s || '').split('_').filter(Boolean).map(cnCapFirst).join(''); }
-function cnPurpose() { const r = document.querySelector('input[name=cnPurpose]:checked'); return r ? r.value : 'all'; }
-function cnSyncPurpose() {
-  const only = cnPurpose() === 'only';
-  $('#cnSecCase').style.display = only ? 'none' : '';
-  $('#cnSecOp').style.display = only ? 'none' : '';
-}
 function cnIsNewCase() { return $('#cnCaseFile').value === CN_NEW_FILE; }
 function cnNewCaseBase() { return ($('#cnCaseNew').value || '').trim().replace(/[^A-Za-z0-9_]/g, '_'); }
 function cnElemFileNameNew() {
@@ -348,8 +344,7 @@ function openCnModal() {
     '<option value="' + t + '">' + STEP_META[t].label + '</option>').join('');
   $('#cnPageFile').value = '';
   $('#cnCaseComment').value = '';
-  document.querySelector('input[name=cnPurpose][value=all]').checked = true;
-  cnSyncPurpose();
+  $('#cnRegName').value = ''; $('#cnRegBy').value = ''; $('#cnRegDesc').value = ''; $('#cnRegProj').value = '';
   syncCnParam();
   renderCnMethodSteps();
   $('#caseNewMask').classList.add('show');
@@ -425,7 +420,7 @@ function cnPick(e) {
   $('#cnBounds').value = b.join(', ');
   const cands = (best.locators || []).filter(l => l.value);
   $('#cnLocator').innerHTML = cands.map((l, i) =>
-    '<option value="' + i + '">' + esc((l.desc || l.locator_type) + '：' + String(l.value).slice(0, 42)) + '</option>').join('') ||
+    '<option value="' + i + '">' + esc(l.desc || l.locator_type) + '</option>').join('') ||
     '<option value="">（该节点无可用定位）</option>';
   $('#cnLocVal').value = cands[0] ? cands[0].value : '';
   cnApply();                                    // 点中即回显到右侧表单
@@ -544,7 +539,6 @@ function renderCnMethodSteps() {
 
 /* ---------------- 写入：元素入库 + 用例行追加 + 页面方法生成（三件套一次完成） ---------------- */
 async function writeCnStep() {
-  const purpose = cnPurpose();
   const name = ($('#cnElName').value || '').trim();
   const locType = ($('#cnElLocType').value || '').trim();
   const locVal = ($('#cnElLocVal').value || '').trim();
@@ -552,7 +546,7 @@ async function writeCnStep() {
   if (!locVal) return toast('请先点击截图中的元素回显定位，或手填定位值', false);
   const type = $('#cnStepType').value;
   const meta = STEP_META[type] || {};
-  if (purpose === 'all' && meta.el === false) return toast('该操作不需要元素，请改用「用例编排」面板添加', false);
+  if (meta.el === false) return toast('该操作不需要元素，请改用「用例编排」面板添加', false);
   const param = $('#cnStepParam').style.display !== 'none' ? $('#cnStepParam').value.trim() : '';
   const desc = $('#cnStepDesc').value.trim() || cnGenDesc(type, name, param);
   /* 1) 元素入库（等待方式/时间/备注一并写入；命中重复定位自动复用已有元素） */
@@ -570,20 +564,15 @@ async function writeCnStep() {
   } else if (!el.ok) {
     return toast('元素入库失败：' + (el.msg || '未知错误'), false);
   }
-  /* 2a) 用途①仅元素：到此为止 */
-  if (purpose === 'only') {
-    toast('元素「' + elemNameUsed + '」已入库', true);
-    $('#cnElName').value = ''; $('#cnElLocVal').value = '';
-    return;
-  }
   const descUsed = desc === cnGenDesc(type, name, param) ? cnGenDesc(type, elemNameUsed, param) : desc;
-  /* 2b) 新建用例文件：临时三件套打包入库（与定位器「保存并继续」同语义） */
+  /* 2a) 新建用例文件：临时三件套打包入库（与定位器「保存并继续」同语义） */
   if (cnIsNewCase()) {
     const base = cnNewCaseBase();
     if (!base) return toast('请填写新用例名', false);
     const tc = _cnTemp = (_cnTemp || { steps: [] });
     tc.base = base;
     tc.steps.push({
+      type, param,                               // 结构化字段：④ 项目登记回填 steps 用
       comment: ($('#cnCaseComment').value || '').trim() || descUsed,
       line: cnPreviewLine({ type, element: elemNameUsed, param }),
       elemName: elemNameUsed, elemLine: cnElementLine().replace('self.' + name + ' ', 'self.' + elemNameUsed + ' '),
@@ -601,9 +590,10 @@ async function writeCnStep() {
     $('#cnCaseFile').value = 'test_' + base + '.py';
     onCnCaseChange();
     $('#cnStepDesc').value = ''; $('#cnStepParam').value = '';
+    await cnRegister();                        // ④ 已填用例名称则登记到用例列表与项目管理
     return;
   }
-  /* 2c) 已有用例文件：操作行追加 + 页面方法生成（与定位器同一接口） */
+  /* 2b) 已有用例文件：操作行追加 + 页面方法生成（与定位器同一接口） */
   const caseFile = $('#cnCaseFile').value, method = $('#cnCaseMethod').value;
   if (!caseFile || !method) return toast('请选择目标用例文件与测试方法', false);
   const pos = +$('#cnInsertPos').value || null;
@@ -621,6 +611,33 @@ async function writeCnStep() {
   renderCnMethodSteps();
   $('#cnStepDesc').value = ''; $('#cnStepParam').value = '';
   toast('已写入第 ' + (at + 1) + ' 步 → ' + caseFile + ' · ' + method, true);
+  await cnRegister();                          // ④ 已填用例名称则登记到用例列表与项目管理
+}
+
+/* ④ 项目登记：把已写入框架文件的用例登记回平台（用例列表 + 项目管理 case_count/详情）。
+   用例名称留空 = 不登记；带 node 走后端仅登记模式（不重复编译生成框架文件）；
+   按 node 幂等：已登记 → PUT 更新，未登记 → POST 新建。
+   步骤回填：仅本会话新建的用例文件回填结构化 steps（追加已有文件的已有步骤无法结构化还原，置空）。 */
+async function cnRegister() {
+  const name = ($('#cnRegName').value || '').trim();
+  const method = $('#cnCaseMethod').value;
+  if (!name || !_cnCaseSel || !method) return null;
+  const node = 'cases/app_ui/android/demoProject/' + _cnCaseSel.file + '::' + _cnCaseSel.class + '::' + method;
+  const body = { name,
+    description: ($('#cnRegDesc').value || '').trim(),
+    created_by: ($('#cnRegBy').value || '').trim(),
+    project_id: $('#cnRegProj').value || '',
+    elements_file: _cnCaseSel.elements_file || currentCnElemFile(),
+    node };
+  if (_cnTemp && _cnCaseSel.file === 'test_' + _cnTemp.base + '.py')
+    body.steps = _cnTemp.steps.map(s => ({ type: s.type, element: s.elemName, param: s.param || '', desc: s.comment }));
+  const prev = _cases.find(c => c.node === node);
+  const d = prev ? await api(AT_PREFIX + '/api/cases/' + prev.id, { method: 'PUT', body: JSON.stringify(body) })
+    : await postJson(AT_PREFIX + '/api/cases', body);
+  if (!d.ok) { toast('用例登记失败：' + (d.msg || '未知错误'), false); return null; }
+  await renderCaseList();                      // 用例列表即时可见
+  await loadProjects();                        // 项目管理用例数即时可见
+  return d.case;
 }
 
 function currentCnElemFile() {
@@ -702,10 +719,14 @@ function cnTempFiles(tc) {
   ];
 }
 
-function cnFinish() {
+async function cnFinish() {
   const n = _cnWritten;
   $('#caseNewMask').classList.remove('show');
-  toast(n ? '本次共写入 ' + n + ' 步，已入库框架文件' : '未写入任何步骤', n > 0);
+  if (!n && !($('#cnRegName').value || '').trim()) return toast('未写入任何步骤', false);
+  /* 兜底登记：用户往往录完步骤才填 ④ 项目；已登记过则走 PUT 更新（幂等） */
+  const c = await cnRegister();
+  if (c) toast('本次共写入 ' + n + ' 步，用例「' + c.name + '」已登记到用例列表与项目管理', true);
+  else if (n) toast('本次共写入 ' + n + ' 步，已入库框架文件（④ 用例名称为空或未选目标用例，未登记）', true);
 }
 
 /* ================= 用例编排（SceneBuilder：顶栏 + 三栏） ================= */
@@ -893,26 +914,43 @@ async function runOrchCase() {
   toast('用例已开始执行 → Run ' + d.run_id + '，进度见「测试报告」面板', true);
 }
 
-/* ================= 测试用例列表（TestCaseList） ================= */
+/* ================= 测试用例列表（数据源：框架 cases/app_ui 测试用例 + 平台登记信息按 node 合并） ================= */
+let _fwCases = [];        // 框架用例行 [{node, file, class, method, step_count, case|null}]
+let _mvNode = null;       // 移动到项目弹窗当前操作的框架用例 node
+
 async function renderCaseList() {
-  const d = await api(AT_PREFIX + '/api/cases');
-  if (!d.ok) return toast(d.msg || '用例加载失败', false);
-  _cases = d.results || [];
+  const [fd, cd] = await Promise.all([
+    api(AT_PREFIX + '/api/cases/framework'), api(AT_PREFIX + '/api/cases')]);
+  if (!fd.ok) return toast(fd.msg || '框架用例加载失败', false);
+  _fwCases = fd.results || [];
+  _cases = cd.ok ? (cd.results || []) : [];    // 编排/套件面板仍用登记实体
   const kw = ($('#clSearch').value || '').trim().toLowerCase();
   const pf = $('#clProj') ? $('#clProj').value : '';
-  const list = _cases.filter(c => matchProj(c, pf) &&
-    (!kw || [c.name, c.description, c.created_by].some(v => String(v || '').toLowerCase().includes(kw))));
+  const list = _fwCases.filter(c => {
+    const reg = c.case;
+    const inProj = !pf || (pf === 'none' ? !(reg && reg.project_id) : !!(reg && +reg.project_id === +pf));
+    const hay = [c.file, c.class, c.method, reg && reg.name, reg && reg.description, reg && reg.created_by];
+    return inProj && (!kw || hay.some(v => String(v || '').toLowerCase().includes(kw)));
+  });
   $('#clEmpty').style.display = list.length ? 'none' : '';
-  $('#clTbody').innerHTML = list.map(c =>
-    '<tr><td><b>' + esc(c.name) + '</b>' +
-    (c.description ? '<div class="path">' + esc(c.description) + '</div>' : '') + '</td>' +
-    '<td>' + esc(projName(c.project_id) || '未分组') + '</td>' +
-    '<td>' + (c.steps || []).length + ' 步<div class="path">' + esc(c.elements_file || '') + '</div></td>' +
-    '<td>' + esc(c.created_by || '—') + '</td>' +
-    '<td>' + fmtTs(c.created_at) + '</td>' +
-    '<td class="ops"><button class="mini" data-orch="' + c.id + '">编排</button>' +
-    '<button class="ghost mini" data-run="' + c.id + '">执行</button>' +
-    '<button class="danger mini" data-del="' + c.id + '">删除</button></td></tr>').join('');
+  $('#clTbody').innerHTML = list.map(c => {
+    const reg = c.case;
+    const name = reg ? reg.name : c.method;
+    const sub = (reg && reg.description) ? reg.description : (c.file + ' · ' + c.class + ' · ' + c.method);
+    return '<tr><td><b>' + esc(name) + '</b>' +
+      (reg ? '' : ' <span class="proj-status" title="尚未登记到平台，可在「移动项目」时登记">未登记</span>') +
+      '<div class="path">' + esc(sub) + '</div></td>' +
+      '<td>' + esc(reg ? (projName(reg.project_id) || '未分组') : '—') + '</td>' +
+      '<td>' + (c.step_count || 0) + ' 步<div class="path">' + esc(c.file.split('/').pop()) + '</div></td>' +
+      '<td>' + esc((reg && reg.created_by) || '—') + '</td>' +
+      '<td>' + (reg ? fmtTs(reg.created_at) : '—') + '</td>' +
+      '<td class="ops">' +
+      '<button class="mini" data-mvnode="' + esc(c.node) + '">移动项目</button>' +
+      '<button class="ghost mini" data-runnode="' + esc(c.node) + '">执行</button>' +
+      (reg ? '<button class="mini" data-orch="' + reg.id + '">编排</button>' +
+             '<button class="danger mini" data-del="' + reg.id + '">删除</button>' : '') +
+      '</td></tr>';
+  }).join('');
 }
 
 function goOrch(cid) {
@@ -921,10 +959,50 @@ function goOrch(cid) {
   selectOrchCase(cid);
 }
 
-async function runCaseById(cid) {
-  const d = await postJson(AT_PREFIX + '/api/cases/' + cid + '/run', _runBody());
+async function runCaseByNode(node) {
+  /* 框架用例直接按 pytest 节点执行（登记不是执行的前置条件），执行配置与套件共用 */
+  const d = await postJson('/api/run', Object.assign(_runBody(), { case_nodes: [node] }));
   if (!d.ok) return toast(d.msg || '执行失败', false);
   toast('用例已开始执行 → Run ' + d.run_id + '，进度见「测试报告」面板', true);
+}
+
+/* ---- 移动用例到项目：已登记 = 只改归属；未登记 = 移动时顺带登记（仅登记模式，不动框架文件） ---- */
+function openCaseMove(node) {
+  _mvNode = node;
+  const row = _fwCases.find(c => c.node === node);
+  const reg = row && row.case;
+  $('#mvWho').textContent = row ? (row.file + ' · ' + row.class + ' · ' + row.method) : node;
+  $('#mvProj').value = reg && reg.project_id ? reg.project_id : '';
+  $('#mvNameWrap').style.display = reg ? 'none' : '';
+  $('#mvByWrap').style.display = reg ? 'none' : '';
+  if (!reg) {
+    const base = (row.file.split('/').pop() || '').replace(/^test_/, '').replace(/\.py$/, '');
+    $('#mvName').value = row.method.replace(/^test_/, '') || base;
+    $('#mvBy').value = '';
+  }
+  $('#caseMoveMask').classList.add('show');
+}
+
+async function saveCaseMove() {
+  if (!_mvNode) return;
+  const row = _fwCases.find(c => c.node === _mvNode);
+  const projVal = $('#mvProj').value || '';
+  let d;
+  if (row && row.case) {
+    d = await api(AT_PREFIX + '/api/cases/' + row.case.id + '/project',
+      { method: 'PUT', body: JSON.stringify({ project_id: projVal }) });
+  } else {
+    const name = ($('#mvName').value || '').trim();
+    if (!name) return toast('请填写登记用例名称', false);
+    d = await postJson(AT_PREFIX + '/api/cases', {
+      name, created_by: ($('#mvBy').value || '').trim(),
+      project_id: projVal, node: _mvNode });
+  }
+  if (!d.ok) return toast(d.msg || '保存失败', false);
+  $('#caseMoveMask').classList.remove('show');
+  toast('已移动到「' + (projName(projVal) || '未分组') + '」', true);
+  await renderCaseList();
+  await loadProjects();                        // 项目管理用例数同步刷新
 }
 
 /* ================= 测试套件（SuiteList：配置卡 + 表格 + 双栏弹窗 + 历史） ================= */
@@ -1162,6 +1240,13 @@ async function appTestingInit() {
   $('#btnClRefresh').addEventListener('click', renderCaseList);
   $('#btnClNew').addEventListener('click', openCnModal);
 
+  /* ---- 移动用例到项目 弹窗 ---- */
+  $('#mvSave').addEventListener('click', () => saveCaseMove().catch(e => toast(e.message, false)));
+  $('#mvCancel').addEventListener('click', () => $('#caseMoveMask').classList.remove('show'));
+  $('#caseMoveMask').addEventListener('click', e => {
+    if (e.target === e.currentTarget) e.currentTarget.classList.remove('show');
+  });
+
   /* ---- 新建用例弹窗（三栏：截图缩放拾取 / 元素坐标定位 / 表单） ---- */
   $('#btnCnShot').addEventListener('click', cnShot);
   $('#btnCnZoomIn').addEventListener('click', () => cnZoom(15));
@@ -1179,8 +1264,6 @@ async function appTestingInit() {
   });
   $('#btnCnApply').addEventListener('click', cnApply);
   $('#cnStepType').addEventListener('change', syncCnParam);
-  document.querySelectorAll('input[name=cnPurpose]').forEach(r =>
-    r.addEventListener('change', cnSyncPurpose));
   $('#cnElemFile').addEventListener('change', () => {
     $('#cnElemFileNewWrap').style.display = $('#cnElemFile').value === CN_NEW_FILE ? '' : 'none';
   });
@@ -1193,10 +1276,11 @@ async function appTestingInit() {
     if (e.target === e.currentTarget) e.currentTarget.classList.remove('show');
   });
   $('#clTbody').addEventListener('click', async e => {
-    const orch = e.target.closest('[data-orch]'), run = e.target.closest('[data-run]'),
-          del = e.target.closest('[data-del]');
+    const mv = e.target.closest('[data-mvnode]'), run = e.target.closest('[data-runnode]'),
+          orch = e.target.closest('[data-orch]'), del = e.target.closest('[data-del]');
+    if (mv) return openCaseMove(mv.dataset.mvnode);
+    if (run) return runCaseByNode(run.dataset.runnode);
     if (orch) return goOrch(+orch.dataset.orch);
-    if (run) return runCaseById(+run.dataset.run);
     if (del) {
       const ok = await confirmModal('删除用例', '确定删除该用例？引用它的套件会同步移除该用例，生成的页面/用例文件也会一并清理。', true);
       if (!ok) return;
