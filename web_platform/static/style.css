@@ -879,9 +879,12 @@ html.night ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, .26
 /* 项目状态徽章（对齐 testhub 项目管理列表的「进行中」样式） */
 .proj-status { display: inline-block; padding: 2px 10px; border-radius: 999px; background: var(--brand-tint); color: var(--brand); font-size: 11.5px; white-space: nowrap; }
 
-/* 测试用例列表：固定列宽（内容再长，列位置不位移）+ 单元格超长单行截断（省略号，悬停 title 看全称） */
+/* 测试用例列表：六列等宽（table-layout:fixed 平分，内容再长列位置不位移）+ 单元格超长单行截断（省略号，悬停 title 看全称） */
 #panel-caselist table { table-layout: fixed; }
+#panel-caselist th, #panel-caselist td { padding: 12px 8px; }
 #panel-caselist td { overflow: hidden; }
+#panel-caselist td.ops { white-space: normal; }   /* 操作列按钮等宽列下放不下就换行，不截断 */
+#panel-caselist td.ops .mini { margin: 3px 6px 3px 0; }   /* 覆盖全局 10px 左间距，换行后行首不缩进 */
 #panel-caselist .clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .a-hint { font-size: 11.5px; color: var(--muted2); flex: 0 0 auto; white-space: nowrap; padding-left: 2px; }
 

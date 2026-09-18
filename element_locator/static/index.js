@@ -203,7 +203,7 @@ async function init() {
   });
   $('el-file-new').addEventListener('input', updatePreview);
   // 「保存测试用例包」弹窗按钮
-  // 三栏字段变动 → 三个示例代码区实时刷新
+  // 三栏字段变动 → 示例代码区实时刷新
   ['el-name', 'el-value', 'el-comment', 'el-case-comment'].forEach(id => $(id).addEventListener('input', updatePreview));
   $('el-op-comment').addEventListener('input', () => { opCommentAuto = false; updatePreview(); });
   $('el-wait').addEventListener('change', updatePreview);
@@ -1410,7 +1410,7 @@ function targetPageInfo() {
   const info = (state.caseFiles || []).find(c => c.file === f && c.page_file);
   return info || null;
 }
-/* ---- 三个实时预览：元素代码 / 用例代码 / 页面方法代码（与后端生成规则保持一致） ---- */
+/* ---- 两个实时预览：元素代码 / 页面方法代码（与后端生成规则保持一致） ---- */
 /* 元素栏：将写入元素库的那一行 */
 function elementLinePreview() {
   const name = $('el-name').value.trim() || '<元素名>';
@@ -1427,12 +1427,6 @@ function elementLinePreview() {
   const tail = cn ? (cn + (c ? ' · ' + c : '')) : c;
   if (tail) line += '  # ' + tail;
   return line;
-}
-/* 用例栏：将插入到目标方法的注释行 + 代码行（注释=步骤描述，留空后端自动生成） */
-function caseLinesPreview(step) {
-  const c = $('el-case-comment').value.trim();
-  const desc = c || genStepDesc(step);
-  return '# ' + desc + '\n' + previewLine(step);
 }
 /* 操作栏：选③时将生成到页面文件的页面方法（镜像后端 page_method_code） */
 function probeBodyLines(el, secondsVar) {
@@ -1489,13 +1483,11 @@ function updatePreview() {
   };
   // 步骤列表的「本步」描述跟随类型/参数/描述实时刷新（避免列表里还挂着旧类型文案）
   if (p !== 'only') renderStepsList(currentSteps());
-  // 用例代码 / 页面方法：按用途显示
+  // 页面方法：按用途显示（用例实时代码预览已移除）
   if (p === 'only') {
-    $('el-code-case').textContent = '';
     $('el-code-preview').textContent = '';
     return;
   }
-  $('el-code-case').textContent = caseLinesPreview(step);
   if (p === 'all') $('el-code-preview').textContent = pageMethodPreview(step);
   else $('el-code-preview').textContent = '（② 不生成页面方法；目标页面须已存在同名方法）';
 }
