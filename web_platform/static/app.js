@@ -112,7 +112,7 @@ function toast(msg, ok = true) {
   el.className = ok ? 'ok' : 'bad';
   el.classList.add('show');
   clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 3000);   // 提示居中展示，3 秒消失
 }
 
 /* 自绘确认模态（替代原生 confirm）；页面没有模态骨架时退回原生 confirm */
@@ -133,10 +133,11 @@ function confirmModal(title, msg, danger) {
   });
 }
 
-/* ================= 顶部全局导航（Apple globalnav 风格，全站共用） =================
-   导航项与结构来自共用的 nav.js（元素定位器也用它），样式来自共用的 nav.css；
-   这里只负责平台特有的右侧状态条（设备 / Appium / 更新日志入口）。 */
-function renderSidebar(active) {
+/* ================= 顶部全局导航（面包屑路径，全站共用） =================
+   导航结构来自共用的 nav.js（元素定位器也用它），样式来自共用的 nav.css；
+   顶部显示「首页 / 当前页面 / 当前面板」面包屑：只有首页可点击，二三级纯文本；
+   这里负责平台右侧状态条（设备 / Appium / 更新日志入口）与三级路径联动。 */
+function renderSidebar(active, sub) {
   const nav = $('#sidebar');
   if (!nav) return;
   PlatformNav.render(nav, active,
@@ -144,11 +145,16 @@ function renderSidebar(active) {
     '<span><i class="dot ok" id="dotDevice"></i>设备 <span id="footDevice">…</span></span>' +
     '<span><i class="dot ok" id="dotAppium"></i>Appium <span id="footAppium">…</span></span>' +
     '<button class="ghost mini" id="btnChangelog" title="查看各版本更新时间与变更内容">更新日志 v<span id="clVer">…</span></button>' +
-    '</div>');
+    '</div>', sub);
   const clBtn = $('#btnChangelog');
   if (clBtn) clBtn.addEventListener('click', showChangelog);
   pollFootStatus();
   setInterval(pollFootStatus, 10000);
+}
+
+/* 更新顶部面包屑第三级（各页面切面板时调用；导航未渲染时静默跳过） */
+function setCrumbSub(sub) {
+  if (window.PlatformNav) PlatformNav.setSub($('#sidebar'), sub);
 }
 
 /* ================= 更新日志（右上角入口） ================= */
@@ -472,10 +478,20 @@ async function initRun() {
   initElementsPanel();
   adminPanelInit();   // 用例管理面板（原独立模块并入，绑定见 admin.js）
   appTestingInit();   // 用例编排 / 测试套件面板（绑定见 app_testing.js）
+  // 测试报告面板（原一级模块并入）：首次进入才加载 iframe，避免每次进 /run 都拉报告数据
+  const reportLink = document.querySelector('[data-panel="report"]');
+  if (reportLink) reportLink.addEventListener('click', () => {
+    if (!$('#reportFrame').src) $('#reportFrame').src = '/report';
+  });
 }
 
 /* ---------------- 左侧二级菜单：hash 深链 + 记住上次所在面板 ---------------- */
-const RUN_PANELS = ['elements', 'exec', 'rec', 'cases', 'orch', 'suites', 'admin'];
+const RUN_PANELS = ['projects', 'elements', 'cases', 'caselist', 'orch', 'suites', 'report', 'admin', 'exec'];
+/* 面板名 → 顶部面包屑第三级文案 */
+const RUN_PANEL_NAMES = {
+  projects: '项目管理', elements: '元素管理', cases: '选择用例', caselist: '测试用例',
+  orch: '用例编排', suites: '测试套件', report: '测试报告', admin: '用例管理', exec: '设备配置',
+};
 function showRunPanel(name) {
   if (!RUN_PANELS.includes(name)) name = 'exec';
   RUN_PANELS.forEach(p => {
@@ -484,6 +500,7 @@ function showRunPanel(name) {
   });
   document.querySelectorAll('#subnav a').forEach(a =>
     a.classList.toggle('on', a.dataset.panel === name));
+  setCrumbSub(RUN_PANEL_NAMES[name]);
   try { localStorage.setItem('appui_panel', name); } catch (e) { /* 隐私模式忽略 */ }
 }
 function initRunPanels() {
@@ -714,7 +731,7 @@ async function startRun() {
 let _detailTimer = null;
 
 async function initRunDetail() {
-  renderSidebar('/run');
+  renderSidebar('/run', '执行详情');
   await renderRunDetail('#detailBody', document.body.dataset.runId);
 }
 

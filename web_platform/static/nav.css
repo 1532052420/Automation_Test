@@ -50,19 +50,21 @@ html.night {
   background: linear-gradient(160deg, #0a84ff, #0071e3);
   color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px;
 }
-.gnav nav {
-  display: flex; align-items: center; gap: 2px; flex: 1 1 auto;
-  overflow-x: auto; scrollbar-width: none;
+/* 面包屑路径：首页可点击（hover 胶囊反馈），二级/三级为纯文本不可点 */
+.gnav nav.crumbs {
+  display: flex; align-items: center; gap: 8px; flex: 1 1 auto;
+  overflow: hidden; white-space: nowrap;
 }
-.gnav nav::-webkit-scrollbar { display: none; }
-.gnav nav a {
-  display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto;
-  padding: 6px 12px; border-radius: 980px;
-  font-size: 13px; color: var(--nav-ink2); white-space: nowrap; text-decoration: none;
+.gnav .crumb { font-size: 13px; color: var(--nav-muted); flex: 0 0 auto; }
+.gnav .crumb.cur { color: var(--nav-ink); font-weight: 500; }
+.gnav .crumb.sub { color: var(--nav-ink2); }
+.gnav .crumb-sep { color: var(--nav-muted); opacity: .5; flex: 0 0 auto; }
+.gnav a.crumb-home {
+  color: var(--nav-ink2); text-decoration: none;
+  padding: 4px 10px; border-radius: 980px;
   transition: background .18s ease, color .18s ease;
 }
-.gnav nav a:hover { background: var(--nav-hover); color: var(--nav-ink); }
-.gnav nav a.on { background: var(--nav-on-bg); color: var(--nav-on-ink); font-weight: 500; }
+.gnav a.crumb-home:hover { background: var(--nav-hover); color: var(--nav-ink); }
 .gnav .foot {
   display: flex; align-items: center; gap: 14px; flex: 0 0 auto;
   font-size: 12px; color: var(--nav-muted);

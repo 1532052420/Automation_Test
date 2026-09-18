@@ -137,6 +137,38 @@ class TestSendRequest:
         assert hist['error_message'] or hist['status_code']
         assert hist['executed_by'] == 'test'
 
+    def test_params_list_format_enabled_flag(self, monkeypatch):
+        """params 新数组格式 [{key,value,description,enabled}]：只发启用项，description 不入参；
+        旧对象格式仍兼容"""
+        captured = {}
+
+        class _FakeResp:
+            status_code = 200
+            headers = {'content-type': 'application/json'}
+            elapsed = None
+            text = '{}'
+            def json(self): return {}
+
+        class _FakeSession:
+            def request(self, **kw):
+                captured.update(kw)
+                return _FakeResp()
+
+        monkeypatch.setattr(executor, '_session_for', lambda url: _FakeSession())
+        req = {'method': 'GET', 'url': 'http://127.0.0.1:9/x', 'headers': [], 'body': None,
+               'assertions': [],
+               'params': [
+                   {'key': 'a', 'value': '1', 'description': '页码', 'enabled': True},
+                   {'key': 'b', 'value': '2', 'description': '停用项', 'enabled': False},
+               ]}
+        executor.send_request(req, None, {})
+        assert captured['params'] == {'a': '1'}          # 停用项不发，描述不进 query
+        # 旧 dict 格式
+        req2 = dict(req, params={'k': 'v'})
+        captured.clear()
+        executor.send_request(req2, None, {})
+        assert captured['params'] == {'k': 'v'}
+
 
 # ---------------- 路由（CRUD + mock + 调度闭环） ----------------
 class TestRoutes:

@@ -14,40 +14,6 @@ function adminApi(url, opts) {
   });
 }
 
-function fmtDate(ts) {
-  if (!ts) return '-';
-  const d = new Date(ts * 1000);
-  const p = n => String(n).padStart(2, '0');
-  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
-}
-
-/* ---------------- 上传（含覆盖确认 + 自动备份） ---------------- */
-async function adminUpload(force) {
-  const fileInput = $('#upFile');
-  if (!fileInput.files.length) return toast('请选择文件', false);
-  const fd = new FormData();
-  fd.append('kind', $('#upKind').value);
-  fd.append('subdir', $('#upSubdir').value.trim());
-  fd.append('uploader', $('#upUploader').value.trim() || 'admin');
-  fd.append('force', force ? 'true' : 'false');
-  fd.append('file', fileInput.files[0]);
-  const d = await adminApi('/api/admin/upload', {method: 'POST', body: fd});
-  if (d.needToken) { $('#authCard').style.display = ''; return toast('请先输入访问口令', false); }
-
-  if (d.exists) {
-    // 同名覆盖确认：展示原上传人与修改时间，确认后自动备份
-    const m = d.meta || {};
-    const yes = await confirmModal('覆盖同名文件',
-      '该文件已存在，原上传人：' + (m.uploader || '框架') +
-      '，修改时间：' + fmtDate(m.modify_time) +
-      '。确认将覆盖旧文件，系统自动备份历史版本。', true);
-    if (yes) { $('#btnUpload').textContent = '上传中…'; await adminUpload(true); $('#btnUpload').textContent = '上传'; }
-    return;
-  }
-  toast(d.msg || (d.ok ? '上传成功' : '上传失败'), d.ok);
-  if (d.ok) fileInput.value = '';
-}
-
 /* ---------------- 用例包（zip）入库：三件套一次性写入 ---------------- */
 async function adminUploadPackage() {
   const fileInput = $('#upPkgFile');

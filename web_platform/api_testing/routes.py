@@ -8,17 +8,20 @@
 另内置 /api-testing/mock/* 回显服务，作为自测/demo 的被测目标（离线可用）。
 字段名与 testhub 模型保持同名，持久化走 YAML 存储层。
 """
+import os
 import time
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, send_file
 
 from web_platform.api_testing import yaml_store as store
 from web_platform.api_testing import executor, scheduler
+from web_platform.api_testing import media_assertions
 
 bp = Blueprint('api_testing', __name__, url_prefix='/api-testing')
 
 HTTP_METHODS = ('GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS')
-ASSERTION_TYPES = ('status_code', 'response_time', 'contains', 'json_path', 'header', 'equals')
+# 断言类型清单不在本层维护：普通类型见 executor.execute_assertions，
+# 音视频类型见 executor.MEDIA_ASSERT_TYPES（实现见 media_assertions.py）。
 
 
 def _body():
@@ -557,3 +560,78 @@ def mock_slow():
     ms = min(5000, max(0, int(request.args.get('ms', 500))))
     time.sleep(ms / 1000.0)
     return jsonify({'ok': True, 'slept_ms': ms})
+
+
+# 1 秒 440Hz 正弦波 WAV（标准库生成，进程内缓存字节）—— 音视频断言演示用
+_media_wav_cache = None
+
+def _mock_media_wav():
+    """生成带有效声音的 WAV（非静音）：8kHz 采样、1 秒、440Hz 正弦、振幅 0.4"""
+    global _media_wav_cache
+    if _media_wav_cache is None:
+        import io
+        import math
+        import struct
+        import wave
+        rate, seconds, amp = 8000, 1.0, 0.4
+        buf = io.BytesIO()
+        with wave.open(buf, 'wb') as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(rate)
+            frames = b''.join(struct.pack('<h', int(amp * 32767 *
+                                          math.sin(2 * math.pi * 440 * i / rate)))
+                              for i in range(int(rate * seconds)))
+            w.writeframes(frames)
+        _media_wav_cache = buf.getvalue()
+    return _media_wav_cache
+
+
+@bp.route('/mock/media.wav', methods=['GET'])
+def mock_media_wav():
+    """返回 1 秒 440Hz 正弦 WAV：供「音频声音检测」断言演示与联测"""
+    import io
+    return send_file(io.BytesIO(_mock_media_wav()), mimetype='audio/wav')
+
+
+# 1 秒 320x240 带音轨 MP4（ffmpeg 现场合成，进程内缓存）—— 视频属性断言演示用
+_video_mp4_cache = None
+
+
+def _mock_media_video():
+    """生成 320x240 / 1 秒 / 带 AC 音轨的 MP4（H.264），分辨率与时长固定便于断言"""
+    global _video_mp4_cache
+    if _video_mp4_cache is None:
+        import subprocess
+        import tempfile
+        fd, path = tempfile.mkstemp(suffix='.mp4', prefix='mockvideo_')
+        os.close(fd)
+        cmd = [
+            media_assertions.FFMPEG, '-y', '-v', 'error',
+            '-f', 'lavfi', '-i', 'testsrc=size=320x240:rate=10:duration=1',
+            '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1',
+            '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p',
+            '-c:a', 'aac', '-shortest', path,
+        ]
+        try:
+            subprocess.run(cmd, capture_output=True, timeout=60, check=True)
+            with open(path, 'rb') as f:
+                _video_mp4_cache = f.read()
+        except Exception:
+            _video_mp4_cache = None
+        finally:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+    return _video_mp4_cache
+
+
+@bp.route('/mock/media.mp4', methods=['GET'])
+def mock_media_video():
+    """返回 320x240 / 1 秒 / 带音轨的 MP4：供「音视频检测」分辨率、时长、码率断言演示"""
+    import io
+    data = _mock_media_video()
+    if not data:
+        return jsonify({'ok': False, 'msg': '生成演示视频失败（需要可用的 ffmpeg）'}), 500
+    return send_file(io.BytesIO(data), mimetype='video/mp4')

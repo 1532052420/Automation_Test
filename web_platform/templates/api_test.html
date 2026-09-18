@@ -4,31 +4,37 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>接口测试 · 自动化测试平台</title>
-<script src="/static/theme.js"></script>
-<link rel="stylesheet" href="/static/nav.css">
-<link rel="stylesheet" href="/static/style.css">
+<script src="/assets/{{ asset_v }}/theme.js"></script>
+<link rel="stylesheet" href="/assets/{{ asset_v }}/nav.css">
+<link rel="stylesheet" href="/assets/{{ asset_v }}/style.css">
 </head>
 <body data-page="api-test">
 <header class="gnav" id="sidebar"></header>
 <main>
-  <div class="pagehead">
-    <h1>接口测试</h1>
-    <p class="sub">接口管理 · 调试执行 · 测试套件 · 定时任务 · 环境变量 —— 用例数据统一 YAML 存储（预留数据库迁移）。</p>
-  </div>
+  <!-- 布局与 AppUI 自动化页一致：左侧二级菜单 + 右侧面板区（testhub 二级导航样式） -->
+  <div class="runlayout">
+    <aside class="subnav" id="subnav">
+      <div class="subnav-label">接口测试</div>
+      <a href="#overview" data-panel="overview" data-icon="chart" class="on">概览</a>
+      <a href="#requests" data-panel="requests" data-icon="flask">接口管理</a>
+      <a href="#suites" data-panel="suites" data-icon="layers">测试套件</a>
+      <a href="#tasks" data-panel="tasks" data-icon="doc">定时任务</a>
+      <a href="#envs" data-panel="envs" data-icon="gear">环境与通知</a>
+    </aside>
 
-  <!-- 统计条 -->
-  <div class="stats" id="dashStats"></div>
+    <div class="submain">
 
-  <!-- 标签页 -->
-  <div class="apitabs" id="apitabs">
-    <a data-tab="requests" class="on">接口管理</a>
-    <a data-tab="suites">测试套件</a>
-    <a data-tab="tasks">定时任务</a>
-    <a data-tab="envs">环境与通知</a>
-  </div>
+      <!-- ============ 概览 ============ -->
+      <section class="panel" id="panel-overview">
+        <div class="pagehead">
+          <h1>接口测试</h1>
+          <p class="sub">接口管理 · 调试执行 · 测试套件 · 定时任务 · 环境变量 —— 用例数据统一 YAML 存储（预留数据库迁移）。</p>
+        </div>
+        <div class="stats" id="dashStats"></div>
+      </section>
 
-  <!-- ============ 接口管理 ============ -->
-  <section id="tab-requests">
+      <!-- ============ 接口管理 ============ -->
+      <section class="panel" id="panel-requests" hidden>
     <div class="apilayout">
       <div class="card apitree">
         <div class="cardhead">
@@ -44,79 +50,92 @@
       </div>
       <div class="apiedit">
         <div class="card" id="reqEditor" style="display:none">
-          <div class="cardhead">
-            <h3 id="reqTitle">接口</h3>
-            <div class="ops">
-              <button class="ghost mini" id="btnReqHistory">执行历史</button>
-              <button id="btnReqSave">保存</button>
-              <button class="mini" id="btnReqSend" style="background:var(--ok);color:#fff">发送</button>
+          <!-- 调试栏（testhub 同款：方式 + 集合 + URL + 发送） -->
+          <div class="debugbar">
+            <select id="reqMethod" title="请求方式"></select>
+            <select id="reqCollection" title="所属集合"></select>
+            <input type="text" id="reqUrl" placeholder="输入请求URL（支持 {{变量}} 与 ${函数}）">
+            <button id="btnReqSend">发送</button>
+          </div>
+          <!-- 名称行（testhub 同款：接口名称 + 保存 / 导入 / 生成代码） -->
+          <div class="namebar">
+            <input type="text" id="reqName" placeholder="请输入接口名称">
+            <button class="ghost mini" id="btnReqSave">保存</button>
+            <button class="ghost mini" id="btnReqImport">导入</button>
+            <button class="ghost mini" id="btnReqCode">生成代码</button>
+          </div>
+
+          <!-- 参数 Tab（testhub 同款：Params / Headers / 请求体 / 断言 / 执行历史） -->
+          <div class="reqtabs">
+            <a data-rtab="params" class="on">Params</a>
+            <a data-rtab="headers">Headers</a>
+            <a data-rtab="body">请求体</a>
+            <a data-rtab="asserts">断言</a>
+            <a data-rtab="history">执行历史</a>
+          </div>
+
+          <div class="rtabpane" id="rtab-params">
+            <div class="kvtable">
+              <div class="kvhead"><span></span><span>Key</span><span>Value</span><span>描述</span><span></span></div>
+              <div id="reqParams"></div>
             </div>
+            <button class="ghost mini mt" id="btnAddParam">+ 添加</button>
           </div>
-          <div class="fields" style="grid-template-columns:130px 1fr">
-            <div class="field"><label>方式</label><select id="reqMethod"></select></div>
-            <div class="field"><label>地址（支持 {{变量}} 与 ${函数}）</label>
-              <input type="text" id="reqUrl" placeholder="http://127.0.0.1:8080/api-testing/mock/echo"></div>
+
+          <div class="rtabpane" id="rtab-headers" hidden>
+            <div class="kvtable">
+              <div class="kvhead"><span></span><span>Key</span><span>Value</span><span>描述</span><span></span></div>
+              <div id="reqHeaders"></div>
+            </div>
+            <button class="ghost mini mt" id="btnAddHeader">+ 添加</button>
           </div>
-          <div class="field mt"><label>名称</label><input type="text" id="reqName" placeholder="接口名称"></div>
 
-          <details class="adv mt" open>
-            <summary>请求头 / 查询参数</summary>
-            <div class="mt" id="reqHeaders"></div>
-            <button class="ghost mini mt" id="btnAddHeader">+ 请求头</button>
-            <div class="mt" id="reqParams"></div>
-            <button class="ghost mini mt" id="btnAddParam">+ 查询参数</button>
-          </details>
-
-          <details class="adv mt">
-            <summary>请求体</summary>
-            <div class="fields mt" style="grid-template-columns:180px 1fr">
+          <div class="rtabpane" id="rtab-body" hidden>
+            <div class="fields" style="grid-template-columns:180px 1fr">
               <div class="field"><label>类型</label>
                 <select id="reqBodyType">
                   <option value="none">无</option><option value="json">JSON</option>
                   <option value="raw">Raw</option><option value="form-data">Form-Data</option>
                   <option value="x-www-form-urlencoded">x-www-form-urlencoded</option>
                 </select></div>
-              <div class="field"><label>内容</label><textarea id="reqBody" rows="5"
+              <div class="field"><label>内容</label><textarea id="reqBody" rows="7"
                 placeholder='{"username": "admin"}'></textarea></div>
             </div>
-          </details>
+          </div>
 
-          <details class="adv mt">
-            <summary>断言</summary>
-            <div class="mt" id="reqAssertions"></div>
-            <button class="ghost mini mt" id="btnAddAssertion">+ 断言</button>
-          </details>
+          <div class="rtabpane" id="rtab-asserts" hidden>
+            <div id="reqAssertions"></div>
+            <button class="ghost mini mt" id="btnAddAssertion">+ 添加断言</button>
+          </div>
+
+          <div class="rtabpane" id="rtab-history" hidden>
+            <div class="tblwrap"><table><thead><tr>
+              <th>时间</th><th>状态码</th><th>耗时(ms)</th><th>断言</th><th>错误</th>
+            </tr></thead><tbody id="histTbody"><tr><td colspan="5" class="empty">打开接口后自动加载</td></tr></tbody></table></div>
+          </div>
+
+          <div class="card resp-inline" id="respArea" style="display:none">
+            <div class="cardhead">
+              <h3>响应</h3>
+              <div class="meta">
+                <span>状态 <b id="respStatus">-</b></span>
+                <span>耗时 <b id="respTime">-</b></span>
+                <span id="respAssertSummary"></span>
+              </div>
+            </div>
+            <pre class="logbox" id="respBody" style="height:auto;max-height:320px">-</pre>
+            <div id="respAssertions" class="mt"></div>
+          </div>
         </div>
         <div class="card" id="reqWelcome">
           <div class="empty">从左侧选择一个接口，或「新建接口」开始调试</div>
-        </div>
-
-        <div class="card" id="respArea" style="display:none">
-          <div class="cardhead">
-            <h3>响应</h3>
-            <div class="meta">
-              <span>状态 <b id="respStatus">-</b></span>
-              <span>耗时 <b id="respTime">-</b></span>
-              <span id="respAssertSummary"></span>
-            </div>
-          </div>
-          <pre class="logbox" id="respBody" style="height:auto;max-height:320px">-</pre>
-          <div id="respAssertions" class="mt"></div>
-        </div>
-
-        <div class="card" id="histArea" style="display:none">
-          <div class="cardhead"><h3>执行历史</h3>
-            <div class="ops"><button class="ghost mini" id="btnHistClose">收起</button></div></div>
-          <div class="tblwrap"><table><thead><tr>
-            <th>时间</th><th>状态码</th><th>耗时(ms)</th><th>断言</th><th>错误</th>
-          </tr></thead><tbody id="histTbody"></tbody></table></div>
         </div>
       </div>
     </div>
   </section>
 
   <!-- ============ 测试套件 ============ -->
-  <section id="tab-suites" hidden>
+  <section class="panel" id="panel-suites" hidden>
     <div class="card">
       <div class="cardhead">
         <h3>测试套件</h3>
@@ -154,7 +173,7 @@
   </section>
 
   <!-- ============ 定时任务 ============ -->
-  <section id="tab-tasks" hidden>
+  <section class="panel" id="panel-tasks" hidden>
     <div class="card">
       <div class="cardhead">
         <h3>定时任务</h3>
@@ -176,7 +195,7 @@
   </section>
 
   <!-- ============ 环境与通知 ============ -->
-  <section id="tab-envs" hidden>
+  <section class="panel" id="panel-envs" hidden>
     <div class="card">
       <div class="cardhead">
         <h3>环境变量</h3>
@@ -206,6 +225,9 @@
       </div>
     </div>
   </section>
+
+    </div>
+  </div>
 </main>
 
 <div id="toast"></div>
@@ -225,8 +247,8 @@
   </div>
 </div>
 
-<script src="/static/nav.js"></script>
-<script src="/static/app.js"></script>
-<script src="/static/api_testing.js"></script>
+<script src="/assets/{{ asset_v }}/nav.js"></script>
+<script src="/assets/{{ asset_v }}/app.js"></script>
+<script src="/assets/{{ asset_v }}/api_testing.js"></script>
 </body>
 </html>

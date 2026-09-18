@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>首页 · 自动化测试平台</title>
-<script src="/static/theme.js"></script>
-<link rel="stylesheet" href="/static/nav.css">
-<link rel="stylesheet" href="/static/style.css">
+<script src="/assets/{{ asset_v }}/theme.js"></script>
+<link rel="stylesheet" href="/assets/{{ asset_v }}/nav.css">
+<link rel="stylesheet" href="/assets/{{ asset_v }}/style.css">
 </head>
 <body data-page="index">
 <header class="gnav" id="sidebar"></header>
@@ -21,19 +21,13 @@
       <a class="nav-card" href="/run">
         <div class="card-icon icon-blue"><span class="ico" data-ico="target"></span></div>
         <h3>AppUI 自动化</h3>
-        <p>元素管理 · 执行配置 · 录屏配置与用例执行</p>
+        <p>项目管理 · 元素管理 · 设备配置与用例执行</p>
       </a>
 
       <a class="nav-card" href="/api-test">
         <div class="card-icon icon-green"><span class="ico" data-ico="flask"></span></div>
         <h3>接口测试</h3>
         <p>接口用例执行与环境管理，请求响应全程留痕</p>
-      </a>
-
-      <a class="nav-card" href="/report">
-        <div class="card-icon icon-indigo"><span class="ico" data-ico="chart"></span></div>
-        <h3>测试报告</h3>
-        <p>执行总览与按 run 独立的 Allure 报告</p>
       </a>
 
       <a class="nav-card" href="/locator">
@@ -51,7 +45,7 @@
   </div>
 </main>
 <div id="toast"></div>
-<script src="/static/nav.js"></script>
-<script src="/static/app.js"></script>
+<script src="/assets/{{ asset_v }}/nav.js"></script>
+<script src="/assets/{{ asset_v }}/app.js"></script>
 </body>
 </html>

@@ -13,7 +13,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-from flask import Flask
+from flask import Flask, send_from_directory
 
 from web_platform.runtime_config import BASE_DIR, WebPlatformConfig
 
@@ -35,6 +35,22 @@ app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 def _no_cache(resp):
     resp.headers['Cache-Control'] = 'no-store'
     return resp
+
+
+# 静态资源版本化：模板用 /assets/<版本>/xxx.js 引用（版本号取自 changelog）。
+# 中间层/企业代理常忽略 Cache-Control 甚至忽略 query 参数做路径级缓存，
+# no-store 拦不住；把版本编进路径，发版即新 URL，彻底绕开陈旧缓存。
+from web_platform.changelog import APP_VERSION as _ASSET_VER   # noqa: E402
+
+
+@app.route('/assets/<ver>/<path:filename>')
+def versioned_static(ver, filename):
+    return send_from_directory(app.static_folder, filename)
+
+
+@app.context_processor
+def _inject_asset_ver():
+    return {'asset_v': _ASSET_VER}
 
 
 from web_platform.routes import bp as platform_bp

@@ -41,6 +41,8 @@ const AT = (function () {
   function openForm(title, bodyHtml, onSave) {
     $('#fmTitle').textContent = title;
     $('#fmBody').innerHTML = bodyHtml;
+    $('#fmCancel').style.display = '';            // 复位：展示型弹窗会隐藏取消/改保存文案
+    $('#fmSave').textContent = '保存';
     $('#formMask').classList.add('show');
     fmSave = onSave;
   }
@@ -71,10 +73,18 @@ const AT = (function () {
     } catch (e) { /* 统计失败不打断 */ }
   }
 
-  /* ---------------- 标签页 ---------------- */
+  /* ---------------- 二级菜单（左侧：概览/接口管理/测试套件/定时任务/环境与通知） ---------------- */
+  const PANELS = ['overview', 'requests', 'suites', 'tasks', 'envs'];
+  /* 面板名 → 顶部面包屑第三级文案 */
+  const PANEL_NAMES = { overview: '概览', requests: '接口管理', suites: '测试套件', tasks: '定时任务', envs: '环境与通知' };
   function switchTab(name) {
-    document.querySelectorAll('#apitabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === name));
-    ['requests', 'suites', 'tasks', 'envs'].forEach(t => { $('#tab-' + t).hidden = (t !== name); });
+    if (PANELS.indexOf(name) < 0) name = 'requests';
+    document.querySelectorAll('#subnav a').forEach(a =>
+      a.classList.toggle('on', a.dataset.panel === name));
+    PANELS.forEach(t => { const el = $('#panel-' + t); if (el) el.hidden = (t !== name); });
+    if (window.setCrumbSub) setCrumbSub(PANEL_NAMES[name]);
+    try { localStorage.setItem('apitest_panel', name); } catch (e) { /* 隐私模式忽略 */ }
+    history.replaceState(null, '', '#' + name);
   }
 
   /* ---------------- 接口管理：树 ---------------- */
@@ -120,17 +130,22 @@ const AT = (function () {
   function currentReq() { return state.requests.find(r => r.id === state.selReqId); }
 
   /* ---------------- 请求编辑器 ---------------- */
-  const kvRow = (k, v, en) =>
-    `<div class="kvrow"><input type="text" class="k" placeholder="Key" value="${esc(k)}">` +
+  /* testhub Params/Headers 同款表格行：启用勾选 + Key + Value + 描述 + 删除 */
+  const kvRow = (k, v, en, desc) =>
+    `<div class="kvrow"><input type="checkbox" class="en" title="启用" ${en === false ? '' : 'checked'}>` +
+    `<input type="text" class="k" placeholder="Key" value="${esc(k)}">` +
     `<input type="text" class="v" placeholder="Value" value="${esc(v)}">` +
-    `<input type="checkbox" class="en" ${en === false ? '' : 'checked'}>` +
+    `<input type="text" class="d" placeholder="描述（仅备注）" value="${esc(desc == null ? '' : desc)}">` +
     `<button type="button" class="kv-del" title="删除">×</button></div>`;
 
   function readKv(container) {
     const out = [];
     container.querySelectorAll('.kvrow').forEach(row => {
       const k = row.querySelector('.k').value.trim();
-      if (k) out.push({ key: k, value: row.querySelector('.v').value, enabled: row.querySelector('.en').checked });
+      /* Key 为空的行丢弃；启用勾选必须生效（此前版本勾选被忽略——已修） */
+      if (k) out.push({ key: k, value: row.querySelector('.v').value,
+                        description: row.querySelector('.d').value.trim(),
+                        enabled: row.querySelector('.en').checked });
     });
     return out;
   }
@@ -138,48 +153,129 @@ const AT = (function () {
   const ASSERT_TYPES = [
     ['status_code', '状态码 ='], ['contains', '包含文本'], ['json_path', 'JSONPath'],
     ['header', '响应头'], ['equals', '正文等于'], ['response_time', '响应时间≤ms'],
+    ['media_check', '音视频检测（格式/时长/有无声音/分辨率）'],
   ];
+  const MEDIA_TYPES = ['media_check', 'media_video', 'media_audio', 'media_volume', 'media_stream'];
   const assertRow = (a) => {
     a = a || {};
-    const extras = { json_path: a.json_path || '', header_name: a.header_name || '' };
-    return `<div class="assertrow">` +
+    if (MEDIA_TYPES.indexOf(a.type) >= 0) {
+      // 一个音视频断言行：选对象（音频/视频）+ 格式 + 时长 + 有无声音；视频多一个分辨率。
+      // 旧数据（media_video / media_audio / media_volume / media_stream）打开时归一成 media_check。
+      const isVideo = a.type === 'media_video' || a.type === 'media_stream'
+        ? ((a.media_type || '') !== 'audio')
+        : (a.type === 'media_check' && (a.media_type || '') === 'video');
+      const rng = (mn, mx) => (mn != null || mx != null)
+        ? [mn == null ? '' : mn, mx == null ? '' : mx].join('-') : '';
+      const dur = rng(a.duration_min, a.duration_max);
+      const sound = a.type === 'media_volume' ? (a.expected == null ? '-40' : a.expected)
+        : (a.sound_threshold == null ? '' : a.sound_threshold);
+      return `<div class="assertrow assertrow-media" data-type="media_check">` +
+        `<select class="a-type">${ASSERT_TYPES.map(x =>
+          `<option value="${x[0]}" ${x[0] === 'media_check' ? 'selected' : ''}>${x[1]}</option>`).join('')}</select>` +
+        `<select class="a-media" title="检测音频还是视频">${[['audio', '音频'], ['video', '视频']].map(x =>
+          `<option value="${x[0]}" ${x[0] === (isVideo ? 'video' : 'audio') ? 'selected' : ''}>${x[1]}</option>`).join('')}</select>` +
+        `<input type="text" class="a-expected" placeholder="格式，如 h264 / aac（可空）" value="${esc(a.codec || '')}">` +
+        `<input type="text" class="a-extra1" placeholder="时长范围 秒，如 0.5-30（可空）" value="${esc(dur)}">` +
+        `<input type="text" class="a-res" placeholder="分辨率，如 1280x720（仅视频）" value="${esc(a.resolution || '')}" ${isVideo ? '' : 'disabled'}>` +
+        `<input type="text" class="a-sound" placeholder="有无声音：静音阈值 dB，如 -40（可空=不检测）" value="${esc(sound)}">` +
+        `<input type="text" class="a-br" placeholder="码率 kbps，如 200-2000（可空）" value="${esc(rng(a.bitrate_min, a.bitrate_max))}">` +
+        `<span class="a-hint">留空 = 不检查</span>` +
+        `<button type="button" class="kv-del" title="删除">×</button></div>`;
+    }
+    return `<div class="assertrow" data-type="${a.type || 'status_code'}">` +
       `<select class="a-type">${ASSERT_TYPES.map(t =>
         `<option value="${t[0]}" ${a.type === t[0] ? 'selected' : ''}>${t[1]}</option>`).join('')}</select>` +
-      `<input type="text" class="a-extra1" placeholder="JSONPath / 头名（按类型）" value="${esc(a.type === 'header' ? extras.header_name : extras.json_path)}">` +
+      `<input type="text" class="a-extra1" placeholder="JSONPath / 头名（按类型）" value="${esc(a.type === 'header' ? (a.header_name || '') : (a.json_path || ''))}">` +
       `<input type="text" class="a-expected" placeholder="期望值" value="${esc(a.expected == null ? '' : a.expected)}">` +
       `<button type="button" class="kv-del" title="删除">×</button></div>`;
   };
-  function readAssertions() {
-    return Array.from($('#reqAssertions').querySelectorAll('.assertrow')).map(row => {
-      const type = row.querySelector('.a-type').value;
-      const extra = row.querySelector('.a-extra1').value.trim();
-      const expected = row.querySelector('.a-expected').value;
-      const a = { name: type, type, expected: expected };
-      if (type === 'json_path') a.json_path = extra;
-      if (type === 'header') { a.header_name = extra; a.expected_value = expected; }
+  function readRow(row) {
+    // data-type 是这一行"当前渲染结构"对应的类型：切换类型时 select 已变，
+    // 必须按原类型解析旧字段，否则会去读新类型才有的输入框（null.value 报错）
+    const type = row.dataset.type || row.querySelector('.a-type').value;
+    if (MEDIA_TYPES.indexOf(type) >= 0) {
+      // 统一落成 media_check（旧类型打开即归一，保存时完成迁移）
+      const mediaType = row.querySelector('.a-media').value;
+      const a = { name: 'media_check', type: 'media_check', media_type: mediaType };
+      const codec = row.querySelector('.a-expected').value.trim();
+      if (codec) a.codec = codec;
+      const dur = row.querySelector('.a-extra1').value.trim();
+      if (dur) {
+        const [mn, mx] = dur.split('-');
+        if (mn) a.duration_min = mn;
+        if (mx) a.duration_max = mx;
+      }
+      if (mediaType === 'video') {                    // 音频跳过分辨率
+        const res = row.querySelector('.a-res').value.trim();
+        if (res) a.resolution = res;
+      }
+      const sound = row.querySelector('.a-sound').value.trim();
+      if (sound) a.sound_threshold = sound;
+      const br = row.querySelector('.a-br').value.trim();
+      if (br) {
+        const [lo, hi] = br.split('-');
+        if (lo) a.bitrate_min = lo;
+        if (hi) a.bitrate_max = hi;
+      }
       return a;
+    }
+    const extra = row.querySelector('.a-extra1').value.trim();
+    const expected = row.querySelector('.a-expected').value;
+    const a = { name: type, type, expected: expected };
+    if (type === 'json_path') a.json_path = extra;
+    if (type === 'header') { a.header_name = extra; a.expected_value = expected; }
+    return a;
+  }
+  function readAssertions() {
+    return Array.from($('#reqAssertions').querySelectorAll('.assertrow')).map(readRow);
+  }
+
+  /* ---------------- 参数 Tab ---------------- */
+  function switchRtab(name) {
+    document.querySelectorAll('.reqtabs a').forEach(a =>
+      a.classList.toggle('on', a.dataset.rtab === name));
+    ['params', 'headers', 'body', 'asserts', 'history'].forEach(t => {
+      const el = $('#rtab-' + t); if (el) el.hidden = (t !== name);
     });
+    if (name === 'history' && state.selReqId) loadHistory().catch(() => {});
+  }
+
+  function fillCollectionSelect(req) {
+    const opts = [['', '— 无集合 —']]
+      .concat(state.collections.filter(c => !req || !req.project_id || c.project_id === req.project_id)
+        .map(c => [c.id, c.name]));
+    $('#reqCollection').innerHTML = opts.map(o =>
+      `<option value="${esc(o[0])}" ${req && req.collection_id === o[0] ? 'selected' : ''}>${esc(o[1])}</option>`).join('');
   }
 
   function openEditor(req) {
     $('#reqWelcome').style.display = 'none';
     $('#reqEditor').style.display = '';
     $('#respArea').style.display = 'none';
-    $('#reqTitle').textContent = req ? '编辑接口 #' + req.id : '新建接口';
+    fillCollectionSelect(req);
     $('#reqName').value = req ? req.name : '';
-    $('#reqUrl').value = req ? req.url : 'http://127.0.0.1:8080/api-testing/mock/echo';
+    $('#reqUrl').value = req ? req.url : '';
     $('#reqMethod').innerHTML = Object.keys(METHOD_COLOR).map(m =>
       `<option ${req && req.method === m ? 'selected' : ''}>${m}</option>`).join('');
     const hs = (req ? req.headers : []) || [];
-    $('#reqHeaders').innerHTML = (hs.length ? hs : [{ key: '', value: '', enabled: true }]).map(h => kvRow(h.key, h.value, h.enabled)).join('');
-    const ps = Object.entries((req ? req.params : {}) || {});
-    $('#reqParams').innerHTML = (ps.length ? ps : [['', '']]).map(([k, v]) => kvRow(k, v, true)).join('');
+    $('#reqHeaders').innerHTML = (hs.length ? hs : [{ key: '', value: '', enabled: true }])
+      .map(h => kvRow(h.key, h.value, h.enabled, h.description)).join('');
+    /* params：新数组格式 [{key,value,description,enabled}]；旧对象格式 {k:v} 打开时转数组 */
+    const rawPs = (req ? req.params : null) || [];
+    const ps = Array.isArray(rawPs)
+      ? rawPs.map(p => [p.key, p.value, p.enabled, p.description])
+      : Object.entries(rawPs).map(([k, v]) => [k, v, true, '']);
+    $('#reqParams').innerHTML = (ps.length ? ps : [['', '', true, '']])
+      .map(([k, v, en, d]) => kvRow(k, v, en, d)).join('');
     const as = (req ? req.assertions : []) || [];
     $('#reqAssertions').innerHTML = (as.length ? as : []).map(assertRow).join('') || assertRow({ type: 'status_code', expected: '200' });
     const bt = (req && req.body && req.body.type) || 'none';
     $('#reqBodyType').value = bt;
     $('#reqBody').value = bt === 'none' ? '' :
       (typeof (req.body || {}).data === 'string' ? (req.body || {}).data : JSON.stringify((req.body || {}).data || '', null, 2));
+    switchRtab('params');
+    if (req) loadHistory().catch(() => {});
+    else $('#histTbody').innerHTML = '<tr><td colspan="5" class="empty">保存并发送后生成历史</td></tr>';
   }
 
   function collectRequest() {
@@ -190,19 +286,20 @@ const AT = (function () {
       if (bodyType === 'json') { try { bodyData = JSON.parse(raw || '{}'); } catch (e) { throw new Error('请求体 JSON 不合法: ' + e.message); } }
       else bodyData = raw;
     }
-    const params = {};
-    $('#reqParams').querySelectorAll('.kvrow').forEach(row => {
-      const k = row.querySelector('.k').value.trim();
-      if (k) params[k] = row.querySelector('.v').value;
-    });
-    const proj = state.projects[0];
+    /* params 落数组格式（含描述与启用），testhub Params 表格同构 */
+    const params = readKv($('#reqParams')).map(p =>
+      ({ key: p.key, value: p.value, description: p.description, enabled: p.enabled }));
+    const col = state.collections.find(c => c.id === +$('#reqCollection').value);
+    const proj = col ? state.projects.find(p => p.id === col.project_id) : currentReq() && currentReq().project_id;
     return {
       name: $('#reqName').value.trim() || '未命名接口',
       method: $('#reqMethod').value, url: $('#reqUrl').value.trim(),
       headers: readKv($('#reqHeaders')), params,
       body: { type: bodyType, data: bodyData },
       assertions: readAssertions(),
-      project_id: proj ? proj.id : null,
+      collection_id: col ? col.id : null,
+      project_id: (col ? col.project_id : null) || (currentReq() && currentReq().project_id) ||
+        (state.projects[0] ? state.projects[0].id : null),
     };
   }
 
@@ -229,6 +326,7 @@ const AT = (function () {
       const hist = (await api('/requests/' + (req ? req.id : 0) + '/execute',
         { method: 'POST', body: { environment_id: activeEnv ? activeEnv.id : null, ...overrides } })).data;
       renderResponse(hist);
+      loadHistory().catch(() => {});
     } catch (e) { $('#respBody').textContent = '执行失败: ' + e.message; }
   }
 
@@ -248,11 +346,10 @@ const AT = (function () {
       `期望 ${esc(a.expected)} / 实际 ${esc(a.actual == null ? (a.error || '-') : a.actual)}</div>`).join('');
   }
 
-  async function showHistory() {
+  async function loadHistory() {
     const req = currentReq();
-    if (!req) return toast('请先选择接口', false);
+    if (!req) { $('#histTbody').innerHTML = '<tr><td colspan="5" class="empty">新接口尚未保存</td></tr>'; return; }
     const d = (await api('/requests/' + req.id + '/histories?page_size=20')).data;
-    $('#histArea').style.display = '';
     $('#histTbody').innerHTML = d.results.map(h => {
       const rs = h.assertions_results || [];
       const ok = rs.filter(a => a.passed).length;
@@ -261,7 +358,91 @@ const AT = (function () {
         `<td>${h.response_time != null ? h.response_time : '-'}</td>` +
         `<td>${rs.length ? ok + '/' + rs.length : '-'}</td>` +
         `<td class="muted" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.error_message || '')}</td></tr>`;
-    }).join('') || '<tr><td colspan="5" class="empty">暂无历史</td></tr>';
+    }).join('') || '<tr><td colspan="5" class="empty">暂无历史 —— 发送一次即生成</td></tr>';
+  }
+
+  /* ---------------- 导入 cURL（testhub「导入」） ---------------- */
+  function parseCurl(text) {
+    /* 解析常用 curl 形式：-X/--request、-H/--header、-d/--data/--data-raw/--data-binary、URL */
+    const s = text.replace(/\\\n/g, ' ').trim();
+    const out = { method: 'GET', url: '', headers: [], body: '' };
+    const tokens = s.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
+    let bodyFlags = 0;
+    for (let i = 1; i < tokens.length; i++) {
+      const t = tokens[i].replace(/^['"]|['"]$/g, '');
+      const nx = () => (tokens[i + 1] || '').replace(/^['"]|['"]$/g, '');
+      if (t === '-X' || t === '--request') { out.method = nx().toUpperCase(); i++; }
+      else if (t === '-H' || t === '--header') {
+        const hv = nx(); const j = hv.indexOf(':');
+        if (j > 0) out.headers.push({ key: hv.slice(0, j).trim(), value: hv.slice(j + 1).trim(), enabled: true, description: '' });
+        i++;
+      } else if (t === '-d' || t === '--data' || t === '--data-raw' || t === '--data-binary' || t === '--data-urlencode') {
+        out.body = nx(); bodyFlags++; i++;
+      } else if (!t.startsWith('-') && !out.url && /^https?:\/\//.test(t)) { out.url = t; }
+    }
+    if (bodyFlags) out.method = out.method === 'GET' ? 'POST' : out.method;
+    if (!out.url) throw new Error('未识别到 URL（需以 http(s):// 开头）');
+    return out;
+  }
+
+  function importCurl() {
+    openForm('导入 cURL 命令',
+      `<div class="field mt"><label>粘贴 curl 命令（识别 -X / -H / -d 与 URL）</label>` +
+      `<textarea id="ciText" rows="7" placeholder="curl -X POST 'http://...' -H 'Content-Type: application/json' -d '{...}'"></textarea></div>`,
+      async () => {
+        const c = parseCurl($('#ciText').value);
+        closeForm();
+        state.selReqId = null;                     // 导入进新建编辑器，确认后再保存
+        renderTree();
+        openEditor(null);
+        $('#reqMethod').value = c.method;
+        $('#reqUrl').value = c.url;
+        $('#reqName').value = '导入的接口';
+        $('#reqHeaders').innerHTML = (c.headers.length ? c.headers : [{ key: '', value: '', enabled: true }])
+          .map(h => kvRow(h.key, h.value, h.enabled, h.description)).join('');
+        if (c.body) {
+          $('#reqBodyType').value = 'json';
+          try { $('#reqBody').value = JSON.stringify(JSON.parse(c.body), null, 2); }
+          catch (e) { $('#reqBodyType').value = 'raw'; $('#reqBody').value = c.body; }
+        }
+        toast('已解析，确认后点「保存」', true);
+      });
+  }
+
+  /* ---------------- 生成代码（testhub「生成代码」：cURL / Python） ---------------- */
+  function genCode() {
+    let r;
+    try { r = collectRequest(); } catch (e) { return toast(e.message, false); }
+    const q = (s) => "'" + String(s == null ? '' : s).replace(/'/g, `'\\''`) + "'";
+    const r0 = r.url;
+    /* query 参数拼进 url */
+    const enabledParams = r.params.filter(p => p.enabled !== false);
+    const curlUrl = enabledParams.length
+      ? r0 + (r0.includes('?') ? '&' : '?') + enabledParams.map(p => encodeURIComponent(p.key) + '=' + encodeURIComponent(p.value)).join('&')
+      : r0;
+    const curlHeaders = r.headers.filter(h => h.enabled !== false).map(h => `  -H ${q(h.key + ': ' + h.value)}`).join(' \\\n');
+    let curl = `curl -X ${r.method} ${q(curlUrl)}`;
+    if (curlHeaders) curl += ` \\\n${curlHeaders}`;
+    if (r.body.type !== 'none' && r.body.data) curl += ` \\\n  -d ${q(typeof r.body.data === 'string' ? r.body.data : JSON.stringify(r.body.data))}`;
+    const pyHeaders = r.headers.filter(h => h.enabled !== false);
+    const pyLines = [
+      'import requests',
+      '',
+      `url = ${q(curlUrl)}`,
+      `headers = {${pyHeaders.map(h => `${q(h.key)}: ${q(h.value)}`).join(', ')}}`,
+      r.body.type === 'json' && r.body.data ? `json_payload = ${JSON.stringify(r.body.data, null, 2)}` : null,
+      '',
+      r.body.type === 'json' && r.body.data ? 'resp = requests.request(' + q(r.method) + ', url, headers=headers, json=json_payload)'
+        : r.body.type !== 'none' && r.body.data ? 'resp = requests.request(' + q(r.method) + ', url, headers=headers, data=' + q(r.body.data) + ')'
+        : 'resp = requests.request(' + q(r.method) + ', url, headers=headers)',
+      'print(resp.status_code, resp.text)',
+    ].filter(x => x !== null).join('\n');
+    openForm('生成代码',
+      `<div class="field mt"><label>cURL</label><textarea id="gcCurl" rows="6" readonly>${esc(curl)}</textarea></div>` +
+      `<div class="field mt"><label>Python (requests)</label><textarea id="gcPy" rows="8" readonly>${esc(pyLines)}</textarea></div>`,
+      null);
+    $('#fmSave').textContent = '关闭';
+    fmSave = closeForm; $('#fmCancel').style.display = 'none';
   }
 
   async function selectRequest(id) {
@@ -557,20 +738,42 @@ const AT = (function () {
 
   /* ---------------- 绑定 ---------------- */
   function bind() {
-    document.querySelectorAll('#apitabs a').forEach(a =>
-      a.addEventListener('click', () => switchTab(a.dataset.tab)));
+    /* 左侧二级菜单：图标注入 + 点击切换（与 AppUI 页 initRunPanels 同款交互） */
+    document.querySelectorAll('#subnav a').forEach(a => {
+      if (a.dataset.icon) a.insertAdjacentHTML('afterbegin', icon(a.dataset.icon, 18));
+      a.addEventListener('click', e => { e.preventDefault(); switchTab(a.dataset.panel); });
+    });
     $('#apiSearch').addEventListener('input', renderTree);
+    /* 参数 Tab 切换 */
+    document.querySelectorAll('.reqtabs a').forEach(a =>
+      a.addEventListener('click', () => switchRtab(a.dataset.rtab)));
     $('#btnReqSave').addEventListener('click', () => saveRequest().catch(e => toast(e.message, false)));
     $('#btnReqSend').addEventListener('click', () => sendRequest().catch(e => toast(e.message, false)));
-    $('#btnReqHistory').addEventListener('click', () => showHistory().catch(e => toast(e.message, false)));
-    $('#btnHistClose').addEventListener('click', () => { $('#histArea').style.display = 'none'; });
-    $('#btnAddHeader').addEventListener('click', () => $('#reqHeaders').insertAdjacentHTML('beforeend', kvRow('', '', true)));
-    $('#btnAddParam').addEventListener('click', () => $('#reqParams').insertAdjacentHTML('beforeend', kvRow('', '', true)));
+    $('#btnReqImport').addEventListener('click', importCurl);
+    $('#btnReqCode').addEventListener('click', genCode);
+    $('#btnAddHeader').addEventListener('click', () => $('#reqHeaders').insertAdjacentHTML('beforeend', kvRow('', '', true, '')));
+    $('#btnAddParam').addEventListener('click', () => $('#reqParams').insertAdjacentHTML('beforeend', kvRow('', '', true, '')));
     $('#btnAddAssertion').addEventListener('click', () => $('#reqAssertions').insertAdjacentHTML('beforeend', assertRow()));
+    // 切换断言类型时按新类型重渲染该行（media 行与普通行字段结构不同），保留已填值
+    $('#reqAssertions').addEventListener('change', (e) => {
+      const row = e.target.closest('.assertrow');
+      if (!row) return;
+      if (e.target.classList.contains('a-type')) {
+        row.outerHTML = assertRow({ ...readRow(row), type: e.target.value });
+        return;
+      }
+      // 音视频行：对象选「音频」时分辨率不适用（禁用并清空），选「视频」时恢复
+      if (e.target.classList.contains('a-media')) {
+        const res = row.querySelector('.a-res');
+        if (!res) return;
+        const isVideo = e.target.value === 'video';
+        res.disabled = !isVideo;
+        if (!isVideo) res.value = '';
+      }
+    });
     document.addEventListener('click', (e) => {
       if (e.target.classList && e.target.classList.contains('kv-del')) e.target.closest('.kvrow,.assertrow').remove();
     });
-    $('#btnReqNew') && 0;
     $('#btnNewRequest').addEventListener('click', () => { state.selReqId = null; renderTree(); openEditor(null); });
     $('#btnNewProject').addEventListener('click', () => openForm('新建项目',
       fmField('项目名称', 'pfName', '') + fmField('描述', 'pfDesc', ''), async () => {
@@ -622,6 +825,12 @@ const AT = (function () {
   async function init() {
     renderSidebar('/api-test');
     bind();
+    /* 初始面板：hash 深链 > 上次所在面板 > 默认接口管理 */
+    let start = (location.hash || '').replace('#', '');
+    if (PANELS.indexOf(start) < 0) {
+      try { start = localStorage.getItem('apitest_panel') || ''; } catch (e) { start = ''; }
+    }
+    switchTab(start);
     $('#reqMethod').innerHTML = Object.keys(METHOD_COLOR).map(m => `<option>${m}</option>`).join('');
     try {
       await reloadAll();

@@ -8,6 +8,7 @@
 - 历史与执行记录字段与 testhub 模型同名（区别：持久化走 YAML 存储层）。
 """
 import json
+import os
 import threading
 import time
 from urllib.parse import urlparse
@@ -32,67 +33,86 @@ def _session_for(url):
     return requests.Session()
 
 
-# ---------------- 断言（照抄 testhub utils.execute_assertions） ----------------
+# ---------------- 断言（照抄 testhub utils.execute_assertions，扩展音视频断言） ----------------
+MEDIA_ASSERT_TYPES = ('media_check', 'media_video', 'media_audio', 'media_volume',
+                      'media_stream')   # 音视频断言：首位为现用类型，其余为历史数据兼容（见 media_assertions.py）
+
 def execute_assertions(resp, assertions):
     """对 requests.Response 执行断言列表，返回逐条结果（与 testhub 同结构）"""
     results = []
-    for assertion in assertions or []:
-        result = {
-            'name': assertion.get('name', '未命名断言'),
-            'type': assertion.get('type'),
-            'passed': False,
-            'expected': assertion.get('expected'),
-            'actual': None,
-            'error': None,
-        }
-        try:
-            a_type = assertion.get('type')
-            expected = assertion.get('expected')
-            actual, passed = None, False
+    media_path = None       # 音视频断言共享的响应体临时文件（本次调用结束即删）
+    try:
+        for assertion in assertions or []:
+            result = {
+                'name': assertion.get('name', '未命名断言'),
+                'type': assertion.get('type'),
+                'passed': False,
+                'expected': assertion.get('expected'),
+                'actual': None,
+                'error': None,
+            }
+            try:
+                a_type = assertion.get('type')
+                expected = assertion.get('expected')
+                actual, passed = None, False
 
-            if a_type == 'status_code':
-                actual = resp.status_code
-                passed = actual == expected
-            elif a_type == 'response_time':
-                actual = assertion.get('actual_time')
-                passed = actual <= expected if actual is not None else False
-            elif a_type == 'contains':
-                text = resp.text or ''
-                actual = text[:200] + '...' if len(text) > 200 else text
-                passed = str(expected) in str(text)
-            elif a_type == 'json_path':
-                json_path = assertion.get('json_path', '')
-                try:
-                    if 'application/json' not in (resp.headers.get('content-type') or '').lower():
-                        raise ValueError('响应不是JSON格式，Content-Type: %s'
-                                         % resp.headers.get('content-type'))
-                    resp_json = json.loads(resp.text)
-                    if not json_path:
-                        raise ValueError('JSON路径表达式不能为空')
-                    matches = jsonpath_parse(json_path).find(resp_json)
-                    actual = matches[0].value if matches else None
-                    passed = str(actual) == str(expected)
+                if a_type == 'status_code':
+                    actual = resp.status_code
+                    passed = actual == expected
+                elif a_type == 'response_time':
+                    actual = assertion.get('actual_time')
+                    passed = actual <= expected if actual is not None else False
+                elif a_type == 'contains':
+                    text = resp.text or ''
+                    actual = text[:200] + '...' if len(text) > 200 else text
+                    passed = str(expected) in str(text)
+                elif a_type == 'json_path':
+                    json_path = assertion.get('json_path', '')
+                    try:
+                        if 'application/json' not in (resp.headers.get('content-type') or '').lower():
+                            raise ValueError('响应不是JSON格式，Content-Type: %s'
+                                             % resp.headers.get('content-type'))
+                        resp_json = json.loads(resp.text)
+                        if not json_path:
+                            raise ValueError('JSON路径表达式不能为空')
+                        matches = jsonpath_parse(json_path).find(resp_json)
+                        actual = matches[0].value if matches else None
+                        passed = str(actual) == str(expected)
+                        result['actual'] = actual
+                    except json.JSONDecodeError as e:
+                        result['error'] = 'JSON解析失败: %s' % e
+                    except ImportError:
+                        result['error'] = '缺少依赖库 jsonpath-ng'
+                    except Exception as e:
+                        result['error'] = '执行错误: %s' % e
+                elif a_type == 'header':
+                    actual = resp.headers.get(assertion.get('header_name', ''))
+                    passed = actual == assertion.get('expected_value')
+                elif a_type == 'equals':
+                    actual = resp.text.strip()
+                    passed = actual == str(expected).strip()
+                elif a_type in MEDIA_ASSERT_TYPES:
+                    # 音视频断言：响应体落临时文件后交给 ffprobe/ffmpeg（L1-L3）
+                    from web_platform.api_testing import media_assertions as media
+                    if media_path is None:
+                        media_path = media.materialize_response(resp)
+                    passed, actual, err = media.evaluate(a_type, assertion, media_path)
+                    if err:
+                        result['error'] = err
+
+                if result['actual'] is None:
                     result['actual'] = actual
-                except json.JSONDecodeError as e:
-                    result['error'] = 'JSON解析失败: %s' % e
-                except ImportError:
-                    result['error'] = '缺少依赖库 jsonpath-ng'
-                except Exception as e:
-                    result['error'] = '执行错误: %s' % e
-            elif a_type == 'header':
-                actual = resp.headers.get(assertion.get('header_name', ''))
-                passed = actual == assertion.get('expected_value')
-            elif a_type == 'equals':
-                actual = resp.text.strip()
-                passed = actual == str(expected).strip()
-
-            if result['actual'] is None:
-                result['actual'] = actual
-            result['passed'] = bool(passed)
-        except Exception as e:
-            result['error'] = str(e)
-            result['passed'] = False
-        results.append(result)
+                result['passed'] = bool(passed)
+            except Exception as e:
+                result['error'] = str(e)
+                result['passed'] = False
+            results.append(result)
+    finally:
+        if media_path:
+            try:
+                os.unlink(media_path)
+            except OSError:
+                pass
     return results
 
 
@@ -160,7 +180,12 @@ def send_request(req, environment=None, overrides=None):
 
     params = {}
     raw_params = ov.get('params') if ov.get('params') is not None else req.get('params')
-    if isinstance(raw_params, dict):
+    if isinstance(raw_params, list):
+        # 新数组格式 [{key,value,description,enabled}]（testhub Params 表格），description 仅备注
+        for p in raw_params:
+            if p.get('enabled', True) and p.get('key'):
+                params[p['key']] = resolver.resolve(replace_vars(str(p.get('value', '')), variables))
+    elif isinstance(raw_params, dict):
         for k, v in raw_params.items():
             params[k] = resolver.resolve(replace_vars(str(v), variables))
 
