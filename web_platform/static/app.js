@@ -144,6 +144,7 @@ function renderSidebar(active, sub) {
     '<div class="foot">' +
     '<span><i class="dot ok" id="dotDevice"></i>设备 <span id="footDevice">…</span></span>' +
     '<span><i class="dot ok" id="dotAppium"></i>Appium <span id="footAppium">…</span></span>' +
+    '<span><i class="dot ok" id="dotFramework" title="框架依赖 import 自检"></i>框架 <span id="footFramework">…</span></span>' +
     '<button class="ghost mini" id="btnChangelog" title="查看各版本更新时间与变更内容">更新日志 v<span id="clVer">…</span></button>' +
     '</div>', sub);
   const clBtn = $('#btnChangelog');
@@ -207,6 +208,20 @@ async function pollFootStatus() {
     if (d2) {
       d2.className = 'dot ' + (st.appium.ok ? 'ok' : 'bad');
       f2.textContent = st.appium.ok ? '正常' : '不可用';
+    }
+    // 框架依赖自检：缺模块时执行必失败，提前在页脚与设备配置卡暴露
+    const d3 = $('#dotFramework'), f3 = $('#footFramework');
+    if (d3) {
+      const fw = st.framework || { ok: true, msg: '' };
+      d3.className = 'dot ' + (fw.ok ? 'ok' : 'bad');
+      f3.textContent = fw.ok ? '正常' : '缺依赖';
+      f3.title = fw.msg || '';
+      const dev = $('#devState');
+      if (dev && !fw.ok && !dev.querySelector('.fw-bad')) {
+        dev.insertAdjacentHTML('afterbegin',
+          '<span class="pill bad fw-bad">框架缺依赖 ' + esc(fw.msg.replace('框架缺依赖：', '')) +
+          ' —— 执行会失败，请先补齐环境</span>');
+      }
     }
   } catch (e) { /* 状态条失败不打断页面 */ }
 }

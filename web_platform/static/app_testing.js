@@ -218,19 +218,23 @@ let _cnSelNode = null;    // 当前命中节点
 function openCnModal() {
   _cnSteps = []; _cnPicked = {}; _cnSelNode = null; _cnAll = []; _cnZoomPct = 100;
   $('#cnName').value = ''; $('#cnBy').value = ''; $('#cnDesc').value = '';
-  $('#cnElName').value = '';
+  $('#cnElName').value = ''; $('#cnElLocVal').value = ''; $('#cnElComment').value = '';
+  $('#cnElWait').value = 'VISIBILITY_OF'; $('#cnElWaitSec').value = 6;
   $('#cnImg').style.display = 'none'; $('#cnImg').style.width = ''; $('#cnImg').src = '';
   $('#cnSelBox').style.display = 'none';
   $('#cnEmptyHint').style.display = '';
   $('#cnPickInfo').style.display = 'none';
   $('#cnEmptyMid').style.display = '';
   $('#cnDeviceInfo').textContent = '未获取截图';
+  $('#cnElLocType').innerHTML = ['ID', 'XPATH', 'ACCESSIBILITY_ID', 'ANDROID_UIAUTOMATOR'].map(t =>
+    '<option value="' + t + '">' + t + '</option>').join('');
   $('#cnElemFile').innerHTML = _atElFiles.filter(f => !f.includes('_backup')).map(f =>
     '<option value="' + esc(f) + '">' + esc(f) + '</option>').join('');
   $('#cnProj').innerHTML = '<option value="">— 未分组 —</option>' +
     _projects.map(p => '<option value="' + p.id + '">' + esc(p.name) + '</option>').join('');
   $('#cnStepType').innerHTML = Object.keys(STEP_META).map(t =>
     '<option value="' + t + '">' + STEP_META[t].label + '</option>').join('');
+  $('#cnPageFile').value = '';
   syncCnParam();
   renderCnSteps();
   $('#caseNewMask').classList.add('show');
@@ -313,7 +317,7 @@ function cnPick(e) {
   cnApply();                                    // 点中即回显到右侧表单
 }
 
-/* 中栏选中内容 → 回显右侧表单（① 元素 + ③ 步骤描述建议） */
+/* 中栏选中内容 → 回显右侧表单（① 元素：名称/定位方式/定位值 + ③ 步骤描述建议） */
 function cnApply() {
   const n = _cnSelNode;
   if (!n) return toast('请先点击截图中的元素', false);
@@ -321,6 +325,11 @@ function cnApply() {
   const cand = (n.locators || [])[li];
   if (cand && cand.value) {
     $('#cnLocVal').value = cand.value;
+    const sel = $('#cnElLocType');
+    if (![...sel.options].some(o => o.value === cand.locator_type))
+      sel.insertAdjacentHTML('beforeend', '<option value="' + esc(cand.locator_type) + '">' + esc(cand.locator_type) + '</option>');
+    sel.value = cand.locator_type;
+    $('#cnElLocVal').value = cand.value;
     const sug = (n.text || '').trim() || ((n['resource-id'] || '').split('/').pop() || '').trim();
     if (!$('#cnElName').value.trim())
       $('#cnElName').value = sug.replace(/[^A-Za-z0-9_\u4e00-\u9fa5]/g, '_').replace(/^_+|_+$/g, '').slice(0, 30);
@@ -338,27 +347,35 @@ function syncCnParam() {
 }
 
 function cnAddStep() {
-  const n = _cnSelNode;
-  if (!n) return toast('请先点击截图中的元素', false);
-  const cand = (n.locators || []) [+$('#cnLocator').value];
   const name = ($('#cnElName').value || '').trim();
-  if (!cand || !cand.value) return toast('该节点没有可用定位，换候选或相邻元素', false);
+  const locType = ($('#cnElLocType').value || '').trim();
+  const locVal = ($('#cnElLocVal').value || '').trim();
   if (!name) return toast('请填写元素名称', false);
+  if (!locVal) return toast('请先点击截图中的元素回显定位，或手填定位值', false);
   const type = $('#cnStepType').value;
-  if (STEP_META[type].el === false) return toast('该操作不需要元素，请改用「用例编排」面板添加', false);
+  const meta = STEP_META[type] || {};
+  if (meta.el === false) return toast('该操作不需要元素，请改用「用例编排」面板添加', false);
   const param = $('#cnStepParam').style.display !== 'none' ? $('#cnStepParam').value.trim() : '';
-  _cnPicked[name] = { locator_type: cand.locator_type, value: cand.value };
-  _cnSteps.push({ type, element: name, param, desc: $('#cnStepDesc').value.trim() || STEP_META[type].label + ' ' + name });
+  _cnPicked[name] = {
+    locator_type: locType, value: locVal,
+    wait_type: $('#cnElWait').value,
+    wait_seconds: +$('#cnElWaitSec').value || null,
+    comment: ($('#cnElComment').value || '').trim(),
+  };
+  _cnSteps.push({ type, element: name, param, desc: $('#cnStepDesc').value.trim() || (meta.label + ' ' + name) });
   $('#cnSelBox').style.display = 'none';
   _cnSelNode = null;
   renderCnSteps();
+  toast('已加入第 ' + _cnSteps.length + ' 步：' + (meta.label || type) + ' ' + name, true);
 }
 
 function renderCnSteps() {
   const box = $('#cnSteps');
   if (!box) return;
+  const count = $('#cnStepCount');
+  if (count) count.textContent = _cnSteps.length ? '（共 ' + _cnSteps.length + ' 步）' : '';
   if (!_cnSteps.length) {
-    box.innerHTML = '<div class="orch-empty">还没有步骤 —— 点左侧截图元素，「＋ 加入步骤」</div>';
+    box.innerHTML = '<div class="orch-empty">还没有步骤 —— 点左侧截图元素回显定位，「＋ 加入步骤」</div>';
     return;
   }
   box.innerHTML = _cnSteps.map((s, i) => {
@@ -367,7 +384,7 @@ function renderCnSteps() {
       '<span class="orch-index">' + (i + 1) + '</span>' +
       '<span class="cn-step-type" title="' + esc(meta.label || s.type) + '">' + esc(meta.label || s.type) + '</span>' +
       '<span class="cn-step-el" title="' + esc(s.element) + '">' + esc(s.element) + '</span>' +
-      '<span class="cn-step-param muted">' + esc(s.param || '—') + '</span>' +
+      '<span class="cn-step-param muted" title="' + esc(s.desc || '') + '">' + esc(s.param || s.desc || '—') + '</span>' +
       '<button class="orch-del" data-rm="' + i + '" title="移除">✕</button></div>';
   }).join('');
 }
@@ -378,12 +395,14 @@ async function saveCnCase() {
   if (!name) return toast('请填写用例名称', false);
   if (!elementsFile) return toast('请选择写入元素文件', false);
   if (!_cnSteps.length) return toast('请至少加入一个步骤（点左侧截图拾取元素）', false);
-  /* 1) 拾取的元素先入元素库；命中重复定位自动复用已有元素 */
+  /* 1) 拾取的元素先入元素库（含等待方式/时间/备注）；命中重复定位自动复用已有元素 */
   for (const [en, loc] of Object.entries(_cnPicked)) {
     const r = await fetch('/locator/api/add_element', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ filename: elementsFile, name: en,
-        locator_type: loc.locator_type, value: loc.value, wait_type: 'VISIBILITY_OF' }),
+        locator_type: loc.locator_type, value: loc.value,
+        wait_type: loc.wait_type || 'VISIBILITY_OF', wait_seconds: loc.wait_seconds,
+        comment: loc.comment }),
     }).then(x => x.json());
     if (!r.ok && r.duplicate && r.duplicate.name) {
       const old = en;
@@ -875,7 +894,7 @@ async function appTestingInit() {
   $('#cnImg').addEventListener('click', cnPick);
   $('#cnLocator').addEventListener('change', () => {
     const cand = (_cnSelNode && _cnSelNode.locators || []) [+$('#cnLocator').value];
-    if (cand) $('#cnLocVal').value = cand.value;
+    if (cand) { $('#cnLocVal').value = cand.value; cnApply(); }
   });
   $('#btnCnApply').addEventListener('click', cnApply);
   $('#cnStepType').addEventListener('change', syncCnParam);

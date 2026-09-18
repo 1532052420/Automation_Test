@@ -90,6 +90,33 @@ def page_api_test():
 
 
 # ---------------------------------------------------------------- API
+# 框架 import 冒烟自检：结果按进程缓存 60s，避免每次 /api/status 都 fork 子进程
+_fw_cache = {'ts': 0.0, 'ok': False, 'msg': ''}
+
+
+def framework_import_check():
+    """检查框架执行链路能否 import（缺依赖时执行必失败，提前在这里暴露）"""
+    import time as _time
+    import subprocess
+    now = _time.time()
+    if now - _fw_cache['ts'] < 60:
+        return _fw_cache['ok'], _fw_cache['msg']
+    venv_py = os.path.join(BASE_DIR, '.venv', 'bin', 'python')
+    py = venv_py if os.path.exists(venv_py) else sys.executable
+    try:
+        r = subprocess.run(
+            [py, '-c', 'import base.app_ui.android.demoProject.app_ui_android_demoProject_client'],
+            cwd=BASE_DIR, capture_output=True, text=True, timeout=30)
+        ok = r.returncode == 0
+        msg = '框架 import 正常' if ok else '框架缺依赖：' + \
+            (re.search(r"No module named '([^']+)'", r.stderr or '').group(1)
+             if re.search(r"No module named '([^']+)'", r.stderr or '') else (r.stderr or '').strip()[-120:])
+    except Exception as e:
+        ok, msg = False, '自检执行失败: %s' % str(e)[:80]
+    _fw_cache.update(ts=now, ok=ok, msg=msg)
+    return ok, msg
+
+
 @bp.route('/api/status')
 def api_status():
     confs = list_devices_conf_files()
@@ -97,6 +124,7 @@ def api_status():
     online = [d for d in adb['devices'] if d['state'] == 'device']
     appium_ok, appium_msg = check_appium('127.0.0.1', '4726')
     running = runner.manager.running_task()
+    fw_ok, fw_msg = framework_import_check()
     return jsonify({
         'ok': True,
         'service': 'automation-test-platform',
@@ -105,6 +133,7 @@ def api_status():
         'device_online': len(online),
         'devices': adb['devices'],
         'appium': {'ok': appium_ok, 'msg': appium_msg},
+        'framework': {'ok': fw_ok, 'msg': fw_msg},
         'running': running,
         'port': PLATFORM_CFG.port,
     })
