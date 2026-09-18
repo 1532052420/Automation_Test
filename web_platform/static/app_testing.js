@@ -206,18 +206,129 @@ async function deleteProj(pid) {
 }
 
 /* ================= 新建用例弹窗（测试用例模块 · 三栏） =================
-   左：设备截图（滚轮/按钮缩放，点击拾取元素）；中：元素坐标定位（命中坐标/边界/定位候选）；
-   右：元素 + 用例 + 页面操作 表单。截图与元素树复用元素定位器 /locator/api/refresh，
-   元素落库复用 /locator/api/add_element，保存走 /app-testing/api/cases 编译生成三件套。 */
+   完全照搬元素定位器「添加测试用例」弹窗（横改竖）：用途 ① 仅元素 / ② 元素+用例+操作；
+   ① 元素（名称/定位方式/定位值/等待方式/等待时间/备注/写入元素文件，支持 ➕新建元素文件）；
+   ② 用例（目标用例文件（支持 ➕新建，临时用例三件套打包入库）/ 目标测试方法 / 用例备注 / 插入位置 /
+      当前用例步骤列表）；③ 操作（类型/参数/描述/写入页面文件）。
+   数据与写入全部复用定位器接口：/locator/api/{cases,refresh,add_element,add_code,save_case_package}。 */
 let _cnAll = [];          // 定位器扁平节点（bounds_num / locators）
 let _cnZoomPct = 100;     // 截图缩放百分比（100 = 适应容器宽）
-let _cnSteps = [];        // 步骤 [{type, element, param, desc}]
-let _cnPicked = {};       // 拾取元素：name -> {locator_type, value}
 let _cnSelNode = null;    // 当前命中节点
+let _cnCaseInfo = [];     // /locator/api/cases 三件套归属信息
+let _cnCaseSel = null;    // 当前选中的目标用例信息
+let _cnMethodSteps = [];  // 目标方法已有步骤描述列表
+let _cnWritten = 0;       // 本次弹窗已写入的步骤数
+let _cnTemp = null;       // 新建用例文件模式：临时步骤会话 {steps:[{comment,line,elemName,elemLine,methodBlock}]}
+const CN_NEW_FILE = '__new__';
 
+/* ---------------- 照搬定位器的代码生成辅助（临时用例三件套打包用） ---------------- */
+const cnEscQ = (s) => String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+function cnCapFirst(s) { s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+function cnCapCamel(s) { return String(s || '').split('_').filter(Boolean).map(cnCapFirst).join(''); }
+function cnPurpose() { const r = document.querySelector('input[name=cnPurpose]:checked'); return r ? r.value : 'all'; }
+function cnSyncPurpose() {
+  const only = cnPurpose() === 'only';
+  $('#cnSecCase').style.display = only ? 'none' : '';
+  $('#cnSecOp').style.display = only ? 'none' : '';
+}
+function cnIsNewCase() { return $('#cnCaseFile').value === CN_NEW_FILE; }
+function cnNewCaseBase() { return ($('#cnCaseNew').value || '').trim().replace(/[^A-Za-z0-9_]/g, '_'); }
+function cnElemFileNameNew() {
+  const raw = ($('#cnElemFileNew').value || '').trim().replace(/\.py$/i, '');
+  const v = raw.replace(/[^A-Za-z0-9_]/g, '_');
+  if (!v) return '';
+  return v.replace(/Elements?$/, '') + 'Elements.py';   // 结尾必须 Elements（页面/用例依赖后缀判归属）
+}
+function cnGenDesc(type, element, param) {
+  switch (type) {
+    case 'click': return '点击' + element;
+    case 'input': return '在' + element + '输入「' + param + '」';
+    case 'long_press': return '长按' + element;
+    case 'assert_visible': return '断言' + element + '出现';
+    case 'assert_text': return '断言' + element + '文本为「' + param + '」';
+    case 'assert_toast': return '断言toast「' + param + '」';
+    case 'assert_gone': return '断言' + element + '消失';
+    case 'wait_element': return '等待' + element + '出现';
+    case 'if_click': return element + '出现才点击';
+    case 'sleep': return '固定等待' + (param || '1') + '秒';
+    case 'tap': return '点击坐标(' + param + ')';
+    case 'screenshot': return '截图' + (param ? '「' + param + '」' : '');
+    case 'hide_keyboard': return '收起键盘';
+    case 'custom': return param || '自定义代码';
+    default: return (STEP_META[type] || {}).label || type;
+  }
+}
+/* 用例行（与定位器 previewLine 同规则） */
+function cnPreviewLine(step) {
+  const t = step.type, el = step.element, p = step.param || '';
+  switch (t) {
+    case 'click': return 'page.click_' + el + '()';
+    case 'input': return "page.input_" + el + "('" + cnEscQ(p) + "')";
+    case 'long_press': return 'page.long_press_' + el + '()';
+    case 'assert_visible': return 'page.assert_' + el + '()';
+    case 'assert_text': return "page.assert_" + el + "_text('" + cnEscQ(p) + "')";
+    case 'assert_toast': return "page.assert_toast('" + cnEscQ(p) + "')";
+    case 'wait_element': { const n = parseInt(p, 10); return 'page.wait_' + el + (isNaN(n) ? '()' : '(' + n + ')'); }
+    case 'assert_gone': return 'page.assert_' + el + '_gone()';
+    case 'if_click': { const n = parseInt(p, 10); return 'page.click_' + el + '_if_visible(' + (isNaN(n) ? '' : n) + ')'; }
+    case 'hide_keyboard': return 'page.dismiss_keyboard()';
+    case 'screenshot': return "page.wait_and_shot('" + cnEscQ(p) + "')";
+    case 'tap': { const parts = p.split(',').map(x => x.trim()).filter(Boolean);
+      return parts.length >= 2 ? 'page.tap_xy(' + parts[0] + ', ' + parts[1] + ')' : 'page.tap_xy(' + (parts[0] || '0') + ')'; }
+    case 'sleep': { const n = parseFloat(p); return 'time.sleep(' + (isNaN(n) ? (p || '1') : n) + ')'; }
+    case 'custom': return p || 'page.xxx()';
+    default: return '';
+  }
+}
+/* 页面方法名（与后端派生规则一致） */
+function cnPageMethodName(type, el) {
+  return { click: 'click_' + el, input: 'input_' + el, long_press: 'long_press_' + el,
+    assert_visible: 'assert_' + el, assert_text: 'assert_' + el + '_text', assert_toast: 'assert_toast',
+    screenshot: 'wait_and_shot', tap: 'tap_xy', wait_element: 'wait_' + el,
+    assert_gone: 'assert_' + el + '_gone', if_click: 'click_' + el + '_if_visible',
+    hide_keyboard: 'dismiss_keyboard' }[type] || '';
+}
+function cnProbeBodyLines(el, secondsVar) {
+  return "probe = CreateElement.create(self._elements." + el + ".locator_type,\n"
+    + "                             self._elements." + el + ".locator_value,\n"
+    + "                             wait_type=Wait_By.PRESENCE_OF_ELEMENT_LOCATED,\n"
+    + "                             wait_seconds=" + secondsVar + ")";
+}
+/* 页面方法块（与定位器 pkgMethodBlock 同规则；doc=步骤描述） */
+function cnMethodBlock(step, doc) {
+  const t = step.type, el = step.element, p = (step.param || '').trim();
+  let sig = '', body = '';
+  if (t === 'click') sig = 'click_' + el + '(self)';
+  else if (t === 'input') { sig = 'input_' + el + '(self, text)'; body = 'self.appOperator.sendText(self._elements.' + el + ', text)'; }
+  else if (t === 'long_press') { sig = 'long_press_' + el + '(self)'; body = 'self.appOperator.touch_long_press(self._elements.' + el + ', duration_sconds=2)'; }
+  else if (t === 'assert_visible') { sig = 'assert_' + el + '(self)'; body = 'self.appOperator.getElement(self._elements.' + el + ')'; }
+  else if (t === 'assert_text') { sig = 'assert_' + el + '_text(self, expected)'; body = "assert self.appOperator.getText(self._elements." + el + ") == expected, '" + cnEscQ(doc) + "'"; }
+  else if (t === 'assert_toast') { sig = 'assert_toast(self, text)'; body = "assert self.appOperator.is_toast_visible(text, wait_seconds=5), '" + cnEscQ(doc) + "'"; }
+  else if (t === 'wait_element') { const n = parseInt(p, 10); sig = 'wait_' + el + '(self, timeout_seconds=' + (isNaN(n) ? 60 : n) + ')'; body = cnProbeBodyLines(el, 'timeout_seconds') + '\nself.appOperator.getElement(probe)'; }
+  else if (t === 'assert_gone') { sig = 'assert_' + el + '_gone(self, wait_seconds=2)'; body = cnProbeBodyLines(el, 'wait_seconds') + '\ngone = True\ntry:\n    self.appOperator.getElement(probe)\n    gone = False\nexcept Exception:\n    pass\n' + "self.appOperator.assert_true_with_shot('" + cnEscQ(doc) + "', gone,\n                                   '等待' + str(wait_seconds) + '秒内元素仍可见')"; }
+  else if (t === 'if_click') { const n = parseInt(p, 10); sig = 'click_' + el + '_if_visible(self, timeout_seconds=' + (isNaN(n) ? 3 : n) + ')'; body = cnProbeBodyLines(el, 'timeout_seconds') + '\ntry:\n    self.appOperator.click(self.appOperator.getElement(probe))\nexcept Exception:\n    pass'; }
+  else if (t === 'hide_keyboard') { sig = 'dismiss_keyboard(self)'; body = 'try:\n    if self.appOperator.is_keyboard_shown():\n        self.appOperator.hide_keyboard()\nexcept Exception:\n    self.appOperator.press_keycode(4)\nimport time\ntime.sleep(1)'; }
+  else if (t === 'screenshot') { sig = 'wait_and_shot(self, tag)'; body = 'import time\ntime.sleep(1)\nself.appOperator.get_screenshot(tag)'; }
+  else if (t === 'tap') { sig = 'tap_xy(self, x, y)'; body = 'self.appOperator.tap(x, y)'; }
+  if (t === 'click') body = 'self.appOperator.click(self._elements.' + el + ')';
+  return '    def ' + sig + ':\n        """' + doc + '"""\n        ' + body.replace(/\n/g, '\n        ');
+}
+function cnElementLine() {
+  const name = $('#cnElName').value.trim() || '<元素名>';
+  const val = $('#cnElLocVal').value.trim();
+  const sec = parseInt($('#cnElWaitSec').value, 10);
+  let line = "self." + name + " = CreateElement.create(Locator_Type." + $('#cnElLocType').value
+    + ", '" + cnEscQ(val) + "', wait_type=Wait_By." + $('#cnElWait').value;
+  if (!isNaN(sec) && sec >= 1) line += ', wait_seconds=' + sec;
+  line += ')';
+  const c = $('#cnElComment').value.trim();
+  return c ? line + '  # ' + c : line;
+}
+
+/* ---------------- 弹窗打开 / 截图 / 缩放 / 拾取 ---------------- */
 function openCnModal() {
-  _cnSteps = []; _cnPicked = {}; _cnSelNode = null; _cnAll = []; _cnZoomPct = 100;
-  $('#cnName').value = ''; $('#cnBy').value = ''; $('#cnDesc').value = '';
+  _cnSelNode = null; _cnAll = []; _cnZoomPct = 100;
+  _cnCaseInfo = []; _cnCaseSel = null; _cnMethodSteps = []; _cnWritten = 0; _cnTemp = null;
   $('#cnElName').value = ''; $('#cnElLocVal').value = ''; $('#cnElComment').value = '';
   $('#cnElWait').value = 'VISIBILITY_OF'; $('#cnElWaitSec').value = 6;
   $('#cnImg').style.display = 'none'; $('#cnImg').style.width = ''; $('#cnImg').src = '';
@@ -229,16 +340,21 @@ function openCnModal() {
   $('#cnElLocType').innerHTML = ['ID', 'XPATH', 'ACCESSIBILITY_ID', 'ANDROID_UIAUTOMATOR'].map(t =>
     '<option value="' + t + '">' + t + '</option>').join('');
   $('#cnElemFile').innerHTML = _atElFiles.filter(f => !f.includes('_backup')).map(f =>
-    '<option value="' + esc(f) + '">' + esc(f) + '</option>').join('');
-  $('#cnProj').innerHTML = '<option value="">— 未分组 —</option>' +
-    _projects.map(p => '<option value="' + p.id + '">' + esc(p.name) + '</option>').join('');
+    '<option value="' + esc(f) + '">' + esc(f) + '</option>').join('') +
+    '<option value="' + CN_NEW_FILE + '">➕ 新建元素文件…</option>';
+  $('#cnElemFileNew').value = ''; $('#cnElemFileNewWrap').style.display = 'none';
+  $('#cnCaseNew').value = ''; $('#cnCaseNewWrap').style.display = 'none';
   $('#cnStepType').innerHTML = Object.keys(STEP_META).map(t =>
     '<option value="' + t + '">' + STEP_META[t].label + '</option>').join('');
   $('#cnPageFile').value = '';
+  $('#cnCaseComment').value = '';
+  document.querySelector('input[name=cnPurpose][value=all]').checked = true;
+  cnSyncPurpose();
   syncCnParam();
-  renderCnSteps();
+  renderCnMethodSteps();
   $('#caseNewMask').classList.add('show');
   cnShot();
+  loadCnCases();
 }
 
 function cnShot() {
@@ -258,12 +374,11 @@ function cnShot() {
       $('#cnPickInfo').style.display = 'none';
       $('#cnEmptyMid').style.display = '';
       $('#cnDeviceInfo').textContent = ((d.device && (d.device.model || d.device.serial)) || '') +
-        ' · ' + d.width + '×' + d.height + (_qcSize(_cnAll) ? ' · ' + _qcSize(_cnAll) : '');
-      $('#cnDeviceInfo').title = _cnAll.length + ' 个可定位节点；滚轮或 ＋/－ 缩放截图';
+        ' · ' + d.width + '×' + d.height + (_cnAll.length ? ' · ' + _cnAll.length + ' 个节点' : '');
+      $('#cnDeviceInfo').title = '滚轮或 ＋/－ 缩放截图；点击画面元素自动回显定位';
     })
     .catch(e => { $('#cnDeviceInfo').textContent = '元素定位器不可达（' + e.message + '）'; });
 }
-function _qcSize(arr) { return arr.length ? arr.length + ' 个节点' : ''; }
 
 function cnZoom(delta) {
   const img = $('#cnImg');
@@ -303,7 +418,6 @@ function cnPick(e) {
   box.style.top = (b[1] * scale) + 'px';
   box.style.width = ((b[2] - b[0]) * scale) + 'px';
   box.style.height = ((b[3] - b[1]) * scale) + 'px';
-  /* 中栏：坐标 + 边界 + 定位候选 */
   $('#cnPickInfo').style.display = '';
   $('#cnEmptyMid').style.display = 'none';
   const cx = Math.round((b[0] + b[2]) / 2), cy = Math.round((b[1] + b[3]) / 2);
@@ -317,7 +431,7 @@ function cnPick(e) {
   cnApply();                                    // 点中即回显到右侧表单
 }
 
-/* 中栏选中内容 → 回显右侧表单（① 元素：名称/定位方式/定位值 + ③ 步骤描述建议） */
+/* 中栏选中内容 → 回显右侧表单（① 元素 + ③ 步骤描述建议） */
 function cnApply() {
   const n = _cnSelNode;
   if (!n) return toast('请先点击截图中的元素', false);
@@ -346,7 +460,91 @@ function syncCnParam() {
   $('#cnStepParamLabel').textContent = '操作参数' + (meta.param ? '：' + meta.param : '');
 }
 
-function cnAddStep() {
+/* ---------------- ② 用例：目标用例文件 / 测试方法 / 插入位置（数据来自框架文件） ---------------- */
+async function loadCnCases() {
+  $('#cnCaseFile').innerHTML = '<option value="">加载中…</option>';
+  try {
+    const d = await fetch('/locator/api/cases').then(r => r.json());
+    _cnCaseInfo = d.ok ? (d.case_info || []) : [];
+  } catch (e) { _cnCaseInfo = []; }
+  $('#cnCaseFile').innerHTML = _cnCaseInfo.map(c =>
+    '<option value="' + esc(c.file) + '">' + esc(c.file) + '（' + esc(c.class) + '）</option>').join('') +
+    '<option value="' + CN_NEW_FILE + '">➕ 新建用例文件…</option>';
+  onCnCaseChange();
+}
+
+function onCnCaseChange() {
+  const isNew = cnIsNewCase();
+  $('#cnCaseNewWrap').style.display = isNew ? '' : 'none';
+  if (isNew) {                                   // 新建模式：方法/页面文件按用例名生成
+    _cnCaseSel = null; _cnMethodSteps = [];
+    const base = cnNewCaseBase();
+    $('#cnCaseMethod').innerHTML = '<option value="test_' + esc(base || 'x') + '">test_' + esc(base || 'x') + '（新建后自动生成）</option>';
+    $('#cnPageFile').value = base ? cnCapFirst(base) + 'Page.py' : '';
+    renderCnMethodSteps();
+    return;
+  }
+  const file = $('#cnCaseFile').value;
+  _cnCaseSel = _cnCaseInfo.find(c => c.file === file) || null;
+  if (!_cnCaseSel) {
+    $('#cnCaseMethod').innerHTML = '<option>—</option>';
+    _cnMethodSteps = []; renderCnMethodSteps();
+    return;
+  }
+  const methods = (_cnCaseSel.methods || []).filter(m => m !== 'setup_class' && m !== 'teardown_class');
+  $('#cnCaseMethod').innerHTML = methods.length ? methods.map(m =>
+    '<option value="' + esc(m) + '">' + esc(m) + '</option>').join('') : '<option value="">（该文件没有测试方法）</option>';
+  /* 三件套联动：元素文件 / 页面文件 按目标用例自动带出（与定位器同一数据源） */
+  if (_cnCaseSel.elements_file) {
+    const sel = $('#cnElemFile');
+    if (![...sel.options].some(o => o.value === _cnCaseSel.elements_file))
+      sel.insertAdjacentHTML('beforeend', '<option value="' + esc(_cnCaseSel.elements_file) + '">' + esc(_cnCaseSel.elements_file) + '</option>');
+    sel.value = _cnCaseSel.elements_file;
+  }
+  $('#cnPageFile').value = _cnCaseSel.page_file || '（未解析到页面文件）';
+  onCnMethodChange();
+}
+
+function onCnMethodChange() {
+  const m = $('#cnCaseMethod').value;
+  _cnMethodSteps = (_cnCaseSel && _cnCaseSel.method_steps && _cnCaseSel.method_steps[m]) || [];
+  renderCnMethodSteps();
+}
+
+function renderCnMethodSteps() {
+  const box = $('#cnSteps');
+  if (!box) return;
+  const isNew = cnIsNewCase();
+  const pending = _cnTemp ? _cnTemp.steps : [];
+  let n, rows;
+  if (isNew) {
+    n = pending.length;
+    rows = pending.map((s, i) =>
+      '<div class="cnstep"><span class="orch-index">' + (i + 1) + '</span>' +
+      '<span class="cn-step-el" style="grid-column:2 / span 3" title="' + esc(s.comment) + '">' + esc(s.comment) + '</span></div>').join('') ||
+      '<div class="orch-empty">新用例还没有步骤 —— 录制的第一步将成为第 1 步</div>';
+    $('#cnStepCount').textContent = n ? '（已录 ' + n + ' 步，未入库）' : '（还没有步骤）';
+  } else {
+    n = _cnMethodSteps.length;
+    rows = _cnMethodSteps.map((s, i) =>
+      '<div class="cnstep"><span class="orch-index">' + (i + 1) + '</span>' +
+      '<span class="cn-step-el" style="grid-column:2 / span 3" title="' + esc(s) + '">' + esc(s) + '</span></div>').join('') ||
+      '<div class="orch-empty">目标方法还没有步骤 —— 录制的第一步将成为第 1 步</div>';
+    $('#cnStepCount').textContent = n ? '（已有 ' + n + ' 步）' : '（还没有步骤）';
+  }
+  box.innerHTML = rows;
+  /* 插入位置：末尾 / 第 k 步之后（新建模式恒为末尾） */
+  const pos = $('#cnInsertPos');
+  const cur = pos.value;
+  if (isNew) { pos.innerHTML = '<option value="">末尾（成为第 ' + (n + 1) + ' 步）</option>'; return; }
+  let opts = '<option value="">末尾（成为第 ' + (n + 1) + ' 步）</option>';
+  for (let k = 1; k <= n; k++) opts += '<option value="' + k + '"' + (String(k) === cur ? ' selected' : '') + '>第 ' + k + ' 步之后</option>';
+  pos.innerHTML = opts;
+}
+
+/* ---------------- 写入：元素入库 + 用例行追加 + 页面方法生成（三件套一次完成） ---------------- */
+async function writeCnStep() {
+  const purpose = cnPurpose();
   const name = ($('#cnElName').value || '').trim();
   const locType = ($('#cnElLocType').value || '').trim();
   const locVal = ($('#cnElLocVal').value || '').trim();
@@ -354,77 +552,160 @@ function cnAddStep() {
   if (!locVal) return toast('请先点击截图中的元素回显定位，或手填定位值', false);
   const type = $('#cnStepType').value;
   const meta = STEP_META[type] || {};
-  if (meta.el === false) return toast('该操作不需要元素，请改用「用例编排」面板添加', false);
+  if (purpose === 'all' && meta.el === false) return toast('该操作不需要元素，请改用「用例编排」面板添加', false);
   const param = $('#cnStepParam').style.display !== 'none' ? $('#cnStepParam').value.trim() : '';
-  _cnPicked[name] = {
-    locator_type: locType, value: locVal,
-    wait_type: $('#cnElWait').value,
-    wait_seconds: +$('#cnElWaitSec').value || null,
-    comment: ($('#cnElComment').value || '').trim(),
-  };
-  _cnSteps.push({ type, element: name, param, desc: $('#cnStepDesc').value.trim() || (meta.label + ' ' + name) });
-  $('#cnSelBox').style.display = 'none';
-  _cnSelNode = null;
-  renderCnSteps();
-  toast('已加入第 ' + _cnSteps.length + ' 步：' + (meta.label || type) + ' ' + name, true);
-}
-
-function renderCnSteps() {
-  const box = $('#cnSteps');
-  if (!box) return;
-  const count = $('#cnStepCount');
-  if (count) count.textContent = _cnSteps.length ? '（共 ' + _cnSteps.length + ' 步）' : '';
-  if (!_cnSteps.length) {
-    box.innerHTML = '<div class="orch-empty">还没有步骤 —— 点左侧截图元素回显定位，「＋ 加入步骤」</div>';
+  const desc = $('#cnStepDesc').value.trim() || cnGenDesc(type, name, param);
+  /* 1) 元素入库（等待方式/时间/备注一并写入；命中重复定位自动复用已有元素） */
+  const el = await fetch('/locator/api/add_element', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename: currentCnElemFile(), name,
+      locator_type: locType, value: locVal,
+      wait_type: $('#cnElWait').value, wait_seconds: +$('#cnElWaitSec').value || null,
+      comment: ($('#cnElComment').value || '').trim() }),
+  }).then(x => x.json());
+  let elemNameUsed = name;
+  if (!el.ok && el.duplicate && el.duplicate.name) {
+    elemNameUsed = el.duplicate.name;
+    toast('元素已存在，复用「' + elemNameUsed + '」', true);
+  } else if (!el.ok) {
+    return toast('元素入库失败：' + (el.msg || '未知错误'), false);
+  }
+  /* 2a) 用途①仅元素：到此为止 */
+  if (purpose === 'only') {
+    toast('元素「' + elemNameUsed + '」已入库', true);
+    $('#cnElName').value = ''; $('#cnElLocVal').value = '';
     return;
   }
-  box.innerHTML = _cnSteps.map((s, i) => {
-    const meta = STEP_META[s.type] || {};
-    return '<div class="cnstep">' +
-      '<span class="orch-index">' + (i + 1) + '</span>' +
-      '<span class="cn-step-type" title="' + esc(meta.label || s.type) + '">' + esc(meta.label || s.type) + '</span>' +
-      '<span class="cn-step-el" title="' + esc(s.element) + '">' + esc(s.element) + '</span>' +
-      '<span class="cn-step-param muted" title="' + esc(s.desc || '') + '">' + esc(s.param || s.desc || '—') + '</span>' +
-      '<button class="orch-del" data-rm="' + i + '" title="移除">✕</button></div>';
-  }).join('');
+  const descUsed = desc === cnGenDesc(type, name, param) ? cnGenDesc(type, elemNameUsed, param) : desc;
+  /* 2b) 新建用例文件：临时三件套打包入库（与定位器「保存并继续」同语义） */
+  if (cnIsNewCase()) {
+    const base = cnNewCaseBase();
+    if (!base) return toast('请填写新用例名', false);
+    const tc = _cnTemp = (_cnTemp || { steps: [] });
+    tc.base = base;
+    tc.steps.push({
+      comment: ($('#cnCaseComment').value || '').trim() || descUsed,
+      line: cnPreviewLine({ type, element: elemNameUsed, param }),
+      elemName: elemNameUsed, elemLine: cnElementLine().replace('self.' + name + ' ', 'self.' + elemNameUsed + ' '),
+      methodBlock: cnMethodBlock({ type, element: elemNameUsed, param }, descUsed),
+    });
+    const files = cnTempFiles(tc);
+    const r = await fetch('/locator/api/save_case_package', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ package: base, files, uploader: ($('#cnElComment').value || '').trim() || 'platform' }),
+    }).then(x => x.json());
+    if (!r.ok) { tc.steps.pop(); return toast('新建用例入库失败：' + (r.msg || '未知错误'), false); }
+    _cnWritten++;
+    toast('用例包「' + base + '」已入库（' + tc.steps.length + ' 步），后续步骤默认继续写入', true);
+    await loadCnCases();                       // 新文件已存在 → 自动切回已有文件模式继续追加
+    $('#cnCaseFile').value = 'test_' + base + '.py';
+    onCnCaseChange();
+    $('#cnStepDesc').value = ''; $('#cnStepParam').value = '';
+    return;
+  }
+  /* 2c) 已有用例文件：操作行追加 + 页面方法生成（与定位器同一接口） */
+  const caseFile = $('#cnCaseFile').value, method = $('#cnCaseMethod').value;
+  if (!caseFile || !method) return toast('请选择目标用例文件与测试方法', false);
+  const pos = +$('#cnInsertPos').value || null;
+  const r = await fetch('/locator/api/add_code', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ case_file: caseFile, method_name: method,
+      step: { type, element: elemNameUsed, param, desc: descUsed,
+              case_comment: ($('#cnCaseComment').value || '').trim() },
+      gen_page_method: true, insert_after_step: pos }),
+  }).then(x => x.json());
+  if (!r.ok) return toast('写入用例失败：' + (r.msg || '未知错误'), false);
+  _cnWritten++;
+  const at = pos || _cnMethodSteps.length;
+  _cnMethodSteps.splice(at, 0, r.line || descUsed);
+  renderCnMethodSteps();
+  $('#cnStepDesc').value = ''; $('#cnStepParam').value = '';
+  toast('已写入第 ' + (at + 1) + ' 步 → ' + caseFile + ' · ' + method, true);
 }
 
-async function saveCnCase() {
-  const name = ($('#cnName').value || '').trim();
-  const elementsFile = $('#cnElemFile').value;
-  if (!name) return toast('请填写用例名称', false);
-  if (!elementsFile) return toast('请选择写入元素文件', false);
-  if (!_cnSteps.length) return toast('请至少加入一个步骤（点左侧截图拾取元素）', false);
-  /* 1) 拾取的元素先入元素库（含等待方式/时间/备注）；命中重复定位自动复用已有元素 */
-  for (const [en, loc] of Object.entries(_cnPicked)) {
-    const r = await fetch('/locator/api/add_element', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filename: elementsFile, name: en,
-        locator_type: loc.locator_type, value: loc.value,
-        wait_type: loc.wait_type || 'VISIBILITY_OF', wait_seconds: loc.wait_seconds,
-        comment: loc.comment }),
-    }).then(x => x.json());
-    if (!r.ok && r.duplicate && r.duplicate.name) {
-      const old = en;
-      _cnSteps.forEach(s => { if (s.element === old) s.element = r.duplicate.name; });
-      delete _cnPicked[old];
-    } else if (!r.ok) {
-      return toast('元素「' + en + '」入库失败：' + (r.msg || '未知错误'), false);
-    }
+function currentCnElemFile() {
+  if ($('#cnElemFile').value === CN_NEW_FILE) {
+    const f = cnElemFileNameNew();
+    if (!f) return '';
+    if (![...$('#cnElemFile').options].some(o => o.value === f))
+      $('#cnElemFile').insertAdjacentHTML('beforeend', '<option value="' + esc(f) + '">' + esc(f) + '</option>');
+    $('#cnElemFile').value = f;
   }
-  /* 2) 创建用例（后端校验元素存在性并编译生成 页面+用例 文件） */
-  const body = { name, description: ($('#cnDesc').value || '').trim(),
-                 created_by: ($('#cnBy').value || '').trim(),
-                 project_id: $('#cnProj').value || null,
-                 elements_file: elementsFile,
-                 steps: _cnSteps.map(s => ({ type: s.type, element: s.element, param: s.param, desc: s.desc })) };
-  const d = await postJson(AT_PREFIX + '/api/cases', body);
-  if (!d.ok) return toast(d.msg || '保存失败', false);
+  return $('#cnElemFile').value;
+}
+
+/* 新建用例文件模式：按定位器 tempCaseRegen 同规则生成三件套内容 */
+function cnTempFiles(tc) {
+  const base = tc.base;
+  const caseName = 'test_' + base + '.py';
+  const pageFile = cnCapFirst(base) + 'Page.py';
+  const pageClass = cnCapFirst(pageFile.replace('.py', ''));
+  const elemFile = ($('#cnElemFile').value && $('#cnElemFile').value !== CN_NEW_FILE)
+    ? $('#cnElemFile').value : cnElemFileNameNew() || (base + 'Elements.py');
+  const elemClass = cnCapFirst(elemFile.replace('.py', ''));
+  /* 元素文件：同名元素取最后一次定义 */
+  const eOrder = [], eMap = {};
+  tc.steps.forEach(s => {
+    if (!s.elemName || !s.elemLine) return;
+    if (!(s.elemName in eMap)) eOrder.push(s.elemName);
+    eMap[s.elemName] = s.elemLine;
+  });
+  const elemContent = '# -*- coding: utf-8 -*-\n'
+    + '# 用例包 ' + base + ' · 元素库\n'
+    + 'from page_objects.createElement import CreateElement\n'
+    + 'from page_objects.app_ui.locator_type import Locator_Type\n'
+    + 'from page_objects.app_ui.wait_type import Wait_Type as Wait_By\n\n\n'
+    + 'class ' + elemClass + ':\n    def __init__(self):\n'
+    + (eOrder.length ? eOrder.map(n => '        ' + eMap[n]).join('\n') + '\n' : '        pass\n');
+  /* 页面文件：同名方法取最后一次 */
+  const mOrder = [], mMap = {};
+  tc.steps.forEach(s => {
+    const mn = (s.methodBlock.match(/def (\w+)/) || [])[1];
+    if (!mn) return;
+    if (!(mn in mMap)) mOrder.push(mn);
+    mMap[mn] = s.methodBlock;
+  });
+  const pageContent = '# -*- coding: utf-8 -*-\n'
+    + '# 用例包 ' + base + ' · 页面操作\n'
+    + 'from page_objects.app_ui.android.demoProject.elements.' + elemFile.replace('.py', '') + ' import ' + elemClass + '\n\n\n'
+    + 'class ' + pageClass + ':\n\n'
+    + '    def __init__(self, appOperator):\n'
+    + '        self.appOperator = appOperator\n'
+    + '        self._elements = ' + elemClass + '()\n'
+    + (mOrder.length ? '\n' + mOrder.map(n => mMap[n]).join('\n') + '\n' : '');
+  /* 用例文件：头部流程注释 + 方法体逐步骤 */
+  const flow = ['# 1. 拉起快歌主页面'].concat(tc.steps.map((s, i) => '# ' + (i + 2) + '. ' + s.comment));
+  const caseContent = '# -*- coding: utf-8 -*-\n'
+    + '# 用例包 ' + base + ' · ' + tc.steps.length + ' 步\n'
+    + flow.join('\n') + '\n'
+    + 'import time\nimport allure\n'
+    + 'from base.app_ui.android.demoProject.app_ui_android_demoProject_client import APP_UI_Android_demoProject_Client\n'
+    + 'from page_objects.app_ui.android.demoProject.pages.' + pageFile.replace('.py', '') + ' import ' + pageClass + '\n\n\n'
+    + "@allure.parent_suite('快歌APP自动化')\n"
+    + "@allure.suite('" + base + "')\n"
+    + 'class Test' + cnCapCamel(base) + ':\n\n'
+    + '    def setup_class(self):\n'
+    + '        # is_need_kill_app=False：绕开 demo 客户端硬编码启动，显式启动被测 App\n'
+    + '        self.demoProjectClient = APP_UI_Android_demoProject_Client(is_need_kill_app=False)\n'
+    + '        self.appOperator = self.demoProjectClient.appOperator\n'
+    + "        self.appOperator.start_activity('com.recordlife.kuaige', 'com.recordlife.kuaige.feature.main.MainActivity')\n"
+    + '        time.sleep(3)\n'
+    + '        self.page = ' + pageClass + '(self.appOperator)\n\n'
+    + "    @allure.title('" + base + ' · ' + tc.steps.length + " 步')\n"
+    + '    def test_' + base + '(self):\n        page = self.page\n\n'
+    + tc.steps.map((s, i) => '        # ' + (i + 1) + '. ' + s.comment + '\n        ' + s.line + '\n\n').join('')
+    + '    def teardown_class(self):\n        self.appOperator.close_app()\n';
+  return [
+    { dir: 'cases/app_ui/android/demoProject', name: caseName, content: caseContent },
+    { dir: 'page_objects/app_ui/android/demoProject/pages', name: pageFile, content: pageContent },
+    { dir: 'page_objects/app_ui/android/demoProject/elements', name: elemFile, content: elemContent },
+  ];
+}
+
+function cnFinish() {
+  const n = _cnWritten;
   $('#caseNewMask').classList.remove('show');
-  toast('用例「' + name + '」已创建并编译生成执行文件', true);
-  await loadOrchData();
-  renderCaseList();
-  renderSuites();
+  toast(n ? '本次共写入 ' + n + ' 步，已入库框架文件' : '未写入任何步骤', n > 0);
 }
 
 /* ================= 用例编排（SceneBuilder：顶栏 + 三栏） ================= */
@@ -898,12 +1179,15 @@ async function appTestingInit() {
   });
   $('#btnCnApply').addEventListener('click', cnApply);
   $('#cnStepType').addEventListener('change', syncCnParam);
-  $('#btnCnAddStep').addEventListener('click', cnAddStep);
-  $('#cnSteps').addEventListener('click', e => {
-    const rm = e.target.closest('[data-rm]');
-    if (rm) { _cnSteps.splice(+rm.dataset.rm, 1); renderCnSteps(); }
+  document.querySelectorAll('input[name=cnPurpose]').forEach(r =>
+    r.addEventListener('change', cnSyncPurpose));
+  $('#cnElemFile').addEventListener('change', () => {
+    $('#cnElemFileNewWrap').style.display = $('#cnElemFile').value === CN_NEW_FILE ? '' : 'none';
   });
-  $('#cnSave').addEventListener('click', () => saveCnCase().catch(e => toast(e.message, false)));
+  $('#cnCaseFile').addEventListener('change', onCnCaseChange);
+  $('#cnCaseMethod').addEventListener('change', onCnMethodChange);
+  $('#cnSave').addEventListener('click', () => writeCnStep().catch(e => toast(e.message, false)));
+  $('#cnClose').addEventListener('click', cnFinish);
   $('#cnCancel').addEventListener('click', () => $('#caseNewMask').classList.remove('show'));
   $('#caseNewMask').addEventListener('click', e => {
     if (e.target === e.currentTarget) e.currentTarget.classList.remove('show');
