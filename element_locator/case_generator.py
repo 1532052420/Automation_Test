@@ -441,7 +441,7 @@ def append_code_to_method(case_file, method_name, step, gen_page_method=False, i
 
     path = os.path.join(CASES_DIR, case_file)
     if not os.path.exists(path):
-        return {'ok': False, 'msg': '用例文件 %s 不存在（可在测试平台「AppUI 自动化 → 用例管理」上传，或在 cases/app_ui/android/demoProject/ 下按框架格式创建）' % case_file}
+        return {'ok': False, 'msg': '用例文件 %s 不存在（可在测试平台「APP自动化 → 用例上传」上传，或在 cases/app_ui/android/demoProject/ 下按框架格式创建）' % case_file}
     content = _read(path)
     case_before = content   # 撤销用：写入前快照
 

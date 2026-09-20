@@ -103,10 +103,14 @@ def _usage_counts():
 
 
 def list_elements():
-    """全量元素列表（文件 mtime 兼作创建时间；使用次数按页面引用统计）"""
+    """全量元素列表（文件 mtime 兼作创建时间；使用次数按页面引用统计）。
+    含弹窗规则库 popupElements.py 的规则元素（popup=True）——元素管理只读展示：
+    该文件由 popup_rules 专管，RULE_OPTIONS/WHITELIST 与元素行同文件共存，
+    走普通编辑会重写整文件把规则抹掉，故列表不带编辑/删除入口。"""
     usages = _usage_counts()
     elements = []
-    for fname in list_element_files():
+    for fname in list_element_files() + [POPUP_FILE]:
+        popup = fname == POPUP_FILE
         path = os.path.join(ELEMENTS_DIR, fname)
         if not os.path.isfile(path):
             continue
@@ -136,6 +140,7 @@ def list_elements():
                 'wait_seconds': int(ws.group(1)) if ws else 6,
                 'desc': desc,
                 'file': fname,
+                'popup': popup,
                 'usage_count': usages.get(name, 0),
                 'created_at': created_at,
             })

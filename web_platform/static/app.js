@@ -571,7 +571,7 @@ const RUN_PANELS = ['projects', 'elements', 'cases', 'caselist', 'orch', 'suites
 /* 面板名 → 顶部面包屑第三级文案 */
 const RUN_PANEL_NAMES = {
   projects: '项目管理', elements: '元素管理', cases: '选择用例', caselist: '测试用例',
-  orch: '用例编排', suites: '测试套件', report: '测试报告', admin: '用例管理', exec: '设备配置',
+  orch: '用例编排', suites: '测试套件', report: '测试报告', admin: '用例上传', exec: '设备配置',
 };
 function showRunPanel(name) {
   if (!RUN_PANELS.includes(name)) name = 'exec';
@@ -611,14 +611,23 @@ async function loadElements() {
   _elFiles = d.files || [];
   _elTypes = d.locator_types || ['ID', 'XPATH'];
   _elWaits = d.wait_types || ['VISIBILITY_OF'];
+  /* 元素文件筛选下拉：排除备份文件，重建时保留当前选择；弹窗规则库只读展示（见 renderElements） */
+  const curFile = $('#elFileFilter').value;
+  $('#elFileFilter').innerHTML = '<option value="">全部元素文件</option>' +
+    _elFiles.filter(f => !f.includes('_backup')).map(f =>
+      '<option value="' + esc(f) + '"' + (f === curFile ? ' selected' : '') + '>' + esc(f) + '</option>').join('') +
+    (_elements.some(e => e.popup)
+      ? '<option value="popupElements.py">popupElements.py（弹窗规则库）</option>' : '');
   renderElements();
 }
 
 function renderElements() {
   const kw = ($('#elSearch').value || '').trim().toLowerCase();
-  const list = kw ? _elements.filter(e =>
-    [e.name, e.cn_name, e.value, e.desc, e.type, e.file].some(v =>
-      String(v || '').toLowerCase().includes(kw))) : _elements;
+  const ff = $('#elFileFilter').value;
+  const list = _elements.filter(e =>
+    (!ff || e.file === ff) &&
+    (!kw || [e.name, e.cn_name, e.value, e.desc, e.type, e.file].some(v =>
+      String(v || '').toLowerCase().includes(kw))));
   const fmtDate = ts => {
     if (!ts) return '-';
     const d = new Date(ts * 1000), p = n => String(n).padStart(2, '0');
@@ -627,8 +636,16 @@ function renderElements() {
   $('#elTbody').innerHTML = list.map(e => {
     /* 名称列：有中文名 → 主行中文、副行代码名；无 → 主行代码名、副行文件名（旧行为） */
     const nameCell = e.cn_name
-      ? '<b>' + esc(e.cn_name) + '</b><br><span class="el-file">' + esc(e.name) + '</span>'
-      : '<b>' + esc(e.name) + '</b><br><span class="el-file">' + esc(e.file) + '</span>';
+      ? '<b>' + esc(e.cn_name) + '</b>' + (e.popup ? ' <span class="el-popup-badge">规则</span>' : '') + '<br><span class="el-file">' + esc(e.name) + '</span>'
+      : '<b>' + esc(e.name) + '</b>' + (e.popup ? ' <span class="el-popup-badge">规则</span>' : '') + '<br><span class="el-file">' + esc(e.file) + '</span>';
+    /* 弹窗规则库行只读：文件里 RULE_OPTIONS/WHITELIST 与元素行共存，普通编辑会重写整文件抹掉规则 */
+    const actions = e.popup
+      ? '<span class="el-popup-note" title="由元素定位器「登记随机弹窗」专管（锚点/冷却/白名单同文件存放），此处只读">规则库 · 到定位器「登记随机弹窗」管理</span>'
+      : '<div class="ops">' +
+    '<button class="ghost mini" data-act="edit" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">编辑</button>' +
+    '<button class="ghost mini" data-act="copy" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">复制</button>' +
+    '<button class="mini danger-ghost" data-act="del" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">删除</button>' +
+    '</div>';
     return '<tr>' +
     '<td>' + nameCell + '</td>' +
     '<td>' + esc(e.type) + '</td>' +
@@ -636,11 +653,7 @@ function renderElements() {
     '<td><span class="el-preview" title="' + esc(e.value) + '">' + esc(e.value) + '</span></td>' +
     '<td><span class="usage-num' + (e.usage_count ? '' : ' zero') + '">' + e.usage_count + '</span></td>' +
     '<td>' + fmtDate(e.created_at) + '</td>' +
-    '<td><div class="ops">' +
-    '<button class="ghost mini" data-act="edit" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">编辑</button>' +
-    '<button class="ghost mini" data-act="copy" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">复制</button>' +
-    '<button class="mini danger-ghost" data-act="del" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">删除</button>' +
-    '</div></td></tr>';
+    '<td>' + actions + '</td></tr>';
   }).join('');
   $('#elEmpty').style.display = list.length ? 'none' : '';
 }
@@ -721,6 +734,7 @@ function onElTableClick(e) {
 function initElementsPanel() {
   $('#btnElRefresh').addEventListener('click', loadElements);
   $('#elSearch').addEventListener('input', renderElements);
+  $('#elFileFilter').addEventListener('change', renderElements);
   $('#elTbody').addEventListener('click', onElTableClick);
   $('#elMCancel').addEventListener('click', () => $('#elMask').classList.remove('show'));
   $('#elMSave').addEventListener('click', saveElModal);

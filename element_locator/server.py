@@ -221,7 +221,7 @@ def api_save_case_package():
         from web_platform.admin_routes import import_case_package
     except ImportError as e:
         return jsonify({'ok': False, 'msg': '「保存到框架」需与测试平台运行在同一进程（%s）；'
-                                            '可改用「⬇ 下载用例包」再在平台「AppUI 自动化 → 用例管理」入库'
+                                            '可改用「⬇ 下载用例包」再在平台「APP自动化 → 用例上传」入库'
                         % str(e)[:80]})
     payload, status = import_case_package(package, files,
                                           (data.get('uploader') or 'locator').strip()[:32])
@@ -230,7 +230,7 @@ def api_save_case_package():
 
 @app.route('/api/build_case_package', methods=['POST'])
 def api_build_case_package():
-    """「保存测试用例包·下载 zip」：三个文件打包，供平台「AppUI 自动化 → 用例管理」入库"""
+    """「保存测试用例包·下载 zip」：三个文件打包，供平台「APP自动化 → 用例上传」入库"""
     import io
     import zipfile
     data = request.get_json(silent=True) or {}
