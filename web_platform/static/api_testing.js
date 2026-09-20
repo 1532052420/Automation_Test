@@ -83,7 +83,6 @@ const AT = (function () {
       a.classList.toggle('on', a.dataset.panel === name));
     PANELS.forEach(t => { const el = $('#panel-' + t); if (el) el.hidden = (t !== name); });
     if (window.setCrumbSub) setCrumbSub(PANEL_NAMES[name]);
-    try { localStorage.setItem('apitest_panel', name); } catch (e) { /* 隐私模式忽略 */ }
     history.replaceState(null, '', '#' + name);
   }
 
@@ -825,11 +824,9 @@ const AT = (function () {
   async function init() {
     renderSidebar('/api-test');
     bind();
-    /* 初始面板：hash 深链 > 上次所在面板 > 默认接口管理 */
+    /* 初始面板：hash 深链优先，否则默认第一个（概览）——不恢复上次停留 */
     let start = (location.hash || '').replace('#', '');
-    if (PANELS.indexOf(start) < 0) {
-      try { start = localStorage.getItem('apitest_panel') || ''; } catch (e) { start = ''; }
-    }
+    if (PANELS.indexOf(start) < 0) start = PANELS[0];
     switchTab(start);
     $('#reqMethod').innerHTML = Object.keys(METHOD_COLOR).map(m => `<option>${m}</option>`).join('');
     try {

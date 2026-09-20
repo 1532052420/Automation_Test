@@ -38,11 +38,13 @@ html.night .embed-bar { background: #1b1c1f; border: 1px solid rgba(255,255,255,
   display: flex; flex-direction: column; gap: 4px;
   background: #1d1d1f; color: #e5e7eb; padding: 16px 12px 12px;
 }
-/* 品牌头：对齐平台 .subnav-label（小字距标签 + 底部分隔线） */
-.brand { display: flex; align-items: center; gap: 8px; font-size: 18px; padding: 2px 12px 10px;
+/* 品牌头：对齐平台 .subnav-label（小字距标签 + 底部分隔线）。
+   限定 .side 作用域——否则会命中顶部导航 .gnav 里的 .brand（自动化测试平台），
+   给它加上 padding 与底部分隔线，造成文案与其他页面对不齐 */
+.side .brand { display: flex; align-items: center; gap: 8px; font-size: 18px; padding: 2px 12px 10px;
   border-bottom: 1px solid rgba(255,255,255,.08); margin-bottom: 8px; }
-.brand .bt { display: flex; flex-direction: column; gap: 2px; font-size: 13px; font-weight: 600; color: #fff; }
-.brand .bt small { font-size: 10.5px; color: rgba(255,255,255,.38); font-weight: 400; line-height: 1.5; }
+.side .brand .bt { display: flex; flex-direction: column; gap: 2px; font-size: 13px; font-weight: 600; color: #fff; }
+.side .brand .bt small { font-size: 10.5px; color: rgba(255,255,255,.38); font-weight: 400; line-height: 1.5; }
 .ver {
   font-size: 10.5px; font-weight: 600; color: #a5f3fc; align-self: flex-start;
   background: #334155; border: 1px solid #475569; border-radius: 4px; padding: 0 6px;
@@ -355,7 +357,7 @@ html.night { color-scheme: dark; }
 html:not(.night) { color-scheme: light; }
 html.night body { background: #101012; color: #e5e7eb; }
 html.night .side { background: #17181b; }
-html.night .brand .bt { color: #f3f4f6; }
+html.night .side .brand .bt { color: #f3f4f6; }
 html.night .side-foot { border-top-color: #303236; }
 html.night .col { background: #1b1c1f; }
 html.night .col-title { background: #232428; border-bottom-color: #303236; color: #f3f4f6; }
@@ -441,7 +443,7 @@ body {
 }
 
 /* ---------- 侧栏：品牌渐变点缀 ---------- */
-.brand .bt { color: #f8fafc; }
+.side .brand .bt { color: #f8fafc; }
 .ver { background: var(--grad-sky); border: none; color: #fff; border-radius: 999px; padding: 1px 8px; box-shadow: 0 2px 8px rgba(14,165,233,.3); }
 .side { border-right: none; box-shadow: 1px 0 0 rgba(255,255,255,.06), 4px 0 24px rgba(0,0,0,.25); }
 .side-btn { border-radius: 10px; text-align: left; }

@@ -582,7 +582,6 @@ function showRunPanel(name) {
   document.querySelectorAll('#subnav a').forEach(a =>
     a.classList.toggle('on', a.dataset.panel === name));
   setCrumbSub(RUN_PANEL_NAMES[name]);
-  try { localStorage.setItem('appui_panel', name); } catch (e) { /* 隐私模式忽略 */ }
 }
 function initRunPanels() {
   document.querySelectorAll('#subnav a').forEach(a => {
@@ -593,10 +592,9 @@ function initRunPanels() {
       history.replaceState(null, '', '#' + a.dataset.panel);
     });
   });
+  /* 初始面板：hash 深链优先，否则默认第一个（项目管理）——不恢复上次停留 */
   let start = (location.hash || '').replace('#', '');
-  if (!RUN_PANELS.includes(start)) {
-    try { start = localStorage.getItem('appui_panel') || ''; } catch (e) { start = ''; }
-  }
+  if (!RUN_PANELS.includes(start)) start = RUN_PANELS[0];
   showRunPanel(start);
 }
 
