@@ -17,7 +17,7 @@ const state = {
   prevSigs: null,         // 上一次刷新的元素签名集合（Diff 基线；null=尚无）
   goneSigs: [],           // 本次刷新相对上次「消失」的元素签名
   undoStack: [],          // 本次会话「添加到用例」步骤的撤销栈（LIFO，存 add_code 返回的文件快照）
-  tempCase: null,         // 新建用例录制会话：本次已录步骤计数（真实步骤由 add_code 直接落库共享页面对象）
+  tempCase: null,         // 临时用例区（新建文件模式）：步骤先累积在内存，「保存」才打包 zip，全程不写框架
   coordMode: false,       // ⌖ 坐标模式：点截图选精确坐标（不再命中容器节点），用于无障碍盲区（自绘弹层等）
   coordPoint: null,       // 坐标模式下最后选中的点 [x, y]（设备坐标）
 };
@@ -1013,7 +1013,6 @@ async function openModal() {
   $('el-content').textContent = '';
   // 写入文件默认定位器自己的元素库文件（避免误写进框架自带文件；② 会在选目标用例后自动对齐）
   resetNewFileInputs();
-  $('el-file').disabled = false;
   $('el-file').value = state.defaultEleFile || 'locator_gui_elements.py';
   // 用途默认：直接选②（三件套一次完成：选已有用例或新建都可以）
   document.querySelector('input[name="el-purpose"][value="only"]').checked = true;
@@ -1039,14 +1038,17 @@ async function openModal() {
   setElLinkNote('');
   onOpTypeChange();
   await loadCaseFiles();
-  // 录制会话：保持「新建」模式并回填用例名，继续累积步骤（元素已锁定共享元素库）
+  // 临时用例会话：保持「新建」模式并回填用例名，继续累积步骤
   if (state.tempCase) {
     $('el-case-file').value = NEW_FILE_OPT;
     $('el-case-new').value = state.tempCase.base;
+    $('el-file').value = NEW_FILE_OPT;
+    $('el-file-new').value = state.tempCase.elemFile.replace(/\.py$/, '').replace(/Elements$/, '');
     $('el-case-new-wrap').style.display = '';
+    $('el-file-new-wrap').style.display = '';
     onCaseFileChange();
-    setElLinkNote('🧪 录制会话「' + state.tempCase.base + '」已录 ' + state.tempCase.steps.length
-      + ' 步 ·「保存并继续」继续录（元素入库、页面方法进共享页面对象）');
+    setElLinkNote('🧪 临时用例「' + state.tempCase.base + '」已录 ' + state.tempCase.steps.length
+      + ' 步（未入库）·「保存并继续」继续累积，「保存」导出 zip');
   }
   document.querySelector('input[name="el-purpose"][value="all"]').checked = true;
   onPurposeChange();
@@ -1070,8 +1072,16 @@ function resetNewFileInputs() {
 /* 当前是否新建用例（选择器值为 __new__ 或元素文件为 __new__） */
 function isNewCase() { return $('el-case-file').value === NEW_FILE_OPT; }
 function isNewElementFile() { return $('el-file').value === NEW_FILE_OPT; }
-/* 新用例基础名（test_ 后面的部分）：非法字符过滤 */
+/* 新用例基础名（test_ 后面的部分）：非法字符过滤；同时派生元素文件名 */
 function newCaseBase() { return ($('el-case-new').value || '').trim().replace(/[^A-Za-z0-9_]/g, '_'); }
+function newElementFileName() {
+  const b = newCaseBase();
+  return b ? b + 'Elements.py' : '';
+}
+function newCaseFileName() {
+  const b = newCaseBase();
+  return b ? 'test_' + b + '.py' : '';
+}
 /* 用途（①仅元素 / ②+用例 / ③+操作 三件套）：决定流程走到哪一栏 */
 function purposeValue() {
   const r = document.querySelector('input[name="el-purpose"]:checked');
@@ -1350,6 +1360,39 @@ function onOpTypeChange() {
 }
 /* ---- 代码预览：与后端 case_step_line 保持一致（所见即所得） ---- */
 function escQ(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+function previewLine(step) {
+  const t = step.type, el = step.element || '<元素名>', p = step.param || '';
+  switch (t) {
+    case 'click': return 'page.click_' + el + '()';
+    case 'input': return 'page.input_' + el + "('" + escQ(p) + "')";
+    case 'long_press': return 'page.long_press_' + el + '()';
+    case 'assert_visible': return 'page.assert_' + el + '()';
+    case 'assert_text': return 'page.assert_' + el + "_text('" + escQ(p) + "')";
+    case 'assert_toast': return "page.assert_toast('" + escQ(p) + "')";
+    case 'wait_element': {
+      const n = parseInt(p, 10);
+      return 'page.wait_' + el + (isNaN(n) ? '()' : '(' + n + ')');
+    }
+    case 'assert_gone': return 'page.assert_' + el + '_gone()';
+    case 'if_click': {
+      const n = parseInt(p, 10);
+      return 'page.click_' + el + '_if_visible(' + (isNaN(n) ? '' : n) + ')';
+    }
+    case 'hide_keyboard': return 'page.dismiss_keyboard()';
+    case 'screenshot': return "page.wait_and_shot('" + escQ(p) + "')";
+    case 'tap': {
+      const parts = p.split(',').map(x => x.trim()).filter(Boolean);
+      return parts.length >= 2 ? 'page.tap_xy(' + parts[0] + ', ' + parts[1] + ')'
+        : 'page.tap_xy(' + (parts[0] || '0') + ')';
+    }
+    case 'sleep': {
+      const n = parseFloat(p);
+      return 'time.sleep(' + (isNaN(n) ? (p || '1') : n) + ')';
+    }
+    case 'custom': return p || 'page.xxx()';
+    default: return '';
+  }
+}
 /* 页面方法名预览：与后端 method_name 派生规则一致（sleep/custom 无页面方法） */
 function pageMethodName(step) {
   const t = step.type, el = step.element || '<元素名>';
@@ -1471,15 +1514,14 @@ async function loadCaseFiles() {
   onCaseFileChange();
 }
 function onCaseFileChange() {
-  // 新建用例：切换到「新建输入模式」——方法/插入位置无意义；
-  // 页面方法统一进共享页面对象 appSharedPage，元素统一进共享元素库（锁定）
+  // 新建用例：切换到「新建输入模式」——方法/插入位置无意义，页面/元素文件自动派生
   const newCase = isNewCase();
   $('el-case-new-wrap').style.display = newCase ? '' : 'none';
   $('el-case-method').disabled = newCase;
   $('el-insert-pos').disabled = newCase;
-  $('el-page-file').value = newCase ? SHARED_PAGE_FILE + '（共享，页面方法统一追加）' : '';
-  if (newCase) { lockSharedElementFile(); renderStepsList([]); return; }
-  $('el-file').disabled = false;
+  $('el-page-file').value = newCase ? (newCaseBase() ? capFirst(newCaseBase()) + 'Page.py（随用例包新建）' : '（输入用例名后自动派生）')
+                                    : '';
+  if (newCase) { renderStepsList([]); return; }
   const f = $('el-case-file').value;
   const infos = (state.caseFiles || []).filter(c => c.file === f);
   const methods = [];
@@ -1530,39 +1572,107 @@ function onCaseFileChange() {
 /* 保存：按「用途」单选分流 —— ① 仅保存到元素库 / ② 保存并追加到目标用例方法 */
 /* 保存：按「保存到哪一步」分流 ① 仅元素 / ② +用例 / ③ +操作；
  * continueMode=true（保存并继续）= 保存后回到定位器，开启连续添加（点下一个元素自动弹本窗） */
-/* ---------- 保存测试用例包（新建用例骨架入库）：见 ensureCaseSkeleton / 共享页面对象 ----------
-   capCamel：login_flow -> LoginFlow（骨架类名用） */
-function capCamel(s) {
+/* ---------- 保存测试用例包（新建用例文件场景）：一次生成三件套 ----------
+   用例/页面/元素三个完整文件由前端按框架风格组装，后端 /api/save_case_package
+   与平台同进程直调用例管理入库（语法校验、备份、登记一条龙）；
+   局域网访问者可选「下载用例包 zip」交由平台「用例管理 → 上传用例包」入库。 */
+function capCamel(s) {  // login_flow -> LoginFlow（类名用）
   return String(s || '').split('_').filter(Boolean).map(capFirst).join('');
 }
+function pkgBase() { return newCaseBase(); }
+function pkgElementFileName() {
+  const raw = ($('el-file-new').value || '').trim().replace(/\.py$/i, '');  // 先剥 .py（过滤会把 . 变 _）
+  const v = raw.replace(/[^A-Za-z0-9_]/g, '_');
+  const b = pkgBase();
+  const stem = v || (b ? b + 'Elements' : '');
+  if (!stem) return '';
+  // 元素文件名必须以 Elements 结尾（页面/用例生成逻辑依赖该后缀判定归属）：
+  // 用户漏写或写成单数 Element 时自动规范化，.py 后缀同样自动补
+  const norm = stem.replace(/Elements?$/,'') + 'Elements';
+  return norm + '.py';
+}
+function pkgElementClassName() { const f = pkgElementFileName(); return f ? capFirst(f.replace('.py', '')) : ''; }
+function pkgPageFileName() { const b = pkgBase(); return b ? capFirst(b) + 'Page.py' : ''; }
+function pkgPageClassName() { const f = pkgPageFileName(); return f ? capFirst(f.replace('.py', '')) : ''; }
+function pkgCaseFileName() { const b = pkgBase(); return b ? 'test_' + b + '.py' : ''; }
 function pkgStepComment() { return $('el-op-comment').value.trim() || genStepDesc(currentStepObj()); }
 function currentStepObj() {
   return { type: $('el-op-type').value, element: $('el-name').value.trim() || '<元素名>', param: $('el-op-param').value.trim() };
 }
-/* ---------- 新建用例：骨架包 + 共享页面对象 ----------
-   页面方法统一进 pages/appSharedPage.py（同名方法覆盖）、元素统一进 elements/appSharedElements.py
-   （同定位复用，文件缺失由后端自动创建）——不再按用例生成三件套。
-   state.tempCase 仅记录本次录制会话的步骤计数（展示用），真实步骤由 add_code 逐步落库。 */
-const SHARED_ELEM_FILE = 'appSharedElements.py';
-const SHARED_PAGE_FILE = 'appSharedPage.py';
-function lockSharedElementFile() {
-  const sel = $('el-file');
-  if (![...sel.options].some(o => o.value === SHARED_ELEM_FILE))
-    sel.insertAdjacentHTML('beforeend', '<option value="' + esc(SHARED_ELEM_FILE) + '">' + esc(SHARED_ELEM_FILE) + '（共享元素库）</option>');
-  sel.value = SHARED_ELEM_FILE;
-  sel.disabled = true;
-  const fw = $('el-file-new-wrap');
-  if (fw) fw.style.display = 'none';
+/* 与后端 page_method_code 同规则的页面方法块（包生成用；pageMethodPreview 是展示格式，无签名不能执行） */
+function pkgMethodBlock(step) {
+  const t = step.type, el = step.element || '<元素名>';
+  const doc = $('el-op-comment').value.trim() || genStepDesc(step);
+  const p = (step.param || '').trim();
+  let sig = '', body = '';
+  if (t === 'click') sig = 'click_' + el + '(self)';
+  else if (t === 'input') { sig = 'input_' + el + '(self, text)'; body = 'self.appOperator.sendText(self._elements.' + el + ', text)'; }
+  else if (t === 'long_press') { sig = 'long_press_' + el + '(self)'; body = 'self.appOperator.touch_long_press(self._elements.' + el + ', duration_sconds=2)'; }
+  else if (t === 'assert_visible') { sig = 'assert_' + el + '(self)'; body = 'self.appOperator.getElement(self._elements.' + el + ')'; }
+  else if (t === 'assert_text') { sig = 'assert_' + el + '_text(self, expected)'; body = "assert self.appOperator.getText(self._elements." + el + ") == expected, '" + escQ(doc) + "'"; }
+  else if (t === 'assert_toast') { sig = 'assert_toast(self, text)'; body = "assert self.appOperator.is_toast_visible(text, wait_seconds=5), '" + escQ(doc) + "'"; }
+  else if (t === 'wait_element') {
+    const n = parseInt(p, 10); sig = 'wait_' + el + '(self, timeout_seconds=' + (isNaN(n) ? 60 : n) + ')';
+    body = probeBodyLines(el, 'timeout_seconds') + '\nself.appOperator.getElement(probe)';
+  }
+  else if (t === 'assert_gone') {
+    sig = 'assert_' + el + '_gone(self, wait_seconds=2)';
+    body = probeBodyLines(el, 'wait_seconds') + '\ngone = True\ntry:\n    self.appOperator.getElement(probe)\n    gone = False\nexcept Exception:\n    pass\n'
+      + "self.appOperator.assert_true_with_shot('" + escQ(doc) + "', gone,\n"
+      + "                                   '等待' + str(wait_seconds) + '秒内元素仍可见')";
+  }
+  else if (t === 'if_click') {
+    const n = parseInt(p, 10); sig = 'click_' + el + '_if_visible(self, timeout_seconds=' + (isNaN(n) ? 3 : n) + ')';
+    body = probeBodyLines(el, 'timeout_seconds') + '\ntry:\n    self.appOperator.click(self.appOperator.getElement(probe))\nexcept Exception:\n    pass';
+  }
+  else if (t === 'hide_keyboard') {
+    sig = 'dismiss_keyboard(self)';
+    body = 'try:\n    if self.appOperator.is_keyboard_shown():\n        self.appOperator.hide_keyboard()\nexcept Exception:\n    self.appOperator.press_keycode(4)\nimport time\ntime.sleep(1)';
+  }
+  else if (t === 'screenshot') { sig = 'wait_and_shot(self, tag)'; body = 'import time\ntime.sleep(1)\nself.appOperator.get_screenshot(tag)'; }
+  else if (t === 'tap') { sig = 'tap_xy(self, x, y)'; body = 'self.appOperator.tap(x, y)'; }
+  if (t === 'click') body = 'self.appOperator.click(self._elements.' + el + ')';
+  return '    def ' + sig + ':\n        """' + doc + '"""\n        ' + body.replace(/\n/g, '\n        ');
 }
-/* 用例骨架：import 共享页面对象，测试方法留空（步骤经 add_code 逐步追加） */
-function skeletonPackage(base) {
-  return [{ dir: 'cases/app_ui/android/demoProject', name: 'test_' + base + '.py', content:
-    '# -*- coding: utf-8 -*-\n'
-    + '# 用例 ' + base + ' · 录制骨架（「保存并继续」逐步追加步骤，页面方法统一在 appSharedPage）\n'
+function pkgFiles() {
+  const elemName = $('el-name').value.trim();
+  const elemFile = pkgElementFileName();
+  const elemClass = pkgElementClassName();
+  const pageFile = pkgPageFileName();
+  const pageClass = pkgPageClassName();
+  const base = pkgBase();
+  const elemLine = '        ' + elementLinePreview();
+  const methodBlock = pkgMethodBlock(currentStepObj());
+  const stepComment = pkgStepComment();
+  const elemPy = '# -*- coding: utf-8 -*-\n'
+    + '# 本文件由 GUI 元素定位器自动生成/维护（用例包：' + base + '）\n'
+    + 'from page_objects.createElement import CreateElement\n'
+    + 'from page_objects.app_ui.locator_type import Locator_Type\n'
+    + 'from page_objects.app_ui.wait_type import Wait_Type as Wait_By\n'
+    + '\n\n'
+    + 'class ' + elemClass + ':\n'
+    + '    def __init__(self):\n'
+    + elemLine + '\n';
+  const pagePy = '# -*- coding: utf-8 -*-\n'
+    + '# 页面对象（用例包：' + base + '）\n'
+    + 'from page_objects.app_ui.android.demoProject.elements.' + elemFile.replace('.py', '') + ' import ' + elemClass + '\n'
+    + '\n\n'
+    + 'class ' + pageClass + ':\n'
+    + '\n'
+    + '    def __init__(self, appOperator):\n'
+    + '        self.appOperator = appOperator\n'
+    + '        self._elements = ' + elemClass + '()\n'
+    + '\n'
+    + methodBlock + '\n';
+  const casePy = '# -*- coding: utf-8 -*-\n'
+    + '# 用例包 ' + base + ' · ' + stepComment + '\n'
+    + '# 流程：\n'
+    + '# 1. 拉起快歌主页面\n'
+    + '# 2. ' + stepComment + '\n'
     + 'import time\n'
     + 'import allure\n'
     + 'from base.app_ui.android.demoProject.app_ui_android_demoProject_client import APP_UI_Android_demoProject_Client\n'
-    + 'from page_objects.app_ui.android.demoProject.pages.appSharedPage import AppSharedPage\n'
+    + 'from page_objects.app_ui.android.demoProject.pages.' + pageFile.replace('.py', '') + ' import ' + pageClass + '\n'
     + '\n\n'
     + "@allure.parent_suite('快歌APP自动化')\n"
     + "@allure.suite('" + base + "')\n"
@@ -1574,28 +1684,145 @@ function skeletonPackage(base) {
     + '        self.appOperator = self.demoProjectClient.appOperator\n'
     + "        self.appOperator.start_activity('com.recordlife.kuaige', 'com.recordlife.kuaige.feature.main.MainActivity')\n"
     + '        time.sleep(3)\n'
-    + '        self.page = AppSharedPage(self.appOperator)\n'
+    + '        self.page = ' + pageClass + '(self.appOperator)\n'
     + '\n'
-    + "    @allure.title('" + base + "')\n"
+    + "    @allure.title('" + stepComment + "')\n"
     + '    def test_' + base + '(self):\n'
     + '        page = self.page\n'
     + '\n'
+    + '        # 1. ' + stepComment + '\n'
+    + '        ' + previewLine(currentStepObj()) + '\n'
+    + '\n'
     + '    def teardown_class(self):\n'
-    + '        self.appOperator.close_app()\n' }];
+    + '        self.appOperator.close_app()\n';
+  return [
+    { dir: 'cases/app_ui/android/demoProject', name: pkgCaseFileName(), content: casePy },
+    { dir: 'page_objects/app_ui/android/demoProject/pages', name: pageFile, content: pagePy },
+    { dir: 'page_objects/app_ui/android/demoProject/elements', name: elemFile, content: elemPy },
+  ];
 }
-/* 骨架不存在则入库（后端 ensure_shared_page 同步补共享页面对象），并把目标用例切到新文件 */
-async function ensureCaseSkeleton(base) {
-  const caseFileNew = 'test_' + base + '.py';
-  if ((state.caseFiles || []).some(c => c.file === caseFileNew)) return true;
-  const r = await fetch('api/save_case_package', {
+/* 包弹窗预览：三个文件落点 */
+/* 生成三件套 zip：mode=save（交平台做校验/备份/登记后入库）/ download（浏览器下载 zip） */
+/* 新建用例（填写了自定义文件名）的按钮直通分支：
+   continueMode=true（保存并继续）→ 三件套（已含当前步骤）直接入库，弹窗关闭并进入
+   连续添加，后续步骤默认继续写入该用例；continueMode=false（保存）→ 打包为 zip
+   下载（不落库），由用户经平台「用例管理 → 上传用例包」入库。 */
+/* ---------- 临时用例区：新建文件模式下步骤先累积在内存，「保存」才打包 zip（全程不写框架） ---------- */
+function tempCaseEnsure() {
+  if (state.tempCase) return state.tempCase;
+  state.tempCase = {
+    base: pkgBase(),
+    caseName: pkgCaseFileName(),
+    pageFile: pkgPageFileName(),
+    elemFile: pkgElementFileName(),
+    pageClass: pkgPageClassName(),
+    elemClass: pkgElementClassName(),
+    steps: [],              // { comment, line, elemName, elemLine, methodBlock }
+  };
+  return state.tempCase;
+}
+function tempCaseAppend() {
+  const tc = tempCaseEnsure();
+  const step = currentStepObj();
+  const st = STEP_TYPES.find(t => t.v === step.type) || {};
+  tc.steps.push({
+    comment: pkgStepComment(),
+    line: previewLine(step),
+    elemName: st.el ? $('el-name').value.trim() : '',
+    elemLine: st.el ? elementLinePreview() : '',
+    methodBlock: pkgMethodBlock(step),
+  });
+  tempCaseRegen();
+  return tc;
+}
+function tempCaseRegen() {
+  const tc = state.tempCase;
+  if (!tc) return;
+  // 元素文件：同名元素取最后一次定义（保持首次出现顺序）
+  const eOrder = [], eMap = {};
+  tc.steps.forEach(s => {
+    if (!s.elemName || !s.elemLine) return;
+    if (!(s.elemName in eMap)) eOrder.push(s.elemName);
+    eMap[s.elemName] = s.elemLine;
+  });
+  tc.elemContent = '# -*- coding: utf-8 -*-\n'
+    + '# 临时用例（未入库）：' + tc.base + '\n'
+    + 'from page_objects.createElement import CreateElement\n'
+    + 'from page_objects.app_ui.locator_type import Locator_Type\n'
+    + 'from page_objects.app_ui.wait_type import Wait_Type as Wait_By\n'
+    + '\n\n'
+    + 'class ' + tc.elemClass + ':\n'
+    + '    def __init__(self):\n'
+    + (eOrder.length ? eOrder.map(n => '        ' + eMap[n]).join('\n') + '\n' : '        pass\n');
+  // 页面文件：同名方法取最后一次（元素行变化的更新语义与后端一致）
+  const mOrder = [], mMap = {};
+  tc.steps.forEach(s => {
+    if (!s.methodBlock) return;
+    const mn = (s.methodBlock.match(/def (\w+)/) || [])[1];
+    if (!mn) return;
+    if (!(mn in mMap)) mOrder.push(mn);
+    mMap[mn] = s.methodBlock;
+  });
+  tc.pageContent = '# -*- coding: utf-8 -*-\n'
+    + '# 临时用例（未入库）：' + tc.base + '\n'
+    + 'from page_objects.app_ui.android.demoProject.elements.' + tc.elemFile.replace('.py', '') + ' import ' + tc.elemClass + '\n'
+    + '\n\n'
+    + 'class ' + tc.pageClass + ':\n'
+    + '\n'
+    + '    def __init__(self, appOperator):\n'
+    + '        self.appOperator = appOperator\n'
+    + '        self._elements = ' + tc.elemClass + '()\n'
+    + (mOrder.length ? '\n' + mOrder.map(n => mMap[n]).join('\n') + '\n' : '');
+  // 用例文件：头部流程注释 + 方法体逐步骤
+  const flow = ['# 1. 拉起快歌主页面'].concat(tc.steps.map((s, i) => '# ' + (i + 2) + '. ' + s.comment));
+  tc.caseContent = '# -*- coding: utf-8 -*-\n'
+    + '# 用例包 ' + tc.base + ' · ' + tc.steps.length + ' 步（临时用例，未入库）\n'
+    + flow.map(l => '# ' + l + '\n').join('')
+    + 'import time\n'
+    + 'import allure\n'
+    + 'from base.app_ui.android.demoProject.app_ui_android_demoProject_client import APP_UI_Android_demoProject_Client\n'
+    + 'from page_objects.app_ui.android.demoProject.pages.' + tc.pageFile.replace('.py', '') + ' import ' + tc.pageClass + '\n'
+    + '\n\n'
+    + "@allure.parent_suite('快歌APP自动化')\n"
+    + "@allure.suite('" + tc.base + "')\n"
+    + 'class Test' + capCamel(tc.base) + ':\n'
+    + '\n'
+    + '    def setup_class(self):\n'
+    + '        # is_need_kill_app=False：绕开 demo 客户端硬编码启动，显式启动被测 App\n'
+    + '        self.demoProjectClient = APP_UI_Android_demoProject_Client(is_need_kill_app=False)\n'
+    + '        self.appOperator = self.demoProjectClient.appOperator\n'
+    + "        self.appOperator.start_activity('com.recordlife.kuaige', 'com.recordlife.kuaige.feature.main.MainActivity')\n"
+    + '        time.sleep(3)\n'
+    + '        self.page = ' + tc.pageClass + '(self.appOperator)\n'
+    + '\n'
+    + "    @allure.title('" + tc.base + ' · ' + tc.steps.length + " 步')\n"
+    + '    def test_' + tc.base + '(self):\n'
+    + '        page = self.page\n'
+    + '\n'
+    + tc.steps.map((s, i) => '        # ' + (i + 1) + '. ' + s.comment + '\n        ' + s.line + '\n\n').join('')
+    + '    def teardown_class(self):\n'
+    + '        self.appOperator.close_app()\n';
+}
+async function tempCaseExportZip() {
+  const tc = state.tempCase;
+  if (!tc) return null;
+  tempCaseRegen();
+  const resp = await fetch('api/build_case_package', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ package: base, files: skeletonPackage(base) }),
-  }).then(x => x.json()).catch(() => null);
-  if (!r || !r.ok) { showElResult('新建用例入库失败：' + ((r && r.msg) || '服务异常'), false); return false; }
-  await loadCaseFiles();
-  $('el-case-file').value = caseFileNew;
-  onCaseFileChange();
-  return true;
+    body: JSON.stringify({ package: tc.base, files: [
+      { dir: 'cases/app_ui/android/demoProject', name: tc.caseName, content: tc.caseContent },
+      { dir: 'page_objects/app_ui/android/demoProject/pages', name: tc.pageFile, content: tc.pageContent },
+      { dir: 'page_objects/app_ui/android/demoProject/elements', name: tc.elemFile, content: tc.elemContent },
+    ] }),
+  });
+  if (!resp.ok) return null;
+  const blob = await resp.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = tc.base + '.zip';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  return tc.base;
 }
 
 async function onSaveElement(continueMode) {
@@ -1605,23 +1832,39 @@ async function onSaveElement(continueMode) {
   if (purpose === 'popup') { await savePopupRule(continueMode); return; }
   const name = $('el-name').value.trim();
   if (purpose !== 'only') {
-    // 新建用例：元素文件已锁定共享元素库；骨架未建则先入库（save_case_package，
-    // 后端仅缺失时创建共享页面对象 appSharedPage），随后与「已有用例」走同一条
-    // 元素入库 + add_code 链路——页面方法统一进共享页面对象，不再按用例生成三件套
+    // 防误操作：「写入元素文件」与「目标用例文件」的新建状态必须同步——
+    // 一起新建（随临时用例打包 zip）或都选已有文件；不同步时 toast 提示并阻止保存
+    if (isNewCase() !== isNewElementFile()) {
+      showToast('⚠️ 「写入元素文件」与「目标用例文件」需同步：要么都用「➕ 新建」，要么都选已有文件');
+      return;
+    }
+    // 新建用例（填写了自定义文件名）：全程写【临时用例区】（内存），与框架零交互——
+    //   保存并继续 = 当前步骤累积进临时区 → 关弹窗，自由选元素后点「添加测试用例」继续
+    //   保存       = 临时区三件套（含全部已录步骤）打包 zip 下载 → 结束会话
     if (isNewCase()) {
-      if (!newCaseBase()) { showElResult('请先输入新用例名（test_ 后面的部分）', false); return; }
+      if (!pkgBase()) { showElResult('请先输入新用例名（test_ 后面的部分）', false); return; }
       if (!name) { showElResult('元素名称不能为空', false); return; }
-      if (state.tempCase && state.tempCase.base !== newCaseBase()) {
-        if (!confirm('已有录制会话「' + state.tempCase.base + '」（' + state.tempCase.steps.length
-            + ' 步）。换用例名将丢弃该会话记录，继续？')) return;
+      if (state.tempCase && state.tempCase.base !== pkgBase()) {
+        if (!confirm('已有临时用例「' + state.tempCase.base + '」（' + state.tempCase.steps.length
+            + ' 步，未导出）。换用例名将丢弃它，继续？')) return;
         state.tempCase = null;
       }
-      const tc = state.tempCase = (state.tempCase || { base: newCaseBase(), steps: [] });
-      tc.base = newCaseBase();
-      tc.steps.push({ comment: pkgStepComment() });   // 会话步骤计数（展示用）；真实步骤由 add_code 落库
-      if (!await ensureCaseSkeleton(newCaseBase())) return;
-      // 骨架就绪、目标用例已切换为新建文件 → 落入下方公共链路（元素入库 + add_code）
+      const tc = tempCaseEnsure();
+      tempCaseAppend();
+      if (continueMode) {
+        $('modal-mask').style.display = 'none';
+        showToast('✅ 已存入临时用例「' + tc.base + '」（共 ' + tc.steps.length
+          + ' 步，未入库）· 点「添加测试用例」继续录，点「保存」导出 zip');
+      } else {
+        const base = await tempCaseExportZip();
+        if (!base) { showElResult('导出 zip 失败：服务异常（临时用例已保留，可重试）', false); return; }
+        state.tempCase = null;   // zip 已交付，会话结束
+        $('modal-mask').style.display = 'none';
+        showToast('📦 已导出 ' + base + '.zip（含全部 ' + '已录步骤）· 请到平台「用例管理 → 上传用例包」入库');
+      }
+      return;
     }
+    // 都选已有文件 → 继续走「元素入库 + 追加用例行」（下方既有流程）
   }
   // 选②：前置校验用例栏（保存元素前就拦住，避免元素入库了代码却追加不了）
   let caseFile = '', methodName = '';
@@ -1629,7 +1872,7 @@ async function onSaveElement(continueMode) {
     caseFile = $('el-case-file').value;
     methodName = $('el-case-method').value;
     if (!(state.caseFiles || []).some(c => c.file === caseFile)) {
-      showElResult('请选择目标用例文件（或选「➕ 新建用例文件…」录入骨架后逐步追加）', false); return;
+      showElResult('请选择目标用例文件（或选「➕ 新建用例文件…」一次生成三件套）', false); return;
     }
     if (!methodName) { showElResult('请选择目标方法', false); return; }
   }
@@ -1702,7 +1945,7 @@ async function onSaveElement(continueMode) {
   res.className = 'el-result ok';
   pushUndoRecord(cr);
   res.textContent = (dupHandled ? '已使用已有元素「' + savedName + '」' : r.msg)
-    + '；' + cr.msg + '（页面方法已写入共享页面对象 appSharedPage）';
+    + '；' + cr.msg + '（三件套已联动完成）';
   // 展示追加后的目标方法片段 + ③ 生成的页面方法片段（方便确认写入位置）
   let snippets = [];
   if (cr.content) {

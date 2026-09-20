@@ -484,7 +484,7 @@
           <div class="field" id="cnCaseNewWrap" style="display:none">
             <label>新用例名</label>
             <input type="text" id="cnCaseNew" placeholder="如: login_flow（前缀 test_ 固定，.py 自动加）">
-            <span class="muted" style="font-size:11px">保存并继续 = 创建用例文件（页面方法统一写入共享页面对象 appSharedPage），后续步骤继续追加</span>
+            <span class="muted" style="font-size:11px">保存并继续 = 三件套（用例+页面+元素）直接入库，后续步骤默认继续写入该用例</span>
           </div>
           <div class="field"><label>目标测试方法</label><select id="cnCaseMethod"></select></div>
           <div class="field"><label>用例备注</label><input type="text" id="cnCaseComment" placeholder="留空=自动生成（可不填）"></div>
@@ -501,7 +501,7 @@
             <div class="field wide"><label>写入页面文件</label><input type="text" id="cnPageFile" readonly placeholder="选择目标用例后自动带出"></div>
           </div>
         </div>
-        <p class="muted" style="font-size:12px">💾 保存并继续 = 元素入库 + 步骤写入用例 + 页面方法进共享页面对象（appSharedPage，同名自动覆盖）</p>
+        <p class="muted" style="font-size:12px">💾 保存并继续 = 元素入库 + 操作写入用例 + 页面方法自动生成（三件套一次完成）</p>
       </div>
     </div>
     <div class="cnew-foot">
