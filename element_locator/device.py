@@ -17,6 +17,8 @@ import xml.etree.ElementTree as ET
 
 ADB = os.path.expanduser('~/Library/Android/sdk/platform-tools/adb')
 
+last_error = ''   # 最近一次截图/dump 的失败原因（刷新接口透出给前端，不再笼统报错）
+
 # 有意义的节点属性（用于展示和定位）
 ATTR_KEYS = ['index', 'text', 'resource-id', 'class', 'package', 'content-desc',
              'checkable', 'checked', 'clickable', 'focusable', 'focused', 'scrollable',
@@ -69,15 +71,33 @@ def device_info(serial):
 
 
 def screenshot_png(serial):
-    """返回设备截图 PNG bytes"""
-    try:
-        p = subprocess.run([ADB, '-s', serial, 'exec-out', 'screencap', '-p'],
-                           capture_output=True, timeout=30)
-        if p.returncode == 0 and p.stdout:
-            return p.stdout
-    except Exception:
-        pass
+    """返回设备截图 PNG bytes；失败自动重试 3 次（间隔 0.5s，USB 闪断自愈），原因记入 last_error"""
+    global last_error
+    for _ in range(3):
+        try:
+            p = subprocess.run([ADB, '-s', serial, 'exec-out', 'screencap', '-p'],
+                               capture_output=True, timeout=30)
+            if p.returncode == 0 and p.stdout[:4] == b'\x89PNG':
+                return p.stdout
+            last_error = '截图失败（adb 退出码 %s）' % p.returncode
+        except Exception as e:
+            last_error = '截图异常: %s' % str(e)[:60]
+        time.sleep(0.5)
+    last_error += '（已重试 3 次）'
     return None
+
+
+def restart_adb(wait_seconds=10):
+    """adb 级恢复：重启 adb server 并等设备重新上线（USB 闪断/offline 等连接类故障，
+    设备层重试救不回来时由刷新接口升级调用）。返回是否重新看到在线设备。"""
+    subprocess.run([ADB, 'kill-server'], capture_output=True, timeout=10)
+    subprocess.run([ADB, 'start-server'], capture_output=True, timeout=10)
+    deadline = time.time() + wait_seconds
+    while time.time() < deadline:
+        if _online_serials():
+            return True
+        time.sleep(1)
+    return False
 
 
 def tap(serial, x, y):
@@ -120,6 +140,24 @@ def _u2_server_running(serial):
     return bool(out and out.strip())
 
 
+def _system_dump(serial):
+    """系统 uiautomator dump 单次：删旧文件 → dump → cat（只认本次生成的树，绝不吃旧树）"""
+    _run(['-s', serial, 'shell', 'rm', '-f', '/sdcard/ui_dump.xml'], timeout=8)
+    _run(['-s', serial, 'shell', 'uiautomator', 'dump', '/sdcard/ui_dump.xml'], timeout=8)
+    xml = _run(['-s', serial, 'shell', 'cat', '/sdcard/ui_dump.xml'], timeout=8)
+    return xml if xml and '<hierarchy' in xml else None
+
+
+def _kill_u2_server(serial):
+    """强杀设备上的 uiautomator2 server。僵尸态：进程在但 UiAutomation 已断连
+    （建会话报 UiAutomation not connected），却占着通道让系统 dump 也拿不到
+    idle——跑完真机用例后刷新失败多源于此；杀掉后系统 dump 立即恢复。"""
+    for pkg in ('io.appium.uiautomator2.server.test', 'io.appium.uiautomator2.server'):
+        _run(['-s', serial, 'shell', 'am', 'force-stop', pkg], timeout=8)
+    _U2_STATES[serial] = {'ok': False, 'session': None}
+    time.sleep(1)
+
+
 def dump_xml(serial):
     """uiautomator dump 返回页面 XML 文本；连续失败返回 None
 
@@ -142,15 +180,28 @@ def dump_xml(serial):
         if u2:
             return u2
     for _ in range(3):
-        # 先删旧文件：若 dump 失败，cat 无文件可读 -> 返回空，绝不把旧树当新树
-        _run(['-s', serial, 'shell', 'rm', '-f', '/sdcard/ui_dump.xml'], timeout=8)
-        _run(['-s', serial, 'shell', 'uiautomator', 'dump', '/sdcard/ui_dump.xml'], timeout=8)
-        xml = _run(['-s', serial, 'shell', 'cat', '/sdcard/ui_dump.xml'], timeout=8)
-        if xml and '<hierarchy' in xml:
+        xml = _system_dump(serial)
+        if xml:
             return xml
         _release_ui_idle(serial)
-    # 系统 dump 连续失败（多为持续动画导致 never idle，或 u2 通道刚失败）→ 降级 u2
-    return _dump_via_u2(serial)
+    xml = _dump_via_u2(serial)
+    if xml:
+        return xml
+    # 双通道全败 + u2 进程仍在 = 僵尸 server（占通道但自身失联）→ 强杀后重试
+    if _u2_server_running(serial):
+        _kill_u2_server(serial)
+        for _ in range(3):
+            xml = _system_dump(serial)
+            if xml:
+                return xml
+            _release_ui_idle(serial)
+        xml = _dump_via_u2(serial)   # 通道已清空：冷启动全新 u2 server 兜底
+        if xml:
+            return xml
+    global last_error
+    last_error = ('界面 dump 失败：系统 uiautomator 与 u2 通道均未成功'
+                  '（已各重试 3 次并清理设备上的 u2 server）')
+    return None
 
 
 # ---------------------------------------------------------------
@@ -248,10 +299,15 @@ def _u2_ensure(serial):
         }},
     }, timeout=30)
     try:
-        sid = json.loads(resp)['sessionId']
+        data = json.loads(resp)
+        # W3C 格式（u2 server 10.x 实测）：顶层 sessionId 是 "None"，真实 id 在 value.sessionId；
+        # 取错字段会把字符串 "None" 当 session 用，所有取树请求都报 invalid session id
+        sid = data.get('sessionId')
+        if not sid or sid == 'None':
+            sid = (data.get('value') or {}).get('sessionId')
         st['session'] = sid
-        st['ok'] = True
-        return True
+        st['ok'] = bool(sid)
+        return bool(sid)
     except Exception:
         return False
 

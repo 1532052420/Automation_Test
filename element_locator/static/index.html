@@ -151,8 +151,6 @@ try {
               <span class="hint" style="font-size:11px">结尾自动补 Elements（固定不可省略）、.py 后缀自动添加</span>
             </span>
           </label>
-          <div class="pv-title">元素代码 <span class="hint">实时</span></div>
-          <pre id="el-code-element" class="el-content mini"></pre>
         </section>
 
         <!-- 第二栏：用例 -->
@@ -165,7 +163,7 @@ try {
               <span class="hint" style="font-size:11px">最终文件名 test_&lt;输入&gt;.py（前缀固定不可改）</span>
             </span>
           </label>
-          <label>目标测试方法 <span class="help-icon" data-help="这步操作的代码行（如 page.click_qs_frame()）追加到用例文件里哪个 def test_xxx 测试方法的末尾。注意：页面操作方法不用在这里选——它由③的操作类型+元素名称自动生成（如 click_qs_frame），并自动写入目标用例绑定的页面文件（见③「写入页面文件」）。">?</span>
+          <label>页面操作 <span class="help-icon" data-help="这步操作的代码行（如 page.click_qs_frame()）追加到用例文件里哪个 def test_xxx 测试方法的末尾。注意：页面操作方法不用在这里选——它由③的操作类型+元素名称自动生成（如 click_qs_frame），并自动写入目标用例绑定的页面文件（见③「写入页面文件」）。">?</span>
             <select id="el-case-method"></select>
           </label>
           <label>用例备注 <span class="help-icon" data-help="这一步在用例里的注释（如「第3步：点登录」），写在追加代码行的上一行，读用例时一眼看懂每步在干嘛。可不填——留空会自动生成（如「点击 login_btn」）。">?</span>
@@ -194,8 +192,6 @@ try {
             <input id="el-page-file" type="text" readonly placeholder="选择目标用例后自动带出">
           </label>
           <div id="op-note" class="op-note"></div>
-          <div class="pv-title">页面方法代码 <span class="hint">实时 · 选③时生成 · 方法名=操作类型+元素名，自动写入上面的页面文件</span></div>
-          <pre id="el-code-preview" class="el-content mini"></pre>
         </section>
 
         <!-- 弹窗规则栏：用途③（登记随机弹窗）专用，与三件套流程互斥显示 -->

@@ -72,22 +72,23 @@ def _request_serial():
     return serial or None
 
 
-def _refresh_payload():
-    """截图 + 元素树 完整载荷（按前端指定的设备；设备掉线自动回退第一台）
+def _refresh_once():
+    """截图 + 元素树 完整载荷（按前端指定的设备；设备掉线自动回退第一台）。
+    返回 (payload, reason)：失败时 reason 带真实原因（哪一步、做过什么）。
     fallback=True：请求的设备已掉线、响应来自回退设备——前端据此校正下拉，
     并与「过期响应」（用户已切到别的设备）区分开，过期响应直接丢弃防串台"""
     asked = _request_serial()
     serial = device.get_device(asked)
     if not serial:
-        return None
+        return None, '未检测到在线设备（USB 断开、未授权或 adb 掉线）'
     png = device.screenshot_png(serial)
     xml = device.dump_xml(serial)
     if not xml:
-        return None
+        return None, device.last_error or '界面 dump 失败'
     try:
         data = device.xml_to_tree(xml)
-    except Exception:
-        return None
+    except Exception as e:
+        return None, '元素树解析失败: %s' % str(e)[:80]
     # 为每个节点生成定位候选（ID/XPath/UIAutomator 等）
     for n in data['all']:
         n['locators'] = device.gen_locators(n, data['all'])
@@ -100,7 +101,16 @@ def _refresh_payload():
         'height': data['height'],
         'tree': _serialize(data['tree']),
         'all': [_serialize(n, with_children=False) for n in data['all']],
-    }
+    }, ''
+
+
+def _platform_running():
+    """平台是否正在执行测试——重启 adb 会打断执行链路，运行中不做 adb 级恢复"""
+    try:
+        from web_platform import runner
+        return bool(runner.manager.running_task())
+    except Exception:
+        return False
 
 
 @app.route('/')
@@ -126,10 +136,21 @@ def api_status():
 
 @app.route('/api/refresh', methods=['POST'])
 def api_refresh():
-    payload = _refresh_payload()
-    if not payload:
-        return jsonify({'ok': False, 'msg': '刷新失败：请检查设备连接，或设备屏幕是否为亮屏状态'})
-    return jsonify({'ok': True, **payload})
+    """刷新 = 截图 + 元素树。失败自愈链：设备层已各自重试 3 次 →
+    这里升级重启 adb server 再试一轮（USB 闪断/offline 类故障的最终自愈手段；
+    平台有测试在跑时不重启，防打断执行链路）→ 仍失败才报错，且带真实原因。"""
+    payload, reason = _refresh_once()
+    if payload:
+        return jsonify({'ok': True, **payload})
+    if not _platform_running():
+        if device.restart_adb():
+            payload, reason2 = _refresh_once()
+            if payload:
+                return jsonify({'ok': True, **payload})
+            reason = reason2 + '（已自动重启 adb 并重试仍失败）'
+        else:
+            reason += '（已自动重启 adb，设备未重新上线——请重新插拔 USB 线）'
+    return jsonify({'ok': False, 'msg': '刷新失败：%s' % reason})
 
 
 @app.route('/api/library')

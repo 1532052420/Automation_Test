@@ -189,28 +189,19 @@ async function init() {
   $('btn-dup-cancel').addEventListener('click', () => { const r = dupResolver; closeDupPanel(); if (r) r('cancel'); });
   document.querySelectorAll('input[name="el-purpose"]').forEach(r => r.addEventListener('change', onPurposeChange));
   $('el-op-type').addEventListener('change', onOpTypeChange);
-  $('el-op-param').addEventListener('input', () => { paramAuto = false; updatePreview(); });
+  $('el-op-param').addEventListener('input', () => { paramAuto = false; });
   $('el-case-file').addEventListener('change', onCaseFileChange);
-  $('el-case-method').addEventListener('change', updatePreview);
   // 新建文件输入联动：元素文件切「新建」显隐输入行；用例名输入实时派生页面/元素文件名
   $('el-file').addEventListener('change', () => {
     $('el-file-new-wrap').style.display = isNewElementFile() ? '' : 'none';
-    updatePreview();
   });
   $('el-case-new').addEventListener('input', () => {
     onCaseFileChange();
-    updatePreview();
   });
-  $('el-file-new').addEventListener('input', updatePreview);
-  // 「保存测试用例包」弹窗按钮
-  // 三栏字段变动 → 示例代码区实时刷新
-  ['el-name', 'el-value', 'el-comment', 'el-case-comment'].forEach(id => $(id).addEventListener('input', updatePreview));
-  $('el-op-comment').addEventListener('input', () => { opCommentAuto = false; updatePreview(); });
-  $('el-wait').addEventListener('change', updatePreview);
   // 定位方式切换：从当前元素的定位候选里取该类型的值回填（ID→ID值，XPATH→XPATH值…）
   $('el-type').addEventListener('change', onElTypeChange);
-  $('el-wait-sec').addEventListener('input', updatePreview);
-  $('el-insert-pos').addEventListener('change', () => { renderStepsList(currentSteps()); updatePreview(); });
+  $('el-op-comment').addEventListener('input', () => { opCommentAuto = false; });
+  $('el-insert-pos').addEventListener('change', () => { renderStepsList(currentSteps()); });
   // 顶部快速打开：用例 / 元素文件 / 页面操作 下拉打开编辑
   loadHeaderOpeners();
   $('open-case-sel').addEventListener('change', (e) => { onOpenHdrFile('case', e.target.value); e.target.value = ''; });
@@ -968,7 +959,6 @@ function onElTypeChange() {
     const best = cands.find(c => (c.desc || '').indexOf('唯一') >= 0) || cands[0];
     $('el-value').value = best.value;
   }
-  updatePreview();
 }
 
 /* ---------- 添加到元素库 ---------- */
@@ -1174,12 +1164,14 @@ function onPurposeChange() {
   $('col-popup').style.display = popup ? '' : 'none';
   ['col-element', 'col-case', 'col-op'].forEach(id => {
     $(id).style.display = popup ? 'none' : '';
-    $(id).classList.toggle('dim', !popup && p === 'only');
   });
+  // 仅元素 = 只走①栏：②③熄灭禁点；①元素栏必须保持可交互（dim 带 pointer-events:none，不能加到①上）
+  $('col-element').classList.remove('dim');
+  $('col-case').classList.toggle('dim', !popup && p === 'only');
+  $('col-op').classList.toggle('dim', !popup && p === 'only');
   if (popup) { ppPrefill(); loadPopupRules(); return; }
   if (p !== 'only') { onOpTypeChange(); onCaseFileChange(); }
   else { renderStepsList([]); updateOpNote(); }
-  updatePreview();
 }
 
 /* ---- 用途③：登记随机弹窗（写 popupElements.py 规则库，不进普通元素库） ---- */
@@ -1356,7 +1348,6 @@ function onOpTypeChange() {
   $('col-element').classList.toggle('soft', t.el === false);
   $('col-element').classList.toggle('dim', false);
   updateOpNote();
-  updatePreview();
 }
 /* ---- 代码预览：与后端 case_step_line 保持一致（所见即所得） ---- */
 function escQ(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
@@ -1393,17 +1384,6 @@ function previewLine(step) {
     default: return '';
   }
 }
-/* 页面方法名预览：与后端 method_name 派生规则一致（sleep/custom 无页面方法） */
-function pageMethodName(step) {
-  const t = step.type, el = step.element || '<元素名>';
-  return {
-    click: 'click_' + el, input: 'input_' + el, long_press: 'long_press_' + el,
-    assert_visible: 'assert_' + el, assert_text: 'assert_' + el + '_text',
-    assert_toast: 'assert_toast', screenshot: 'wait_and_shot', tap: 'tap_xy',
-    wait_element: 'wait_' + el, assert_gone: 'assert_' + el + '_gone',
-    if_click: 'click_' + el + '_if_visible', hide_keyboard: 'dismiss_keyboard',
-  }[t] || '';
-}
 /* 目标用例的页面文件（来自 /api/cases 的三件套归属信息） */
 function targetPageInfo() {
   const f = $('el-case-file').value;
@@ -1434,62 +1414,6 @@ function probeBodyLines(el, secondsVar) {
     + "                             self._elements." + el + ".locator_value,\n"
     + "                             wait_type=Wait_By.PRESENCE_OF_ELEMENT_LOCATED,\n"
     + "                             wait_seconds=" + secondsVar + ")";
-}
-function pageMethodPreview(step) {
-  const pm = pageMethodName(step);
-  if (!pm) return '（该操作类型无需页面方法）';
-  const el = step.element || '<元素名>';
-  const doc = $('el-op-comment').value.trim() || genStepDesc(step);
-  const t = step.type;
-  const p = step.param || '';
-  let sig = pm, body = '';
-  if (t === 'click') body = 'self.appOperator.click(self._elements.' + el + ')';
-  else if (t === 'input') { sig += '(self, text)'; body = 'self.appOperator.sendText(self._elements.' + el + ', text)'; }
-  else if (t === 'long_press') body = 'self.appOperator.touch_long_press(self._elements.' + el + ', duration_sconds=2)';
-  else if (t === 'assert_visible') body = 'self.appOperator.getElement(self._elements.' + el + ')';
-  else if (t === 'assert_text') { sig += '(self, expected)'; body = "assert self.appOperator.getText(self._elements." + el + ") == expected, '" + escQ(doc) + "'"; }
-  else if (t === 'assert_toast') { sig += '(self, text)'; body = "assert self.appOperator.is_toast_visible(text, wait_seconds=5), '" + escQ(doc) + "'"; }
-  else if (t === 'wait_element') {
-    const n = parseInt(p, 10);
-    sig += '(self, timeout_seconds=' + (isNaN(n) ? 60 : n) + ')';
-    body = probeBodyLines(el, 'timeout_seconds') + '\nself.appOperator.getElement(probe)';
-  }
-  else if (t === 'assert_gone') {
-    sig += '(self, wait_seconds=2)';
-    body = probeBodyLines(el, 'wait_seconds') + '\ngone = True\ntry:\n    self.appOperator.getElement(probe)\n    gone = False\nexcept Exception:\n    pass\n'
-      + "self.appOperator.assert_true_with_shot('" + escQ(doc) + "', gone,\n"
-      + "                                   '等待' + str(wait_seconds) + '秒内元素仍可见')";
-  }
-  else if (t === 'if_click') {
-    const n = parseInt(p, 10);
-    sig += '(self, timeout_seconds=' + (isNaN(n) ? 3 : n) + ')';
-    body = probeBodyLines(el, 'timeout_seconds') + '\ntry:\n    self.appOperator.click(self.appOperator.getElement(probe))\nexcept Exception:\n    pass';
-  }
-  else if (t === 'hide_keyboard') {
-    body = 'try:\n    if self.appOperator.is_keyboard_shown():\n        self.appOperator.hide_keyboard()\nexcept Exception:\n    self.appOperator.press_keycode(4)\nimport time\ntime.sleep(1)';
-  }
-  else if (t === 'screenshot') { sig += '(self, tag)'; body = 'import time\ntime.sleep(1)\nself.appOperator.get_screenshot(tag)'; }
-  else if (t === 'tap') { sig += '(self, x, y)'; body = 'self.appOperator.tap(x, y)'; }
-  return 'def ' + sig + ':\n    """' + doc + '"""\n    ' + body.replace(/\n/g, '\n    ');
-}
-function updatePreview() {
-  // 元素代码：任何用途都实时显示（元素栏是必走的第一步）
-  $('el-code-element').textContent = elementLinePreview();
-  const p = purposeValue();
-  const step = {
-    type: $('el-op-type').value,
-    element: $('el-name').value.trim() || '<元素名>',
-    param: $('el-op-param').value.trim(),
-  };
-  // 步骤列表的「本步」描述跟随类型/参数/描述实时刷新（避免列表里还挂着旧类型文案）
-  if (p !== 'only') renderStepsList(currentSteps());
-  // 页面方法：按用途显示（用例实时代码预览已移除）
-  if (p === 'only') {
-    $('el-code-preview').textContent = '';
-    return;
-  }
-  if (p === 'all') $('el-code-preview').textContent = pageMethodPreview(step);
-  else $('el-code-preview').textContent = '（② 不生成页面方法；目标页面须已存在同名方法）';
 }
 /* ---- 目标用例文件 + 方法（两级联动；③ 时元素文件自动对齐页面引用的元素文件） ---- */
 async function loadCaseFiles() {
@@ -1567,7 +1491,6 @@ function onCaseFileChange() {
   } else {
     setElLinkNote('');
   }
-  updatePreview();
 }
 /* 保存：按「用途」单选分流 —— ① 仅保存到元素库 / ② 保存并追加到目标用例方法 */
 /* 保存：按「保存到哪一步」分流 ① 仅元素 / ② +用例 / ③ +操作；
@@ -1599,7 +1522,7 @@ function pkgStepComment() { return $('el-op-comment').value.trim() || genStepDes
 function currentStepObj() {
   return { type: $('el-op-type').value, element: $('el-name').value.trim() || '<元素名>', param: $('el-op-param').value.trim() };
 }
-/* 与后端 page_method_code 同规则的页面方法块（包生成用；pageMethodPreview 是展示格式，无签名不能执行） */
+/* 与后端 page_method_code 同规则的页面方法块（用例包生成用） */
 function pkgMethodBlock(step) {
   const t = step.type, el = step.element || '<元素名>';
   const doc = $('el-op-comment').value.trim() || genStepDesc(step);
@@ -1874,7 +1797,7 @@ async function onSaveElement(continueMode) {
     if (!(state.caseFiles || []).some(c => c.file === caseFile)) {
       showElResult('请选择目标用例文件（或选「➕ 新建用例文件…」一次生成三件套）', false); return;
     }
-    if (!methodName) { showElResult('请选择目标方法', false); return; }
+    if (!methodName) { showElResult('请选择页面操作', false); return; }
   }
   // 同名（同文件）覆盖确认：防止误覆盖已有元素
   const fname = $('el-file').value;
