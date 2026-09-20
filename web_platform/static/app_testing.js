@@ -208,10 +208,10 @@ async function deleteProj(pid) {
 }
 
 /* ================= 新建用例弹窗（测试用例模块 · 三栏） =================
-   完全照搬元素定位器「添加测试用例」弹窗（横改竖）：用途 ① 仅元素 / ② 元素+用例+操作；
-   ① 元素（名称/定位方式/定位值/等待方式/等待时间/备注/写入元素文件，支持 ➕新建元素文件）；
-   ② 用例（目标用例文件（支持 ➕新建，临时用例三件套打包入库）/ 目标测试方法 / 用例备注 / 插入位置 /
-      当前用例步骤列表）；③ 操作（类型/参数/描述/写入页面文件）。
+   照搬元素定位器「添加测试用例」弹窗（横改竖）：
+   ① 元素（名称/定位方式/定位值/等待方式/等待时间/备注/写入元素文件）；
+   ② 用例（目标用例文件（支持 ➕新建：只建用例骨架，页面方法统一进共享页面对象 appSharedPage）/
+      目标测试方法 / 用例备注 / 插入位置 / 当前用例步骤列表）；③ 操作（类型/参数/描述/写入页面文件）。
    数据与写入全部复用定位器接口：/locator/api/{cases,refresh,add_element,add_code,save_case_package}。 */
 let _cnAll = [];          // 定位器扁平节点（bounds_num / locators）
 let _cnZoomPct = 100;     // 截图缩放百分比（100 = 适应容器宽）
@@ -220,11 +220,10 @@ let _cnCaseInfo = [];     // /locator/api/cases 三件套归属信息
 let _cnCaseSel = null;    // 当前选中的目标用例信息
 let _cnMethodSteps = [];  // 目标方法已有步骤描述列表
 let _cnWritten = 0;       // 本次弹窗已写入的步骤数
-let _cnTemp = null;       // 新建用例文件模式：临时步骤会话 {steps:[{comment,line,elemName,elemLine,methodBlock}]}
+let _cnTemp = null;       // 新建用例会话：本次录制的结构化步骤 {base, steps:[{type,element,param,desc,comment}]}
 const CN_NEW_FILE = '__new__';
 
-/* ---------------- 照搬定位器的代码生成辅助（临时用例三件套打包用） ---------------- */
-const cnEscQ = (s) => String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+/* ---------------- 新建用例骨架辅助（页面方法/元素统一进共享页面对象） ---------------- */
 function cnCapFirst(s) { s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 function cnCapCamel(s) { return String(s || '').split('_').filter(Boolean).map(cnCapFirst).join(''); }
 function cnIsNewCase() { return $('#cnCaseFile').value === CN_NEW_FILE; }
@@ -254,72 +253,8 @@ function cnGenDesc(type, element, param) {
     default: return (STEP_META[type] || {}).label || type;
   }
 }
-/* 用例行（与定位器 previewLine 同规则） */
-function cnPreviewLine(step) {
-  const t = step.type, el = step.element, p = step.param || '';
-  switch (t) {
-    case 'click': return 'page.click_' + el + '()';
-    case 'input': return "page.input_" + el + "('" + cnEscQ(p) + "')";
-    case 'long_press': return 'page.long_press_' + el + '()';
-    case 'assert_visible': return 'page.assert_' + el + '()';
-    case 'assert_text': return "page.assert_" + el + "_text('" + cnEscQ(p) + "')";
-    case 'assert_toast': return "page.assert_toast('" + cnEscQ(p) + "')";
-    case 'wait_element': { const n = parseInt(p, 10); return 'page.wait_' + el + (isNaN(n) ? '()' : '(' + n + ')'); }
-    case 'assert_gone': return 'page.assert_' + el + '_gone()';
-    case 'if_click': { const n = parseInt(p, 10); return 'page.click_' + el + '_if_visible(' + (isNaN(n) ? '' : n) + ')'; }
-    case 'hide_keyboard': return 'page.dismiss_keyboard()';
-    case 'screenshot': return "page.wait_and_shot('" + cnEscQ(p) + "')";
-    case 'tap': { const parts = p.split(',').map(x => x.trim()).filter(Boolean);
-      return parts.length >= 2 ? 'page.tap_xy(' + parts[0] + ', ' + parts[1] + ')' : 'page.tap_xy(' + (parts[0] || '0') + ')'; }
-    case 'sleep': { const n = parseFloat(p); return 'time.sleep(' + (isNaN(n) ? (p || '1') : n) + ')'; }
-    case 'custom': return p || 'page.xxx()';
-    default: return '';
-  }
-}
-/* 页面方法名（与后端派生规则一致） */
-function cnPageMethodName(type, el) {
-  return { click: 'click_' + el, input: 'input_' + el, long_press: 'long_press_' + el,
-    assert_visible: 'assert_' + el, assert_text: 'assert_' + el + '_text', assert_toast: 'assert_toast',
-    screenshot: 'wait_and_shot', tap: 'tap_xy', wait_element: 'wait_' + el,
-    assert_gone: 'assert_' + el + '_gone', if_click: 'click_' + el + '_if_visible',
-    hide_keyboard: 'dismiss_keyboard' }[type] || '';
-}
-function cnProbeBodyLines(el, secondsVar) {
-  return "probe = CreateElement.create(self._elements." + el + ".locator_type,\n"
-    + "                             self._elements." + el + ".locator_value,\n"
-    + "                             wait_type=Wait_By.PRESENCE_OF_ELEMENT_LOCATED,\n"
-    + "                             wait_seconds=" + secondsVar + ")";
-}
-/* 页面方法块（与定位器 pkgMethodBlock 同规则；doc=步骤描述） */
-function cnMethodBlock(step, doc) {
-  const t = step.type, el = step.element, p = (step.param || '').trim();
-  let sig = '', body = '';
-  if (t === 'click') sig = 'click_' + el + '(self)';
-  else if (t === 'input') { sig = 'input_' + el + '(self, text)'; body = 'self.appOperator.sendText(self._elements.' + el + ', text)'; }
-  else if (t === 'long_press') { sig = 'long_press_' + el + '(self)'; body = 'self.appOperator.touch_long_press(self._elements.' + el + ', duration_sconds=2)'; }
-  else if (t === 'assert_visible') { sig = 'assert_' + el + '(self)'; body = 'self.appOperator.getElement(self._elements.' + el + ')'; }
-  else if (t === 'assert_text') { sig = 'assert_' + el + '_text(self, expected)'; body = "assert self.appOperator.getText(self._elements." + el + ") == expected, '" + cnEscQ(doc) + "'"; }
-  else if (t === 'assert_toast') { sig = 'assert_toast(self, text)'; body = "assert self.appOperator.is_toast_visible(text, wait_seconds=5), '" + cnEscQ(doc) + "'"; }
-  else if (t === 'wait_element') { const n = parseInt(p, 10); sig = 'wait_' + el + '(self, timeout_seconds=' + (isNaN(n) ? 60 : n) + ')'; body = cnProbeBodyLines(el, 'timeout_seconds') + '\nself.appOperator.getElement(probe)'; }
-  else if (t === 'assert_gone') { sig = 'assert_' + el + '_gone(self, wait_seconds=2)'; body = cnProbeBodyLines(el, 'wait_seconds') + '\ngone = True\ntry:\n    self.appOperator.getElement(probe)\n    gone = False\nexcept Exception:\n    pass\n' + "self.appOperator.assert_true_with_shot('" + cnEscQ(doc) + "', gone,\n                                   '等待' + str(wait_seconds) + '秒内元素仍可见')"; }
-  else if (t === 'if_click') { const n = parseInt(p, 10); sig = 'click_' + el + '_if_visible(self, timeout_seconds=' + (isNaN(n) ? 3 : n) + ')'; body = cnProbeBodyLines(el, 'timeout_seconds') + '\ntry:\n    self.appOperator.click(self.appOperator.getElement(probe))\nexcept Exception:\n    pass'; }
-  else if (t === 'hide_keyboard') { sig = 'dismiss_keyboard(self)'; body = 'try:\n    if self.appOperator.is_keyboard_shown():\n        self.appOperator.hide_keyboard()\nexcept Exception:\n    self.appOperator.press_keycode(4)\nimport time\ntime.sleep(1)'; }
-  else if (t === 'screenshot') { sig = 'wait_and_shot(self, tag)'; body = 'import time\ntime.sleep(1)\nself.appOperator.get_screenshot(tag)'; }
-  else if (t === 'tap') { sig = 'tap_xy(self, x, y)'; body = 'self.appOperator.tap(x, y)'; }
-  if (t === 'click') body = 'self.appOperator.click(self._elements.' + el + ')';
-  return '    def ' + sig + ':\n        """' + doc + '"""\n        ' + body.replace(/\n/g, '\n        ');
-}
-function cnElementLine() {
-  const name = $('#cnElName').value.trim() || '<元素名>';
-  const val = $('#cnElLocVal').value.trim();
-  const sec = parseInt($('#cnElWaitSec').value, 10);
-  let line = "self." + name + " = CreateElement.create(Locator_Type." + $('#cnElLocType').value
-    + ", '" + cnEscQ(val) + "', wait_type=Wait_By." + $('#cnElWait').value;
-  if (!isNaN(sec) && sec >= 1) line += ', wait_seconds=' + sec;
-  line += ')';
-  const c = $('#cnElComment').value.trim();
-  return c ? line + '  # ' + c : line;
-}
+/* 用例代码行/页面方法块由后端 /locator/api/add_code 派生（同名页面方法自动覆盖），
+   前端不再拼三件套内容。 */
 
 /* ---------------- 弹窗打开 / 截图 / 缩放 / 拾取 ---------------- */
 function openCnModal() {
@@ -339,6 +274,7 @@ function openCnModal() {
     '<option value="' + esc(f) + '">' + esc(f) + '</option>').join('') +
     '<option value="' + CN_NEW_FILE + '">➕ 新建元素文件…</option>';
   $('#cnElemFileNew').value = ''; $('#cnElemFileNewWrap').style.display = 'none';
+  $('#cnElemFile').disabled = false;
   $('#cnCaseNew').value = ''; $('#cnCaseNewWrap').style.display = 'none';
   $('#cnStepType').innerHTML = Object.keys(STEP_META).map(t =>
     '<option value="' + t + '">' + STEP_META[t].label + '</option>').join('');
@@ -471,15 +407,22 @@ async function loadCnCases() {
 function onCnCaseChange() {
   const isNew = cnIsNewCase();
   $('#cnCaseNewWrap').style.display = isNew ? '' : 'none';
-  if (isNew) {                                   // 新建模式：方法/页面文件按用例名生成
+  if (isNew) {                                   // 新建模式：方法按用例名生成；页面/元素固定走共享页面对象
     _cnCaseSel = null; _cnMethodSteps = [];
     const base = cnNewCaseBase();
     $('#cnCaseMethod').innerHTML = '<option value="test_' + esc(base || 'x') + '">test_' + esc(base || 'x') + '（新建后自动生成）</option>';
-    $('#cnPageFile').value = base ? cnCapFirst(base) + 'Page.py' : '';
+    $('#cnPageFile').value = CN_SHARED_PAGE + '（共享，页面方法统一追加）';
+    const sel = $('#cnElemFile');                // 共享页面只 import 共享元素库 → 新建模式锁定
+    if (![...sel.options].some(o => o.value === CN_SHARED_ELEM))
+      sel.insertAdjacentHTML('beforeend', '<option value="' + CN_SHARED_ELEM + '">' + CN_SHARED_ELEM + '（共享元素库）</option>');
+    sel.value = CN_SHARED_ELEM;
+    sel.disabled = true;
+    $('#cnElemFileNewWrap').style.display = 'none';
     renderCnMethodSteps();
     return;
   }
   const file = $('#cnCaseFile').value;
+  $('#cnElemFile').disabled = false;
   _cnCaseSel = _cnCaseInfo.find(c => c.file === file) || null;
   if (!_cnCaseSel) {
     $('#cnCaseMethod').innerHTML = '<option>—</option>';
@@ -537,7 +480,7 @@ function renderCnMethodSteps() {
   pos.innerHTML = opts;
 }
 
-/* ---------------- 写入：元素入库 + 用例行追加 + 页面方法生成（三件套一次完成） ---------------- */
+/* ---------------- 写入：元素入库 + 步骤追加 + 页面方法进共享页面对象（逐步写入） ---------------- */
 async function writeCnStep() {
   const name = ($('#cnElName').value || '').trim();
   const locType = ($('#cnElLocType').value || '').trim();
@@ -565,33 +508,29 @@ async function writeCnStep() {
     return toast('元素入库失败：' + (el.msg || '未知错误'), false);
   }
   const descUsed = desc === cnGenDesc(type, name, param) ? cnGenDesc(type, elemNameUsed, param) : desc;
-  /* 2a) 新建用例文件：临时三件套打包入库（与定位器「保存并继续」同语义） */
+  /* 2a) 新建用例文件：首次只建用例骨架（本步随后经 add_code 成为第 1 步）；
+         页面方法统一进共享页面对象 appSharedPage（同名覆盖），元素进共享元素库（同定位复用） */
   if (cnIsNewCase()) {
     const base = cnNewCaseBase();
     if (!base) return toast('请填写新用例名', false);
     const tc = _cnTemp = (_cnTemp || { steps: [] });
     tc.base = base;
-    tc.steps.push({
-      type, param,                               // 结构化字段：④ 项目登记回填 steps 用
-      comment: ($('#cnCaseComment').value || '').trim() || descUsed,
-      line: cnPreviewLine({ type, element: elemNameUsed, param }),
-      elemName: elemNameUsed, elemLine: cnElementLine().replace('self.' + name + ' ', 'self.' + elemNameUsed + ' '),
-      methodBlock: cnMethodBlock({ type, element: elemNameUsed, param }, descUsed),
-    });
-    const files = cnTempFiles(tc);
-    const r = await fetch('/locator/api/save_case_package', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ package: base, files, uploader: ($('#cnElComment').value || '').trim() || 'platform' }),
-    }).then(x => x.json());
-    if (!r.ok) { tc.steps.pop(); return toast('新建用例入库失败：' + (r.msg || '未知错误'), false); }
-    _cnWritten++;
-    toast('用例包「' + base + '」已入库（' + tc.steps.length + ' 步），后续步骤默认继续写入', true);
-    await loadCnCases();                       // 新文件已存在 → 自动切回已有文件模式继续追加
-    $('#cnCaseFile').value = 'test_' + base + '.py';
-    onCnCaseChange();
-    $('#cnStepDesc').value = ''; $('#cnStepParam').value = '';
-    await cnRegister();                        // ④ 已填用例名称则登记到用例列表与项目管理
-    return;
+    tc.steps.push({ type, param, element: elemNameUsed, desc: descUsed,   // ④ 登记回填结构化 steps 用
+      comment: ($('#cnCaseComment').value || '').trim() || descUsed });
+    const caseFileNew = 'test_' + base + '.py';
+    if (!_cnCaseInfo.some(c => c.file === caseFileNew)) {
+      const r = await fetch('/locator/api/save_case_package', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ package: base, files: [cnSkeletonFile(base)],
+          uploader: ($('#cnElComment').value || '').trim() || 'platform' }),
+      }).then(x => x.json());
+      if (!r.ok) { tc.steps.pop(); return toast('新建用例入库失败：' + (r.msg || '未知错误'), false); }
+      toast('用例「' + base + '」已创建，页面方法将统一写入共享页面对象', true);
+      await loadCnCases();                     // 新文件已存在 → 自动切回已有文件模式继续追加
+      $('#cnCaseFile').value = caseFileNew;
+      onCnCaseChange();
+    }
+    /* 不 return：骨架就绪后落入下方「已有用例追加」链路 */
   }
   /* 2b) 已有用例文件：操作行追加 + 页面方法生成（与定位器同一接口） */
   const caseFile = $('#cnCaseFile').value, method = $('#cnCaseMethod').value;
@@ -630,7 +569,7 @@ async function cnRegister() {
     elements_file: _cnCaseSel.elements_file || currentCnElemFile(),
     node };
   if (_cnTemp && _cnCaseSel.file === 'test_' + _cnTemp.base + '.py')
-    body.steps = _cnTemp.steps.map(s => ({ type: s.type, element: s.elemName, param: s.param || '', desc: s.comment }));
+    body.steps = _cnTemp.steps.map(s => ({ type: s.type, element: s.element || s.elemName, param: s.param || '', desc: s.desc || s.comment }));
   const prev = _cases.find(c => c.node === node);
   const d = prev ? await api(AT_PREFIX + '/api/cases/' + prev.id, { method: 'PUT', body: JSON.stringify(body) })
     : await postJson(AT_PREFIX + '/api/cases', body);
@@ -651,73 +590,35 @@ function currentCnElemFile() {
   return $('#cnElemFile').value;
 }
 
-/* 新建用例文件模式：按定位器 tempCaseRegen 同规则生成三件套内容 */
-function cnTempFiles(tc) {
-  const base = tc.base;
-  const caseName = 'test_' + base + '.py';
-  const pageFile = cnCapFirst(base) + 'Page.py';
-  const pageClass = cnCapFirst(pageFile.replace('.py', ''));
-  const elemFile = ($('#cnElemFile').value && $('#cnElemFile').value !== CN_NEW_FILE)
-    ? $('#cnElemFile').value : cnElemFileNameNew() || (base + 'Elements.py');
-  const elemClass = cnCapFirst(elemFile.replace('.py', ''));
-  /* 元素文件：同名元素取最后一次定义 */
-  const eOrder = [], eMap = {};
-  tc.steps.forEach(s => {
-    if (!s.elemName || !s.elemLine) return;
-    if (!(s.elemName in eMap)) eOrder.push(s.elemName);
-    eMap[s.elemName] = s.elemLine;
-  });
-  const elemContent = '# -*- coding: utf-8 -*-\n'
-    + '# 用例包 ' + base + ' · 元素库\n'
-    + 'from page_objects.createElement import CreateElement\n'
-    + 'from page_objects.app_ui.locator_type import Locator_Type\n'
-    + 'from page_objects.app_ui.wait_type import Wait_Type as Wait_By\n\n\n'
-    + 'class ' + elemClass + ':\n    def __init__(self):\n'
-    + (eOrder.length ? eOrder.map(n => '        ' + eMap[n]).join('\n') + '\n' : '        pass\n');
-  /* 页面文件：同名方法取最后一次 */
-  const mOrder = [], mMap = {};
-  tc.steps.forEach(s => {
-    const mn = (s.methodBlock.match(/def (\w+)/) || [])[1];
-    if (!mn) return;
-    if (!(mn in mMap)) mOrder.push(mn);
-    mMap[mn] = s.methodBlock;
-  });
-  const pageContent = '# -*- coding: utf-8 -*-\n'
-    + '# 用例包 ' + base + ' · 页面操作\n'
-    + 'from page_objects.app_ui.android.demoProject.elements.' + elemFile.replace('.py', '') + ' import ' + elemClass + '\n\n\n'
-    + 'class ' + pageClass + ':\n\n'
-    + '    def __init__(self, appOperator):\n'
-    + '        self.appOperator = appOperator\n'
-    + '        self._elements = ' + elemClass + '()\n'
-    + (mOrder.length ? '\n' + mOrder.map(n => mMap[n]).join('\n') + '\n' : '');
-  /* 用例文件：头部流程注释 + 方法体逐步骤 */
-  const flow = ['# 1. 拉起快歌主页面'].concat(tc.steps.map((s, i) => '# ' + (i + 2) + '. ' + s.comment));
-  const caseContent = '# -*- coding: utf-8 -*-\n'
-    + '# 用例包 ' + base + ' · ' + tc.steps.length + ' 步\n'
-    + flow.join('\n') + '\n'
-    + 'import time\nimport allure\n'
-    + 'from base.app_ui.android.demoProject.app_ui_android_demoProject_client import APP_UI_Android_demoProject_Client\n'
-    + 'from page_objects.app_ui.android.demoProject.pages.' + pageFile.replace('.py', '') + ' import ' + pageClass + '\n\n\n'
-    + "@allure.parent_suite('快歌APP自动化')\n"
-    + "@allure.suite('" + base + "')\n"
-    + 'class Test' + cnCapCamel(base) + ':\n\n'
-    + '    def setup_class(self):\n'
-    + '        # is_need_kill_app=False：绕开 demo 客户端硬编码启动，显式启动被测 App\n'
-    + '        self.demoProjectClient = APP_UI_Android_demoProject_Client(is_need_kill_app=False)\n'
-    + '        self.appOperator = self.demoProjectClient.appOperator\n'
-    + "        self.appOperator.start_activity('com.recordlife.kuaige', 'com.recordlife.kuaige.feature.main.MainActivity')\n"
-    + '        time.sleep(3)\n'
-    + '        self.page = ' + pageClass + '(self.appOperator)\n\n'
-    + "    @allure.title('" + base + ' · ' + tc.steps.length + " 步')\n"
-    + '    def test_' + base + '(self):\n        page = self.page\n\n'
-    + tc.steps.map((s, i) => '        # ' + (i + 1) + '. ' + s.comment + '\n        ' + s.line + '\n\n').join('')
-    + '    def teardown_class(self):\n        self.appOperator.close_app()\n';
-  return [
-    { dir: 'cases/app_ui/android/demoProject', name: caseName, content: caseContent },
-    { dir: 'page_objects/app_ui/android/demoProject/pages', name: pageFile, content: pageContent },
-    { dir: 'page_objects/app_ui/android/demoProject/elements', name: elemFile, content: elemContent },
-  ];
+/* 共享页面对象（appSharedPage/appSharedElements）由后端 /locator/api/save_case_package
+   仅缺失时自动创建，前端只发用例骨架；元素库缺失由 add_element 自动建 */
+const CN_SHARED_ELEM = 'appSharedElements.py';
+const CN_SHARED_PAGE = 'appSharedPage.py';
+
+/* 新建用例文件模式：只生成用例骨架（步骤经 add_code 逐步追加，不再按用例生成页面/元素文件） */
+function cnSkeletonFile(base) {
+  return { dir: 'cases/app_ui/android/demoProject', name: 'test_' + base + '.py',
+    content: '# -*- coding: utf-8 -*-\n'
+      + '# 用例 ' + base + ' · 录制骨架（「保存并继续」逐步追加步骤，页面方法统一在 appSharedPage）\n'
+      + 'import time\nimport allure\n'
+      + 'from base.app_ui.android.demoProject.app_ui_android_demoProject_client import APP_UI_Android_demoProject_Client\n'
+      + 'from page_objects.app_ui.android.demoProject.pages.appSharedPage import AppSharedPage\n\n\n'
+      + "@allure.parent_suite('快歌APP自动化')\n"
+      + "@allure.suite('" + base + "')\n"
+      + 'class Test' + cnCapCamel(base) + ':\n\n'
+      + '    def setup_class(self):\n'
+      + '        # is_need_kill_app=False：绕开 demo 客户端硬编码启动，显式启动被测 App\n'
+      + '        self.demoProjectClient = APP_UI_Android_demoProject_Client(is_need_kill_app=False)\n'
+      + '        self.appOperator = self.demoProjectClient.appOperator\n'
+      + "        self.appOperator.start_activity('com.recordlife.kuaige', 'com.recordlife.kuaige.feature.main.MainActivity')\n"
+      + '        time.sleep(3)\n'
+      + '        self.page = AppSharedPage(self.appOperator)\n\n'
+      + "    @allure.title('" + base + "')\n"
+      + '    def test_' + base + '(self):\n        page = self.page\n\n'
+      + '    def teardown_class(self):\n        self.appOperator.close_app()\n' };
 }
+
+/* 共享页面对象文件已由后端 ensure_shared_page 兜底创建，前端不再拼接其内容 */
 
 async function cnFinish() {
   const n = _cnWritten;

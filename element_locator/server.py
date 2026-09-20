@@ -196,6 +196,7 @@ def api_save_case_package():
         return jsonify({'ok': False, 'msg': '缺少包名或文件内容'})
     if not all(isinstance(f, dict) and f.get('name') and f.get('content') is not None for f in files):
         return jsonify({'ok': False, 'msg': '文件结构不合法'})
+    case_generator.ensure_shared_page()   # 共享页面对象仅缺失时创建（骨架 self.page=AppSharedPage 依赖它）
     try:
         from web_platform.admin_routes import import_case_package
     except ImportError as e:

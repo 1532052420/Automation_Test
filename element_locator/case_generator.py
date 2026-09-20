@@ -53,6 +53,31 @@ def list_page_files():
                   and not element_library.is_generated_backup(f))
 
 
+# 共享页面对象：所有录制用例的页面方法统一追加在此（同名方法覆盖），
+# 元素统一进 elements/appSharedElements.py（同定位复用，文件缺失由 add_element 自动建）
+SHARED_PAGE_FILE = 'appSharedPage.py'
+SHARED_PAGE_CONTENT = '''# -*- coding: utf-8 -*-
+# 共享页面对象 · 所有录制用例的页面方法统一追加在此（同名方法自动覆盖）
+from page_objects.app_ui.android.demoProject.elements.appSharedElements import AppSharedElements
+
+
+class AppSharedPage:
+
+    def __init__(self, appOperator):
+        self.appOperator = appOperator
+        self._elements = AppSharedElements()
+'''
+
+
+def ensure_shared_page():
+    """共享页面对象缺失时创建（仅缺失时，已存在不覆盖——保护已累积的方法）。
+    「保存用例骨架包」时调用，保证骨架 self.page = AppSharedPage 可被 resolve_page 唯一解析。"""
+    path = os.path.join(PAGES_DIR, SHARED_PAGE_FILE)
+    if not os.path.exists(path):
+        _write(path, SHARED_PAGE_CONTENT)
+    return SHARED_PAGE_FILE
+
+
 def _read(path):
     with open(path, 'r', encoding='utf-8') as f:
         return f.read()
