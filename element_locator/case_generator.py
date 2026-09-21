@@ -492,6 +492,37 @@ def parse_case_steps(content, method_name):
     return steps
 
 
+def replace_case_steps(content, method_name, steps):
+    """用结构化步骤重建用例方法体（parse_case_steps 的逆操作，写回用例文件用）：
+    - docstring = 各步描述以「 → 」串联（与定位器生成格式一致）
+    - 每步 = 注释行（首个带「1.」编号）+ case_step_line 生成的一行调用
+    - 方法体外其余内容（导入/类/其他方法）原样保留
+    返回 (new_content, msg)；方法不存在返回 (None, msg)。调用方须自行 ast 校验后落盘。"""
+    m = re.search(r'^%sdef %s\(self\):' % (IND, re.escape(method_name)), content, re.MULTILINE)
+    if not m:
+        return None, '用例文件里没有方法 %s' % method_name
+    body_start = content.find('\n', m.end()) + 1
+    tail = content[body_start:]
+    nxt = re.search(r'\n%s(?:def |@|class )' % IND, tail)
+    body_end = body_start + (nxt.start() + 1 if nxt else len(tail))
+
+    descs = []
+    lines = [IND * 2 + 'page = self.page', '']
+    for i, step in enumerate(steps):
+        if step.get('type') not in STEP_TYPES:
+            return None, '第 %d 步类型不合法：%s' % (i + 1, step.get('type'))
+        desc = (step.get('desc') or '').strip().replace('\n', ' ') or step_desc(step)
+        line = case_step_line(step)
+        if not line:
+            return None, '第 %d 步无法生成代码行' % (i + 1)
+        descs.append(desc)
+        lines.append(IND * 2 + ('# 1. ' if i == 0 else '# ') + desc)
+        lines.append(IND * 2 + line)
+    doc = ' → '.join(descs) if descs else '（无步骤）'
+    new_body = '\n'.join(lines) + '\n\n'
+    return content[:body_start] + '%s"""%s"""\n%s' % (IND * 2, doc, new_body) + content[body_end:], ''
+
+
 def case_files_info():
     """返回用例文件的"三件套归属"信息，供「添加到元素库」联动：
     [{file, class, methods, method_steps:{方法: [步骤描述...]}, page_class, page_file, elements_file}]

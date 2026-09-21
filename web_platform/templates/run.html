@@ -28,6 +28,8 @@
   .ce-foot { display: flex; gap: 8px; border-top: 1px solid var(--line, #e8e8ed); padding-top: 12px; margin-top: 2px; }
   .ce-el-preview { margin-top: 6px; background: var(--panel2, #fbfbfd); border: 1px dashed var(--line, #e8e8ed); border-radius: 8px; padding: 8px 10px; font-size: 12px; color: var(--muted, #6e6e73); white-space: normal; word-break: break-all; }
   .ce-el-preview code { font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; color: var(--ink2, #3a3a3c); }
+  .ce-legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted, #6e6e73); flex-wrap: wrap; }
+  .ce-legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 5px; }
   .ce-steps { flex: 1; min-height: 140px; overflow-y: auto; padding: 6px 10px 14px; position: relative; }
   .ce-steps::before { content: ""; position: absolute; left: 34px; top: 18px; bottom: 18px; width: 2px; background: var(--line, #e8e8ed); }
   .ce-step { display: grid; grid-template-columns: 24px 34px minmax(0,1fr) auto; gap: 4px 8px; align-items: center; padding: 8px 6px 8px 0; border-radius: 10px; position: relative; }
@@ -297,8 +299,7 @@
             <div class="ce-meta" id="ceMeta"></div>
           </div>
           <div class="ce-actions">
-            <span class="ce-dirty" id="ceDirty" style="display:none">● 未保存（仅当前页预览）</span>
-            <button class="ghost mini" id="ceDiscard">放弃</button>
+            <span class="ce-dirty" id="ceDirty" style="display:none">● 未保存（刷新页面恢复初始数据）</span>
             <button class="mini" id="ceSave">保存</button>
           </div>
         </div>

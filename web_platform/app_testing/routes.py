@@ -12,6 +12,7 @@
 
 持久化走 api_testing.yaml_store.YamlStore（data_dir 参数化到 config/app_testing/）。
 """
+import ast
 import os
 import re
 import time
@@ -351,6 +352,38 @@ def api_case_steps():
         src = f.read()
     from element_locator.case_generator import parse_case_steps
     return _ok(steps=parse_case_steps(src, method))
+
+
+@bp.route('/api/case/steps/save', methods=['POST'])
+def api_case_steps_save():
+    """步骤编辑写回：用重建的方法体替换用例文件里对应方法（ast 语法校验通过才落盘）。"""
+    d = request.get_json(force=True, silent=True) or {}
+    rel = (d.get('file') or '').strip().replace('\\', '/')
+    method = (d.get('method') or '').strip()
+    steps = d.get('steps')
+    base = os.path.realpath(BASE_DIR)
+    if not rel.startswith('cases/app_ui') or not os.path.basename(rel).startswith('test_') \
+            or not rel.endswith('.py') or '..' in rel or not method \
+            or not isinstance(steps, list) or not steps:
+        return _bad('参数不合法（至少保留一个步骤）')
+    if not all(isinstance(s, dict) and s.get('type') for s in steps):
+        return _bad('步骤结构不合法')
+    path = os.path.realpath(os.path.join(base, rel))
+    if not path.startswith(os.path.join(base, 'cases/app_ui')) or not os.path.isfile(path):
+        return _bad('用例文件不存在', 404)
+    with open(path, 'r', encoding='utf-8') as f:
+        src = f.read()
+    from element_locator.case_generator import replace_case_steps
+    new, msg = replace_case_steps(src, method, steps)
+    if new is None:
+        return _bad(msg)
+    try:
+        ast.parse(new)
+    except SyntaxError:
+        return _bad('重建代码语法校验未通过，已放弃写入')
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(new)
+    return _ok(saved=len(steps))
 
 
 @bp.route('/api/cases/<int:cid>/run', methods=['POST'])

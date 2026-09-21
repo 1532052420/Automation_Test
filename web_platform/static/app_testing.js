@@ -1259,7 +1259,9 @@ async function appTestingInit() {
      数据 = /api/case/steps 反解（方法体注释 + 调用行），编辑仅当前页预览，写回未接入 ---- */
   const CE_GROUP_CSS = { '基本操作': 'var(--brand)', '断言': '#6e46c8', '等待与分支': '#b26a00', '其他': '#86868b' };
   const CE_EXTRA_TYPES = { deal_first_launch_dialogs: { label: '首启弹窗处理', group: '其他', param: null } };
-  let _ceCtx = null, _ceSel = -1, _ceElements = null;
+  /* 暂存模型：时间轴只渲染已保存步骤（_ceCtx.steps）；全部编辑进 _cePending，
+     点「保存」才写回用例文件并刷新时间轴；刷新页面 = 重新拉取 = 恢复初始数据 */
+  let _ceCtx = null, _ceSel = -1, _ceElements = null, _cePending = null;
 
   function ceTypeMeta(t) { return STEP_META[t] || CE_EXTRA_TYPES[t] || { label: t || '未知', group: '其他', param: null }; }
 
@@ -1269,6 +1271,7 @@ async function appTestingInit() {
     const d = await api(AT_PREFIX + '/api/case/steps?file=' + encodeURIComponent(row.file) + '&method=' + encodeURIComponent(row.method));
     if (!d.ok) return toast(d.msg || '步骤反解失败', false);
     _ceCtx = { row, steps: d.steps || [] };
+    _cePending = JSON.parse(JSON.stringify(_ceCtx.steps));
     _ceSel = _ceCtx.steps.length ? 0 : -1;
     $('#ceDirty').style.display = 'none';
     if (!_ceElements) {
@@ -1330,7 +1333,7 @@ async function appTestingInit() {
 
   function renderCeEditor() {
     if (!_ceCtx) return;
-    const s = _ceCtx.steps[_ceSel];
+    const s = (_cePending || [])[_ceSel];
     $('#ceNone').style.display = s ? 'none' : '';
     $('#ceBody').style.display = s ? '' : 'none';
     $('#ceDup').style.display = s ? '' : 'none';
@@ -1364,13 +1367,13 @@ async function appTestingInit() {
   }
 
   function ceTouch() {
-    const s = _ceCtx.steps[_ceSel]; if (!s) return;
+    const s = (_cePending || [])[_ceSel]; if (!s) return;
     s.type = $('#ceType').value; s.element = $('#ceEl').value || '';
     s.param = $('#ceParam').value.trim();
     s.wait = $('#ceWait').value; s.sec = $('#ceSec').value.trim();
     s.desc = $('#ceDesc').value.trim();
-    $('#ceDirty').style.display = '';
-    renderCeSteps(); ceElPreview();
+    $('#ceDirty').style.display = '';   // 只改暂存；时间轴在保存写回后刷新
+    ceElPreview();
   }
 
   $('#ceQ').addEventListener('input', renderCeSteps);
@@ -1382,22 +1385,31 @@ async function appTestingInit() {
   $('#ceDesc').addEventListener('input', ceTouch);
   $('#ceDup').addEventListener('click', () => {
     if (!_ceCtx || _ceSel < 0) return;
-    _ceCtx.steps.splice(_ceSel + 1, 0, Object.assign({}, _ceCtx.steps[_ceSel]));
+    _cePending.splice(_ceSel + 1, 0, JSON.parse(JSON.stringify(_cePending[_ceSel])));
     _ceSel = _ceSel + 1;
     $('#ceDirty').style.display = '';
-    renderCeSteps(); renderCeEditor();
+    renderCeEditor();
   });
   $('#ceDel').addEventListener('click', () => {
     if (!_ceCtx || _ceSel < 0) return;
-    if (!confirm('删除第 ' + (_ceSel + 1) + ' 步？（仅当前页预览，写回未接入）')) return;
-    _ceCtx.steps.splice(_ceSel, 1);
-    _ceSel = Math.min(_ceSel, _ceCtx.steps.length - 1);
+    if (!confirm('删除第 ' + (_ceSel + 1) + ' 步？点击「保存」后写入用例文件。')) return;
+    _cePending.splice(_ceSel, 1);
+    _ceSel = Math.min(_ceSel, _cePending.length - 1);
     $('#ceDirty').style.display = '';
-    renderCeSteps(); renderCeEditor();
+    renderCeEditor();
   });
   $('#ceBack').addEventListener('click', e => { e.preventDefault(); showRunPanel('caselist'); });
-  $('#ceDiscard').addEventListener('click', () => { if (_ceCtx) openCaseEditor(_ceCtx.row.node); });  // 重拉反解 = 真放弃
-  $('#ceSave').addEventListener('click', () => toast('编辑已更新当前页预览；写回用例文件的能力未接入'));
+  $('#ceSave').addEventListener('click', async () => {
+    if (!_ceCtx) return;
+    if (!_cePending || !_cePending.length) return toast('至少保留一个步骤', false);
+    const d = await api(AT_PREFIX + '/api/case/steps/save', {
+      method: 'POST',
+      body: JSON.stringify({ file: _ceCtx.row.file, method: _ceCtx.row.method, steps: _cePending })
+    });
+    if (!d.ok) return toast(d.msg || '保存失败', false);
+    toast('保存成功', true);
+    await openCaseEditor(_ceCtx.row.node);   // 以文件为准重新拉取，时间轴与暂存归一
+  });
 
   /* ---- 移动用例到项目 弹窗 ---- */
   $('#mvSave').addEventListener('click', () => saveCaseMove().catch(e => toast(e.message, false)));
