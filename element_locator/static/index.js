@@ -600,8 +600,8 @@ function showToast(msg) {
   void t.offsetWidth;
   t.style.animation = '';
   clearTimeout(hitToastTimer);
-  hitToastHideAt = Date.now() + 6000;
-  hitToastTimer = setTimeout(hideHitToast, 6000);
+  hitToastHideAt = Date.now() + 3000;
+  hitToastTimer = setTimeout(hideHitToast, 3000);
 }
 // 页面从后台切回时：浏览器对后台标签的 setTimeout 会节流推迟，此时按应隐藏时刻立即补隐藏
 document.addEventListener('visibilitychange', () => {
@@ -1735,7 +1735,7 @@ async function onSaveElement(continueMode) {
     loadPages(); loadLibraryFiles(); loadCaseFiles();
     $('modal-mask').style.display = 'none';
     // 不自动弹窗：用户自由点选元素查看，点「添加测试用例」再录下一步（用例/方法预选已保持）
-    showToast('请继续添加用例');
+    showToast('保存成功，请继续添加用例');
   };
 
   if (purpose === 'only') {
