@@ -34,6 +34,31 @@ logger = logging.getLogger('video_evidence')
 # 进程级缓存：设备序列号/配置只解析一次（多设备并行时每个 pytest 进程独享一台设备）
 _RESOLVED = {}
 
+# 失败/报错用例集合：teardown 后对被测 App force-stop，保证下一条用例冷启动（平台 v6.85）
+_FAILED_NODEIDS = set()
+
+
+def pytest_runtest_teardown(item, nextitem):
+    """失败冷启动兜底：设计上用例间冷启动靠 teardown_class close_app + 下一条 start_activity
+    重新拉起；但旧用例可能缺 teardown_class，或失败把 App 卡死导致 close_app 无效——
+    此处对失败/报错用例结束后 adb force-stop 被测 App，下一条 setup_class 即冷启动，
+    一条用例失败不阻碍后面的用例。成功用例不做额外动作（保持现有热启动行为）。"""
+    if item.nodeid not in _FAILED_NODEIDS:
+        return
+    caps = _read_current_capabilities()
+    udid = os.environ.get('ADB_SERIAL') or caps.get('udid')
+    pkg = caps.get('appPackage') or ''
+    if not (udid and pkg):
+        logger.warning('[冷启动兜底] 缺 udid/appPackage（%s/%s），跳过 force-stop', udid, pkg)
+        return
+    import subprocess
+    try:
+        subprocess.run(['adb', '-s', udid, 'shell', 'am', 'force-stop', pkg],
+                       timeout=15, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        logger.info('[冷启动兜底] 上条用例失败，已 force-stop %s，下一条将冷启动', pkg)
+    except Exception as e:
+        logger.warning('[冷启动兜底] force-stop 失败: %s', e)
+
 
 def _read_current_capabilities():
     """读取 run_app_ui_test 为当前进程落盘的 desired_capabilities（含 udid），读取失败返回空 dict。"""
@@ -168,6 +193,9 @@ def pytest_runtest_setup(item):
 def pytest_runtest_makereport(item, call):
     outcome = yield
     rep = outcome.get_result()
+
+    if rep.failed:
+        _FAILED_NODEIDS.add(item.nodeid)   # 失败/报错记录：teardown 后触发冷启动兜底
 
     if rep.when == 'setup':
         if rep.failed:

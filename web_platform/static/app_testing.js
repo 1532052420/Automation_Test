@@ -1504,18 +1504,19 @@ async function appTestingInit() {
     if (e.target === e.currentTarget) e.currentTarget.classList.remove('show');
   });
   $('#clTbody').addEventListener('click', async e => {
-    const mv = e.target.closest('[data-mvnode]'), del = e.target.closest('[data-del]'),
+    /* 注意：局部名不能用 del —— 会遮蔽全局 del() 请求函数导致删除请求永远发不出 */
+    const mv = e.target.closest('[data-mvnode]'), delBtn = e.target.closest('[data-del]'),
           cn = e.target.closest('[data-cncase]'), ed = e.target.closest('[data-editsteps]');
     if (ed) return openCaseEditor(ed.dataset.editsteps);
     if (cn) return openCaseCnModal(cn.dataset.cncase, cn.dataset.cn);   // 复用执行用例的中文名弹窗
     if (mv) return openCaseMove(mv.dataset.mvnode);
-    if (del) {
+    if (delBtn) {
       const ok = await confirmModal('删除用例', '确定删除该用例？引用它的套件会同步移除该用例，生成的页面/用例文件也会一并清理。', true);
       if (!ok) return;
-      const d = await del(AT_PREFIX + '/api/cases/' + del.dataset.del);
+      const d = await del(AT_PREFIX + '/api/cases/' + delBtn.dataset.del);
       toast(d.ok ? '已删除' : (d.msg || '删除失败'), d.ok);
       if (d.ok) {
-        if (+del.dataset.del === _orchCaseId) selectOrchCase(0);   // 删的是正在编辑的用例 → 重置编排表单
+        if (+delBtn.dataset.del === _orchCaseId) selectOrchCase(0);   // 删的是正在编辑的用例 → 重置编排表单
         refreshOrchCaseOptions();
         renderCaseList();
         renderSuites();
@@ -1531,14 +1532,14 @@ async function appTestingInit() {
   $('#btnSuiteNew').addEventListener('click', () => openSuiteModal(0));
   $('#suiteTbody').addEventListener('click', async e => {
     const run = e.target.closest('[data-run]'), edit = e.target.closest('[data-edit]'),
-          hist = e.target.closest('[data-hist]'), del = e.target.closest('[data-del]');
+          hist = e.target.closest('[data-hist]'), delBtn = e.target.closest('[data-del]');
     if (run) return runSuite(+run.dataset.run);
     if (edit) return openSuiteModal(+edit.dataset.edit);
     if (hist) return openSuiteHist(+hist.dataset.hist);
-    if (del) {
+    if (delBtn) {
       const ok = await confirmModal('删除套件', '确定删除该套件？用例本身不受影响。', true);
       if (!ok) return;
-      const d = await del(AT_PREFIX + '/api/suites/' + del.dataset.del);
+      const d = await del(AT_PREFIX + '/api/suites/' + delBtn.dataset.del);
       toast(d.ok ? '已删除' : (d.msg || '删除失败'), d.ok);
       renderSuites();
     }
