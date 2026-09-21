@@ -273,12 +273,13 @@ function renderCaseTable() {
   };
   $('#caseTbody').innerHTML = list.map(r => {
     const reg = r.ent;
+    const desc = (reg && reg.description) || r.desc || '';   // 场景描述：登记描述优先，兜底方法 docstring 首行
     return '<tr>' +
       '<td><input type="checkbox" data-node="' + esc(r.node) + '" class="ck-node"></td>' +
-      '<td><b>' + esc((reg && reg.name) || r.method) + '</b>' +
+      '<td><div class="clip" title="' + esc((reg && reg.name) || r.method) + '"><b>' + esc((reg && reg.name) || r.method) + '</b>' +
         (reg ? '' : ' <span class="proj-status" title="尚未登记到项目，点「命名」旁可先登记归属">未登记</span>') +
-      '</td>' +
-      '<td>' + esc((reg && reg.description) || r.desc || '—') + '</td>' +
+      '</div></td>' +
+      '<td><div class="clip" title="' + esc(desc) + '">' + esc(desc || '—') + '</div></td>' +
       '<td>' + fmtDate(r.mtime) + '</td>' +
       '<td class="ops"><button class="ghost mini" data-act="cn" data-file="' + esc(r.file) + '" data-cn="' + esc(r.cn_name) + '">命名</button>' +
       '<button class="mini" data-runone="' + esc(r.node) + '">执行</button></td></tr>';

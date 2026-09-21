@@ -1653,6 +1653,7 @@ function pkgFiles() {
     + '\n'
     + "    @allure.title('" + stepComment + "')\n"
     + '    def test_' + base + '(self):\n'
+    + '        """' + stepComment + '"""\n'
     + '        page = self.page\n'
     + '\n'
     + '        # 1. ' + stepComment + '\n'
@@ -1732,7 +1733,7 @@ async function onSaveElement(continueMode) {
     $('modal-mask').style.display = 'none';
     // 不自动弹窗：用户自由点选元素查看，点「添加测试用例」再录下一步（用例/方法预选已保持）
     showToast('保存成功，请继续添加用例');
-    // 下拉刷新延后到 toast 入场动画（220ms）结束后，避免与蒙层关闭、toast 入场同帧挤占渲染
+    // 下拉刷新延后到 toast 显示之后，避免与蒙层关闭、toast 出现同帧挤占渲染
     setTimeout(() => { loadPages(); loadLibraryFiles(); loadCaseFiles(); }, 260);
   };
 

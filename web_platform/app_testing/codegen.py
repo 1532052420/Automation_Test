@@ -148,6 +148,7 @@ def compile_case(case):
         lines.append('        # %d. %s' % (i, step_desc(s)))
         lines.append('        %s\n' % case_step_line(s))
     body = '\n'.join(lines)
+    orch_doc = ' → '.join(dict.fromkeys(step_desc(s) for s in steps))   # 场景描述：步骤描述汇总去重
     case_py = ('# -*- coding: utf-8 -*-\n'
                + '%s（用例 #%d %s，%d 步）；手改会在下次保存时被覆盖\n'
                % (GENERATED_MARK, cid, name, len(steps))
@@ -171,6 +172,7 @@ def compile_case(case):
                + '\n'
                + "    @allure.title('%s · %d 步')\n" % (name.replace("'", "\\'"), len(steps))
                + '    def test_orch_%d(self):\n' % cid
+               + ('        """%s"""\n' % orch_doc if orch_doc else '')
                + '        page = self.page\n\n'
                + body + '\n'
                + '    def teardown_class(self):\n'

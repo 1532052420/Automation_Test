@@ -890,6 +890,12 @@ html.night ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, .26
 #panel-caselist td.ops { white-space: normal; }   /* 操作列按钮等宽列下放不下就换行，不截断 */
 #panel-caselist td.ops .mini { margin: 3px 6px 3px 0; }   /* 覆盖全局 10px 左间距，换行后行首不缩进 */
 #panel-caselist .clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+/* 选择用例列表：固定列宽 + 场景描述等长文本单行截断（悬停 title 看全文），长描述不再换行撑破行高 */
+#panel-cases table { table-layout: fixed; }
+#panel-cases th, #panel-cases td { padding: 12px 8px; }
+#panel-cases td { overflow: hidden; }
+#panel-cases .clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .a-hint { font-size: 11.5px; color: var(--muted2); flex: 0 0 auto; white-space: nowrap; padding-left: 2px; }
 
 /* 操作面板（SceneBuilder 组件面板样式：分组 + 可拖拽胶囊） */

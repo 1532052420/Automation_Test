@@ -441,6 +441,31 @@ def case_files_info():
     return infos
 
 
+def _sync_method_docstring(content, method_name):
+    """把方法 docstring 同步为步骤描述汇总（供平台选择用例「场景描述」列展示）。
+    步骤描述与方法体 # 注释同源（method_steps）；无步骤（如 setup_class）不动。"""
+    steps = method_steps(content, method_name)
+    if not steps:
+        return content
+    m = re.search(r'^%sdef %s\(self\):' % (IND, re.escape(method_name)), content, re.MULTILINE)
+    if not m:
+        return content
+    body_start = content.find('\n', m.end()) + 1
+    if body_start <= 0:
+        return content
+    tail = content[body_start:]
+    nxt = re.search(r'\n%s(?:def |@|class )' % IND, tail)
+    body_end = body_start + (nxt.start() + 1 if nxt else len(tail))
+    body = content[body_start:body_end]
+    doc_line = IND * 2 + '"""' + ' → '.join(steps) + '"""\n'
+    dm = re.match(r'^%s(?:"""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\')[ \t]*\n' % IND, body)
+    if dm:   # 已有 docstring → 整段替换（追加步骤后保持汇总最新）
+        new_body = doc_line + body[dm.end():].lstrip('\n')
+    else:    # 没有 docstring → 插到方法体最前（必须是第一条语句）
+        new_body = doc_line + body.lstrip('\n')
+    return content[:body_start] + new_body + content[body_end:]
+
+
 def append_code_to_method(case_file, method_name, step, gen_page_method=False, insert_after_step=None):
     """把 step 生成的一行调用代码插入用例文件指定方法体（不破坏文件结构）。
 
@@ -512,6 +537,7 @@ def append_code_to_method(case_file, method_name, step, gen_page_method=False, i
         else:
             new_body = body.rstrip('\n') + '\n' + comment_line + IND * 2 + line + '\n\n'
     new_content = content[:body_start] + new_body + content[body_end:]
+    new_content = _sync_method_docstring(new_content, method_name)   # docstring 同步步骤描述汇总（场景描述）
     _write(path, new_content)
     result = {'ok': True, 'action': 'appended', 'line': line, 'content': new_content,
               'case_before': case_before,
