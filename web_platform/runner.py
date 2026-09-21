@@ -21,6 +21,7 @@ import re
 import shutil
 import signal
 import subprocess
+import json
 import sys
 import threading
 import time
@@ -49,6 +50,19 @@ _PROGRESS_RE = re.compile(r'(?:::[^ ]+\s+)?(PASSED|FAILED|ERROR|SKIPPED)(?:\s+\[
 
 def _now_str():
     return time.strftime('%Y-%m-%d %H:%M:%S')
+
+
+EXEC_CLEANUP_FILE = os.path.join(BASE_DIR, 'config', 'exec_cleanup.json')
+
+
+def _cleanup_cfg():
+    """「前后置清理」卡片保存的持久化配置（文件缺失/损坏按全关处理）"""
+    try:
+        with open(EXEC_CLEANUP_FILE, 'r', encoding='utf-8') as f:
+            cfg = json.load(f)
+    except (OSError, ValueError):
+        cfg = {}
+    return bool(cfg.get('setup_reset')), bool(cfg.get('teardown_reset'))
 
 
 class ExecutionManager(object):
@@ -189,7 +203,7 @@ class ExecutionManager(object):
     # ------------------------------------------------------------------ 创建
     def start_run(self, conf_file, case_nodes, overrides=None,
                   owner='', marker='', timeout_minutes=None,
-                  setup_reset=False, teardown_reset=False):
+                  setup_reset=None, teardown_reset=None):
         """创建并启动一个执行任务。case_nodes 为用例节点路径列表（文件/类/方法级）。
 
         APP UI 设备自动化专用执行器（接口测试已由 api_testing 模块独立承接）。
@@ -211,7 +225,7 @@ class ExecutionManager(object):
 
     def _start_run_locked(self, conf_file, case_nodes, overrides=None,
                           owner='', marker='', timeout_minutes=None,
-                          setup_reset=False, teardown_reset=False):
+                          setup_reset=None, teardown_reset=None):
         """启动主体（持有 _start_lock：校验与任务注册串行，互斥检查才会命中并发请求）"""
         with self._lock:
             for t in self._tasks.values():
@@ -243,6 +257,12 @@ class ExecutionManager(object):
         current_capabilities = capabilities[0]
 
         # 2.2 应用执行参数覆盖（udid/包名/Activity，仅本次执行生效）
+        # 清理策略：未显式传参（None）时读「前后置清理」卡片保存的持久化配置
+        saved_setup, saved_teardown = _cleanup_cfg()
+        if setup_reset is None:
+            setup_reset = saved_setup
+        if teardown_reset is None:
+            teardown_reset = saved_teardown
         overrides = {k: str(v).strip() for k, v in (overrides or {}).items()
                      if v and str(v).strip()}
         for key in ('udid', 'appPackage', 'appActivity'):

@@ -34,7 +34,7 @@ class KuaigeLoginElements:
         self.btn_login = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/btnLogin', wait_type=Wait_By.VISIBILITY_OF)
         # 我已阅读并同意 - 左侧勾选框 icon（点击切换勾选）。
         # 注意：不要点整行 TextView（可点但会误触《用户协议》链接跳到协议页），用 ivCheck 精确定位
-        self.agree_protocol = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/ivCheck', wait_type=Wait_By.VISIBILITY_OF)
+        self.agree_protocol = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/ivCheck', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6, desc='测试')  # 测试
         # 登录成功字段/文案（含 toast 与页面文本，contains 兼容两种）
         self.text_login_success = CreateElement.create(Locator_Type.XPATH, '//*[contains(@text,"登录成功")]', wait_type=Wait_By.PRESENCE_OF_ELEMENT_LOCATED)
         self.btnStarlightValue = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/btnStarlightValue', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)

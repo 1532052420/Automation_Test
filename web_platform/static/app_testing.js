@@ -901,11 +901,10 @@ async function saveOrchCase() {
 }
 
 function _runBody() {
+  // 前后置清理走「前后置清理」卡片保存的持久化配置，执行时不随请求传
   return { conf_file: $('#suiteConf') ? $('#suiteConf').value : '',
            overrides: { udid: ($('#suiteUdid') && $('#suiteUdid').value.trim()) || '' },
-           owner: ($('#suiteOwner') && $('#suiteOwner').value.trim()) || '',
-           setup_reset: ($('#execSetupReset') && $('#execSetupReset').checked) || false,
-           teardown_reset: ($('#execTeardownReset') && $('#execTeardownReset').checked) || false };
+           owner: ($('#suiteOwner') && $('#suiteOwner').value.trim()) || '' };
 }
 
 async function runOrchCase() {

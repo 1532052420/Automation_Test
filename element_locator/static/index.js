@@ -41,11 +41,17 @@ const STEP_TYPES = [
   { v: 'assert_gone', n: '断言消失(弹窗已关闭)', el: true, param: false, ph: '', group: '断言' },
   { v: 'wait_element', n: '轮询等待出现(慢页面/生成中)', el: true, param: true, ph: '最长等待秒数', group: '长流程·等待与分支', defv: '60' },
   { v: 'if_click', n: '出现才点击(分支弹窗)', el: true, param: true, ph: '探测秒数', group: '长流程·等待与分支', defv: '3' },
-  { v: 'deal_first_launch_dialogs', n: '首次启动弹窗处理(无弹窗跳过)', el: false, param: false, ph: '', group: '长流程·等待与分支' },
-  { v: 'hide_keyboard', n: '收起键盘', el: false, param: false, ph: '', group: '长流程·等待与分支' },
   { v: 'custom', n: '自定义代码', el: false, param: true, ph: '代码行', group: '长流程·等待与分支', defv: '' },
 ];
-const stepTypeInfo = (v) => STEP_TYPES.find(t => t.v === v) || STEP_TYPES[0];
+/* 特殊操作：与元素无关的用例级动作，单独下拉（el-op-special）。不写元素库、元素栏禁用；
+   选中后只需选目标用例 + 插入位置。deal_first_launch_dialogs 固定前插（见 onCaseFileChange） */
+const SPECIAL_OPS = {
+  hide_keyboard: { v: 'hide_keyboard', n: '收起键盘', el: false, param: false },
+  deal_first_launch_dialogs: { v: 'deal_first_launch_dialogs', n: '首次启动弹窗处理', el: false, param: false },
+};
+const stepTypeInfo = (v) => SPECIAL_OPS[v] || STEP_TYPES.find(t => t.v === v) || STEP_TYPES[0];
+/* 当前生效的操作类型：特殊操作优先，否则用常规操作类型下拉 */
+function currentOpType() { return $('el-op-special').value || $('el-op-type').value; }
 
 function genStepDesc(s) {
   const t = stepTypeInfo(s.type);
@@ -191,6 +197,7 @@ async function init() {
   $('btn-dup-cancel').addEventListener('click', () => { const r = dupResolver; closeDupPanel(); if (r) r('cancel'); });
   document.querySelectorAll('input[name="el-purpose"]').forEach(r => r.addEventListener('change', onPurposeChange));
   $('el-op-type').addEventListener('change', () => { onOpTypeChange(); onCaseFileChange(); });
+  $('el-op-special').addEventListener('change', onSpecialOpChange);
   $('el-op-param').addEventListener('input', () => { paramAuto = false; });
   $('el-case-file').addEventListener('change', onCaseFileChange);
   // 新建文件输入联动：元素文件切「新建」显隐输入行；用例名输入实时派生页面/元素文件名
@@ -1011,6 +1018,8 @@ async function openModal() {
   onPurposeChange();   // 栏位显示复位（上次若用了用途③，弹窗栏要藏回、三件套栏恢复）
   $('el-op-type').innerHTML = opTypeOptions();
   $('el-op-type').value = 'click';
+  $('el-op-type').disabled = false;
+  $('el-op-special').value = '';   // 特殊操作每次打开复位为「无」
   $('el-op-param').value = '';
   paramAuto = true;  // 打开弹窗重置为「自动预填」状态
   // ⌖ 坐标模式：默认「坐标点击」并回填最后选中的点
@@ -1120,7 +1129,7 @@ function renderStepsList(steps) {
   box.style.display = '';
   const pos = insertPos();
   const newNo = pos === 'front' ? 1 : (pos > 0 ? pos + 1 : steps.length + 1);
-  const step = { type: $('el-op-type').value, element: $('el-name').value.trim() || '<元素名>', param: $('el-op-param').value.trim() };
+  const step = { type: currentOpType(), element: $('el-name').value.trim() || '<元素名>', param: $('el-op-param').value.trim() };
   const desc = $('el-op-comment').value.trim() || genStepDesc(step);
   let html = steps.length
     ? '<div class="sl-title">当前用例已有 ' + steps.length + ' 步：</div>'
@@ -1165,7 +1174,12 @@ function toggleCoordMode() {
 }
 
 function onPurposeChange() {
-  const p = purposeValue();
+  let p = purposeValue();
+  // 特殊操作必须写用例（不写元素库），用途不允许停在「仅元素」
+  if (p === 'only' && $('el-op-special').value) {
+    document.querySelector('input[name="el-purpose"][value="all"]').checked = true;
+    p = 'all';
+  }
   const popup = p === 'popup';
   $('col-popup').style.display = popup ? '' : 'none';
   ['col-element', 'col-case', 'col-op'].forEach(id => {
@@ -1296,7 +1310,7 @@ function opTypeOptions() {
 /* 操作提示区：用途联动提示 + 当前类型提示，两段共存（换行分隔） */
 function updateOpNote() {
   const p = purposeValue();
-  const t = stepTypeInfo($('el-op-type').value);
+  const t = stepTypeInfo(currentOpType());
   const purposeNote = p === 'all'
     ? '🔗 保存时将自动生成/更新页面操作方法（三件套一次完成）'
     : (p === 'case' ? '⚠ 不会生成页面方法——目标页面须已存在同名方法，否则执行报错' : '');
@@ -1338,7 +1352,8 @@ function autoStepComment(type, elementText) {
 }
 
 function onOpTypeChange() {
-  const t = stepTypeInfo($('el-op-type').value);
+  const special = $('el-op-special').value;
+  const t = stepTypeInfo(currentOpType());
   $('el-op-param-wrap').style.display = t.param ? '' : 'none';
   $('el-op-param').placeholder = t.ph || '参数';
   // 换类型时：参数为空或是上个类型的自动预填值 → 换成当前类型默认值（用户手输过则保留）
@@ -1348,13 +1363,31 @@ function onOpTypeChange() {
   }
   // 步骤描述是自动预填时跟随类型重生成（避免「等待」步骤还挂着「点击…」描述）
   if (opCommentAuto) {
-    $('el-op-comment').value = autoStepComment(t.v, $('el-name').value);
+    $('el-op-comment').value = autoStepComment(currentOpType(), $('el-name').value);
   }
-  // 无需元素的类型（收键盘/Toast/坐标/截图/固定等待/自定义）：元素栏弱化示意「这步不依赖元素」
-  // （元素本身仍会照常入库——从截图选进来的元素攒在库里，后续步骤可用）
-  $('col-element').classList.toggle('soft', t.el === false);
-  $('col-element').classList.toggle('dim', false);
+  if (special) {
+    // 特殊操作：与元素无关且不写元素库 → 元素栏整体禁用（dim = 禁点 + 弱化）
+    $('col-element').classList.add('dim');
+    $('col-element').classList.remove('soft');
+  } else {
+    // 常规里无需元素的类型（Toast/坐标/截图/固定等待/自定义）：只弱化不禁点，元素仍会入库
+    $('col-element').classList.toggle('soft', t.el === false);
+    $('col-element').classList.remove('dim');
+  }
   updateOpNote();
+}
+
+/* 特殊操作下拉：选中 → 常规操作类型禁用、用途强制②（必须写用例）、元素栏禁用；
+   取消（选「无」）→ 全部恢复。deal_first_launch_dialogs 的插入位置锁定由 onCaseFileChange 处理 */
+function onSpecialOpChange() {
+  const isSpecial = !!$('el-op-special').value;
+  $('el-op-type').disabled = isSpecial;
+  if (isSpecial && purposeValue() !== 'all') {
+    document.querySelector('input[name="el-purpose"][value="all"]').checked = true;
+    onPurposeChange();
+  }
+  onOpTypeChange();
+  onCaseFileChange();
 }
 /* ---- 代码预览：与后端 case_step_line 保持一致（所见即所得） ---- */
 function escQ(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
@@ -1469,7 +1502,7 @@ function onCaseFileChange() {
   const steps = (stepsInfo && stepsInfo.method_steps[selMethod]) || [];
   const posSel = $('el-insert-pos');
   const curPos = posSel.value;
-  if (stepTypeInfo($('el-op-type').value).v === 'deal_first_launch_dialogs') {
+  if (currentOpType() === 'deal_first_launch_dialogs') {
     // 首启弹窗只能出现在所有操作之前：锁定「最前」，不允许选其他插入位置
     posSel.innerHTML = '<option value="front">最前（放在第 1 步之前）</option>';
     posSel.value = 'front';
@@ -1536,7 +1569,7 @@ function pkgPageClassName() { const f = pkgPageFileName(); return f ? capFirst(f
 function pkgCaseFileName() { const b = pkgBase(); return b ? 'test_' + b + '.py' : ''; }
 function pkgStepComment() { return $('el-op-comment').value.trim() || genStepDesc(currentStepObj()); }
 function currentStepObj() {
-  return { type: $('el-op-type').value, element: $('el-name').value.trim() || '<元素名>', param: $('el-op-param').value.trim() };
+  return { type: currentOpType(), element: $('el-name').value.trim() || '<元素名>', param: $('el-op-param').value.trim() };
 }
 /* 与后端 page_method_code 同规则的页面方法块（用例包生成用） */
 function pkgMethodBlock(step) {
@@ -1788,11 +1821,13 @@ async function onSaveElement(continueMode) {
   if (!purpose) return;
   // 用途③：登记随机弹窗——写规则库，与元素库/用例三件套完全无关
   if (purpose === 'popup') { await savePopupRule(continueMode); return; }
-  const name = $('el-name').value.trim();
+  const special = $('el-op-special').value;   // 特殊操作：不碰元素库，只写用例
+  const name = special ? '' : $('el-name').value.trim();
   if (purpose !== 'only') {
     // 防误操作：「写入元素文件」与「目标用例文件」的新建状态必须同步——
     // 一起新建（随临时用例打包 zip）或都选已有文件；不同步时 toast 提示并阻止保存
-    if (isNewCase() !== isNewElementFile()) {
+    //（特殊操作不碰元素库，不受此约束）
+    if (!special && isNewCase() !== isNewElementFile()) {
       showToast('⚠️ 「写入元素文件」与「目标用例文件」需同步：要么都用「➕ 新建」，要么都选已有文件');
       return;
     }
@@ -1801,7 +1836,7 @@ async function onSaveElement(continueMode) {
     //   保存       = 临时区三件套（含全部已录步骤）打包 zip 下载 → 结束会话
     if (isNewCase()) {
       if (!pkgBase()) { showElResult('请先输入新用例名（test_ 后面的部分）', false); return; }
-      if (!name) { showElResult('元素名称不能为空', false); return; }
+      if (!special && !name) { showElResult('元素名称不能为空', false); return; }
       if (state.tempCase && state.tempCase.base !== pkgBase()) {
         if (!confirm('已有临时用例「' + state.tempCase.base + '」（' + state.tempCase.steps.length
             + ' 步，未导出）。换用例名将丢弃它，继续？')) return;
@@ -1834,17 +1869,17 @@ async function onSaveElement(continueMode) {
     }
     if (!methodName) { showElResult('请选择页面操作', false); return; }
   }
-  // 同名（同文件）覆盖确认：防止误覆盖已有元素
+  // 同名（同文件）覆盖确认：防止误覆盖已有元素（特殊操作不碰元素库，整段跳过）
   const fname = $('el-file').value;
-  if (name && (state.elementsAll[fname] || []).indexOf(name) >= 0) {
+  if (!special && name && (state.elementsAll[fname] || []).indexOf(name) >= 0) {
     if (!await uiConfirm('元素库文件 ' + fname + ' 里已有同名元素「' + name + '」，保存将覆盖更新原定义。\n\n' +
       '点「确定」= 覆盖更新\n点「取消」= 不保存')) return;
   }
-  let r = await saveElement(true);
+  let r = special ? { ok: true, msg: '' } : await saveElement(true);
   if (!r) return;
-  let savedName = name;
+  let savedName = special ? '' : name;
   let dupHandled = false;   // 已处理「相同定位重复」：复用=使用已有元素 / 更新=覆盖定义 / 取消
-  if (r.duplicate) {
+  if (!special && r.duplicate) {
     dupHandled = true;
     const choice = await askDuplicatePanel(r.duplicate);
     if (choice === 'cancel') { showElResult('已取消，元素未保存（可改用途或直接关闭）', false); return; }
@@ -1879,7 +1914,7 @@ async function onSaveElement(continueMode) {
   }
   // purpose ②/③：追加一步代码到目标用例方法体末尾（③ 同时生成/更新页面方法）
   const step = {
-    type: $('el-op-type').value,
+    type: special || $('el-op-type').value,   // 特殊操作优先（不依赖元素）
     element: savedName,
     param: $('el-op-param').value.trim(),
     desc: '',

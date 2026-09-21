@@ -179,8 +179,15 @@ try {
         <!-- 第三栏：操作 -->
         <section class="flow-col" id="col-op">
           <div class="col-head">③ 操作 <span class="hint">对这个元素做什么</span></div>
-          <label>操作类型 <span class="help-icon" data-help="保存后要「对这个元素做什么」，决定生成的代码。按分组找：基本操作=点击/输入/长按/坐标/截图/固定等待；断言=存在/文本/Toast/消失（弹窗关了才算过）；长流程=轮询等待出现（生成中/加载慢）、出现才点击（偶发弹窗分支）、收起键盘。断言也是操作的一种：框架把断言逻辑封装在页面方法里（Page Object 惯例），用例只调用 page.assert_xxx()。不需要参数的类型参数框自动隐藏。">?</span>
+          <label>操作类型 <span class="help-icon" data-help="保存后要「对这个元素做什么」，决定生成的代码。按分组找：基本操作=点击/输入/长按/坐标/截图/固定等待；断言=存在/文本/Toast/消失（弹窗关了才算过）；长流程=轮询等待出现（生成中/加载慢）、出现才点击（偶发弹窗分支）。断言也是操作的一种：框架把断言逻辑封装在页面方法里（Page Object 惯例），用例只调用 page.assert_xxx()。不需要参数的类型参数框自动隐藏。">?</span>
             <select id="el-op-type"></select>
+          </label>
+          <label>特殊操作 <span class="help-icon" data-help="与元素无关的用例级动作（不写元素库，元素栏随之禁用）：收起键盘=只在键盘可见时收起，否则不动；首次启动弹窗处理=点掉隐私协议/系统权限弹窗，无弹窗自动跳过，且固定插在所有步骤之前。选择后只需选目标用例和插入位置。">?</span>
+            <select id="el-op-special">
+              <option value="">无（使用上方操作类型）</option>
+              <option value="hide_keyboard">收起键盘（键盘在才收，否则不动）</option>
+              <option value="deal_first_launch_dialogs">首次启动弹窗处理（无弹窗自动跳过）</option>
+            </select>
           </label>
           <label id="el-op-param-wrap">操作参数 <span class="help-icon" data-help="操作需要的额外内容：输入→文本；断言Toast→toast 文案；断言文本→期望文字；坐标点击→x,y；轮询等待出现→最长等待秒数（超时用例失败）；出现才点击→探测秒数，例填 3=最多等 3 秒找弹窗，出现就点、没出现就跳过；固定等待→秒数；截图→截图名。不需要时自动隐藏。">?</span>
             <input id="el-op-param" type="text" placeholder="输入内容 / 期望文本 / toast文本 / 坐标(x,y) / 秒数">
@@ -272,6 +279,6 @@ try {
 </div>
 <script src="/static/nav.js"></script>
 <script src="/static/theme.js"></script>
-<script src="static/index.js?v=63"></script>
+<script src="static/index.js?v=64"></script>
 </body>
 </html>

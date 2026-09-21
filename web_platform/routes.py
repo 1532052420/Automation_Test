@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Web 执行平台 · 页面与 API 路由"""
 import atexit
+import json
 import os
 import re
 import shutil
@@ -376,6 +377,33 @@ def api_start_run():
     if not ok:
         return jsonify({'ok': False, 'msg': result}), 409 if '正在运行' in result else 400
     return jsonify({'ok': True, 'run_id': result})
+
+
+@bp.route('/api/exec/cleanup', methods=['GET', 'POST'])
+def api_exec_cleanup():
+    """前后置清理配置（设备配置页「前后置清理」卡片，保存后对所有执行入口生效）。
+    runner 起 pytest 时读取：前置=首条用例前清一次 App 数据（清登录态）；
+    后置=全部用例结束后清一次；用例之间恒为冷启动（teardown 停进程保留数据）。"""
+    cfg_file = os.path.join(BASE_DIR, 'config', 'exec_cleanup.json')
+    if request.method == 'POST':
+        d = request.get_json(force=True, silent=True) or {}
+        cfg = {'setup_reset': bool(d.get('setup_reset')),
+               'teardown_reset': bool(d.get('teardown_reset')),
+               'updated_at': int(time.time())}
+        try:
+            with open(cfg_file, 'w', encoding='utf-8') as f:
+                json.dump(cfg, f, ensure_ascii=False, indent=2)
+        except OSError as e:
+            return jsonify({'ok': False, 'msg': '保存失败: %s' % e})
+        return jsonify({'ok': True, 'msg': '已保存，对后续所有执行生效', **cfg})
+    cfg = {}
+    try:
+        with open(cfg_file, 'r', encoding='utf-8') as f:
+            cfg = json.load(f)
+    except (OSError, ValueError):
+        pass
+    return jsonify({'ok': True, 'setup_reset': bool(cfg.get('setup_reset')),
+                    'teardown_reset': bool(cfg.get('teardown_reset'))})
 
 
 @bp.route('/api/run/<run_id>')

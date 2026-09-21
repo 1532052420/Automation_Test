@@ -96,12 +96,6 @@ class DemoToolLoginPage:
                 pass
         self.appOperator.assert_true_with_shot('断言登录成功', ok, '未捕获到「登录成功」toast 或页面文案')
 
-    def wait_and_shot(self, tag):
-        """截图存档"""
-        import time
-        time.sleep(1)
-        self.appOperator.get_screenshot(tag)
-
     def click_sss(self):
         """点击「12枚勋章」"""
         self.appOperator.click(self._elements.sss)
@@ -109,5 +103,3 @@ class DemoToolLoginPage:
     def click_btnStarlightValue(self):
         """点击「btnStarlightValue」"""
         self.appOperator.click(self._elements.btnStarlightValue)
-
-

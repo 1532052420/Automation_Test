@@ -556,6 +556,8 @@ async function initRun() {
   });
   $('#confSel').addEventListener('change', () => loadExecDefaults($('#confSel').value));
   $('#btnRecSave').addEventListener('click', saveRecordingConfig);
+  $('#btnCleanupSave').addEventListener('click', saveCleanupConfig);
+  loadCleanupConfig();   // 前后置清理：回读持久化配置填充勾选
   initElementsPanel();
   adminPanelInit();   // 用例管理面板（原独立模块并入，绑定见 admin.js）
   appTestingInit();   // 用例编排 / 测试套件面板（绑定见 app_testing.js）
@@ -744,6 +746,25 @@ function initElementsPanel() {
   loadElements();
 }
 
+/* ================= 前后置清理（独立卡片，保存后持久化，全部执行入口共用） ================= */
+async function loadCleanupConfig() {
+  try {
+    const d = await api('/api/exec/cleanup');
+    if (!d.ok) return;
+    $('#execSetupReset').checked = !!d.setup_reset;
+    $('#execTeardownReset').checked = !!d.teardown_reset;
+  } catch (e) { /* 加载失败不打断执行页 */ }
+}
+
+async function saveCleanupConfig() {
+  const d = await postJson('/api/exec/cleanup', {
+    setup_reset: $('#execSetupReset').checked,
+    teardown_reset: $('#execTeardownReset').checked,
+  });
+  toast(d.msg || (d.ok ? '已保存' : '保存失败'), !!d.ok);
+  if (d.ok) loadCleanupConfig();   // 回读校准
+}
+
 /* ================= 录屏配置（失败证据视频的开关与时间参数，存 config/recording.conf） ================= */
 async function loadRecordingConfig() {
   try {
@@ -814,8 +835,7 @@ async function startRun() {
       appPackage: $('#inPackage').value.trim(),
       appActivity: $('#inActivity').value.trim(),
     },
-    setup_reset: $('#execSetupReset').checked,
-    teardown_reset: $('#execTeardownReset').checked,
+    // 前后置清理走「前后置清理」卡片保存的持久化配置（见 loadCleanupConfig）
   });
   btn.disabled = false; btn.textContent = '开始执行';
   if (!d.ok) return toast(d.msg || '启动失败', false);
