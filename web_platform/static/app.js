@@ -21,6 +21,21 @@ async function api(url, opts) {
 }
 const postJson = (url, body) => api(url, { method: 'POST', body: JSON.stringify(body || {}) });
 const del = (url) => api(url, { method: 'DELETE' });
+
+/* 列表分页条（通用）：渲染「共 N 条 · 每页 x · 上一页/下一页」到容器；
+   go(目标页) 由调用方写入自己的页码变量并重渲染列表 */
+function listPager(elId, total, page, perPage, go) {
+  const el = $(elId);
+  if (!el) return;
+  const pages = Math.max(1, Math.ceil(total / perPage));
+  const cur = Math.min(Math.max(1, page), pages);
+  el.innerHTML =
+    '<span class="muted" style="margin-right:auto">共 ' + total + ' 条 · 每页 ' + perPage + ' 条</span>' +
+    '<button class="ghost mini" data-pg="-1"' + (cur <= 1 ? ' disabled' : '') + '>上一页</button>' +
+    '<span class="mono" style="min-width:56px;text-align:center">' + cur + ' / ' + pages + '</span>' +
+    '<button class="ghost mini" data-pg="1"' + (cur >= pages ? ' disabled' : '') + '>下一页</button>';
+  el.querySelectorAll('button[data-pg]').forEach(b => b.addEventListener('click', () => go(cur + (+b.dataset.pg))));
+}
 const $ = (sel) => document.querySelector(sel);
 
 function esc(s) {
@@ -230,6 +245,8 @@ async function pollFootStatus() {
    数据源：/api/cases（scan_case_tree：文件/方法/docstring/中文名映射/mtime）
          + app_testing 登记实体（node→项目归属，供「所属项目」筛选）。 */
 let _caseRows = [];       // 选择用例表行 [{node, file, cls, method, cn_name, mtime, desc, ent}]
+let _elPage = 1;          // 元素管理列表当前页（每页 10 条）
+let _casePage = 1;        // 执行用例列表当前页（每页 10 条）
 let _caseCnFile = null;   // 命名弹窗当前操作的用例文件
 
 async function loadCaseSelectPanel() {
@@ -266,12 +283,17 @@ function renderCaseTable() {
     const hay = [r.method, r.file, r.cls, r.cn_name, reg && reg.name, reg && reg.description];
     return inProj && (!kw || hay.some(v => String(v || '').toLowerCase().includes(kw)));
   });
+  const perPage = 10;
+  const pages = Math.max(1, Math.ceil(list.length / perPage));
+  if (_casePage > pages) _casePage = pages;
+  if (_casePage < 1) _casePage = 1;
+  const view = list.slice((_casePage - 1) * perPage, _casePage * perPage);
   const fmtDate = ts => {
     if (!ts) return '-';
     const d = new Date(ts * 1000), p = n => String(n).padStart(2, '0');
     return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
   };
-  $('#caseTbody').innerHTML = list.map(r => {
+  $('#caseTbody').innerHTML = view.map(r => {
     const reg = r.ent;
     const desc = (reg && reg.description) || r.desc || '';   // 场景描述：登记描述优先，兜底方法 docstring 首行
     return '<tr>' +
@@ -284,6 +306,7 @@ function renderCaseTable() {
       '<td class="ops"><button class="mini" data-runone="' + esc(r.node) + '">执行</button></td></tr>';
   }).join('');
   $('#caseEmpty').style.display = list.length ? 'none' : '';
+  listPager('#casePager', list.length, _casePage, perPage, p => { _casePage = p; renderCaseTable(); });
 }
 
 function openCaseCnModal(file, cn) {
@@ -542,8 +565,8 @@ async function initRun() {
   $('#btnStop').addEventListener('click', stopRun);
   $('#btnSelectAll').addEventListener('click', () => setAllChecked(true));
   $('#btnSelectNone').addEventListener('click', () => setAllChecked(false));
-  $('#caseProj').addEventListener('change', renderCaseTable);
-  $('#caseSearch').addEventListener('input', renderCaseTable);
+  $('#caseProj').addEventListener('change', () => { _casePage = 1; renderCaseTable(); });
+  $('#caseSearch').addEventListener('input', () => { _casePage = 1; renderCaseTable(); });
   $('#btnCaseRefresh').addEventListener('click', () => {
     /* 重置：清空本面板所有已选择项（搜索词 / 项目筛选 / 勾选用例），列表回到初始视图 */
     $('#caseSearch').value = '';
@@ -636,12 +659,17 @@ function renderElements() {
     (!ff || e.file === ff) &&
     (!kw || [e.name, e.cn_name, e.value, e.desc, e.type, e.file].some(v =>
       String(v || '').toLowerCase().includes(kw))));
+  const perPage = 10;
+  const pages = Math.max(1, Math.ceil(list.length / perPage));
+  if (_elPage > pages) _elPage = pages;
+  if (_elPage < 1) _elPage = 1;
+  const view = list.slice((_elPage - 1) * perPage, _elPage * perPage);
   const fmtDate = ts => {
     if (!ts) return '-';
     const d = new Date(ts * 1000), p = n => String(n).padStart(2, '0');
     return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
   };
-  $('#elTbody').innerHTML = list.map(e => {
+  $('#elTbody').innerHTML = view.map(e => {
     /* 名称列：有中文名 → 主行中文、副行代码名；无 → 主行代码名、副行文件名（旧行为） */
     const nameCell = e.cn_name
       ? '<b>' + esc(e.cn_name) + '</b>' + (e.popup ? ' <span class="el-popup-badge">规则</span>' : '') + '<br><span class="el-file">' + esc(e.name) + '</span>'
@@ -664,6 +692,7 @@ function renderElements() {
     '<td>' + actions + '</td></tr>';
   }).join('');
   $('#elEmpty').style.display = list.length ? 'none' : '';
+  listPager('#elPager', list.length, _elPage, perPage, p => { _elPage = p; renderElements(); });
 }
 
 function fillSelect(sel, options, val) {
@@ -746,8 +775,8 @@ function initElementsPanel() {
     $('#elFileFilter').value = '';
     loadElements();
   });
-  $('#elSearch').addEventListener('input', renderElements);
-  $('#elFileFilter').addEventListener('change', renderElements);
+  $('#elSearch').addEventListener('input', () => { _elPage = 1; renderElements(); });
+  $('#elFileFilter').addEventListener('change', () => { _elPage = 1; renderElements(); });
   $('#elTbody').addEventListener('click', onElTableClick);
   $('#elMCancel').addEventListener('click', () => $('#elMask').classList.remove('show'));
   $('#elMSave').addEventListener('click', saveElModal);

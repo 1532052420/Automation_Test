@@ -61,7 +61,8 @@ function projName(id) {
 
 /* ================= 项目管理（对齐 testhub APP项目管理：搜索/全列/详情/分页） ================= */
 let _projFilters = { name: '', status: '' };
-let _projPage = 1, _projPageSize = 20;
+let _projPage = 1, _projPageSize = 10;
+let _clPage = 1;          // 用例管理列表当前页（每页 10 条）
 
 async function loadProjects() {
   const d = await api(AT_PREFIX + '/api/projects');
@@ -170,8 +171,11 @@ async function saveProj() {
 async function openProjDetail(pid) {
   const p = _projects.find(x => x.id === +pid);
   if (!p) return;
-  const [cd, sd] = await Promise.all([
-    api(AT_PREFIX + '/api/cases'), api(AT_PREFIX + '/api/suites')]);
+  const [cd, sd, fd] = await Promise.all([
+    api(AT_PREFIX + '/api/cases'), api(AT_PREFIX + '/api/suites'), api(AT_PREFIX + '/api/cases/framework')]);
+  /* 步数以框架反解为准：登记实体没有 steps 字段（用例已走框架文件），直接取 c.steps 恒为 0 */
+  const fwByNode = {};
+  (fd.ok ? fd.results : []).forEach(r => { fwByNode[r.node] = r.step_count || 0; });
   const cases = (cd.ok ? cd.results : []).filter(c => +c.project_id === +pid);
   const suites = (sd.ok ? sd.results : []).filter(s => +s.project_id === +pid);
   $('#pjdTitle').textContent = '项目详情 · ' + p.name;
@@ -180,9 +184,11 @@ async function openProjDetail(pid) {
     (p.description ? ' · ' + esc(p.description) : '');
   $('#pjdCaseCount').textContent = cases.length + ' 个';
   $('#pjdSuiteCount').textContent = suites.length + ' 个';
-  $('#pjdCases').innerHTML = cases.length ? cases.map(c =>
-    '<div class="orch-add">' + esc(c.name) + ' <span class="muted">(' + (c.steps || []).length + ' 步)</span></div>').join('')
-    : '<div class="orch-empty">项目下还没有用例</div>';
+  $('#pjdCases').innerHTML = cases.length ? cases.map(c => {
+    const sc = fwByNode[c.node];
+    return '<div class="orch-add">' + esc(c.name) + ' <span class="muted">(' +
+      (sc != null ? sc + ' 步' : '步骤未反解') + ')</span></div>';
+  }).join('') : '<div class="orch-empty">项目下还没有用例</div>';
   $('#pjdSuites').innerHTML = suites.length ? suites.map(s =>
     '<div class="orch-add">' + esc(s.name) + ' <span class="muted">(' + (s.case_ids || []).length + ' 个用例)</span></div>').join('')
     : '<div class="orch-empty">项目下还没有套件</div>';
@@ -949,8 +955,13 @@ async function renderCaseList() {
     const hay = [c.file, c.class, c.method, c.cn_name, reg && reg.name, reg && reg.description, reg && reg.created_by];
     return inProj && (!kw || hay.some(v => String(v || '').toLowerCase().includes(kw)));
   });
+  const perPage = 10;
+  const pages = Math.max(1, Math.ceil(list.length / perPage));
+  if (_clPage > pages) _clPage = pages;
+  if (_clPage < 1) _clPage = 1;
+  const view = list.slice((_clPage - 1) * perPage, _clPage * perPage);
   $('#clEmpty').style.display = list.length ? 'none' : '';
-  $('#clTbody').innerHTML = list.map(c => {
+  $('#clTbody').innerHTML = view.map(c => {
     const reg = c.case;
     /* 用例字段：优先取中文名映射（定位器/重命名写入），悬停 title 附方法名便于对照 */
     const name = c.cn_name || (reg ? reg.name : c.method);
@@ -973,6 +984,7 @@ async function renderCaseList() {
       (reg ? '<button class="danger mini" data-del="' + reg.id + '">删除</button>' : '') +
       '</td></tr>';
   }).join('');
+  listPager('#clPager', list.length, _clPage, perPage, p => { _clPage = p; renderCaseList(); });
 }
 
 /* ---- 移动用例到项目：已登记 = 只改归属；未登记 = 移动时顺带登记（仅登记模式，不动框架文件） ---- */
@@ -1244,8 +1256,8 @@ async function appTestingInit() {
     (type, at) => { addOrchStep(type, at); });
 
   /* ---- 测试用例列表 ---- */
-  $('#clSearch').addEventListener('input', renderCaseList);
-  $('#clProj').addEventListener('change', renderCaseList);
+  $('#clSearch').addEventListener('input', () => { _clPage = 1; renderCaseList(); });
+  $('#clProj').addEventListener('change', () => { _clPage = 1; renderCaseList(); });
   $('#btnClRefresh').addEventListener('click', () => {
     /* 重置：清空本面板已选择项（搜索词 / 项目筛选），列表回到初始视图 */
     $('#clSearch').value = '';

@@ -905,3 +905,7 @@ html.night ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, .26
 .palette-item:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-tint); }
 .orch-step.missing { border-color: var(--bad); }
 .orch-step.missing .orch-index { background: var(--bad-bg); color: var(--bad-text); }
+
+/* 列表分页条（通用）：元素管理 / 用例管理 / 执行用例 等列表底部 */
+.list-pager { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-top: 1px solid var(--line-soft, #e8e8ed); }
+.list-pager .mono { font-variant-numeric: tabular-nums; }
