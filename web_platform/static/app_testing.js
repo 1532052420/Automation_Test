@@ -1286,9 +1286,6 @@ async function appTestingInit() {
     const reg = row.case;
     $('#ceTitle').textContent = row.cn_name || (reg && reg.name) || row.method;
     $('#ceMeta').innerHTML =
-      '<span class="chip">' + esc(row.file) + '</span>' +
-      '<span class="chip">' + esc(row.class) + '</span>' +
-      '<span class="chip">' + esc(row.method) + '</span>' +
       '<span class="chip">' + steps.length + ' 步</span>' +
       '<span class="chip">' + esc(reg ? (projName(reg.project_id) || '未分组') : '未登记') + '</span>';
     const sel = $('#ceType');
@@ -1376,36 +1373,6 @@ async function appTestingInit() {
     renderCeSteps(); ceElPreview();
   }
 
-  /* ＋ 添加步骤：按分组的下拉菜单（词表与定位器生成器同源）；预览语义，写回未接入 */
-  function ceBuildAddMenu() {
-    const menu = $('#ceAddMenu');
-    if (menu.dataset.built) return;
-    menu.dataset.built = '1';
-    const types = Object.assign({}, STEP_META, CE_EXTRA_TYPES);
-    Object.keys(types).forEach(k => {
-      const t = types[k];
-      let grp = menu.querySelector('[data-g="' + t.group + '"]');
-      if (!grp) {
-        grp = document.createElement('div');
-        grp.className = 'grp'; grp.dataset.g = t.group; grp.textContent = t.group;
-        menu.appendChild(grp);
-      }
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.innerHTML = '<span class="mini-node" style="background:' + (CE_GROUP_CSS[t.group] || '#86868b') + '"></span>' + esc(t.label);
-      b.addEventListener('click', () => {
-        menu.classList.remove('open');
-        const s = { type: k, element: t.el === false ? '' : ((_ceElements || [])[0] || {}).name || '',
-                    param: '', wait: '出现即可', sec: '10', desc: '' };
-        _ceCtx.steps.push(s);
-        _ceSel = _ceCtx.steps.length - 1;
-        $('#ceDirty').style.display = '';
-        renderCeSteps(); renderCeEditor();
-      });
-      menu.appendChild(b);
-    });
-  }
-
   $('#ceQ').addEventListener('input', renderCeSteps);
   $('#ceType').addEventListener('change', ceTouch);
   $('#ceEl').addEventListener('change', ceTouch);
@@ -1413,14 +1380,6 @@ async function appTestingInit() {
   $('#ceWait').addEventListener('change', ceTouch);
   $('#ceSec').addEventListener('input', ceTouch);
   $('#ceDesc').addEventListener('input', ceTouch);
-  $('#ceAddBtn').addEventListener('click', e => {
-    e.stopPropagation();
-    ceBuildAddMenu();
-    $('#ceAddMenu').classList.toggle('open');
-  });
-  document.addEventListener('click', e => {
-    if (!e.target.closest('.ce-add-wrap')) $('#ceAddMenu').classList.remove('open');
-  });
   $('#ceDup').addEventListener('click', () => {
     if (!_ceCtx || _ceSel < 0) return;
     _ceCtx.steps.splice(_ceSel + 1, 0, Object.assign({}, _ceCtx.steps[_ceSel]));
