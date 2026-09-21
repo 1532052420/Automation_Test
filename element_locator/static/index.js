@@ -1732,10 +1732,11 @@ async function onSaveElement(continueMode) {
   let savedName = special ? '' : name;
 
   const finishContinue = () => {
-    loadPages(); loadLibraryFiles(); loadCaseFiles();
     $('modal-mask').style.display = 'none';
     // 不自动弹窗：用户自由点选元素查看，点「添加测试用例」再录下一步（用例/方法预选已保持）
     showToast('保存成功，请继续添加用例');
+    // 下拉刷新延后到 toast 入场动画（220ms）结束后，避免与蒙层关闭、toast 入场同帧挤占渲染
+    setTimeout(() => { loadPages(); loadLibraryFiles(); loadCaseFiles(); }, 260);
   };
 
   if (purpose === 'only') {
@@ -1799,9 +1800,10 @@ async function onSaveElement(continueMode) {
   if (snippets.length) $('el-content').textContent = snippets.join('\n\n');
   // 刷新页面/元素/用例列表（可能有新元素、新页面对象/新方法）；保存并继续 → 连续添加模式
   if (continueMode) { finishContinue(); return; }
-  loadPages(); loadLibraryFiles(); loadCaseFiles();
   $('modal-mask').style.display = 'none';   // 保存 = 完成本条录入，与「保存并继续」一致关闭弹窗
   showToast('保存成功');
+  // 下拉刷新延后到 toast 入场动画（220ms）结束后，避免与蒙层关闭、toast 入场同帧挤占渲染
+  setTimeout(() => { loadPages(); loadLibraryFiles(); loadCaseFiles(); }, 260);
 }
 
 function showElResult(msg, ok) {
