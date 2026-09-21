@@ -410,6 +410,88 @@ def element_usage_in_cases(element_name):
     return used
 
 
+def _call_to_step(mod, fn, args):
+    """调用行 → (type, element, param)：与 case_step_line 的生成规则互逆反解。"""
+    def _unq(a):
+        a = a.strip()
+        if len(a) >= 2 and a[0] == a[-1] and a[0] in '\'"':
+            return a[1:-1]
+        return a
+    if mod == 'time' and fn == 'sleep':
+        return 'sleep', '', _unq(args)
+    if mod != 'page':
+        return 'custom', '', args
+    if fn == 'dismiss_keyboard':
+        return 'hide_keyboard', '', ''
+    if fn == 'deal_first_launch_dialogs':
+        return 'deal_first_launch_dialogs', '', ''
+    if fn == 'assert_toast':
+        return 'assert_toast', '', _unq(args)
+    if fn == 'wait_and_shot':
+        return 'screenshot', '', _unq(args)
+    if fn == 'tap_xy':
+        return 'tap', '', ', '.join(a.strip() for a in args.split(',') if a.strip())
+    if fn.endswith('_if_visible'):
+        return 'if_click', fn[:-len('_if_visible')], _unq(args)
+    if fn.startswith('assert_'):
+        rest = fn[len('assert_'):]
+        if rest.endswith('_text'):
+            return 'assert_text', rest[:-len('_text')], _unq(args)
+        if rest.endswith('_gone'):
+            return 'assert_gone', rest[:-len('_gone')], ''
+        return 'assert_visible', rest, ''
+    for pre, t in (('input_', 'input'), ('long_press_', 'long_press'),
+                   ('wait_', 'wait_element'), ('click_', 'click')):
+        if fn.startswith(pre):
+            return t, fn[len(pre):], (_unq(args) if t in ('input', 'wait_element') else '')
+    return 'custom', '', args
+
+
+def parse_case_steps(content, method_name):
+    """反解方法体为结构化步骤：注释行=步骤描述，其后的 page.xxx(...) / time.sleep(...)
+    调用行反解出 type/element/param（与 case_step_line 词表互逆）。返回
+    [{'desc', 'call', 'type', 'element', 'param'}]，按出现顺序；docstring 与赋值行跳过。"""
+    body = _method_body(content, method_name)
+    if not body:
+        return []
+    steps, cur, in_doc = [], None, False
+
+    def _flush():
+        nonlocal cur
+        if cur is not None:
+            steps.append(cur)
+            cur = None
+
+    for raw in body.splitlines():
+        s = raw.strip()
+        if in_doc:
+            if s.endswith('"""') or s.endswith("'''"):
+                in_doc = False
+            continue
+        if s.startswith('"""') or s.startswith("'''"):
+            # 单行 docstring 直接跳过；跨行进入 doc 状态直到闭合
+            if not (len(s) >= 6 and s.endswith(s[:3])):
+                in_doc = True
+            continue
+        if not s or s == 'page = self.page' or s.startswith('@') or s.startswith('def '):
+            continue
+        if s.startswith('#'):
+            _flush()
+            cur = {'desc': re.sub(r'^#\s*(?:\d+[.、]\s*)?', '', s).strip(), 'call': '',
+                   'type': 'custom', 'element': '', 'param': ''}
+            continue
+        m = re.match(r'^(page|time)\.([\w]+)\s*\((.*)\)\s*$', s)
+        if not m:
+            continue   # 其他语句（赋值/续行等）不进时间轴
+        if cur is None:
+            cur = {'desc': '', 'call': '', 'type': 'custom', 'element': '', 'param': ''}
+        cur['call'] = s
+        cur['type'], cur['element'], cur['param'] = _call_to_step(m.group(1), m.group(2), m.group(3).strip())
+        _flush()
+    _flush()
+    return steps
+
+
 def case_files_info():
     """返回用例文件的"三件套归属"信息，供「添加到元素库」联动：
     [{file, class, methods, method_steps:{方法: [步骤描述...]}, page_class, page_file, elements_file}]
