@@ -1259,9 +1259,10 @@ async function appTestingInit() {
      数据 = /api/case/steps 反解（方法体注释 + 调用行），编辑仅当前页预览，写回未接入 ---- */
   const CE_GROUP_CSS = { '基本操作': 'var(--brand)', '断言': '#6e46c8', '等待与分支': '#b26a00', '其他': '#86868b' };
   const CE_EXTRA_TYPES = { deal_first_launch_dialogs: { label: '首启弹窗处理', group: '其他', param: null } };
-  /* 暂存模型：时间轴只渲染已保存步骤（_ceCtx.steps）；全部编辑进 _cePending，
-     点「保存」才写回用例文件并刷新时间轴；刷新页面 = 重新拉取 = 恢复初始数据 */
+  /* 暂存模型：时间轴渲染暂存步骤并标注每行待保存状态（已删除/新增/已修改），
+     点「保存」才写回用例文件；刷新页面 = 重新拉取 = 恢复初始数据 */
   let _ceCtx = null, _ceSel = -1, _ceElements = null, _cePending = null;
+  let _ceNextSid = 0, _ceDelSids = [], _ceNewSids = [], _ceModSids = [];
 
   function ceTypeMeta(t) { return STEP_META[t] || CE_EXTRA_TYPES[t] || { label: t || '未知', group: '其他', param: null }; }
 
@@ -1272,7 +1273,10 @@ async function appTestingInit() {
     if (!d.ok) return toast(d.msg || '步骤反解失败', false);
     _ceCtx = { row, steps: d.steps || [] };
     _cePending = JSON.parse(JSON.stringify(_ceCtx.steps));
-    _ceSel = _ceCtx.steps.length ? 0 : -1;
+    _cePending.forEach((s, i) => { s._sid = i; });
+    _ceNextSid = _cePending.length;
+    _ceDelSids = []; _ceNewSids = []; _ceModSids = [];
+    _ceSel = _cePending.length ? 0 : -1;
     $('#ceDirty').style.display = 'none';
     if (!_ceElements) {
       const ed = await api('/api/appui/elements');
@@ -1297,12 +1301,6 @@ async function appTestingInit() {
       const t = ceTypeMeta(k);
       sel.insertAdjacentHTML('beforeend', '<option value="' + k + '">' + esc(t.label) + '（' + t.group + '）</option>');
     });
-    const elSel = $('#ceEl');
-    elSel.innerHTML = '';
-    _ceElements.forEach(e => {
-      elSel.insertAdjacentHTML('beforeend',
-        '<option value="' + esc(e.name) + '">' + esc(e.cn_name ? e.cn_name + '（' + e.name + '）' : e.name) + '</option>');
-    });
   }
 
   function renderCeSteps() {
@@ -1310,17 +1308,23 @@ async function appTestingInit() {
     const kw = ($('#ceQ').value || '').trim().toLowerCase();
     const box = $('#ceSteps');
     box.innerHTML = '';
-    const items = _ceCtx.steps.map((s, i) => ({ s, i }))
+    const items = (_cePending || []).map((s, i) => ({ s, i }))
       .filter(({s}) => !kw || [s.desc, s.element, s.param, ceTypeMeta(s.type).label]
         .some(v => String(v || '').toLowerCase().includes(kw)));
+    let activeNo = 0;
     items.forEach(({s, i}) => {
       const t = ceTypeMeta(s.type);
+      const deleted = _ceDelSids.indexOf(s._sid) >= 0;
+      if (!deleted) activeNo += 1;
+      const badge = deleted ? ' <span class="ce-badge" style="background:#86868b">已删除</span>'
+        : (_ceNewSids.indexOf(s._sid) >= 0 ? ' <span class="ce-badge" style="background:#248a3d">新增</span>'
+        : (_ceModSids.indexOf(s._sid) >= 0 ? ' <span class="ce-badge" style="background:#b26a00">已修改</span>' : ''));
       const row = document.createElement('div');
-      row.className = 'ce-step' + (i === _ceSel ? ' sel' : '');
+      row.className = 'ce-step' + (i === _ceSel ? ' sel' : '') + (deleted ? ' ce-del' : '');
       row.innerHTML =
         '<span class="ce-grip">☰</span>' +
-        '<span class="ce-node" style="background:' + (CE_GROUP_CSS[t.group] || '#86868b') + '">' + (i + 1) + '</span>' +
-        '<div class="ce-main"><div class="ce-type">' + esc(t.label) + '</div>' +
+        '<span class="ce-node" style="background:' + (CE_GROUP_CSS[t.group] || '#86868b') + '">' + activeNo + '</span>' +
+        '<div class="ce-main"><div class="ce-type">' + esc(t.label) + badge + '</div>' +
         '<div class="ce-desc">' + (s.element ? esc(s.element) + (s.param ? ' · <b>' + esc(s.param) + '</b>' : '')
           : (s.param ? '<b>' + esc(s.param) + '</b>' : '')) +
         (s.desc ? ' <span style="color:var(--muted2)">' + esc(s.desc) + '</span>' : '') + '</div></div><span></span>';
@@ -1328,7 +1332,7 @@ async function appTestingInit() {
       box.appendChild(row);
     });
     if (!items.length) box.innerHTML = '<div class="ce-none">没有匹配的步骤</div>';
-    $('#ceCnt').textContent = _ceCtx.steps.length + ' 步';
+    $('#ceCnt').textContent = activeNo + ' 步';
   }
 
   function renderCeEditor() {
@@ -1339,19 +1343,14 @@ async function appTestingInit() {
     $('#ceDup').style.display = s ? '' : 'none';
     $('#ceDel').style.display = s ? '' : 'none';
     if (!s) { $('#ceIdx').textContent = ''; return; }
-    $('#ceIdx').textContent = '第 ' + (_ceSel + 1) + ' 步';
+    $('#ceIdx').textContent = '第 ' + (_ceSel + 1) + ' 步' +
+      (_ceDelSids.indexOf(s._sid) >= 0 ? '（已标记删除，保存后生效）' : '');
     const t = ceTypeMeta(s.type);
     $('#ceType').value = (STEP_META[s.type] || CE_EXTRA_TYPES[s.type]) ? s.type : 'custom';
     $('#ceElWrap').style.display = t.el === false ? 'none' : '';
     $('#ceParamWrap').style.display = (t.param || s.param) ? '' : 'none';
     $('#ceParamLab').textContent = t.param || '参数';
-    const elSel = $('#ceEl');
-    elSel.querySelectorAll('option[data-tmp]').forEach(o => o.remove());   // 清掉上次的临时回显项
-    if (s.element && ![...elSel.options].some(o => o.value === s.element)) {
-      elSel.insertAdjacentHTML('afterbegin',
-        '<option data-tmp value="' + esc(s.element) + '">' + esc(s.element) + '（不在元素库）</option>');
-    }
-    elSel.value = s.element || '';
+    $('#ceEl').value = s.element || '';   // 元素改为可输入的下拉组合框，直接回显（库外元素也天然支持）
     $('#ceParam').value = s.param || '';
     $('#ceWait').value = s.wait || '出现即可';
     $('#ceSec').value = s.sec || '10';
@@ -1368,43 +1367,83 @@ async function appTestingInit() {
 
   function ceTouch() {
     const s = (_cePending || [])[_ceSel]; if (!s) return;
-    s.type = $('#ceType').value; s.element = $('#ceEl').value || '';
+    s.type = $('#ceType').value; s.element = $('#ceEl').value.trim();
     s.param = $('#ceParam').value.trim();
     s.wait = $('#ceWait').value; s.sec = $('#ceSec').value.trim();
     s.desc = $('#ceDesc').value.trim();
-    $('#ceDirty').style.display = '';   // 只改暂存；时间轴在保存写回后刷新
-    ceElPreview();
+    if (_ceNewSids.indexOf(s._sid) < 0 && _ceDelSids.indexOf(s._sid) < 0) {
+      /* 与文件反解值比对：改回原值则摘掉「已修改」标记，避免无变化也提示未保存 */
+      const savedS = (_ceCtx.steps || [])[s._sid] || {};
+      const same = ['type', 'element', 'param', 'desc'].every(k => (s[k] || '') === (savedS[k] || ''));
+      _ceModSids = _ceModSids.filter(id => id !== s._sid);
+      if (!same) _ceModSids.push(s._sid);
+    }
+    const anyPending = _ceDelSids.length || _ceNewSids.length || _ceModSids.length;
+    $('#ceDirty').style.display = anyPending ? '' : 'none';
+    renderCeSteps(); ceElPreview();
   }
+
+  /* 元素下拉组合框：输入过滤 + 限高滚动列表，替代原生 select 的超长下拉 */
+  function ceElCombo(filter) {
+    const list = $('#ceElList');
+    const kw = (filter == null ? $('#ceEl').value : filter).trim().toLowerCase();
+    const items = (_ceElements || []).filter(e => !kw ||
+      [e.name, e.cn_name].some(v => String(v || '').toLowerCase().includes(kw)));
+    list.innerHTML = items.map(e =>
+      '<div class="ce-combo-item" data-v="' + esc(e.name) + '">' +
+      esc(e.cn_name ? e.cn_name + '（' + e.name + '）' : e.name) + '</div>').join('')
+      || '<div class="ce-combo-item" style="color:var(--muted2)">无匹配元素（可直接输入元素名）</div>';
+    list.classList.add('open');
+  }
+  $('#ceEl').addEventListener('focus', () => ceElCombo(''));
+  $('#ceEl').addEventListener('input', () => { ceElCombo(); ceTouch(); });
+  $('#ceElList').addEventListener('mousedown', e => {
+    const item = e.target.closest('.ce-combo-item'); if (!item || !item.dataset.v) return;
+    $('#ceEl').value = item.dataset.v;
+    $('#ceElList').classList.remove('open');
+    ceTouch();
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.ce-combo')) $('#ceElList').classList.remove('open');
+  });
 
   $('#ceQ').addEventListener('input', renderCeSteps);
   $('#ceType').addEventListener('change', ceTouch);
-  $('#ceEl').addEventListener('change', ceTouch);
   $('#ceParam').addEventListener('input', ceTouch);
   $('#ceWait').addEventListener('change', ceTouch);
   $('#ceSec').addEventListener('input', ceTouch);
   $('#ceDesc').addEventListener('input', ceTouch);
   $('#ceDup').addEventListener('click', () => {
     if (!_ceCtx || _ceSel < 0) return;
-    _cePending.splice(_ceSel + 1, 0, JSON.parse(JSON.stringify(_cePending[_ceSel])));
+    const clone = JSON.parse(JSON.stringify(_cePending[_ceSel]));
+    clone._sid = _ceNextSid++;
+    _cePending.splice(_ceSel + 1, 0, clone);
+    _ceNewSids.push(clone._sid);
     _ceSel = _ceSel + 1;
     $('#ceDirty').style.display = '';
-    renderCeEditor();
+    renderCeSteps(); renderCeEditor();
   });
   $('#ceDel').addEventListener('click', () => {
     if (!_ceCtx || _ceSel < 0) return;
-    if (!confirm('删除第 ' + (_ceSel + 1) + ' 步？点击「保存」后写入用例文件。')) return;
-    _cePending.splice(_ceSel, 1);
-    _ceSel = Math.min(_ceSel, _cePending.length - 1);
+    const s = _cePending[_ceSel];
+    if (_ceNewSids.indexOf(s._sid) >= 0) {          // 新增行直接从暂存移除
+      _cePending.splice(_ceSel, 1);
+      _ceSel = Math.min(_ceSel, _cePending.length - 1);
+    } else {
+      _ceDelSids.push(s._sid);                      // 已有行标记删除，保存后从文件移除
+    }
     $('#ceDirty').style.display = '';
-    renderCeEditor();
+    renderCeSteps(); renderCeEditor();
   });
   $('#ceBack').addEventListener('click', e => { e.preventDefault(); showRunPanel('caselist'); });
   $('#ceSave').addEventListener('click', async () => {
     if (!_ceCtx) return;
-    if (!_cePending || !_cePending.length) return toast('至少保留一个步骤', false);
+    const steps = (_cePending || []).filter(s => _ceDelSids.indexOf(s._sid) < 0)
+      .map(s => { const c = Object.assign({}, s); delete c._sid; return c; });
+    if (!steps.length) return toast('至少保留一个步骤', false);
     const d = await api(AT_PREFIX + '/api/case/steps/save', {
       method: 'POST',
-      body: JSON.stringify({ file: _ceCtx.row.file, method: _ceCtx.row.method, steps: _cePending })
+      body: JSON.stringify({ file: _ceCtx.row.file, method: _ceCtx.row.method, steps: steps })
     });
     if (!d.ok) return toast(d.msg || '保存失败', false);
     toast('保存成功', true);
