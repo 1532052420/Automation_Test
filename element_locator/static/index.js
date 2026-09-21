@@ -583,7 +583,7 @@ function initDialog() {
   });
 }
 
-/* ---------- 底部提示（通用）：6 秒自动消失，pointer-events:none 不阻挡任何操作 ---------- */
+/* ---------- 居中提示（通用）：原地静止显示 3 秒自动消失，pointer-events:none 不阻挡任何操作 ---------- */
 let hitToastTimer = null;
 let hitToastHideAt = 0;   // 应隐藏的时刻（ms）；后台标签页定时器被浏览器节流时，回到页面立即补隐藏
 function hideHitToast() {
@@ -595,10 +595,7 @@ function showToast(msg) {
   const t = $('hit-toast');
   if (!t) return;
   t.textContent = msg;
-  t.style.display = '';
-  t.style.animation = 'none';   // 连续弹出时重播入场动画
-  void t.offsetWidth;
-  t.style.animation = '';
+  t.style.display = '';   // 原地静止显示：无入场动画、无动画重播，弹出瞬间零重排
   clearTimeout(hitToastTimer);
   hitToastHideAt = Date.now() + 3000;
   hitToastTimer = setTimeout(hideHitToast, 3000);
