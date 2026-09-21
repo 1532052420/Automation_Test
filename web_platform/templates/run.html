@@ -103,13 +103,19 @@
               <div class="field"><label>应用包名（appPackage）</label><input type="text" id="inPackage" placeholder="如 com.recordlife.kuaige"></div>
               <div class="field"><label>启动 Activity</label><input type="text" id="inActivity" placeholder="如 com.recordlife.kuaige.feature.main.MainActivity"></div>
             </div>
-            <div class="mt" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
-              <label class="chk"><input type="checkbox" id="execSetupReset"> 前置清理（仅第 1 条用例前：清登录态+App 数据）</label>
-              <label class="chk"><input type="checkbox" id="execTeardownReset"> 后置清理（仅最后 1 条用例后：清 App 数据）</label>
-            </div>
-            <p class="muted mt">以上参数仅对本次执行生效（不写回 conf 文件）；留空 = 用默认值。<br>
-            用例之间恒为「冷启动」：每条用例结束停 App（保留数据），下一条自动重新拉起、落在首页——无需每条用例写登录步骤。</p>
+            <p class="muted mt">以上参数仅对本次执行生效（不写回 conf 文件）；留空 = 用默认值。</p>
           </div>
+        </div>
+
+        <!-- 前后置清理：独立卡片，保存后持久化，全部执行入口（选择用例/套件/单用例）共用 -->
+        <div class="card">
+          <h3>前后置清理 <span class="muted">全部执行入口共用 · 用例之间恒为冷启动（停 App 保留数据，下一条自动拉起落在首页）</span></h3>
+          <div class="mt" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+            <label class="chk"><input type="checkbox" id="execSetupReset"> 前置清理（仅第 1 条用例前：清登录态+App 数据）</label>
+            <label class="chk"><input type="checkbox" id="execTeardownReset"> 后置清理（仅最后 1 条用例后：清 App 数据）</label>
+            <button class="ghost mini" id="btnCleanupSave" style="margin-left:auto">保存清理配置</button>
+          </div>
+          <p class="muted mt">保存后对后续所有执行生效（选择用例 / 测试套件 / 单用例执行共用，不写回 conf 文件）——用例之间无需每条写登录步骤。</p>
         </div>
 
         <div class="card">
