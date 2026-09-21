@@ -228,25 +228,6 @@ def api_save_case_package():
     return jsonify(payload), status
 
 
-@app.route('/api/build_case_package', methods=['POST'])
-def api_build_case_package():
-    """「保存测试用例包·下载 zip」：三个文件打包，供平台「APP自动化 → 用例上传」入库"""
-    import io
-    import zipfile
-    data = request.get_json(silent=True) or {}
-    package = (data.get('package') or 'case_package').strip()
-    files = data.get('files') or []
-    if not files:
-        return jsonify({'ok': False, 'msg': '缺少文件内容'}), 400
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for f in files:
-            zf.writestr('%s/%s' % (f.get('dir', ''), f.get('name', '')), f.get('content', ''))
-    buf.seek(0)
-    return send_file(buf, as_attachment=True, mimetype='application/zip',
-                     attachment_filename='%s.zip' % re.sub(r'[^A-Za-z0-9_\-]', '_', package))
-
-
 @app.route('/api/add_code', methods=['POST'])
 def api_add_code():
     """「保存并添加到用例」：把一步操作代码追加到目标用例文件的指定方法体末尾。

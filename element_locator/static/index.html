@@ -111,7 +111,7 @@ try {
       <div class="flow-step">
         <span class="fs-label">保存到哪一步：</span>
         <label class="purpose"><input type="radio" name="el-purpose" value="only" checked> <span class="help-icon" data-help="只把元素写进元素库（先攒元素，之后统一写用例）。右侧②③栏熄灭不可用。">?</span> ① 仅元素</label>
-        <label class="purpose"><input type="radio" name="el-purpose" value="all"> <span class="help-icon" data-help="三件套一次完成（推荐）：元素入库 + 用例行追加 + 页面操作方法自动生成/更新到目标用例的页面文件。用例、元素、操作缺一不可，选这个就不会漏。目标用例选「➕ 新建…」并填用例名时：步骤存入临时用例（未入库）——「保存并继续」继续累积，「保存」导出全部步骤的 zip。">?</span> ② 元素 + 用例 + 操作（推荐）</label>
+        <label class="purpose"><input type="radio" name="el-purpose" value="all"> <span class="help-icon" data-help="三件套一次完成（推荐）：元素入库 + 用例行追加 + 页面操作方法自动生成/更新到目标用例的页面文件。用例、元素、操作缺一不可，选这个就不会漏。目标用例选「➕ 新建…」并填用例名时：首次保存即三件套（用例+页面+元素）直接入库，弹窗回显文件信息，后续步骤继续追加。">?</span> ② 元素 + 用例 + 操作（推荐）</label>
         <label class="purpose"><input type="radio" name="el-purpose" value="popup"> <span class="help-icon" data-help="把当前选中的元素登记为「随机弹窗关闭规则」：写进 popupElements.py 规则库（不进普通元素库、不写用例）。用例执行时框架在元素等待的间隙按规则被动扫描，偶遇弹窗就截图存证并自动关闭——不为弹窗写用例，正常用例"无感"。建议配锚点防误关。">?</span> 🎯 ③ 登记随机弹窗</label>
       </div>
 
@@ -156,7 +156,7 @@ try {
         <!-- 第二栏：用例 -->
         <section class="flow-col" id="col-case">
           <div class="col-head">② 用例 <span class="hint">这步操作追加到哪条用例</span></div>
-          <label>目标用例文件 <span class="help-icon" data-help="操作代码行追加到哪个用例文件（test_*.py）。下拉列出现有用例文件；选「➕ 新建…」并输入用例名后：步骤先存入临时用例（不写框架）——「保存并继续」累积步骤继续录，「保存」把全部已录步骤打包 zip 下载，再到平台「用例管理 → 上传用例包」入库。">?</span>
+          <label>目标用例文件 <span class="help-icon" data-help="操作代码行追加到哪个用例文件（test_*.py）。下拉列出现有用例文件；选「➕ 新建…」并输入用例名后：首次保存即创建用例文件并写入当前步骤——「保存并继续」继续录后续步骤（自动追加到该用例）。">?</span>
             <select id="el-case-file"></select>
             <span id="el-case-new-wrap" style="display:none;margin-top:6px">
               <span class="hint" style="font-size:12px;font-weight:600">test_</span><input id="el-case-new" type="text" placeholder="如: login_flow" style="width:calc(100% - 40px)">

@@ -475,7 +475,7 @@ function onCnCaseChange() {
     _cnCaseSel = null; _cnMethodSteps = [];
     const base = cnNewCaseBase();
     $('#cnCaseMethod').innerHTML = '<option value="test_' + esc(base || 'x') + '">test_' + esc(base || 'x') + '（新建后自动生成）</option>';
-    $('#cnPageFile').value = base ? cnCapFirst(base) + 'Page.py' : '';
+    $('#cnPageFile').value = base ? cnCapFirst(base) + 'Page.py' : '（输入用例名后自动派生）';
     renderCnMethodSteps();
     return;
   }
@@ -651,7 +651,7 @@ function currentCnElemFile() {
   return $('#cnElemFile').value;
 }
 
-/* 新建用例文件模式：按定位器 tempCaseRegen 同规则生成三件套内容 */
+/* 新建用例文件模式：按用例名生成三件套内容（用例+页面+元素，一次打包入库） */
 function cnTempFiles(tc) {
   const base = tc.base;
   const caseName = 'test_' + base + '.py';
@@ -1274,6 +1274,12 @@ async function appTestingInit() {
     $('#cnElemFileNewWrap').style.display = $('#cnElemFile').value === CN_NEW_FILE ? '' : 'none';
   });
   $('#cnCaseFile').addEventListener('change', onCnCaseChange);
+  $('#cnCaseNew').addEventListener('input', () => {
+    // 新建用例：输入用例名实时派生「写入页面文件」显示（与三件套实际生成的文件名一致）
+    if (!cnIsNewCase()) return;
+    const base = cnNewCaseBase();
+    $('#cnPageFile').value = base ? cnCapFirst(base) + 'Page.py' : '（输入用例名后自动派生）';
+  });
   $('#cnCaseMethod').addEventListener('change', onCnMethodChange);
   $('#cnSave').addEventListener('click', () => writeCnStep().catch(e => toast(e.message, false)));
   $('#cnClose').addEventListener('click', cnFinish);

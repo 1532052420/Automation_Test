@@ -17,7 +17,7 @@ const state = {
   prevSigs: null,         // 上一次刷新的元素签名集合（Diff 基线；null=尚无）
   goneSigs: [],           // 本次刷新相对上次「消失」的元素签名
   undoStack: [],          // 本次会话「添加到用例」步骤的撤销栈（LIFO，存 add_code 返回的文件快照）
-  tempCase: null,         // 临时用例区（新建文件模式）：步骤先累积在内存，「保存」才打包 zip，全程不写框架
+  tempCase: null,         // 录制会话：上次三件套入库的用例（base/caseComment），重开弹窗时回显
   coordMode: false,       // ⌖ 坐标模式：点截图选精确坐标（不再命中容器节点），用于无障碍盲区（自绘弹层等）
   coordPoint: null,       // 坐标模式下最后选中的点 [x, y]（设备坐标）
 };
@@ -190,7 +190,6 @@ async function init() {
   $('btn-undo-step').addEventListener('click', undoLastStep);
   // 临时用例未导出时，离开页面前提醒（防误关丢失已录步骤）
   window.addEventListener('beforeunload', (e) => {
-    if (state.tempCase) { e.preventDefault(); e.returnValue = ''; }
   });
   $('btn-dup-reuse').addEventListener('click', () => { const r = dupResolver; closeDupPanel(); if (r) r('reuse'); });
   $('btn-dup-update').addEventListener('click', () => { const r = dupResolver; closeDupPanel(); if (r) r('update'); });
@@ -1039,17 +1038,16 @@ async function openModal() {
   setElLinkNote('');
   onOpTypeChange();
   await loadCaseFiles();
-  // 临时用例会话：保持「新建」模式并回填用例名，继续累积步骤
+  // 录制会话回显：预选上次入库的用例文件 + 用例备注；元素/页面文件由 onCaseFileChange 自动对齐
   if (state.tempCase) {
-    $('el-case-file').value = NEW_FILE_OPT;
-    $('el-case-new').value = state.tempCase.base;
-    $('el-file').value = NEW_FILE_OPT;
-    $('el-file-new').value = state.tempCase.elemFile.replace(/\.py$/, '').replace(/Elements$/, '');
-    $('el-case-new-wrap').style.display = '';
-    $('el-file-new-wrap').style.display = '';
-    onCaseFileChange();
-    setElLinkNote('🧪 临时用例「' + state.tempCase.base + '」已录 ' + state.tempCase.steps.length
-      + ' 步（未入库）·「保存并继续」继续累积，「保存」导出 zip');
+    const caseFile = 'test_' + state.tempCase.base + '.py';
+    if ((state.caseFiles || []).some(c => c.file === caseFile)) {
+      $('el-case-file').value = caseFile;
+      $('el-case-comment').value = state.tempCase.caseComment || '';
+      onCaseFileChange();
+    } else {
+      state.tempCase = null;   // 用例文件已不存在（被删除）→ 会话失效
+    }
   }
   document.querySelector('input[name="el-purpose"][value="all"]').checked = true;
   onPurposeChange();
@@ -1690,132 +1688,6 @@ function pkgFiles() {
     { dir: 'page_objects/app_ui/android/demoProject/elements', name: elemFile, content: elemPy },
   ];
 }
-/* 包弹窗预览：三个文件落点 */
-/* 生成三件套 zip：mode=save（交平台做校验/备份/登记后入库）/ download（浏览器下载 zip） */
-/* 新建用例（填写了自定义文件名）的按钮直通分支：
-   continueMode=true（保存并继续）→ 三件套（已含当前步骤）直接入库，弹窗关闭并进入
-   连续添加，后续步骤默认继续写入该用例；continueMode=false（保存）→ 打包为 zip
-   下载（不落库），由用户经平台「用例管理 → 上传用例包」入库。 */
-/* ---------- 临时用例区：新建文件模式下步骤先累积在内存，「保存」才打包 zip（全程不写框架） ---------- */
-function tempCaseEnsure() {
-  if (state.tempCase) return state.tempCase;
-  state.tempCase = {
-    base: pkgBase(),
-    caseName: pkgCaseFileName(),
-    pageFile: pkgPageFileName(),
-    elemFile: pkgElementFileName(),
-    pageClass: pkgPageClassName(),
-    elemClass: pkgElementClassName(),
-    steps: [],              // { comment, line, elemName, elemLine, methodBlock }
-  };
-  return state.tempCase;
-}
-function tempCaseAppend() {
-  const tc = tempCaseEnsure();
-  const step = currentStepObj();
-  const st = STEP_TYPES.find(t => t.v === step.type) || {};
-  const entry = {
-    comment: pkgStepComment(),
-    line: previewLine(step),
-    elemName: st.el ? $('el-name').value.trim() : '',
-    elemLine: st.el ? elementLinePreview() : '',
-    methodBlock: pkgMethodBlock(step),
-  };
-  if (step.type === 'deal_first_launch_dialogs') tc.steps.unshift(entry);   // 首启弹窗恒在第 1 步之前
-  else tc.steps.push(entry);
-  tempCaseRegen();
-  return tc;
-}
-function tempCaseRegen() {
-  const tc = state.tempCase;
-  if (!tc) return;
-  // 元素文件：同名元素取最后一次定义（保持首次出现顺序）
-  const eOrder = [], eMap = {};
-  tc.steps.forEach(s => {
-    if (!s.elemName || !s.elemLine) return;
-    if (!(s.elemName in eMap)) eOrder.push(s.elemName);
-    eMap[s.elemName] = s.elemLine;
-  });
-  tc.elemContent = '# -*- coding: utf-8 -*-\n'
-    + '# 临时用例（未入库）：' + tc.base + '\n'
-    + 'from page_objects.createElement import CreateElement\n'
-    + 'from page_objects.app_ui.locator_type import Locator_Type\n'
-    + 'from page_objects.app_ui.wait_type import Wait_Type as Wait_By\n'
-    + '\n\n'
-    + 'class ' + tc.elemClass + ':\n'
-    + '    def __init__(self):\n'
-    + (eOrder.length ? eOrder.map(n => '        ' + eMap[n]).join('\n') + '\n' : '        pass\n');
-  // 页面文件：同名方法取最后一次（元素行变化的更新语义与后端一致）
-  const mOrder = [], mMap = {};
-  tc.steps.forEach(s => {
-    if (!s.methodBlock) return;
-    const mn = (s.methodBlock.match(/def (\w+)/) || [])[1];
-    if (!mn) return;
-    if (!(mn in mMap)) mOrder.push(mn);
-    mMap[mn] = s.methodBlock;
-  });
-  tc.pageContent = '# -*- coding: utf-8 -*-\n'
-    + '# 临时用例（未入库）：' + tc.base + '\n'
-    + 'from page_objects.app_ui.android.demoProject.elements.' + tc.elemFile.replace('.py', '') + ' import ' + tc.elemClass + '\n'
-    + '\n\n'
-    + 'class ' + tc.pageClass + ':\n'
-    + '\n'
-    + '    def __init__(self, appOperator):\n'
-    + '        self.appOperator = appOperator\n'
-    + '        self._elements = ' + tc.elemClass + '()\n'
-    + (mOrder.length ? '\n' + mOrder.map(n => mMap[n]).join('\n') + '\n' : '');
-  // 用例文件：头部流程注释 + 方法体逐步骤
-  const flow = ['# 1. 拉起快歌主页面'].concat(tc.steps.map((s, i) => '# ' + (i + 2) + '. ' + s.comment));
-  tc.caseContent = '# -*- coding: utf-8 -*-\n'
-    + '# 用例包 ' + tc.base + ' · ' + tc.steps.length + ' 步（临时用例，未入库）\n'
-    + flow.map(l => '# ' + l + '\n').join('')
-    + 'import time\n'
-    + 'import allure\n'
-    + 'from base.app_ui.android.demoProject.app_ui_android_demoProject_client import APP_UI_Android_demoProject_Client\n'
-    + 'from page_objects.app_ui.android.demoProject.pages.' + tc.pageFile.replace('.py', '') + ' import ' + tc.pageClass + '\n'
-    + '\n\n'
-    + "@allure.parent_suite('快歌APP自动化')\n"
-    + "@allure.suite('" + tc.base + "')\n"
-    + 'class Test' + capCamel(tc.base) + ':\n'
-    + '\n'
-    + '    def setup_class(self):\n'
-    + '        # is_need_kill_app=False：绕开 demo 客户端硬编码启动，显式启动被测 App\n'
-    + '        self.demoProjectClient = APP_UI_Android_demoProject_Client(is_need_kill_app=False)\n'
-    + '        self.appOperator = self.demoProjectClient.appOperator\n'
-    + "        self.appOperator.start_activity('com.recordlife.kuaige', 'com.recordlife.kuaige.feature.main.MainActivity')\n"
-    + '        time.sleep(3)\n'
-    + '        self.page = ' + tc.pageClass + '(self.appOperator)\n'
-    + '\n'
-    + "    @allure.title('" + tc.base + ' · ' + tc.steps.length + " 步')\n"
-    + '    def test_' + tc.base + '(self):\n'
-    + '        page = self.page\n'
-    + '\n'
-    + tc.steps.map((s, i) => '        # ' + (i + 1) + '. ' + s.comment + '\n        ' + s.line + '\n\n').join('')
-    + '    def teardown_class(self):\n'
-    + '        self.appOperator.close_app()\n';
-}
-async function tempCaseExportZip() {
-  const tc = state.tempCase;
-  if (!tc) return null;
-  tempCaseRegen();
-  const resp = await fetch('api/build_case_package', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ package: tc.base, files: [
-      { dir: 'cases/app_ui/android/demoProject', name: tc.caseName, content: tc.caseContent },
-      { dir: 'page_objects/app_ui/android/demoProject/pages', name: tc.pageFile, content: tc.pageContent },
-      { dir: 'page_objects/app_ui/android/demoProject/elements', name: tc.elemFile, content: tc.elemContent },
-    ] }),
-  });
-  if (!resp.ok) return null;
-  const blob = await resp.blob();
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = tc.base + '.zip';
-  a.click();
-  URL.revokeObjectURL(a.href);
-  return tc.base;
-}
-
 async function onSaveElement(continueMode) {
   const purpose = purposeValue();
   if (!purpose) return;
@@ -1825,36 +1697,34 @@ async function onSaveElement(continueMode) {
   const name = special ? '' : $('el-name').value.trim();
   if (purpose !== 'only') {
     // 防误操作：「写入元素文件」与「目标用例文件」的新建状态必须同步——
-    // 一起新建（随临时用例打包 zip）或都选已有文件；不同步时 toast 提示并阻止保存
+    // 一起新建（三件套随首次保存入库）或都选已有文件；不同步时 toast 提示并阻止保存
     //（特殊操作不碰元素库，不受此约束）
     if (!special && isNewCase() !== isNewElementFile()) {
       showToast('⚠️ 「写入元素文件」与「目标用例文件」需同步：要么都用「➕ 新建」，要么都选已有文件');
       return;
     }
-    // 新建用例（填写了自定义文件名）：全程写【临时用例区】（内存），与框架零交互——
-    //   保存并继续 = 当前步骤累积进临时区 → 关弹窗，自由选元素后点「添加测试用例」继续
-    //   保存       = 临时区三件套（含全部已录步骤）打包 zip 下载 → 结束会话
+    // 新建用例（填写了自定义文件名）：首次「保存并继续/保存」即三件套（元素+用例+页面，
+    // 已含当前步骤）直接入库——与平台「保存并继续」同语义；之后弹窗回显文件信息，继续录走 add_code 追加
     if (isNewCase()) {
       if (!pkgBase()) { showElResult('请先输入新用例名（test_ 后面的部分）', false); return; }
       if (!special && !name) { showElResult('元素名称不能为空', false); return; }
       if (state.tempCase && state.tempCase.base !== pkgBase()) {
-        if (!confirm('已有临时用例「' + state.tempCase.base + '」（' + state.tempCase.steps.length
-            + ' 步，未导出）。换用例名将丢弃它，继续？')) return;
-        state.tempCase = null;
+        if (!confirm('上次录制会话是「' + state.tempCase.base + '」。换用例名将切换会话，继续？')) return;
       }
-      const tc = tempCaseEnsure();
-      tempCaseAppend();
-      if (continueMode) {
-        $('modal-mask').style.display = 'none';
-        showToast('✅ 已存入临时用例「' + tc.base + '」（共 ' + tc.steps.length
-          + ' 步，未入库）· 点「添加测试用例」继续录，点「保存」导出 zip');
-      } else {
-        const base = await tempCaseExportZip();
-        if (!base) { showElResult('导出 zip 失败：服务异常（临时用例已保留，可重试）', false); return; }
-        state.tempCase = null;   // zip 已交付，会话结束
-        $('modal-mask').style.display = 'none';
-        showToast('📦 已导出 ' + base + '.zip（含全部 ' + '已录步骤）· 请到平台「用例管理 → 上传用例包」入库');
-      }
+      const tc = state.tempCase = { base: pkgBase(), caseComment: $('el-case-comment').value.trim() };
+      const r = await fetch('api/save_case_package', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ package: tc.base, files: pkgFiles(), uploader: special ? 'locator' : name }),
+      }).then(x => x.json()).catch(() => null);
+      if (!r || !r.ok) { showElResult('三件套入库失败：' + ((r && r.msg) || '服务异常'), false); return; }
+      // 本步已随三件套写入 → 切回已有文件模式（回显用例/页面/元素文件），后续步骤走 add_code 追加
+      await loadCaseFiles();
+      $('el-case-file').value = pkgCaseFileName();
+      onCaseFileChange();
+      $('el-case-comment').value = tc.caseComment;   // 用例备注回显（onCaseFileChange 不动该字段）
+      $('modal-mask').style.display = 'none';
+      showToast('✅ 三件套已入库：' + pkgCaseFileName() + ' / ' + pkgPageFileName() + ' / ' + pkgElementFileName()
+        + '；选下一个元素后点「添加测试用例」继续录');
       return;
     }
     // 都选已有文件 → 继续走「元素入库 + 追加用例行」（下方既有流程）
