@@ -25,14 +25,16 @@ STEP_TYPES = [
     'click', 'input', 'long_press', 'assert_visible', 'assert_text',
     'assert_toast', 'wait_element', 'assert_gone', 'if_click',
     'screenshot', 'tap', 'sleep', 'hide_keyboard', 'custom',
+    'deal_first_launch_dialogs',
 ]
 
 # 页面里固定实现的工具方法：已存在则不重复生成
-TOOL_METHODS = {'wait_and_shot', 'tap_xy', 'assert_toast', 'dismiss_keyboard'}
+TOOL_METHODS = {'wait_and_shot', 'tap_xy', 'assert_toast', 'dismiss_keyboard',
+                'deal_first_launch_dialogs'}
 
 # 需要构造探针元素（CreateElement/Locator_Type/Wait_By）的步骤类型：
 # 生成页面方法时页面文件缺这三个 import 会自动补齐
-PROBE_STEP_TYPES = {'wait_element', 'assert_gone', 'if_click'}
+PROBE_STEP_TYPES = {'wait_element', 'assert_gone', 'if_click', 'deal_first_launch_dialogs'}
 
 
 def list_case_files():
@@ -94,6 +96,7 @@ def step_desc(step):
         'sleep': '等待%s秒' % p,
         'hide_keyboard': '收起键盘',
         'custom': (p or '自定义代码').splitlines()[0],
+        'deal_first_launch_dialogs': '首次启动弹窗处理（无弹窗自动跳过）',
     }.get(t, '未定义步骤')
 
 
@@ -187,6 +190,24 @@ def page_method_code(step):
     if t == 'tap':
         return _method_block('tap_xy', desc, ['x', 'y'],
                              'self.appOperator.tap(x, y)')
+    if t == 'deal_first_launch_dialogs':
+        # 首次启动弹窗处理：隐私协议「同意并继续」→ 系统权限「允许」，出现才点、无弹窗自动跳过。
+        # 探针自包含（文本定位，不依赖页面元素文件），任何页面都能生成；
+        # 已有同名方法的页面（如 demoToolLoginPage）走 TOOL_METHODS 守卫不覆盖。
+        body = ('import time\n'
+                + 'for _lval, _desc in (\n'
+                + '        ("//*[@text=\'同意并继续\']", \'隐私协议弹窗\'),\n'
+                + '        ("//*[@text=\'允许\']", \'系统权限弹窗\'),\n'
+                + '):\n'
+                + '    probe = CreateElement.create(Locator_Type.XPATH, _lval,\n'
+                + '                                 wait_type=Wait_By.PRESENCE_OF_ELEMENT_LOCATED,\n'
+                + '                                 wait_seconds=2)\n'
+                + '    try:\n'
+                + '        self.appOperator.click(self.appOperator.getElement(probe))\n'
+                + '        time.sleep(1)  # 等弹窗收尾动画，避免点击落到下层页面\n'
+                + '    except Exception:\n'
+                + '        pass  # 该弹窗未出现，跳过')
+        return _method_block('deal_first_launch_dialogs', desc, [], body)
     return None
 
 
@@ -222,6 +243,8 @@ def case_step_line(step):
             return 'page.click_%s_if_visible()' % el
     if t == 'hide_keyboard':
         return 'page.dismiss_keyboard()'
+    if t == 'deal_first_launch_dialogs':
+        return 'page.deal_first_launch_dialogs()'
     if t == 'screenshot':
         return 'page.wait_and_shot(%s)' % _q(p)
     if t == 'tap':
@@ -462,20 +485,32 @@ def append_code_to_method(case_file, method_name, step, gen_page_method=False, i
     body_end = body_start + (nxt.start() + 1 if nxt else len(tail))
     body = content[body_start:body_end]
 
-    # 插入位置：insert_after_step=N → 第 N 个步骤（方法体内的 # 注释锚点）之后；否则末尾追加
-    try:
-        after_n = int(insert_after_step or 0)
-    except (TypeError, ValueError):
-        after_n = 0
-    if after_n > 0:
+    # 插入位置：insert_after_step='front' → 第 1 步之前；=N → 第 N 步之后；0/None → 末尾追加。
+    # 首次启动弹窗处理语义上只能在所有操作之前，无条件强制前插（防止误插中间/末尾）。
+    if step.get('type') == 'deal_first_launch_dialogs':
+        insert_after_step = 'front'
+    if insert_after_step == 'front':
         anchors = list(re.finditer(r'^%s# ' % (IND * 2), body, re.MULTILINE))
-        if after_n > len(anchors):
-            return {'ok': False, 'msg': '目标方法只有 %d 个步骤，没有第 %d 步' % (len(anchors), after_n)}
-        chunk_end = anchors[after_n].start() if after_n < len(anchors) else len(body)
-        new_body = (body[:chunk_end].rstrip('\n') + '\n\n' + comment_line + IND * 2 + line + '\n\n'
-                    + body[chunk_end:].lstrip('\n'))
+        if anchors:
+            first = anchors[0].start()
+            new_body = (body[:first].rstrip('\n') + '\n\n' + comment_line + IND * 2 + line + '\n\n'
+                        + body[first:].lstrip('\n'))
+        else:
+            new_body = body.rstrip('\n') + '\n' + comment_line + IND * 2 + line + '\n\n'
     else:
-        new_body = body.rstrip('\n') + '\n' + comment_line + IND * 2 + line + '\n\n'
+        try:
+            after_n = int(insert_after_step or 0)
+        except (TypeError, ValueError):
+            after_n = 0
+        if after_n > 0:
+            anchors = list(re.finditer(r'^%s# ' % (IND * 2), body, re.MULTILINE))
+            if after_n > len(anchors):
+                return {'ok': False, 'msg': '目标方法只有 %d 个步骤，没有第 %d 步' % (len(anchors), after_n)}
+            chunk_end = anchors[after_n].start() if after_n < len(anchors) else len(body)
+            new_body = (body[:chunk_end].rstrip('\n') + '\n\n' + comment_line + IND * 2 + line + '\n\n'
+                        + body[chunk_end:].lstrip('\n'))
+        else:
+            new_body = body.rstrip('\n') + '\n' + comment_line + IND * 2 + line + '\n\n'
     new_content = content[:body_start] + new_body + content[body_end:]
     _write(path, new_content)
     result = {'ok': True, 'action': 'appended', 'line': line, 'content': new_content,

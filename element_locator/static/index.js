@@ -41,6 +41,7 @@ const STEP_TYPES = [
   { v: 'assert_gone', n: '断言消失(弹窗已关闭)', el: true, param: false, ph: '', group: '断言' },
   { v: 'wait_element', n: '轮询等待出现(慢页面/生成中)', el: true, param: true, ph: '最长等待秒数', group: '长流程·等待与分支', defv: '60' },
   { v: 'if_click', n: '出现才点击(分支弹窗)', el: true, param: true, ph: '探测秒数', group: '长流程·等待与分支', defv: '3' },
+  { v: 'deal_first_launch_dialogs', n: '首次启动弹窗处理(无弹窗跳过)', el: false, param: false, ph: '', group: '长流程·等待与分支' },
   { v: 'hide_keyboard', n: '收起键盘', el: false, param: false, ph: '', group: '长流程·等待与分支' },
   { v: 'custom', n: '自定义代码', el: false, param: true, ph: '代码行', group: '长流程·等待与分支', defv: '' },
 ];
@@ -64,6 +65,7 @@ function genStepDesc(s) {
     case 'tap': return '点击坐标(' + p + ')';
     case 'sleep': return '等待' + p + '秒';
     case 'hide_keyboard': return '收起键盘';
+    case 'deal_first_launch_dialogs': return '首次启动弹窗处理（无弹窗自动跳过）';
     case 'custom': return (p || '自定义代码').split('\n')[0];
     default: return '未定义步骤';
   }
@@ -188,7 +190,7 @@ async function init() {
   $('btn-dup-update').addEventListener('click', () => { const r = dupResolver; closeDupPanel(); if (r) r('update'); });
   $('btn-dup-cancel').addEventListener('click', () => { const r = dupResolver; closeDupPanel(); if (r) r('cancel'); });
   document.querySelectorAll('input[name="el-purpose"]').forEach(r => r.addEventListener('change', onPurposeChange));
-  $('el-op-type').addEventListener('change', onOpTypeChange);
+  $('el-op-type').addEventListener('change', () => { onOpTypeChange(); onCaseFileChange(); });
   $('el-op-param').addEventListener('input', () => { paramAuto = false; });
   $('el-case-file').addEventListener('change', onCaseFileChange);
   // 新建文件输入联动：元素文件切「新建」显隐输入行；用例名输入实时派生页面/元素文件名
@@ -1106,15 +1108,18 @@ function currentSteps() {
   const info = (state.caseFiles || []).find(c => c.file === f && (c.method_steps || {})[method]);
   return info ? (info.method_steps[method] || []) : [];
 }
-function insertPos() { return parseInt($('el-insert-pos').value, 10) || 0; }
-function newStepNo() { const p = insertPos(); return p > 0 ? p + 1 : currentSteps().length + 1; }
+function insertPos() {
+  if ($('el-insert-pos').value === 'front') return 'front';   // 第 1 步之前（首启弹窗类操作锁定）
+  return parseInt($('el-insert-pos').value, 10) || 0;
+}
+function newStepNo() { const p = insertPos(); if (p === 'front') return 1; return p > 0 ? p + 1 : currentSteps().length + 1; }
 function renderStepsList(steps) {
   const box = $('el-steps-list');
   if (!box) return;
   if (purposeValue() === 'only' || !$('el-case-method').value) { box.innerHTML = ''; box.style.display = 'none'; return; }
   box.style.display = '';
   const pos = insertPos();
-  const newNo = pos > 0 ? pos + 1 : steps.length + 1;
+  const newNo = pos === 'front' ? 1 : (pos > 0 ? pos + 1 : steps.length + 1);
   const step = { type: $('el-op-type').value, element: $('el-name').value.trim() || '<元素名>', param: $('el-op-param').value.trim() };
   const desc = $('el-op-comment').value.trim() || genStepDesc(step);
   let html = steps.length
@@ -1123,8 +1128,9 @@ function renderStepsList(steps) {
   steps.forEach((s, i) => {
     html += '<div class="sl-row"><span class="sl-idx">' + (i + 1) + '</span><span>' + esc(s) + '</span></div>';
   });
+  const posTxt = pos === 'front' ? '（放在第 1 步之前）' : (pos > 0 ? '（插到第 ' + pos + ' 步之后）' : '');
   html += '<div class="sl-row new"><span class="sl-idx">' + newNo + '</span><span>➕ 本步：'
-    + esc(desc) + (pos > 0 ? '（插到第 ' + pos + ' 步之后）' : '') + '</span></div>';
+    + esc(desc) + posTxt + '</span></div>';
   box.innerHTML = html;
 }
 /* 组装添加元素请求；checkDup=true 时后端先做重复检测（命中返回 duplicate 不落盘） */
@@ -1326,6 +1332,7 @@ function autoStepComment(type, elementText) {
     case 'assert_gone': return t ? '断言「' + t + '」已消失' : '';
     case 'if_click': return t ? '若「' + t + '」出现则点击' : '';
     case 'assert_visible': return t ? '断言「' + t + '」出现' : '';
+    case 'deal_first_launch_dialogs': return '首次启动弹窗处理（无弹窗自动跳过）';
     default: return '';
   }
 }
@@ -1370,6 +1377,7 @@ function previewLine(step) {
       return 'page.click_' + el + '_if_visible(' + (isNaN(n) ? '' : n) + ')';
     }
     case 'hide_keyboard': return 'page.dismiss_keyboard()';
+    case 'deal_first_launch_dialogs': return 'page.deal_first_launch_dialogs()';
     case 'screenshot': return "page.wait_and_shot('" + escQ(p) + "')";
     case 'tap': {
       const parts = p.split(',').map(x => x.trim()).filter(Boolean);
@@ -1461,12 +1469,20 @@ function onCaseFileChange() {
   const steps = (stepsInfo && stepsInfo.method_steps[selMethod]) || [];
   const posSel = $('el-insert-pos');
   const curPos = posSel.value;
-  let posOpts = '<option value="0">末尾（成为第 ' + (steps.length + 1) + ' 步）</option>';
-  for (let i = 1; i <= steps.length; i++) {
-    posOpts += '<option value="' + i + '">第 ' + i + ' 步之后 · ' + esc(String(steps[i - 1]).slice(0, 12)) + '</option>';
+  if (stepTypeInfo($('el-op-type').value).v === 'deal_first_launch_dialogs') {
+    // 首启弹窗只能出现在所有操作之前：锁定「最前」，不允许选其他插入位置
+    posSel.innerHTML = '<option value="front">最前（放在第 1 步之前）</option>';
+    posSel.value = 'front';
+    posSel.disabled = true;
+  } else {
+    posSel.disabled = false;
+    let posOpts = '<option value="0">末尾（成为第 ' + (steps.length + 1) + ' 步）</option>';
+    for (let i = 1; i <= steps.length; i++) {
+      posOpts += '<option value="' + i + '">第 ' + i + ' 步之后 · ' + esc(String(steps[i - 1]).slice(0, 12)) + '</option>';
+    }
+    posSel.innerHTML = posOpts;
+    posSel.value = (curPos !== '' && curPos !== null && parseInt(curPos, 10) <= steps.length) ? curPos : '0';
   }
-  posSel.innerHTML = posOpts;
-  posSel.value = (curPos !== '' && curPos !== null && parseInt(curPos, 10) <= steps.length) ? curPos : '0';
   renderStepsList(steps);
   // 三件套联动：写入元素文件 ← 目标用例页面实际引用的元素文件（必须一致）
   // 写入页面文件 = 目标用例的 self.page 所在文件（只读展示，跟随用例）
@@ -1551,6 +1567,23 @@ function pkgMethodBlock(step) {
   else if (t === 'hide_keyboard') {
     sig = 'dismiss_keyboard(self)';
     body = 'try:\n    if self.appOperator.is_keyboard_shown():\n        self.appOperator.hide_keyboard()\nexcept Exception:\n    self.appOperator.press_keycode(4)\nimport time\ntime.sleep(1)';
+  }
+  else if (t === 'deal_first_launch_dialogs') {
+    /* 首次启动弹窗处理：与后端 page_method_code 同一标准实现（探针自包含，不依赖元素文件） */
+    sig = 'deal_first_launch_dialogs(self)';
+    body = 'import time\n'
+      + 'for _lval, _desc in (\n'
+      + '        ("//*[@text=\'同意并继续\']", \'隐私协议弹窗\'),\n'
+      + '        ("//*[@text=\'允许\']", \'系统权限弹窗\'),\n'
+      + '):\n'
+      + '    probe = CreateElement.create(Locator_Type.XPATH, _lval,\n'
+      + '                                 wait_type=Wait_By.PRESENCE_OF_ELEMENT_LOCATED,\n'
+      + '                                 wait_seconds=2)\n'
+      + '    try:\n'
+      + '        self.appOperator.click(self.appOperator.getElement(probe))\n'
+      + '        time.sleep(1)  # 等弹窗收尾动画，避免点击落到下层页面\n'
+      + '    except Exception:\n'
+      + '        pass  # 该弹窗未出现，跳过';
   }
   else if (t === 'screenshot') { sig = 'wait_and_shot(self, tag)'; body = 'import time\ntime.sleep(1)\nself.appOperator.get_screenshot(tag)'; }
   else if (t === 'tap') { sig = 'tap_xy(self, x, y)'; body = 'self.appOperator.tap(x, y)'; }
@@ -1648,13 +1681,15 @@ function tempCaseAppend() {
   const tc = tempCaseEnsure();
   const step = currentStepObj();
   const st = STEP_TYPES.find(t => t.v === step.type) || {};
-  tc.steps.push({
+  const entry = {
     comment: pkgStepComment(),
     line: previewLine(step),
     elemName: st.el ? $('el-name').value.trim() : '',
     elemLine: st.el ? elementLinePreview() : '',
     methodBlock: pkgMethodBlock(step),
-  });
+  };
+  if (step.type === 'deal_first_launch_dialogs') tc.steps.unshift(entry);   // 首启弹窗恒在第 1 步之前
+  else tc.steps.push(entry);
   tempCaseRegen();
   return tc;
 }
