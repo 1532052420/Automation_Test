@@ -279,7 +279,7 @@ function renderCaseTable() {
       '<td><div class="clip" title="' + esc((reg && reg.name) || r.method) + '"><b>' + esc((reg && reg.name) || r.method) + '</b>' +
         (reg ? '' : ' <span class="proj-status" title="尚未登记到项目，点「命名」旁可先登记归属">未登记</span>') +
       '</div></td>' +
-      '<td><div class="clip" title="' + esc(desc) + '">' + esc(desc || '—') + '</div></td>' +
+      '<td><div class="clip" title="' + esc(desc) + '">' + esc(desc ? (desc.length > 10 ? desc.slice(0, 10) + '…' : desc) : '—') + '</div></td>' +
       '<td>' + fmtDate(r.mtime) + '</td>' +
       '<td class="ops"><button class="ghost mini" data-act="cn" data-file="' + esc(r.file) + '" data-cn="' + esc(r.cn_name) + '">命名</button>' +
       '<button class="mini" data-runone="' + esc(r.node) + '">执行</button></td></tr>';
