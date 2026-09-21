@@ -334,6 +334,25 @@ def api_cases_framework():
     return _ok(results=rows)
 
 
+@bp.route('/api/case/steps')
+def api_case_steps():
+    """用例步骤反解（三级页「步骤编辑」数据源）：把方法体注释行 + page.xxx(...) 调用行
+    反解成结构化步骤（type/element/param 与定位器 case_step_line 生成词表互逆）。"""
+    rel = (request.args.get('file') or '').strip().replace('\\', '/')
+    method = (request.args.get('method') or '').strip()
+    base = os.path.realpath(BASE_DIR)
+    if not rel.startswith('cases/app_ui') or not os.path.basename(rel).startswith('test_') \
+            or not rel.endswith('.py') or '..' in rel or not method:
+        return _bad('参数不合法')
+    path = os.path.realpath(os.path.join(base, rel))
+    if not path.startswith(os.path.join(base, 'cases/app_ui')) or not os.path.isfile(path):
+        return _bad('用例文件不存在', 404)
+    with open(path, 'r', encoding='utf-8') as f:
+        src = f.read()
+    from element_locator.case_generator import parse_case_steps
+    return _ok(steps=parse_case_steps(src, method))
+
+
 @bp.route('/api/cases/<int:cid>/run', methods=['POST'])
 def api_case_run(cid):
     """单用例执行：执行其编译产物的 pytest 节点，走 AppUI 执行链路"""

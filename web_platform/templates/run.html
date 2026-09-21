@@ -7,6 +7,38 @@
 <script src="/assets/{{ asset_v }}/theme.js"></script>
 <link rel="stylesheet" href="/assets/{{ asset_v }}/nav.css">
 <link rel="stylesheet" href="/assets/{{ asset_v }}/style.css">
+<style>
+  /* ===== 步骤编辑三级页（ce- 前缀，布局对照 design/case-step-editor-prototype.html） ===== */
+  .ce-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 18px; }
+  .ce-back { color: var(--muted); font-size: 12.5px; text-decoration: none; }
+  .ce-back:hover { color: var(--brand); }
+  .ce-title { font-size: 19px; font-weight: 700; }
+  .ce-meta { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 12.5px; flex-wrap: wrap; margin-top: 3px; }
+  .ce-meta .chip { background: var(--panel2, #fbfbfd); border: 1px solid var(--line, #e8e8ed); border-radius: 999px; padding: 2px 10px; font-size: 12px; color: var(--ink2, #3a3a3c); }
+  .ce-dirty { font-size: 12px; color: #b26a00; }
+  .ce-cols { display: grid; grid-template-columns: minmax(0, 1fr) 372px; gap: 16px; margin-top: 16px; align-items: start; }
+  @media (max-width: 1100px) { .ce-cols { grid-template-columns: 1fr; } }
+  .ce-search { flex: 1; display: flex; align-items: center; gap: 7px; background: var(--panel2, #fbfbfd); border: 1px solid var(--line, #e8e8ed); border-radius: 8px; padding: 6px 10px; }
+  .ce-search input { border: none; outline: none; background: transparent; width: 100%; font-size: 13px; }
+  .ce-steps { padding: 6px 10px 14px; position: relative; }
+  .ce-steps::before { content: ""; position: absolute; left: 34px; top: 18px; bottom: 18px; width: 2px; background: var(--line, #e8e8ed); }
+  .ce-step { display: grid; grid-template-columns: 24px 34px minmax(0,1fr) auto; gap: 4px 8px; align-items: center; padding: 8px 6px 8px 0; border-radius: 10px; position: relative; }
+  .ce-step:hover { background: var(--panel2, #fbfbfd); }
+  .ce-step.sel { background: var(--brand-tint, rgba(0,113,227,.08)); box-shadow: inset 0 0 0 1px var(--brand-ring, rgba(0,113,227,.28)); }
+  .ce-node { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 12px; font-weight: 700; position: relative; z-index: 1; border: 3px solid var(--panel, #fff); }
+  .ce-step.sel .ce-node { border-color: #eaf3fd; }
+  .ce-main { min-width: 0; }
+  .ce-type { font-weight: 600; font-size: 13.5px; }
+  .ce-desc { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ce-desc b { color: var(--ink2, #3a3a3c); font-weight: 600; }
+  .ce-none { padding: 40px 20px; text-align: center; color: var(--muted2, #86868b); }
+  .ce-editor { position: sticky; top: 62px; }
+  .ce-editor .ed-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 13px; }
+  .ce-editor .field label { display: flex; font-size: 12.5px; color: var(--muted); margin-bottom: 5px; }
+  .ce-editor input[type=text], .ce-editor select, .ce-editor textarea { width: 100%; border: 1px solid var(--line, #e8e8ed); border-radius: 8px; padding: 7px 10px; background: var(--panel, #fff); outline: none; font: inherit; color: var(--ink, #1d1d1f); }
+  .ce-editor input:focus, .ce-editor select:focus, .ce-editor textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-tint, rgba(0,113,227,.08)); }
+  .ce-editor textarea { resize: vertical; }
+</style>
 </head>
 <body data-page="run">
 <header class="gnav" id="sidebar"></header>
@@ -243,6 +275,49 @@
             </table>
           </div>
           <div id="clEmpty" class="empty" style="display:none">框架里还没有 AppUI 测试用例 —— 用上方「＋ 新建用例」从设备截图录制，或到元素定位器保存用例包</div>
+        </div>
+      </section>
+
+      <!-- 步骤编辑（三级页）：用例管理「编辑步骤」进入；布局对照 design/case-step-editor-prototype.html
+           左 步骤时间轴（轨道 + 分组色节点）· 右 步骤编辑器；数据 = 方法体注释 + 调用行反解 -->
+      <section class="panel" id="panel-caseedit" hidden>
+        <div class="card ce-head" id="ceHead">
+          <a href="#caselist" class="ce-back" id="ceBack">‹ 返回用例管理</a>
+          <div class="ce-title-wrap">
+            <div class="ce-title" id="ceTitle">—</div>
+            <div class="ce-meta" id="ceMeta"></div>
+          </div>
+          <div class="head-sp"></div>
+          <span class="ce-dirty" id="ceDirty" style="display:none">● 未保存（仅当前页预览）</span>
+          <button class="ghost mini" id="ceDiscard">放弃</button>
+          <button class="mini" id="ceSave">保存</button>
+        </div>
+        <div class="ce-cols">
+          <div class="card">
+            <div class="card-h"><h3 style="font-size:14.5px;font-weight:700">步骤</h3><span class="muted" id="ceCnt" style="font-size:12.5px"></span></div>
+            <div class="step-tools">
+              <div class="ce-search">🔍<input id="ceQ" placeholder="筛选步骤：描述 / 元素 / 参数"></div>
+            </div>
+            <div class="ce-steps" id="ceSteps"></div>
+            <div class="ce-legend" style="padding:0 16px 14px">
+              <span><i style="background:var(--brand)"></i>基本操作</span>
+              <span><i style="background:#6e46c8"></i>断言</span>
+              <span><i style="background:#b26a00"></i>等待与分支</span>
+              <span><i style="background:#86868b"></i>其他</span>
+            </div>
+          </div>
+          <div class="card ce-editor">
+            <div class="card-h"><h3 style="font-size:14.5px;font-weight:700">步骤编辑</h3><span class="muted" id="ceIdx" style="font-size:12.5px"></span></div>
+            <div class="ce-none" id="ceNone">从左侧选择一步开始编辑</div>
+            <div class="ed-body" id="ceBody" style="display:none">
+              <div class="field"><label>动作类型</label><select id="ceType"></select></div>
+              <div class="field" id="ceElWrap"><label>目标元素</label><select id="ceEl"></select>
+                <div class="el-preview" id="ceElPreview" style="margin-top:6px;background:var(--panel2,#fbfbfd);border:1px dashed var(--line,#e8e8ed);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--muted,#6e6e73)"></div>
+              </div>
+              <div class="field" id="ceParamWrap"><label id="ceParamLab">参数</label><input type="text" id="ceParam"></div>
+              <div class="field"><label>步骤描述（方法体注释，步骤主文本）</label><textarea id="ceDesc" rows="2"></textarea></div>
+            </div>
+          </div>
         </div>
       </section>
 

@@ -967,6 +967,7 @@ async function renderCaseList() {
       '<td class="clip" title="' + esc((reg && reg.created_by) || '—') + '">' + esc((reg && reg.created_by) || '—') + '</td>' +
       '<td>' + (reg ? fmtTs(reg.created_at) : '—') + '</td>' +
       '<td class="ops">' +
+      '<button class="mini" data-editsteps="' + esc(c.node) + '">编辑步骤</button>' +
       '<button class="ghost mini" data-cncase="' + esc(c.file) + '" data-cn="' + esc(c.cn_name || '') + '">重命名</button>' +
       '<button class="mini" data-mvnode="' + esc(c.node) + '">移动项目</button>' +
       (reg ? '<button class="danger mini" data-del="' + reg.id + '">删除</button>' : '') +
@@ -1254,6 +1255,130 @@ async function appTestingInit() {
   /* 新建用例：跳转元素定位器（截图点选 → 添加测试用例弹窗在定位器内完成） */
   $('#btnClNew').addEventListener('click', () => { window.open('/locator', '_blank', 'noopener'); });
 
+  /* ---- 步骤编辑（三级页）：布局对照 design/case-step-editor-prototype.html；
+     数据 = /api/case/steps 反解（方法体注释 + 调用行），编辑仅当前页预览，写回未接入 ---- */
+  const CE_GROUP_CSS = { '基本操作': 'var(--brand)', '断言': '#6e46c8', '等待与分支': '#b26a00', '其他': '#86868b' };
+  const CE_EXTRA_TYPES = { deal_first_launch_dialogs: { label: '首启弹窗处理', group: '其他', param: null } };
+  let _ceCtx = null, _ceSel = -1, _ceElements = null;
+
+  function ceTypeMeta(t) { return STEP_META[t] || CE_EXTRA_TYPES[t] || { label: t || '未知', group: '其他', param: null }; }
+
+  async function openCaseEditor(node) {
+    const row = _fwCases.find(c => c.node === node);
+    if (!row) return toast('用例行数据未就绪，请刷新列表后重试', false);
+    const d = await api(AT_PREFIX + '/api/case/steps?file=' + encodeURIComponent(row.file) + '&method=' + encodeURIComponent(row.method));
+    if (!d.ok) return toast(d.msg || '步骤反解失败', false);
+    _ceCtx = { row, steps: d.steps || [] };
+    _ceSel = _ceCtx.steps.length ? 0 : -1;
+    $('#ceDirty').style.display = 'none';
+    if (!_ceElements) {
+      const ed = await api('/api/appui/elements');
+      _ceElements = ed.ok ? (ed.elements || []) : [];
+    }
+    renderCeShell();
+    renderCeSteps();
+    renderCeEditor();
+    showRunPanel('caseedit');
+  }
+
+  function renderCeShell() {
+    const { row, steps } = _ceCtx;
+    const reg = row.case;
+    $('#ceTitle').textContent = row.cn_name || (reg && reg.name) || row.method;
+    $('#ceMeta').innerHTML =
+      '<span class="chip">' + esc(row.file) + '</span>' +
+      '<span class="chip">' + esc(row.class) + '</span>' +
+      '<span class="chip">' + esc(row.method) + '</span>' +
+      '<span class="chip">' + steps.length + ' 步</span>' +
+      '<span class="chip">' + esc(reg ? (projName(reg.project_id) || '未分组') : '未登记') + '</span>';
+    const sel = $('#ceType');
+    sel.innerHTML = '';
+    Object.keys(Object.assign({}, STEP_META, CE_EXTRA_TYPES)).forEach(k => {
+      const t = ceTypeMeta(k);
+      sel.insertAdjacentHTML('beforeend', '<option value="' + k + '">' + esc(t.label) + '（' + t.group + '）</option>');
+    });
+    const elSel = $('#ceEl');
+    elSel.innerHTML = '';
+    _ceElements.forEach(e => {
+      elSel.insertAdjacentHTML('beforeend',
+        '<option value="' + esc(e.name) + '">' + esc(e.cn_name ? e.cn_name + '（' + e.name + '）' : e.name) + '</option>');
+    });
+  }
+
+  function renderCeSteps() {
+    if (!_ceCtx) return;
+    const kw = ($('#ceQ').value || '').trim().toLowerCase();
+    const box = $('#ceSteps');
+    box.innerHTML = '';
+    const items = _ceCtx.steps.map((s, i) => ({ s, i }))
+      .filter(({s}) => !kw || [s.desc, s.element, s.param, ceTypeMeta(s.type).label]
+        .some(v => String(v || '').toLowerCase().includes(kw)));
+    items.forEach(({s, i}) => {
+      const t = ceTypeMeta(s.type);
+      const row = document.createElement('div');
+      row.className = 'ce-step' + (i === _ceSel ? ' sel' : '');
+      row.innerHTML =
+        '<span></span>' +
+        '<span class="ce-node" style="background:' + (CE_GROUP_CSS[t.group] || '#86868b') + '">' + (i + 1) + '</span>' +
+        '<div class="ce-main"><div class="ce-type">' + esc(t.label) + '</div>' +
+        '<div class="ce-desc">' + (s.element ? esc(s.element) + (s.param ? ' · <b>' + esc(s.param) + '</b>' : '')
+          : (s.param ? '<b>' + esc(s.param) + '</b>' : '')) +
+        (s.desc ? ' <span style="color:var(--muted2)">' + esc(s.desc) + '</span>' : '') + '</div></div><span></span>';
+      row.addEventListener('click', () => { _ceSel = i; renderCeSteps(); renderCeEditor(); });
+      box.appendChild(row);
+    });
+    if (!items.length) box.innerHTML = '<div class="ce-none">没有匹配的步骤</div>';
+    $('#ceCnt').textContent = _ceCtx.steps.length + ' 步';
+  }
+
+  function renderCeEditor() {
+    if (!_ceCtx) return;
+    const s = _ceCtx.steps[_ceSel];
+    $('#ceNone').style.display = s ? 'none' : '';
+    $('#ceBody').style.display = s ? '' : 'none';
+    if (!s) { $('#ceIdx').textContent = ''; return; }
+    $('#ceIdx').textContent = '第 ' + (_ceSel + 1) + ' 步';
+    const t = ceTypeMeta(s.type);
+    $('#ceType').value = (STEP_META[s.type] || CE_EXTRA_TYPES[s.type]) ? s.type : 'custom';
+    $('#ceElWrap').style.display = t.el === false ? 'none' : '';
+    $('#ceParamWrap').style.display = (t.param || s.param) ? '' : 'none';
+    $('#ceParamLab').textContent = t.param || '参数';
+    const elSel = $('#ceEl');
+    elSel.querySelectorAll('option[data-tmp]').forEach(o => o.remove());   // 清掉上次的临时回显项
+    if (s.element && ![...elSel.options].some(o => o.value === s.element)) {
+      elSel.insertAdjacentHTML('afterbegin',
+        '<option data-tmp value="' + esc(s.element) + '">' + esc(s.element) + '（不在元素库）</option>');
+    }
+    elSel.value = s.element || '';
+    $('#ceParam').value = s.param || '';
+    $('#ceDesc').value = s.desc || '';
+    ceElPreview();
+  }
+
+  function ceElPreview() {
+    const name = $('#ceEl').value;
+    const e = (_ceElements || []).find(x => x.name === name);
+    $('#ceElPreview').innerHTML = e ? '定位：<code>' + esc((e.type || '') + ' = ' + (e.value || '')) + '</code>'
+      : (name ? '元素「' + esc(name) + '」不在元素库（页面对象内引用）' : '未选择元素');
+  }
+
+  function ceTouch() {
+    const s = _ceCtx.steps[_ceSel]; if (!s) return;
+    s.type = $('#ceType').value; s.element = $('#ceEl').value || '';
+    s.param = $('#ceParam').value.trim(); s.desc = $('#ceDesc').value.trim();
+    $('#ceDirty').style.display = '';
+    renderCeSteps(); ceElPreview();
+  }
+
+  $('#ceQ').addEventListener('input', renderCeSteps);
+  $('#ceType').addEventListener('change', ceTouch);
+  $('#ceEl').addEventListener('change', ceTouch);
+  $('#ceParam').addEventListener('input', ceTouch);
+  $('#ceDesc').addEventListener('input', ceTouch);
+  $('#ceBack').addEventListener('click', e => { e.preventDefault(); showRunPanel('caselist'); });
+  $('#ceDiscard').addEventListener('click', () => { if (_ceCtx) openCaseEditor(_ceCtx.row.node); });  // 重拉反解 = 真放弃
+  $('#ceSave').addEventListener('click', () => toast('编辑已更新当前页预览；写回用例文件的能力未接入'));
+
   /* ---- 移动用例到项目 弹窗 ---- */
   $('#mvSave').addEventListener('click', () => saveCaseMove().catch(e => toast(e.message, false)));
   $('#mvCancel').addEventListener('click', () => $('#caseMoveMask').classList.remove('show'));
@@ -1297,7 +1422,8 @@ async function appTestingInit() {
   });
   $('#clTbody').addEventListener('click', async e => {
     const mv = e.target.closest('[data-mvnode]'), del = e.target.closest('[data-del]'),
-          cn = e.target.closest('[data-cncase]');
+          cn = e.target.closest('[data-cncase]'), ed = e.target.closest('[data-editsteps]');
+    if (ed) return openCaseEditor(ed.dataset.editsteps);
     if (cn) return openCaseCnModal(cn.dataset.cncase, cn.dataset.cn);   // 复用执行用例的中文名弹窗
     if (mv) return openCaseMove(mv.dataset.mvnode);
     if (del) {
