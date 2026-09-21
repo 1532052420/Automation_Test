@@ -1318,7 +1318,7 @@ async function appTestingInit() {
       const row = document.createElement('div');
       row.className = 'ce-step' + (i === _ceSel ? ' sel' : '');
       row.innerHTML =
-        '<span></span>' +
+        '<span class="ce-grip">☰</span>' +
         '<span class="ce-node" style="background:' + (CE_GROUP_CSS[t.group] || '#86868b') + '">' + (i + 1) + '</span>' +
         '<div class="ce-main"><div class="ce-type">' + esc(t.label) + '</div>' +
         '<div class="ce-desc">' + (s.element ? esc(s.element) + (s.param ? ' · <b>' + esc(s.param) + '</b>' : '')
@@ -1336,6 +1336,8 @@ async function appTestingInit() {
     const s = _ceCtx.steps[_ceSel];
     $('#ceNone').style.display = s ? 'none' : '';
     $('#ceBody').style.display = s ? '' : 'none';
+    $('#ceDup').style.display = s ? '' : 'none';
+    $('#ceDel').style.display = s ? '' : 'none';
     if (!s) { $('#ceIdx').textContent = ''; return; }
     $('#ceIdx').textContent = '第 ' + (_ceSel + 1) + ' 步';
     const t = ceTypeMeta(s.type);
@@ -1351,6 +1353,8 @@ async function appTestingInit() {
     }
     elSel.value = s.element || '';
     $('#ceParam').value = s.param || '';
+    $('#ceWait').value = s.wait || '出现即可';
+    $('#ceSec').value = s.sec || '10';
     $('#ceDesc').value = s.desc || '';
     ceElPreview();
   }
@@ -1365,16 +1369,73 @@ async function appTestingInit() {
   function ceTouch() {
     const s = _ceCtx.steps[_ceSel]; if (!s) return;
     s.type = $('#ceType').value; s.element = $('#ceEl').value || '';
-    s.param = $('#ceParam').value.trim(); s.desc = $('#ceDesc').value.trim();
+    s.param = $('#ceParam').value.trim();
+    s.wait = $('#ceWait').value; s.sec = $('#ceSec').value.trim();
+    s.desc = $('#ceDesc').value.trim();
     $('#ceDirty').style.display = '';
     renderCeSteps(); ceElPreview();
+  }
+
+  /* ＋ 添加步骤：按分组的下拉菜单（词表与定位器生成器同源）；预览语义，写回未接入 */
+  function ceBuildAddMenu() {
+    const menu = $('#ceAddMenu');
+    if (menu.dataset.built) return;
+    menu.dataset.built = '1';
+    const types = Object.assign({}, STEP_META, CE_EXTRA_TYPES);
+    Object.keys(types).forEach(k => {
+      const t = types[k];
+      let grp = menu.querySelector('[data-g="' + t.group + '"]');
+      if (!grp) {
+        grp = document.createElement('div');
+        grp.className = 'grp'; grp.dataset.g = t.group; grp.textContent = t.group;
+        menu.appendChild(grp);
+      }
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.innerHTML = '<span class="mini-node" style="background:' + (CE_GROUP_CSS[t.group] || '#86868b') + '"></span>' + esc(t.label);
+      b.addEventListener('click', () => {
+        menu.classList.remove('open');
+        const s = { type: k, element: t.el === false ? '' : ((_ceElements || [])[0] || {}).name || '',
+                    param: '', wait: '出现即可', sec: '10', desc: '' };
+        _ceCtx.steps.push(s);
+        _ceSel = _ceCtx.steps.length - 1;
+        $('#ceDirty').style.display = '';
+        renderCeSteps(); renderCeEditor();
+      });
+      menu.appendChild(b);
+    });
   }
 
   $('#ceQ').addEventListener('input', renderCeSteps);
   $('#ceType').addEventListener('change', ceTouch);
   $('#ceEl').addEventListener('change', ceTouch);
   $('#ceParam').addEventListener('input', ceTouch);
+  $('#ceWait').addEventListener('change', ceTouch);
+  $('#ceSec').addEventListener('input', ceTouch);
   $('#ceDesc').addEventListener('input', ceTouch);
+  $('#ceAddBtn').addEventListener('click', e => {
+    e.stopPropagation();
+    ceBuildAddMenu();
+    $('#ceAddMenu').classList.toggle('open');
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.ce-add-wrap')) $('#ceAddMenu').classList.remove('open');
+  });
+  $('#ceDup').addEventListener('click', () => {
+    if (!_ceCtx || _ceSel < 0) return;
+    _ceCtx.steps.splice(_ceSel + 1, 0, Object.assign({}, _ceCtx.steps[_ceSel]));
+    _ceSel = _ceSel + 1;
+    $('#ceDirty').style.display = '';
+    renderCeSteps(); renderCeEditor();
+  });
+  $('#ceDel').addEventListener('click', () => {
+    if (!_ceCtx || _ceSel < 0) return;
+    if (!confirm('删除第 ' + (_ceSel + 1) + ' 步？（仅当前页预览，写回未接入）')) return;
+    _ceCtx.steps.splice(_ceSel, 1);
+    _ceSel = Math.min(_ceSel, _ceCtx.steps.length - 1);
+    $('#ceDirty').style.display = '';
+    renderCeSteps(); renderCeEditor();
+  });
   $('#ceBack').addEventListener('click', e => { e.preventDefault(); showRunPanel('caselist'); });
   $('#ceDiscard').addEventListener('click', () => { if (_ceCtx) openCaseEditor(_ceCtx.row.node); });  // 重拉反解 = 真放弃
   $('#ceSave').addEventListener('click', () => toast('编辑已更新当前页预览；写回用例文件的能力未接入'));
