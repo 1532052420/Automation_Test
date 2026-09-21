@@ -1167,7 +1167,19 @@ function validateElementFields() {
   }
   return ok;
 }
-function fieldErr(id, msg) { const el = document.getElementById(id); if (el) el.textContent = msg || ''; }
+function fieldErr(id, msg) {
+  let el = document.getElementById(id);
+  if (!el) {
+    // 旧版页面缓存没有提示占位元素时自动补建（自愈，保证红字提示一定可见）
+    const map = { 'err-el-name': 'el-name', 'err-el-cn': 'el-cn-name', 'err-el-value': 'el-value' };
+    const input = document.getElementById(map[id]);
+    if (!input) return;
+    el = document.createElement('span');
+    el.id = id; el.className = 'fld-err';
+    input.parentNode.insertBefore(el, input);
+  }
+  el.textContent = msg || '';
+}
 
 /* 组装添加元素请求；checkDup=true 时后端先做重复检测（命中返回 duplicate 不落盘） */
 async function saveElement(checkDup) {
@@ -1874,6 +1886,7 @@ async function onSaveElement(continueMode) {
   // 刷新页面/元素/用例列表（可能有新元素、新页面对象/新方法）；保存并继续 → 连续添加模式
   if (continueMode) { finishContinue(); return; }
   loadPages(); loadLibraryFiles(); loadCaseFiles();
+  $('modal-mask').style.display = 'none';   // 保存 = 完成本条录入，与「保存并继续」一致关闭弹窗
 }
 
 function showElResult(msg, ok) {
