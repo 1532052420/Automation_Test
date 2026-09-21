@@ -73,4 +73,4 @@ class TestDemoToolLogin:
         page.click_btnStarlightValue()
 
     def teardown_class(self):
-        self.appOperator.reset_app()
+        self.appOperator.close_app()

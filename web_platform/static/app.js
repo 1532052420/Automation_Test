@@ -814,6 +814,8 @@ async function startRun() {
       appPackage: $('#inPackage').value.trim(),
       appActivity: $('#inActivity').value.trim(),
     },
+    setup_reset: $('#execSetupReset').checked,
+    teardown_reset: $('#execTeardownReset').checked,
   });
   btn.disabled = false; btn.textContent = '开始执行';
   if (!d.ok) return toast(d.msg || '启动失败', false);

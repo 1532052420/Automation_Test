@@ -451,7 +451,9 @@ def _run_nodes(nodes, body, suite=None, case=None):
     overrides = body.get('overrides') or {}
     ok, result = runner.manager.start_run(
         conf_file, nodes, overrides,
-        owner=(body.get('owner') or '').strip()[:40])
+        owner=(body.get('owner') or '').strip()[:40],
+        setup_reset=bool(body.get('setup_reset')),        # 设备配置「前置清理」：仅首条用例前清数据
+        teardown_reset=bool(body.get('teardown_reset')))  # 「后置清理」：仅末条用例后清数据
     if not ok:
         return _bad(result, 409 if '正在运行' in result else 400)
     run_id = result

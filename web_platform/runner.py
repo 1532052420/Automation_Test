@@ -188,13 +188,17 @@ class ExecutionManager(object):
 
     # ------------------------------------------------------------------ 创建
     def start_run(self, conf_file, case_nodes, overrides=None,
-                  owner='', marker='', timeout_minutes=None):
+                  owner='', marker='', timeout_minutes=None,
+                  setup_reset=False, teardown_reset=False):
         """创建并启动一个执行任务。case_nodes 为用例节点路径列表（文件/类/方法级）。
 
         APP UI 设备自动化专用执行器（接口测试已由 api_testing 模块独立承接）。
         overrides={udid?, appPackage?, appActivity?} 覆盖式生效（仅本次执行，不写回 conf 文件）。
         owner 为发起人（多人共用平台时区分谁跑的）；marker 为 pytest 标记表达式（-m）；
         timeout_minutes 覆盖默认任务超时。
+        setup_reset/teardown_reset（设备配置「前置/后置清理」）：经环境变量 AT_SETUP_RESET /
+        AT_TEARDOWN_RESET 下传 pytest——前置=首条用例前清 App 数据（Client 构造时一次），
+        后置=全部用例结束后清一次（根 conftest.py 的 pytest_sessionfinish）。
         返回 (ok, run_id 或错误信息)。"""
         if not case_nodes:
             return False, '请至少选择一个用例'
@@ -202,10 +206,12 @@ class ExecutionManager(object):
             return False, '请选择设备配置文件(conf)'
         with self._start_lock:
             return self._start_run_locked(conf_file, case_nodes, overrides,
-                                          owner, marker, timeout_minutes)
+                                          owner, marker, timeout_minutes,
+                                          setup_reset, teardown_reset)
 
     def _start_run_locked(self, conf_file, case_nodes, overrides=None,
-                          owner='', marker='', timeout_minutes=None):
+                          owner='', marker='', timeout_minutes=None,
+                          setup_reset=False, teardown_reset=False):
         """启动主体（持有 _start_lock：校验与任务注册串行，互斥检查才会命中并发请求）"""
         with self._lock:
             for t in self._tasks.values():
@@ -341,6 +347,11 @@ class ExecutionManager(object):
             proc = subprocess.Popen(
                 pytest_args, cwd=BASE_DIR,
                 start_new_session=True,
+                # 清理策略（设备配置「前置/后置清理」）经环境变量下传：
+                # 平台自身进程环境里没有这两个变量，必须显式传，不能靠继承
+                env=dict(os.environ,
+                         AT_SETUP_RESET='1' if setup_reset else '',
+                         AT_TEARDOWN_RESET='1' if teardown_reset else ''),
                 # 显式 DEVNULL：pytest 不需要 stdin。不指定会继承平台自身的 stdin，
                 # 而平台被 nohup/systemd/Popen 以非终端方式启动时该 fd 可能已失效，
                 # pytest 的 capture 会以 "saved filedescriptor not valid anymore" 崩掉，

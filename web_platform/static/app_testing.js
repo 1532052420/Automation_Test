@@ -903,7 +903,9 @@ async function saveOrchCase() {
 function _runBody() {
   return { conf_file: $('#suiteConf') ? $('#suiteConf').value : '',
            overrides: { udid: ($('#suiteUdid') && $('#suiteUdid').value.trim()) || '' },
-           owner: ($('#suiteOwner') && $('#suiteOwner').value.trim()) || '' };
+           owner: ($('#suiteOwner') && $('#suiteOwner').value.trim()) || '',
+           setup_reset: ($('#execSetupReset') && $('#execSetupReset').checked) || false,
+           teardown_reset: ($('#execTeardownReset') && $('#execTeardownReset').checked) || false };
 }
 
 async function runOrchCase() {

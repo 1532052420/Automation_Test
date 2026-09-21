@@ -368,8 +368,11 @@ def api_start_run():
     if bad_nodes:
         return jsonify({'ok': False, 'msg': '用例节点不合法: %s' % bad_nodes[0]}), 400
     overrides = data.get('overrides') or {}
-    ok, result = runner.manager.start_run(conf_file, case_nodes, overrides,
-                                          owner=(data.get('owner') or '').strip()[:40])
+    ok, result = runner.manager.start_run(
+        conf_file, case_nodes, overrides,
+        owner=(data.get('owner') or '').strip()[:40],
+        setup_reset=bool(data.get('setup_reset')),      # 设备配置「前置清理」：仅首条用例前清数据
+        teardown_reset=bool(data.get('teardown_reset')))  # 「后置清理」：仅末条用例后清数据
     if not ok:
         return jsonify({'ok': False, 'msg': result}), 409 if '正在运行' in result else 400
     return jsonify({'ok': True, 'run_id': result})

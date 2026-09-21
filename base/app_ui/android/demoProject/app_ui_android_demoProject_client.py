@@ -36,15 +36,25 @@ class APP_UI_Android_demoProject_Client(object):
             self.driver = webdriver.Remote(self._appium_hub, desired_capabilities=self.current_desired_capabilities)
             self._save_last_device_session(self.driver.session_id, self.device_info['device_desc'])
             self.appOperator = AppOperator(self.driver,self._appium_hub)
-            
+            # 平台「前置清理」（设备配置面板，经 runner 环境变量下传）：清登录态+App 数据。
+            # Client 是单例，本块整轮只进一次 = 仅首条用例执行前生效；后续用例构造直接复用实例。
+            if os.environ.get('AT_SETUP_RESET') == '1':
+                print('[前置清理] 清 App 数据（本轮首条用例前，仅此一次）...')
+                self.appOperator.reset_app()
+
         if is_need_reset_app:
             # appium启动是非重置或者非第一次appium启动，则要进行重置
             if self.__is_first==False or self.noReset==True:
                 self.appOperator.reset_app()
         # 注：is_need_kill_app 分支原用于启动演示项目墨迹天气，已随墨迹天气清理移除；
         # 被测 App 统一在用例 setup_class 中显式 start_activity 启动
-    
+
         self.__is_first=False
+
+    @classmethod
+    def instance(cls):
+        """当前进程的单例（未构造返回 None）——根 conftest.py 轮末后置清理用"""
+        return cls.__instance
 
     def _init(self,is_init=False):
         print('初始化android基础数据......')
