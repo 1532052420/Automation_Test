@@ -340,6 +340,7 @@ function openCnModal() {
     '<option value="' + CN_NEW_FILE + '">➕ 新建元素文件…</option>';
   $('#cnElemFileNew').value = ''; $('#cnElemFileNewWrap').style.display = 'none';
   $('#cnCaseNew').value = ''; $('#cnCaseNewWrap').style.display = 'none';
+  $('#cnCaseCnName').value = '';
   $('#cnStepType').innerHTML = Object.keys(STEP_META).map(t =>
     '<option value="' + t + '">' + STEP_META[t].label + '</option>').join('');
   $('#cnPageFile').value = '';
@@ -692,7 +693,9 @@ function cnTempFiles(tc) {
     + (mOrder.length ? '\n' + mOrder.map(n => mMap[n]).join('\n') + '\n' : '');
   /* 用例文件：头部流程注释 + 方法体逐步骤 */
   const flow = ['# 1. 拉起快歌主页面'].concat(tc.steps.map((s, i) => '# ' + (i + 2) + '. ' + s.comment));
+  const cnTitle = ($('#cnCaseCnName').value || '').trim();
   const caseContent = '# -*- coding: utf-8 -*-\n'
+    + (cnTitle ? '# 用例中文名：' + cnTitle + '\n' : '')
     + '# 用例包 ' + base + ' · ' + tc.steps.length + ' 步\n'
     + flow.join('\n') + '\n'
     + 'import time\nimport allure\n'

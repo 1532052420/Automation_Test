@@ -202,6 +202,7 @@ async function init() {
   // 新建文件输入联动：元素文件切「新建」显隐输入行；用例名输入实时派生页面/元素文件名
   $('el-file').addEventListener('change', () => {
     $('el-file-new-wrap').style.display = isNewElementFile() ? '' : 'none';
+    validateElementFields();   // 目标元素文件变了 → 查重范围随之变化
   });
   $('el-case-new').addEventListener('input', () => {
     onCaseFileChange();
@@ -209,6 +210,8 @@ async function init() {
   // 定位方式切换：从当前元素的定位候选里取该类型的值回填（ID→ID值，XPATH→XPATH值…）
   $('el-type').addEventListener('change', onElTypeChange);
   $('el-op-comment').addEventListener('input', () => { opCommentAuto = false; });
+  ['el-name', 'el-cn-name', 'el-value'].forEach(id => $(id).addEventListener('input', validateElementFields));
+  $('el-op-special').addEventListener('change', validateElementFields);
   $('el-insert-pos').addEventListener('change', () => { renderStepsList(currentSteps()); });
   // 顶部快速打开：用例 / 元素文件 / 页面操作 下拉打开编辑
   loadHeaderOpeners();
@@ -984,6 +987,7 @@ async function loadPages() {
   if (!r || !r.ok) return;
   state.pages = r.pages || [];
   state.elementsAll = r.elements || {};
+  state.elementsCn = r.elements_details || {};   // {file:[{name,cn}]} 元素名/中文名行内查重用
 }
 async function openModal() {
   // ⌖ 坐标模式：选了精确坐标即可打开（不需要树里有选中元素）
@@ -1067,6 +1071,7 @@ function resetNewFileInputs() {
   const fw = $('el-file-new-wrap'), cw = $('el-case-new-wrap');
   if (fw) { fw.style.display = 'none'; $('el-file-new').value = ''; }
   if (cw) { cw.style.display = 'none'; $('el-case-new').value = ''; }
+  const cnInput = $('el-case-cn'); if (cnInput) cnInput.value = '';
 }
 /* 当前是否新建用例（选择器值为 __new__ 或元素文件为 __new__） */
 function isNewCase() { return $('el-case-file').value === NEW_FILE_OPT; }
@@ -1140,6 +1145,30 @@ function renderStepsList(steps) {
     + esc(desc) + posTxt + '</span></div>';
   box.innerHTML = html;
 }
+/* 字段行内校验：必填缺失阻断保存；元素名/元素中文名重复 → 字段右侧红字提示（输入即消）。
+   重复仅提示不阻断——确需覆盖同名元素时仍走既有的覆盖确认流程。返回 true = 必填齐全可继续保存 */
+function validateElementFields() {
+  const special = $('el-op-special').value;
+  const name = $('el-name').value.trim();
+  const cn = $('el-cn-name').value.trim();
+  const val = $('el-value').value.trim();
+  if (special) {   // 特殊操作不依赖元素：清空全部提示
+    fieldErr('err-el-name'); fieldErr('err-el-cn'); fieldErr('err-el-value');
+    return true;
+  }
+  let ok = true;
+  fieldErr('err-el-name', name ? '' : '元素名称为必填');
+  fieldErr('err-el-value', val ? '' : '定位值为必填');
+  if (!name || !val) ok = false;
+  if (name || cn) {
+    const details = state.elementsCn[$('el-file').value] || [];
+    if (name && details.some(e => e.name === name)) { fieldErr('err-el-name', '名称重复'); ok = false; }
+    if (cn && details.some(e => e.cn === cn)) { fieldErr('err-el-cn', '中文名重复'); ok = false; }
+  }
+  return ok;
+}
+function fieldErr(id, msg) { const el = document.getElementById(id); if (el) el.textContent = msg || ''; }
+
 /* 组装添加元素请求；checkDup=true 时后端先做重复检测（命中返回 duplicate 不落盘） */
 async function saveElement(checkDup) {
   const waitSec = parseInt($('el-wait-sec').value, 10);
@@ -1651,7 +1680,9 @@ function pkgFiles() {
     + '        self._elements = ' + elemClass + '()\n'
     + '\n'
     + methodBlock + '\n';
+  const cnTitle = ($('el-case-cn').value || '').trim();
   const casePy = '# -*- coding: utf-8 -*-\n'
+    + (cnTitle ? '# 用例中文名：' + cnTitle + '\n' : '')
     + '# 用例包 ' + base + ' · ' + stepComment + '\n'
     + '# 流程：\n'
     + '# 1. 拉起快歌主页面\n'
@@ -1738,6 +1769,11 @@ async function onSaveElement(continueMode) {
       showElResult('请选择目标用例文件（或选「➕ 新建用例文件…」一次生成三件套）', false); return;
     }
     if (!methodName) { showElResult('请选择页面操作', false); return; }
+  }
+  // 必填缺失阻断保存（行内红字已提示）；重复为提示不阻断——确需覆盖走下方确认流程
+  if (!special && !validateElementFields()) {
+    showElResult('有必填字段未填，请按字段右侧红字提示补全后再保存', false);
+    return;
   }
   // 同名（同文件）覆盖确认：防止误覆盖已有元素（特殊操作不碰元素库，整段跳过）
   const fname = $('el-file').value;

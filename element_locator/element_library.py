@@ -121,6 +121,26 @@ def list_element_names(filename=None):
     return names
 
 
+_CN_DESC_RE = re.compile(r"desc='([^']*)'")
+
+
+def list_element_details(filename):
+    """元素文件内已定义元素的 [{name, cn}] 清单；cn 取 desc= 首段（元素中文名，与元素管理同口径）。
+    供「添加用例弹窗」按 元素名/元素中文名 行内查重。"""
+    p = os.path.join(ELEMENTS_DIR, filename)
+    if not os.path.isfile(p):
+        return []
+    out = []
+    for line in _read(p).splitlines():
+        m = re.match(r'^\s*self\.(%s)\s*=' % _NAME_CLS, line)
+        if not m:
+            continue
+        cn_m = _CN_DESC_RE.search(line)
+        cn = cn_m.group(1).split(' · ')[0].strip() if cn_m else ''
+        out.append({'name': m.group(1), 'cn': cn})
+    return out
+
+
 def find_duplicate(locator_type, value, elements_dir=None):
     """跨元素文件查找相同「定位方式 + 定位值」的已存在元素（重复元素检测）。
     返回 {'name':..., 'filename':...} 或 None。文件里存的定位值是转义后的，比对时同样转义。

@@ -268,6 +268,9 @@ body.col-resizing * { cursor: col-resize !important; }
 .flow-col.soft .col-head::after { content: '（此操作类型不依赖元素，元素仍会照常入库）'; font-weight: 400; font-size: 11px; color: #9ca3af; margin-left: 4px; }
 html.night .flow-col.soft .col-head::after { color: #6b7280; }
 .op-note { font-size: 12px; color: #337ecc; margin: 2px 0 8px; min-height: 16px; }
+/* 字段行内红字提示（必填缺失 / 元素名·中文名重复）：标签行右侧、输入框上方，≤8 字简短提示 */
+.fld-err { float: right; font-size: 11px; font-weight: 600; color: #e5484d; }
+html.night .fld-err { color: #ff7369; }
 /* 操作类型下拉弹层：分组标题（基本操作/断言/长流程）白色加粗；
    弹层统一深底，保证日间/夜间模式下白字都清晰可读 */
 #el-op-type optgroup, #el-op-type option { background: #232428; }

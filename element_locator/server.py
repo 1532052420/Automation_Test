@@ -307,12 +307,15 @@ def api_delete_popup_rule():
 
 @app.route('/api/pages')
 def api_pages():
-    """列出页面文件 + 各元素文件已定义的元素名（用例步骤下拉用）"""
+    """列出页面文件 + 各元素文件已定义的元素名（用例步骤下拉用）。
+    elements_details 附元素中文名（添加用例弹窗按 元素名/中文名 行内查重用）"""
     return jsonify({
         'ok': True,
         'pages': case_generator.list_page_files(),
         'elements': {f: element_library.list_element_names(f)
                      for f in element_library.list_element_files()},
+        'elements_details': {f: element_library.list_element_details(f)
+                             for f in element_library.list_element_files()},
     })
 
 
