@@ -23,6 +23,7 @@ class TestAaaa:
 
     @allure.title('点击「workspace_screen」')
     def test_aaaa(self):
+        """点击「workspace_screen」 → 点击xxxxxx → cccc → cccc → 点击workspace → 点击workspace_screen → 点击workspace_screen → 点击widget_home → 点击widget_city_date → 点击element_45 → 点击left_widget_area → 点击阅读快看版 → 点击应用市场 → 点击华为商城 → 点击钱包 → 点击钱包 → 点击主题 → 点击主题 → 点击主题 → 点击主题 → 点击主题11111 → 点击主题 → 点击主题 → 点击workspace → 点击workspace → 点击workspace → 点击workspace → 点击workspace → 点击workspace → 点击element_9 → 点击workspace_screen → 点击workspace_screen → 点击workspace_screen → 点击workspace_screen → 点击workspace_screen → 点击workspace → 点击workspace → 点击workspace → 点击workspace → 点击workspace → 点击workspace → 点击drag_layer → 点击drag_layer → 点击widget_time_hour"""
         page = self.page
 
         # 1. 点击「workspace_screen」
@@ -33,6 +34,86 @@ class TestAaaa:
         page.click_ccccc()
         # cccc
         page.click_ccccc()
+        # 点击workspace
+        page.click_workspace()
+        # 点击workspace_screen
+        page.click_workspace_screen()
+        # 点击workspace_screen
+        page.click_workspace_screen()
+        # 点击widget_home
+        page.click_widget_home()
+        # 点击widget_city_date
+        page.click_widget_city_date()
+        # 点击element_45
+        page.click_element_45()
+        # 点击left_widget_area
+        page.click_left_widget_area()
+        # 点击阅读快看版
+        page.click_阅读快看版()
+        # 点击应用市场
+        page.click_应用市场()
+        # 点击华为商城
+        page.click_华为商城()
+        # 点击钱包
+        page.click_钱包()
+        # 点击钱包
+        page.click_钱包()
+        # 点击主题
+        page.click_主题()
+        # 点击主题
+        page.click_主题()
+        # 点击主题
+        page.click_主题()
+        # 点击主题
+        page.click_主题()
+        # 点击主题11111
+        page.click_主题11111()
+        # 点击主题
+        page.click_主题()
+        # 点击主题
+        page.click_主题()
+        # 点击workspace
+        page.click_workspace()
+        # 点击workspace
+        page.click_workspace()
+        # 点击workspace
+        page.click_workspace()
+        # 点击workspace
+        page.click_workspace()
+        # 点击workspace
+        page.click_workspace()
+        # 点击workspace
+        page.click_workspace()
+        # 点击element_9
+        page.click_element_9()
+        # 点击workspace_screen
+        page.click_workspace_screen()
+        # 点击workspace_screen
+        page.click_workspace_screen()
+        # 点击workspace_screen
+        page.click_workspace_screen()
+        # 点击workspace_screen
+        page.click_workspace_screen()
+        # 点击workspace_screen
+        page.click_workspace_screen()
+        # 点击workspace
+        page.click_workspace()
+        # 点击workspace
+        page.click_workspace()
+        # 点击workspace
+        page.click_workspace()
+        # 点击workspace
+        page.click_workspace()
+        # 点击workspace
+        page.click_workspace()
+        # 点击workspace
+        page.click_workspace()
+        # 点击drag_layer
+        page.click_drag_layer()
+        # 点击drag_layer
+        page.click_drag_layer()
+        # 点击widget_time_hour
+        page.click_widget_time_hour()
 
     def teardown_class(self):
         self.appOperator.close_app()
