@@ -191,9 +191,6 @@ async function init() {
   // 临时用例未导出时，离开页面前提醒（防误关丢失已录步骤）
   window.addEventListener('beforeunload', (e) => {
   });
-  $('btn-dup-reuse').addEventListener('click', () => { const r = dupResolver; closeDupPanel(); if (r) r('reuse'); });
-  $('btn-dup-update').addEventListener('click', () => { const r = dupResolver; closeDupPanel(); if (r) r('update'); });
-  $('btn-dup-cancel').addEventListener('click', () => { const r = dupResolver; closeDupPanel(); if (r) r('cancel'); });
   document.querySelectorAll('input[name="el-purpose"]').forEach(r => r.addEventListener('change', onPurposeChange));
   $('el-op-type').addEventListener('change', () => { onOpTypeChange(); onCaseFileChange(); });
   $('el-op-special').addEventListener('change', onSpecialOpChange);
@@ -202,7 +199,6 @@ async function init() {
   // 新建文件输入联动：元素文件切「新建」显隐输入行；用例名输入实时派生页面/元素文件名
   $('el-file').addEventListener('change', () => {
     $('el-file-new-wrap').style.display = isNewElementFile() ? '' : 'none';
-    validateElementFields();   // 目标元素文件变了 → 查重范围随之变化
   });
   $('el-case-new').addEventListener('input', () => {
     onCaseFileChange();
@@ -210,8 +206,6 @@ async function init() {
   // 定位方式切换：从当前元素的定位候选里取该类型的值回填（ID→ID值，XPATH→XPATH值…）
   $('el-type').addEventListener('change', onElTypeChange);
   $('el-op-comment').addEventListener('input', () => { opCommentAuto = false; });
-  ['el-name', 'el-cn-name', 'el-value'].forEach(id => $(id).addEventListener('input', validateElementFields));
-  $('el-op-special').addEventListener('change', validateElementFields);
   $('el-insert-pos').addEventListener('change', () => { renderStepsList(currentSteps()); });
   // 顶部快速打开：用例 / 元素文件 / 页面操作 下拉打开编辑
   loadHeaderOpeners();
@@ -987,7 +981,6 @@ async function loadPages() {
   if (!r || !r.ok) return;
   state.pages = r.pages || [];
   state.elementsAll = r.elements || {};
-  state.elementsCn = r.elements_details || {};   // {file:[{name,cn}]} 元素名/中文名行内查重用
 }
 async function openModal() {
   // ⌖ 坐标模式：选了精确坐标即可打开（不需要树里有选中元素）
@@ -1038,7 +1031,6 @@ async function openModal() {
   $('el-comment').value = '';
   $('el-case-comment').value = '';
   $('el-page-file').value = '';
-  closeDupPanel();
   setElLinkNote('');
   onOpTypeChange();
   await loadCaseFiles();
@@ -1095,23 +1087,6 @@ function setElLinkNote(msg) {
   const el = $('el-link-note');
   if (el) { el.textContent = msg || ''; el.style.display = msg ? '' : 'none'; }
 }
-/* ---- 已有元素复用面板：命中相同定位时弹出，默认「直接复用」防元素库膨胀 ---- */
-let dupResolver = null;
-function askDuplicatePanel(dup) {
-  const used = dup.used_in || [];
-  const usedTxt = used.length
-    ? '已被用例使用：' + used.map(u => u.file + '（' + u.count + ' 处）').join('、')
-    : '暂无用例使用';
-  $('el-dup-info').textContent = '已有元素「' + dup.name + '」（' + dup.filename + '）· ' + usedTxt
-    + '。直接复用不在元素库新增条目，且不阻止你继续添加「用例 + 操作」；'
-    + '「更新元素定义」才会用当前定位/等待覆盖它。';
-  $('el-dup-panel').style.display = '';
-  return new Promise(resolve => { dupResolver = resolve; });
-}
-function closeDupPanel() {
-  $('el-dup-panel').style.display = 'none';
-  dupResolver = null;
-}
 /* ---- 目标方法已有步骤 + 插入位置（②栏） ---- */
 function currentSteps() {
   const f = $('el-case-file').value;
@@ -1145,42 +1120,6 @@ function renderStepsList(steps) {
     + esc(desc) + posTxt + '</span></div>';
   box.innerHTML = html;
 }
-/* 字段行内校验：必填缺失阻断保存；元素名/元素中文名重复 → 字段右侧红字提示（输入即消）。
-   重复仅提示不阻断——确需覆盖同名元素时仍走既有的覆盖确认流程。返回 true = 必填齐全可继续保存 */
-function validateElementFields() {
-  const special = $('el-op-special').value;
-  const name = $('el-name').value.trim();
-  const cn = $('el-cn-name').value.trim();
-  const val = $('el-value').value.trim();
-  if (special) {   // 特殊操作不依赖元素：清空全部提示
-    fieldErr('err-el-name'); fieldErr('err-el-cn'); fieldErr('err-el-value');
-    return true;
-  }
-  let ok = true;
-  fieldErr('err-el-name', name ? '' : '元素名称为必填');
-  fieldErr('err-el-value', val ? '' : '定位值为必填');
-  if (!name || !val) ok = false;
-  if (name || cn) {
-    const details = state.elementsCn[$('el-file').value] || [];
-    if (name && details.some(e => e.name === name)) { fieldErr('err-el-name', '名称重复'); ok = false; }
-    if (cn && details.some(e => e.cn === cn)) { fieldErr('err-el-cn', '中文名重复'); ok = false; }
-  }
-  return ok;
-}
-function fieldErr(id, msg) {
-  let el = document.getElementById(id);
-  if (!el) {
-    // 旧版页面缓存没有提示占位元素时自动补建（自愈，保证红字提示一定可见）
-    const map = { 'err-el-name': 'el-name', 'err-el-cn': 'el-cn-name', 'err-el-value': 'el-value' };
-    const input = document.getElementById(map[id]);
-    if (!input) return;
-    el = document.createElement('span');
-    el.id = id; el.className = 'fld-err';
-    input.parentNode.insertBefore(el, input);
-  }
-  el.textContent = msg || '';
-}
-
 /* 组装添加元素请求；checkDup=true 时后端先做重复检测（命中返回 duplicate 不落盘） */
 async function saveElement(checkDup) {
   const waitSec = parseInt($('el-wait-sec').value, 10);
@@ -1195,7 +1134,6 @@ async function saveElement(checkDup) {
     cn_name: $('el-cn-name').value.trim(),                          // 元素中文名 → desc= 参数（元素管理显示名）
     check_dup: checkDup ? 1 : 0,
   };
-  if (!payload.name || !payload.value) { showElResult('元素名称和定位值不能为空', false); return null; }
   const r = await fetch('api/add_element', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     .then(r => r.json()).catch(() => null);
   if (!r) { showElResult('保存失败：服务异常', false); return null; }
@@ -1766,8 +1704,7 @@ async function onSaveElement(continueMode) {
       onCaseFileChange();
       $('el-case-comment').value = tc.caseComment;   // 用例备注回显（onCaseFileChange 不动该字段）
       $('modal-mask').style.display = 'none';
-      showToast('✅ 三件套已入库：' + pkgCaseFileName() + ' / ' + pkgPageFileName() + ' / ' + pkgElementFileName()
-        + '；选下一个元素后点「添加测试用例」继续录');
+      showToast(continueMode ? '请继续添加用例' : '保存成功');
       return;
     }
     // 都选已有文件 → 继续走「元素入库 + 追加用例行」（下方既有流程）
@@ -1782,52 +1719,30 @@ async function onSaveElement(continueMode) {
     }
     if (!methodName) { showElResult('请选择页面操作', false); return; }
   }
-  // 必填缺失阻断保存（行内红字已提示）；重复为提示不阻断——确需覆盖走下方确认流程
-  if (!special && !validateElementFields()) {
-    showElResult('有必填字段未填，请按字段右侧红字提示补全后再保存', false);
-    return;
-  }
   // 同名（同文件）覆盖确认：防止误覆盖已有元素（特殊操作不碰元素库，整段跳过）
   const fname = $('el-file').value;
   if (!special && name && (state.elementsAll[fname] || []).indexOf(name) >= 0) {
     if (!await uiConfirm('元素库文件 ' + fname + ' 里已有同名元素「' + name + '」，保存将覆盖更新原定义。\n\n' +
       '点「确定」= 覆盖更新\n点「取消」= 不保存')) return;
   }
-  let r = special ? { ok: true, msg: '' } : await saveElement(true);
+  // 按需求：添加测试用例不判断重复——同名直接覆盖、同定位直接新增，元素照常入库
+  let r = special ? { ok: true, msg: '' } : await saveElement(false);
   if (!r) return;
+  if (!r.ok) { showElResult(r.msg || '元素保存失败', false); return; }
   let savedName = special ? '' : name;
-  let dupHandled = false;   // 已处理「相同定位重复」：复用=使用已有元素 / 更新=覆盖定义 / 取消
-  if (!special && r.duplicate) {
-    dupHandled = true;
-    const choice = await askDuplicatePanel(r.duplicate);
-    if (choice === 'cancel') { showElResult('已取消，元素未保存（可改用途或直接关闭）', false); return; }
-    if (choice === 'reuse') {
-      savedName = r.duplicate.name;        // 直接复用：不新建，防元素库膨胀；用例+操作继续
-    } else {
-      r = await saveElement(false);        // 更新元素定义：用当前定位/等待覆盖
-      if (!r || !r.ok) { if (r) showElResult(r.msg, false); return; }
-      savedName = $('el-name').value.trim();
-    }
-  }
-  // 非重复场景失败 → 报错返回；重复但已「使用已有元素」→ 继续后续流程
-  if (!r || (!r.ok && !dupHandled)) { if (r) showElResult(r.msg, false); return; }
 
   const finishContinue = () => {
     loadPages(); loadLibraryFiles(); loadCaseFiles();
     $('modal-mask').style.display = 'none';
     // 不自动弹窗：用户自由点选元素查看，点「添加测试用例」再录下一步（用例/方法预选已保持）
-    showToast('✅ 已入库 · 选下一个元素后点「添加测试用例」继续（用例与方法已保持）');
+    showToast('请继续添加用例');
   };
 
   if (purpose === 'only') {
-    if (dupHandled && r.duplicate) {
-      showElResult('已复用已有元素「' + savedName + '」（未新建，避免元素库重复）', true);
-    } else {
-      if (r.ok && r.content) $('el-content').textContent = r.content;
-      showElResult(r.msg + ' —— 已保存到元素库', true);
-    }
+    if (r.content) $('el-content').textContent = r.content;
+    showElResult(r.msg + ' —— 已保存到元素库', true);
     if (continueMode) finishContinue();
-    else setTimeout(() => { $('modal-mask').style.display = 'none'; }, 600);
+    else { showToast('保存成功'); setTimeout(() => { $('modal-mask').style.display = 'none'; }, 600); }
     return;
   }
   // purpose ②/③：追加一步代码到目标用例方法体末尾（③ 同时生成/更新页面方法）
@@ -1855,8 +1770,7 @@ async function onSaveElement(continueMode) {
   }
   res.className = 'el-result ok';
   pushUndoRecord(cr);
-  res.textContent = (dupHandled ? '已使用已有元素「' + savedName + '」' : r.msg)
-    + '；' + cr.msg + '（三件套已联动完成）';
+  res.textContent = r.msg + '；' + cr.msg + '（页面方法已写入目标页面文件）';
   // 展示追加后的目标方法片段 + ③ 生成的页面方法片段（方便确认写入位置）
   let snippets = [];
   if (cr.content) {
@@ -1887,6 +1801,7 @@ async function onSaveElement(continueMode) {
   if (continueMode) { finishContinue(); return; }
   loadPages(); loadLibraryFiles(); loadCaseFiles();
   $('modal-mask').style.display = 'none';   // 保存 = 完成本条录入，与「保存并继续」一致关闭弹窗
+  showToast('保存成功');
 }
 
 function showElResult(msg, ok) {

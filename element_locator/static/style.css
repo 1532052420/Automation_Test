@@ -269,8 +269,6 @@ body.col-resizing * { cursor: col-resize !important; }
 html.night .flow-col.soft .col-head::after { color: #6b7280; }
 .op-note { font-size: 12px; color: #337ecc; margin: 2px 0 8px; min-height: 16px; }
 /* 字段行内红字提示（必填缺失 / 元素名·中文名重复）：标签行右侧、输入框上方，≤8 字简短提示 */
-.fld-err { float: right; font-size: 11px; font-weight: 600; color: #e5484d; }
-html.night .fld-err { color: #ff7369; }
 /* 操作类型下拉弹层：分组标题（基本操作/断言/长流程）白色加粗；
    弹层统一深底，保证日间/夜间模式下白字都清晰可读 */
 #el-op-type optgroup, #el-op-type option { background: #232428; }
@@ -283,10 +281,6 @@ html.night .fld-err { color: #ff7369; }
 /* 只读文件显示（写入页面文件：由目标用例决定） */
 .modal-body input[readonly] { background: #f3f4f6; color: #374151; cursor: not-allowed; }
 /* 已有元素复用面板（默认直接复用，防元素库膨胀） */
-.dup-panel { border: 1px solid #f59e0b; background: #fffbeb; border-radius: 8px; padding: 10px 12px; margin: 6px 0; }
-.dup-panel .dup-title { font-weight: 600; font-size: 13px; color: #92400e; margin-bottom: 4px; }
-.dup-panel .dup-info { font-size: 12px; color: #78350f; margin-bottom: 8px; line-height: 1.7; }
-.dup-panel .dup-btns { display: flex; gap: 8px; }
 /* 目标方法已有步骤列表（②栏）：当前新步骤高亮排在末尾/插入位 */
 .steps-list { border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; padding: 8px 10px;
   margin: 4px 0 8px; max-height: 150px; overflow: auto; font-size: 12px; color: #374151; }
@@ -417,7 +411,6 @@ html.night .bind-note { background: #172554; border-color: #337ecc; color: #a0cf
 html.night .adv-group { background: #17181b; border-color: #303236; }
 html.night .view-content { background: #101012; border-color: #303236; }
 html.night .op-note { color: #a0cfff; }
-html.night .dup-panel { background: #271c05; border-color: #a16207; }
 html.night .dup-tip { background: #271c05; border-color: #a16207; color: #fbbf24; }
 html.night .dup-tip code { background: #3a2c05; }
 html.night ::-webkit-scrollbar-thumb { background: #3a3c42; }
@@ -599,7 +592,7 @@ html.night .su-title em { color: #9ca3af; }
 html.night .su-btn { background: rgba(64,158,255,.18); border-color: rgba(64,158,255,.5); color: #a0cfff; }
 
 /* ---------- 命中定位底部提示：6s 自动消失；pointer-events:none 不阻挡任何操作 ---------- */
-.hit-toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 1400;
+.hit-toast { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 1400;
   max-width: 72vw; padding: 10px 20px; border-radius: 999px; pointer-events: none;
   background: rgba(250, 250, 252, .95); color: #111827; font-size: 13px; font-weight: 600;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
