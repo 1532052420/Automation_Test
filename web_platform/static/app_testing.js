@@ -807,7 +807,7 @@ function renderOrchCfg() {
         '<div class="cfg-meta">创建人 <b>' + esc(_orchMeta && _orchMeta.created_by || '—') + '</b></div>' +
         '<div class="cfg-meta">创建时间 <b>' + fmtTs(_orchMeta && _orchMeta.created_at) + '</b></div>'
       : '<div class="cfg-meta muted">新用例 —— 顶栏选元素文件并填名称，点左侧操作编排步骤后「保存用例」</div>') +
-      '<p class="muted" style="font-size:12px">保存时平台会把编排编译成页面 + 用例文件（元素只引用不复制），自动进入「选择用例」与执行链路。</p>';
+      '<p class="muted" style="font-size:12px">保存时平台会把编排编译成页面 + 用例文件（元素只引用不复制），自动进入「执行用例」与执行链路。</p>';
   }
 }
 
@@ -953,17 +953,9 @@ async function renderCaseList() {
       '<td>' + (reg ? fmtTs(reg.created_at) : '—') + '</td>' +
       '<td class="ops">' +
       '<button class="mini" data-mvnode="' + esc(c.node) + '">移动项目</button>' +
-      '<button class="ghost mini" data-runnode="' + esc(c.node) + '">执行</button>' +
       (reg ? '<button class="danger mini" data-del="' + reg.id + '">删除</button>' : '') +
       '</td></tr>';
   }).join('');
-}
-
-async function runCaseByNode(node) {
-  /* 框架用例直接按 pytest 节点执行（登记不是执行的前置条件），执行配置与套件共用 */
-  const d = await postJson('/api/run', Object.assign(_runBody(), { case_nodes: [node] }));
-  if (!d.ok) return toast(d.msg || '执行失败', false);
-  toast('用例已开始执行 → Run ' + d.run_id + '，进度见「测试报告」面板', true);
 }
 
 /* ---- 移动用例到项目：已登记 = 只改归属；未登记 = 移动时顺带登记（仅登记模式，不动框架文件） ---- */
@@ -1283,10 +1275,8 @@ async function appTestingInit() {
     if (e.target === e.currentTarget) e.currentTarget.classList.remove('show');
   });
   $('#clTbody').addEventListener('click', async e => {
-    const mv = e.target.closest('[data-mvnode]'), run = e.target.closest('[data-runnode]'),
-          del = e.target.closest('[data-del]');
+    const mv = e.target.closest('[data-mvnode]'), del = e.target.closest('[data-del]');
     if (mv) return openCaseMove(mv.dataset.mvnode);
-    if (run) return runCaseByNode(run.dataset.runnode);
     if (del) {
       const ok = await confirmModal('删除用例', '确定删除该用例？引用它的套件会同步移除该用例，生成的页面/用例文件也会一并清理。', true);
       if (!ok) return;

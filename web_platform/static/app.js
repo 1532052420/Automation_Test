@@ -226,7 +226,7 @@ async function pollFootStatus() {
   } catch (e) { /* 状态条失败不打断页面 */ }
 }
 
-/* ================= 选择用例（testhub 式列表：所属项目筛选 + 搜索 + 命名 + 单执行） =================
+/* ================= 执行用例（testhub 式列表：所属项目筛选 + 搜索 + 重命名 + 单执行） =================
    数据源：/api/cases（scan_case_tree：文件/方法/docstring/中文名映射/mtime）
          + app_testing 登记实体（node→项目归属，供「所属项目」筛选）。 */
 let _caseRows = [];       // 选择用例表行 [{node, file, cls, method, cn_name, mtime, desc, ent}]
@@ -281,7 +281,7 @@ function renderCaseTable() {
       '</div></td>' +
       '<td><div class="clip" title="' + esc(desc) + '">' + esc(desc ? (desc.length > 10 ? desc.slice(0, 10) + '…' : desc) : '—') + '</div></td>' +
       '<td>' + fmtDate(r.mtime) + '</td>' +
-      '<td class="ops"><button class="ghost mini" data-act="cn" data-file="' + esc(r.file) + '" data-cn="' + esc(r.cn_name) + '">命名</button>' +
+      '<td class="ops"><button class="ghost mini" data-act="cn" data-file="' + esc(r.file) + '" data-cn="' + esc(r.cn_name) + '">重命名</button>' +
       '<button class="mini" data-runone="' + esc(r.node) + '">执行</button></td></tr>';
   }).join('');
   $('#caseEmpty').style.display = list.length ? 'none' : '';
@@ -543,7 +543,13 @@ async function initRun() {
   $('#btnSelectNone').addEventListener('click', () => setAllChecked(false));
   $('#caseProj').addEventListener('change', renderCaseTable);
   $('#caseSearch').addEventListener('input', renderCaseTable);
-  $('#btnCaseRefresh').addEventListener('click', loadCaseSelectPanel);
+  $('#btnCaseRefresh').addEventListener('click', () => {
+    /* 重置：清空本面板所有已选择项（搜索词 / 项目筛选 / 勾选用例），列表回到初始视图 */
+    $('#caseSearch').value = '';
+    $('#caseProj').value = '';
+    document.querySelectorAll('#caseTbody .ck-node').forEach(c => { c.checked = false; });
+    renderCaseTable();
+  });
   $('#caseTbody').addEventListener('click', e => {
     const cn = e.target.closest('[data-act=cn]'), run = e.target.closest('[data-runone]');
     if (cn) return openCaseCnModal(cn.dataset.file, cn.dataset.cn);
@@ -572,7 +578,7 @@ async function initRun() {
 const RUN_PANELS = ['projects', 'elements', 'cases', 'caselist', 'orch', 'suites', 'report', 'admin', 'exec'];
 /* 面板名 → 顶部面包屑第三级文案 */
 const RUN_PANEL_NAMES = {
-  projects: '项目管理', elements: '元素管理', cases: '选择用例', caselist: '测试用例',
+  projects: '项目管理', elements: '元素管理', cases: '执行用例', caselist: '用例管理',
   orch: '用例编排', suites: '测试套件', report: '测试报告', admin: '用例上传', exec: '设备配置',
 };
 function showRunPanel(name) {

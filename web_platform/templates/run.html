@@ -17,8 +17,8 @@
       <div class="subnav-label">APP自动化</div>
       <a href="#projects" data-panel="projects" data-icon="folder" class="on">项目管理</a>
       <a href="#elements" data-panel="elements" data-icon="target">元素管理</a>
-      <a href="#cases" data-panel="cases" data-icon="list">选择用例</a>
-      <a href="#caselist" data-panel="caselist" data-icon="doc">测试用例</a>
+      <a href="#caselist" data-panel="caselist" data-icon="doc">用例管理</a>
+      <a href="#cases" data-panel="cases" data-icon="list">执行用例</a>
       <a href="#orch" data-panel="orch" data-icon="flow">用例编排</a>
       <a href="#suites" data-panel="suites" data-icon="layers">测试套件</a>
       <a href="#report" data-panel="report" data-icon="chart">测试报告</a>
@@ -107,7 +107,7 @@
           </div>
         </div>
 
-        <!-- 前后置清理：独立卡片，保存后持久化，全部执行入口（选择用例/套件/单用例）共用 -->
+        <!-- 前后置清理：独立卡片，保存后持久化，全部执行入口（执行用例/套件/单用例）共用 -->
         <div class="card">
           <h3>前后置清理 <span class="muted">全部执行入口共用 · 用例之间恒为冷启动（停 App 保留数据，下一条自动拉起落在首页）</span></h3>
           <div class="mt" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
@@ -115,7 +115,7 @@
             <label class="chk"><input type="checkbox" id="execTeardownReset"> 后置清理（仅最后 1 条用例后：清 App 数据）</label>
             <button class="ghost mini" id="btnCleanupSave" style="margin-left:auto">保存清理配置</button>
           </div>
-          <p class="muted mt">保存后对后续所有执行生效（选择用例 / 测试套件 / 单用例执行共用，不写回 conf 文件）——用例之间无需每条写登录步骤。</p>
+          <p class="muted mt">保存后对后续所有执行生效（执行用例 / 测试套件 / 单用例执行共用，不写回 conf 文件）——用例之间无需每条写登录步骤。</p>
         </div>
 
         <div class="card">
@@ -136,14 +136,14 @@
         </div>
       </section>
 
-      <!-- 选择用例（含执行面板） -->
+      <!-- 执行用例（含执行面板） -->
       <section class="panel" id="panel-cases" hidden>
         <div class="card">
-          <h3>选择用例（cases/app_ui）</h3>
+          <h3>执行用例（cases/app_ui）</h3>
           <div class="treebar">
             <select id="caseProj" style="max-width:170px"><option value="">所属项目：全部</option></select>
             <input type="search" id="caseSearch" placeholder="搜索用例名称 / 方法 / 文件 / 中文名" style="max-width:260px">
-            <button class="ghost mini" id="btnCaseRefresh">刷新</button>
+            <button class="ghost mini" id="btnCaseRefresh">重置</button>
             <button class="ghost mini" id="btnSelectAll">全选</button>
             <button class="ghost mini" id="btnSelectNone">全不选</button>
             <button id="btnStart" style="margin-left:auto">开始执行</button>
@@ -224,10 +224,10 @@
         </div>
       </section>
 
-      <!-- 测试用例（testhub TestCaseList 移植）：编排用例实体列表 -->
+      <!-- 用例管理（testhub TestCaseList 移植）：只管理 / 编辑用例实体，执行统一走「执行用例」 -->
       <section class="panel" id="panel-caselist" hidden>
         <div class="card">
-          <h3>测试用例 <span class="muted">框架 cases/app_ui 全部测试用例 · 可执行 / 移动到项目 · 已登记可编排</span></h3>
+          <h3>用例管理 <span class="muted">框架 cases/app_ui 全部测试用例 · 管理与编辑 · 移动到项目</span></h3>
           <div class="treebar">
             <select id="clProj" style="max-width:170px" title="按项目筛选"><option value="">全部项目</option></select>
             <input type="search" id="clSearch" placeholder="搜索用例名称 / 描述 / 创建人">
@@ -499,7 +499,7 @@
           <div class="field" id="cnCaseNewWrap" style="display:none">
             <label>新用例名</label>
             <input type="text" id="cnCaseNew" placeholder="如: login_flow（前缀 test_ 固定，.py 自动加）">
-            <label style="margin-top:8px">用例中文名 <span class="muted">（可选，映射到「选择用例」列表显示）</span></label>
+            <label style="margin-top:8px">用例中文名 <span class="muted">（可选，映射到「执行用例」列表显示）</span></label>
             <input type="text" id="cnCaseCnName" placeholder="如: 快歌登录冒烟">
             <span class="muted" style="font-size:11px">保存并继续 = 三件套（用例+页面+元素）直接入库，后续步骤默认继续写入该用例</span>
           </div>
