@@ -967,6 +967,7 @@ async function renderCaseList() {
       '<td class="clip" title="' + esc((reg && reg.created_by) || '—') + '">' + esc((reg && reg.created_by) || '—') + '</td>' +
       '<td>' + (reg ? fmtTs(reg.created_at) : '—') + '</td>' +
       '<td class="ops">' +
+      '<button class="ghost mini" data-cncase="' + esc(c.file) + '" data-cn="' + esc(c.cn_name || '') + '">重命名</button>' +
       '<button class="mini" data-mvnode="' + esc(c.node) + '">移动项目</button>' +
       (reg ? '<button class="danger mini" data-del="' + reg.id + '">删除</button>' : '') +
       '</td></tr>';
@@ -1295,7 +1296,9 @@ async function appTestingInit() {
     if (e.target === e.currentTarget) e.currentTarget.classList.remove('show');
   });
   $('#clTbody').addEventListener('click', async e => {
-    const mv = e.target.closest('[data-mvnode]'), del = e.target.closest('[data-del]');
+    const mv = e.target.closest('[data-mvnode]'), del = e.target.closest('[data-del]'),
+          cn = e.target.closest('[data-cncase]');
+    if (cn) return openCaseCnModal(cn.dataset.cncase, cn.dataset.cn);   // 复用执行用例的中文名弹窗
     if (mv) return openCaseMove(mv.dataset.mvnode);
     if (del) {
       const ok = await confirmModal('删除用例', '确定删除该用例？引用它的套件会同步移除该用例，生成的页面/用例文件也会一并清理。', true);
@@ -1307,6 +1310,7 @@ async function appTestingInit() {
         refreshOrchCaseOptions();
         renderCaseList();
         renderSuites();
+        await loadCaseSelectPanel();   // 执行用例面板同步刷新（删掉的节点立即消失）
       }
     }
   });

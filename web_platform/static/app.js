@@ -276,13 +276,12 @@ function renderCaseTable() {
     const desc = (reg && reg.description) || r.desc || '';   // 场景描述：登记描述优先，兜底方法 docstring 首行
     return '<tr>' +
       '<td><input type="checkbox" data-node="' + esc(r.node) + '" class="ck-node"></td>' +
-      '<td><div class="clip" title="' + esc((reg && reg.name) || r.method) + '"><b>' + esc((reg && reg.name) || r.method) + '</b>' +
-        (reg ? '' : ' <span class="proj-status" title="尚未登记到项目，点「命名」旁可先登记归属">未登记</span>') +
+      '<td><div class="clip" title="' + esc(r.cn_name ? (r.cn_name + '（' + r.method + '）') : r.method) + '"><b>' + esc(r.cn_name || r.method) + '</b>' +
+        (reg ? '' : ' <span class="proj-status" title="尚未登记到项目，可到「用例管理」登记归属">未登记</span>') +
       '</div></td>' +
       '<td><div class="clip" title="' + esc(desc) + '">' + esc(desc ? (desc.length > 10 ? desc.slice(0, 10) + '…' : desc) : '—') + '</div></td>' +
       '<td>' + fmtDate(r.mtime) + '</td>' +
-      '<td class="ops"><button class="ghost mini" data-act="cn" data-file="' + esc(r.file) + '" data-cn="' + esc(r.cn_name) + '">重命名</button>' +
-      '<button class="mini" data-runone="' + esc(r.node) + '">执行</button></td></tr>';
+      '<td class="ops"><button class="mini" data-runone="' + esc(r.node) + '">执行</button></td></tr>';
   }).join('');
   $('#caseEmpty').style.display = list.length ? 'none' : '';
 }
@@ -302,6 +301,8 @@ async function saveCaseCn() {
   if (d.ok) {
     $('#caseCnMask').classList.remove('show');
     await loadCaseSelectPanel();
+    /* 用例管理面板共用本弹窗：重命名后同步刷新其列表（中文名映射即时生效） */
+    if (typeof renderCaseList === 'function') renderCaseList();
   }
 }
 
@@ -551,8 +552,7 @@ async function initRun() {
     renderCaseTable();
   });
   $('#caseTbody').addEventListener('click', e => {
-    const cn = e.target.closest('[data-act=cn]'), run = e.target.closest('[data-runone]');
-    if (cn) return openCaseCnModal(cn.dataset.file, cn.dataset.cn);
+    const run = e.target.closest('[data-runone]');
     if (run) return runOneCase(run.dataset.runone);
   });
   $('#caseCnSave').addEventListener('click', () => saveCaseCn().catch(e => toast(e.message, false)));
