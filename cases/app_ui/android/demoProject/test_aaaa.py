@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# 用例中文名：测试
 # 用例包 aaaa · 点击「workspace_screen」
 # 流程：
 # 1. 拉起快歌主页面

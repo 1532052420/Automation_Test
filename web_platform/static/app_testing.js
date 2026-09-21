@@ -927,22 +927,37 @@ async function renderCaseList() {
     api(AT_PREFIX + '/api/cases/framework'), api(AT_PREFIX + '/api/cases')]);
   if (!fd.ok) return toast(fd.msg || '框架用例加载失败', false);
   _fwCases = fd.results || [];
+  /* 用例中文名映射（文件头「# 用例中文名：」，与元素定位器「添加测试用例」同源）：
+     没有就回填（登记名 > 方法名去 test_ 前缀），有就直接用；只补缺，不覆盖已有映射 */
+  const miss = _fwCases.filter(c => !c.cn_name);
+  if (miss.length) {
+    await Promise.all(miss.map(async c => {
+      const reg0 = c.case;
+      const fallback = (reg0 && reg0.name) || (c.method || '').replace(/^test_/, '') || c.method || '';
+      try {
+        const d = await api('/api/cases/cn-name', { method: 'POST', body: JSON.stringify({ file: c.file, cn_name: fallback }) });
+        if (d.ok) c.cn_name = d.cn_name;
+      } catch (_) {}   // 单条回填失败只影响该行显示，不阻塞列表
+    }));
+  }
   _cases = cd.ok ? (cd.results || []) : [];    // 编排/套件面板仍用登记实体
   const kw = ($('#clSearch').value || '').trim().toLowerCase();
   const pf = $('#clProj') ? $('#clProj').value : '';
   const list = _fwCases.filter(c => {
     const reg = c.case;
     const inProj = !pf || (pf === 'none' ? !(reg && reg.project_id) : !!(reg && +reg.project_id === +pf));
-    const hay = [c.file, c.class, c.method, reg && reg.name, reg && reg.description, reg && reg.created_by];
+    const hay = [c.file, c.class, c.method, c.cn_name, reg && reg.name, reg && reg.description, reg && reg.created_by];
     return inProj && (!kw || hay.some(v => String(v || '').toLowerCase().includes(kw)));
   });
   $('#clEmpty').style.display = list.length ? 'none' : '';
   $('#clTbody').innerHTML = list.map(c => {
     const reg = c.case;
-    const name = reg ? reg.name : c.method;
+    /* 用例字段：优先取中文名映射（定位器/重命名写入），悬停 title 附方法名便于对照 */
+    const name = c.cn_name || (reg ? reg.name : c.method);
+    const title = c.cn_name ? (c.cn_name + '（' + c.method + '）') : name;
     const sub = (reg && reg.description) ? reg.description : '';   // 用例列只显示名称+描述，不显示文件路径
     /* 列宽固定（table-layout:fixed），超长内容 .clip 单行截断，title 悬停看全称 */
-    return '<tr><td><div class="clip" title="' + esc(name) + '"><b>' + esc(name) + '</b>' +
+    return '<tr><td><div class="clip" title="' + esc(title) + '"><b>' + esc(name) + '</b>' +
       (reg ? '' : ' <span class="proj-status" title="尚未登记到平台，可在「移动项目」时登记">未登记</span>') +
       '</div>' +
       (sub ? '<div class="path clip" title="' + esc(sub) + '">' + esc(sub) + '</div>' : '') + '</td>' +
@@ -1236,7 +1251,7 @@ async function appTestingInit() {
     renderCaseList();
   });
   /* 新建用例：跳转元素定位器（截图点选 → 添加测试用例弹窗在定位器内完成） */
-  $('#btnClNew').addEventListener('click', () => { location.href = '/locator'; });
+  $('#btnClNew').addEventListener('click', () => { window.open('/locator', '_blank', 'noopener'); });
 
   /* ---- 移动用例到项目 弹窗 ---- */
   $('#mvSave').addEventListener('click', () => saveCaseMove().catch(e => toast(e.message, false)));
