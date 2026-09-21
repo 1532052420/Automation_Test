@@ -119,16 +119,16 @@ try {
         <!-- 第一栏：元素 -->
         <section class="flow-col" id="col-element">
           <div class="col-head">① 元素 <span class="hint">入库必需</span></div>
-          <label>元素名称 <span class="help-icon" data-help="元素在代码里的引用名，生成 self.元素名 = CreateElement.create(...)；用例、页面方法都靠它找到这个元素，三件套以它为纽带。命名：支持中文/字母/数字/下划线，不能以数字开头，不能是 Python 关键字。已按截图元素自动推荐，可改。">?</span><span class="fld-err" id="err-el-name"></span>
+          <label>元素名称 <span class="help-icon" data-help="元素在代码里的引用名，生成 self.元素名 = CreateElement.create(...)；用例、页面方法都靠它找到这个元素，三件套以它为纽带。命名：支持中文/字母/数字/下划线，不能以数字开头，不能是 Python 关键字。已按截图元素自动推荐，可改。">?</span>
             <input id="el-name" type="text" placeholder="如: search_btn">
           </label>
-          <label>元素中文名 <span class="help-icon" data-help="元素管理/测试报告里显示的名称（如：悬浮球），让不懂代码的人也能看懂。选截图元素时若节点有中文文案会自动预填。不填则元素管理直接显示代码名。">?</span><span class="fld-err" id="err-el-cn"></span>
+          <label>元素中文名 <span class="help-icon" data-help="元素管理/测试报告里显示的名称（如：悬浮球），让不懂代码的人也能看懂。选截图元素时若节点有中文文案会自动预填。不填则元素管理直接显示代码名。">?</span>
             <input id="el-cn-name" type="text" placeholder="如：悬浮球（元素管理中显示的名称，可不填）">
           </label>
           <label>定位方式 <span class="help-icon" data-help="用什么方式找这个元素。ID = 资源 id（最稳最快，首选）；XPATH = 表达式（按文本/层级找）；ACCESSIBILITY_ID = 无障碍标签；其他少用。定位器已按元素特点给出候选，一般不用改。">?</span>
             <select id="el-type"></select>
           </label>
-          <label>定位值 <span class="help-icon" data-help="和定位方式配套的具体值，已自动填好；改定位方式时记得一起核对。">?</span><span class="fld-err" id="err-el-value"></span>
+          <label>定位值 <span class="help-icon" data-help="和定位方式配套的具体值，已自动填好；改定位方式时记得一起核对。">?</span>
             <input id="el-value" type="text">
           </label>
           <label>等待方式 <span class="help-icon" data-help="操作这个元素之前，框架要等它先达到什么状态。可见 = 显示出来再操作（默认，最常用）；存在 = 可能在屏幕外/加载慢，存在即可；可点击 = 适合按钮。选错可能等超时或点击时机不对。">?</span>
@@ -240,17 +240,6 @@ try {
           <div id="pp-rules" class="pp-rules"></div>
           <div id="pp-result" class="el-result"></div>
         </section>
-      </div>
-
-      <!-- 已有元素复用面板：命中重复定位时显示，默认直接复用（防元素库膨胀） -->
-      <div id="el-dup-panel" class="dup-panel" style="display:none">
-        <div class="dup-title">⚠ 元素库中已存在相同定位</div>
-        <div id="el-dup-info" class="dup-info"></div>
-        <div class="dup-btns">
-          <button id="btn-dup-reuse" class="btn small primary">✔ 直接复用（推荐）</button>
-          <button id="btn-dup-update" class="btn small">✎ 更新元素定义</button>
-          <button id="btn-dup-cancel" class="btn small">✕ 取消</button>
-        </div>
       </div>
 
       <div id="el-result" class="el-result"></div>
