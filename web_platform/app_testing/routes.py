@@ -307,7 +307,9 @@ def api_cases_framework():
     reg_by_node = {c['node']: c for c in cases_store.list() if c.get('node')}
     try:
         from element_locator.case_generator import case_files_info
-        step_by_method = {(i['file'], i['class'], m): len(v or [])
+        # case_files_info 的 file 是裸文件名（如 test_aaaa.py），scan_case_tree 是相对项目根路径
+        # ——键统一取 basename，否则永远查不到、步骤列恒为 0
+        step_by_method = {(os.path.basename(i['file']), i['class'], m): len(v or [])
                           for i in case_files_info()
                           for m, v in (i.get('method_steps') or {}).items()}
     except Exception:
@@ -320,7 +322,7 @@ def api_cases_framework():
             rows.append({
                 'node': node, 'file': item['file'],
                 'class': item['class_name'], 'method': m,
-                'step_count': step_by_method.get((item['file'], item['class_name'], m), 0),
+                'step_count': step_by_method.get((os.path.basename(item['file']), item['class_name'], m), 0),
                 'case': {'id': reg['id'], 'name': reg['name'],
                          'project_id': reg.get('project_id'),
                          'created_by': reg.get('created_by'),

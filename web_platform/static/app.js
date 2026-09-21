@@ -273,12 +273,11 @@ function renderCaseTable() {
   };
   $('#caseTbody').innerHTML = list.map(r => {
     const reg = r.ent;
-    const fileLabel = r.cn_name ? r.cn_name + '（' + r.file.split('/').pop() + '）' : r.file.split('/').pop();
     return '<tr>' +
       '<td><input type="checkbox" data-node="' + esc(r.node) + '" class="ck-node"></td>' +
       '<td><b>' + esc((reg && reg.name) || r.method) + '</b>' +
         (reg ? '' : ' <span class="proj-status" title="尚未登记到项目，点「命名」旁可先登记归属">未登记</span>') +
-        '<div class="path">' + esc(fileLabel + ' · ' + r.cls) + '</div></td>' +
+      '</td>' +
       '<td>' + esc((reg && reg.description) || r.desc || '—') + '</td>' +
       '<td>' + fmtDate(r.mtime) + '</td>' +
       '<td class="ops"><button class="ghost mini" data-act="cn" data-file="' + esc(r.file) + '" data-cn="' + esc(r.cn_name) + '">命名</button>' +

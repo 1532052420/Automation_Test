@@ -941,7 +941,6 @@ async function renderCaseList() {
     const reg = c.case;
     const name = reg ? reg.name : c.method;
     const sub = (reg && reg.description) ? reg.description : '';   // 用例列只显示名称+描述，不显示文件路径
-    const file = c.file.split('/').pop();
     /* 列宽固定（table-layout:fixed），超长内容 .clip 单行截断，title 悬停看全称 */
     return '<tr><td><div class="clip" title="' + esc(name) + '"><b>' + esc(name) + '</b>' +
       (reg ? '' : ' <span class="proj-status" title="尚未登记到平台，可在「移动项目」时登记">未登记</span>') +
@@ -949,22 +948,15 @@ async function renderCaseList() {
       (sub ? '<div class="path clip" title="' + esc(sub) + '">' + esc(sub) + '</div>' : '') + '</td>' +
       '<td class="clip" title="' + esc(reg ? (projName(reg.project_id) || '未分组') : '—') + '">' +
       esc(reg ? (projName(reg.project_id) || '未分组') : '—') + '</td>' +
-      '<td>' + (c.step_count || 0) + ' 步<div class="path clip" title="' + esc(file) + '">' + esc(file) + '</div></td>' +
+      '<td>' + (c.step_count || 0) + ' 步</td>' +
       '<td class="clip" title="' + esc((reg && reg.created_by) || '—') + '">' + esc((reg && reg.created_by) || '—') + '</td>' +
       '<td>' + (reg ? fmtTs(reg.created_at) : '—') + '</td>' +
       '<td class="ops">' +
       '<button class="mini" data-mvnode="' + esc(c.node) + '">移动项目</button>' +
       '<button class="ghost mini" data-runnode="' + esc(c.node) + '">执行</button>' +
-      (reg ? '<button class="mini" data-orch="' + reg.id + '">编排</button>' +
-             '<button class="danger mini" data-del="' + reg.id + '">删除</button>' : '') +
+      (reg ? '<button class="danger mini" data-del="' + reg.id + '">删除</button>' : '') +
       '</td></tr>';
   }).join('');
-}
-
-function goOrch(cid) {
-  showRunPanel('orch');
-  $('#orchSel').value = cid;
-  selectOrchCase(cid);
 }
 
 async function runCaseByNode(node) {
@@ -1292,10 +1284,9 @@ async function appTestingInit() {
   });
   $('#clTbody').addEventListener('click', async e => {
     const mv = e.target.closest('[data-mvnode]'), run = e.target.closest('[data-runnode]'),
-          orch = e.target.closest('[data-orch]'), del = e.target.closest('[data-del]');
+          del = e.target.closest('[data-del]');
     if (mv) return openCaseMove(mv.dataset.mvnode);
     if (run) return runCaseByNode(run.dataset.runnode);
-    if (orch) return goOrch(+orch.dataset.orch);
     if (del) {
       const ok = await confirmModal('删除用例', '确定删除该用例？引用它的套件会同步移除该用例，生成的页面/用例文件也会一并清理。', true);
       if (!ok) return;
