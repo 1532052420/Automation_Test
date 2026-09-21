@@ -740,7 +740,12 @@ function onElTableClick(e) {
 }
 
 function initElementsPanel() {
-  $('#btnElRefresh').addEventListener('click', loadElements);
+  $('#btnElRefresh').addEventListener('click', () => {
+    /* 重置：清空本面板已选择项（搜索词 / 元素文件筛选），列表回到初始视图 */
+    $('#elSearch').value = '';
+    $('#elFileFilter').value = '';
+    loadElements();
+  });
   $('#elSearch').addEventListener('input', renderElements);
   $('#elFileFilter').addEventListener('change', renderElements);
   $('#elTbody').addEventListener('click', onElTableClick);

@@ -1229,7 +1229,12 @@ async function appTestingInit() {
   /* ---- 测试用例列表 ---- */
   $('#clSearch').addEventListener('input', renderCaseList);
   $('#clProj').addEventListener('change', renderCaseList);
-  $('#btnClRefresh').addEventListener('click', renderCaseList);
+  $('#btnClRefresh').addEventListener('click', () => {
+    /* 重置：清空本面板已选择项（搜索词 / 项目筛选），列表回到初始视图 */
+    $('#clSearch').value = '';
+    $('#clProj').value = '';
+    renderCaseList();
+  });
   /* 新建用例：跳转元素定位器（截图点选 → 添加测试用例弹窗在定位器内完成） */
   $('#btnClNew').addEventListener('click', () => { location.href = '/locator'; });
 
