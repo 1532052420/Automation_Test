@@ -340,6 +340,40 @@ def api_cases_framework():
     return _ok(results=rows)
 
 
+@bp.route('/api/case/file', methods=['DELETE'])
+def api_case_file_delete():
+    """删除框架用例文件：未登记用例的删除通道（已登记的一并清理登记与套件引用）。
+    文件先备份到 output/backups/cases/ 再移除——未入库的文件直接删就找不回来了。"""
+    rel = (request.args.get('file') or '').strip().replace('\\', '/')
+    base = os.path.realpath(BASE_DIR)
+    if not rel.startswith('cases/app_ui') or not os.path.basename(rel).startswith('test_') \
+            or not rel.endswith('.py') or '..' in rel:
+        return _bad('参数不合法')
+    path = os.path.realpath(os.path.join(base, rel))
+    if not path.startswith(os.path.join(base, 'cases/app_ui')) or not os.path.isfile(path):
+        return _bad('用例文件不存在', 404)
+    import shutil
+    backup_dir = os.path.join(base, 'output', 'backups', 'cases')
+    os.makedirs(backup_dir, exist_ok=True)
+    stamp = time.strftime('%Y%m%d_%H%M%S')
+    backup_name = '%s_%s' % (stamp, os.path.basename(rel))
+    shutil.copy2(path, os.path.join(backup_dir, backup_name))
+    prefix = rel + '::'
+    removed_ids = []
+    for c in list(cases_store.list()):
+        if (c.get('node') or '').startswith(prefix):
+            removed_ids.append(c['id'])
+            codegen.remove_generated(c['id'])
+            cases_store.delete(c['id'])
+    for s in list(suites_store.list()):
+        ids = s.get('case_ids') or []
+        if any(i in removed_ids for i in ids):
+            suites_store.update(s['id'], {'case_ids': [i for i in ids if i not in removed_ids]})
+    os.remove(path)
+    return _ok(removed_registrations=len(removed_ids),
+               backup='output/backups/cases/' + backup_name)
+
+
 @bp.route('/api/case/steps')
 def api_case_steps():
     """用例步骤反解（三级页「步骤编辑」数据源）：把方法体注释行 + page.xxx(...) 调用行

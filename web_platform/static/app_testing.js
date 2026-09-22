@@ -981,7 +981,7 @@ async function renderCaseList() {
       '<button class="mini" data-editsteps="' + esc(c.node) + '">编辑步骤</button>' +
       '<button class="ghost mini" data-cncase="' + esc(c.file) + '" data-cn="' + esc(c.cn_name || '') + '">重命名</button>' +
       '<button class="mini" data-mvnode="' + esc(c.node) + '">移动项目</button>' +
-      (reg ? '<button class="danger mini" data-del="' + reg.id + '">删除</button>' : '') +
+      '<button class="danger mini" data-delfile="' + esc(c.file) + '">删除</button>' +
       '</td></tr>';
   }).join('');
   listPager('#clPager', list.length, _clPage, perPage, p => { _clPage = p; renderCaseList(); });
@@ -1512,22 +1512,24 @@ async function appTestingInit() {
   });
   $('#clTbody').addEventListener('click', async e => {
     /* 注意：局部名不能用 del —— 会遮蔽全局 del() 请求函数导致删除请求永远发不出 */
-    const mv = e.target.closest('[data-mvnode]'), delBtn = e.target.closest('[data-del]'),
+    const mv = e.target.closest('[data-mvnode]'), delBtn = e.target.closest('[data-delfile]'),
           cn = e.target.closest('[data-cncase]'), ed = e.target.closest('[data-editsteps]');
     if (ed) return openCaseEditor(ed.dataset.editsteps);
     if (cn) return openCaseCnModal(cn.dataset.cncase, cn.dataset.cn);   // 复用执行用例的中文名弹窗
     if (mv) return openCaseMove(mv.dataset.mvnode);
     if (delBtn) {
-      const ok = await confirmModal('删除用例', '确定删除该用例？引用它的套件会同步移除该用例，生成的页面/用例文件也会一并清理。', true);
+      const f = delBtn.dataset.delfile;
+      const ok = await confirmModal('删除用例', '确定删除 ' + f + ' ？将备份并移除用例文件，登记信息与套件引用同步清理；页面/元素文件可能被其他用例共用，不会自动删除。', true);
       if (!ok) return;
-      const d = await del(AT_PREFIX + '/api/cases/' + delBtn.dataset.del);
-      toast(d.ok ? '已删除' : (d.msg || '删除失败'), d.ok);
+      const d = await del(AT_PREFIX + '/api/case/file?file=' + encodeURIComponent(f));
+      toast(d.ok ? '已删除（备份：' + (d.backup || '—') + '）' : (d.msg || '删除失败'), d.ok);
       if (d.ok) {
-        if (+delBtn.dataset.del === _orchCaseId) selectOrchCase(0);   // 删的是正在编辑的用例 → 重置编排表单
         refreshOrchCaseOptions();
+        if (_orchCaseId && !_cases.some(c => c.id === _orchCaseId)) selectOrchCase(0);
         renderCaseList();
         renderSuites();
         await loadCaseSelectPanel();   // 执行用例面板同步刷新（删掉的节点立即消失）
+        await loadProjects();          // 项目管理用例数同步
       }
     }
   });
