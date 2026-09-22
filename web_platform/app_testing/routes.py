@@ -251,6 +251,11 @@ def api_cases():
     payload, err = _clean_case_body(d)
     if err:
         return _bad(err)
+    if payload.get('node'):                    # 仅登记模式：按 node 幂等——同一用例节点重复登记
+        exist = next((c for c in cases_store.list() if c.get('node') == payload['node']), None)
+        if exist:                              # 转为更新，杜绝「移动项目/登记连点」堆出重复实体
+            cases_store.update(exist['id'], payload)
+            return _ok(case=cases_store.get(exist['id']))
     case = cases_store.create(payload)
     if payload.get('node'):                    # 仅登记模式：用例已在框架文件中，不重复编译
         return _ok(case=cases_store.get(case['id']))

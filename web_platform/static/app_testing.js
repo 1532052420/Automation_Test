@@ -1463,7 +1463,14 @@ async function appTestingInit() {
   });
 
   /* ---- 移动用例到项目 弹窗 ---- */
-  $('#mvSave').addEventListener('click', () => saveCaseMove().catch(e => toast(e.message, false)));
+  $('#mvSave').addEventListener('click', async () => {
+    const btn = $('#mvSave');
+    if (btn.disabled) return;                  // 防连击：登记请求在途时忽略再次点击
+    btn.disabled = true;
+    try { await saveCaseMove(); }
+    catch (e) { toast(e.message, false); }
+    finally { btn.disabled = false; }
+  });
   $('#mvCancel').addEventListener('click', () => $('#caseMoveMask').classList.remove('show'));
   $('#caseMoveMask').addEventListener('click', e => {
     if (e.target === e.currentTarget) e.currentTarget.classList.remove('show');
