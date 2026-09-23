@@ -17,7 +17,7 @@ const state = {
   prevSigs: null,         // 上一次刷新的元素签名集合（Diff 基线；null=尚无）
   goneSigs: [],           // 本次刷新相对上次「消失」的元素签名
   undoStack: [],          // 本次会话「添加到用例」步骤的撤销栈（LIFO，存 add_code 返回的文件快照）
-  tempCase: null,         // 录制会话：上次三件套入库的用例（base/caseComment），重开弹窗时回显
+  tempCase: null,         // 录制会话：上次三件套入库的用例（base），重开弹窗时回显
   coordMode: false,       // ⌖ 坐标模式：点截图选精确坐标（不再命中容器节点），用于无障碍盲区（自绘弹层等）
   coordPoint: null,       // 坐标模式下最后选中的点 [x, y]（设备坐标）
 };
@@ -212,10 +212,13 @@ async function init() {
   // 新建文件输入联动：元素文件切「新建」显隐输入行；用例名输入实时派生页面/元素文件名
   $('el-file').addEventListener('change', () => {
     $('el-file-new-wrap').style.display = isNewElementFile() ? '' : 'none';
+    syncElFileNote();
   });
   $('el-case-new').addEventListener('input', () => {
     onCaseFileChange();
   });
+  // 元素文件名输入：三件派生名回显行实时跟随（留空 = 自动按用例名派生）
+  $('el-file-new').addEventListener('input', updatePkgTrio);
   // 定位方式切换：从当前元素的定位候选里取该类型的值回填（ID→ID值，XPATH→XPATH值…）
   $('el-type').addEventListener('change', onElTypeChange);
   $('el-op-comment').addEventListener('input', () => { opCommentAuto = false; });
@@ -223,13 +226,8 @@ async function init() {
   $('el-cn-name').addEventListener('input', followStepDesc);
   $('el-name').addEventListener('input', followStepDesc);
   $('el-insert-pos').addEventListener('change', () => { renderStepsList(currentSteps()); });
-  // 顶部快速打开：用例 / 元素文件 / 页面操作 下拉打开编辑
-  loadHeaderOpeners();
-  $('open-case-sel').addEventListener('change', (e) => { onOpenHdrFile('case', e.target.value); e.target.value = ''; });
-  $('open-ele-sel').addEventListener('change', (e) => { onOpenHdrFile('element', e.target.value); e.target.value = ''; });
-  $('open-page-sel').addEventListener('change', (e) => { onOpenHdrFile('page', e.target.value); e.target.value = ''; });
-  $('btn-view-close').addEventListener('click', () => { $('view-mask').style.display = 'none'; });
-  $('btn-view-save').addEventListener('click', onSaveHdrFile);
+  // （v6.11 残留的「顶部快速打开」死调用已清除——其 HTML 与函数定义早已删除，
+  //   但调用漏删导致 init 在此 ReferenceError 中断，后面的问号提示/三栏拖拽全部失效）
   bindHelpIcons();
   bindColumnResizers();
 }
@@ -1041,18 +1039,15 @@ async function openModal() {
     ? '点击坐标(' + state.coordPoint[0] + ', ' + state.coordPoint[1] + ')'
     : autoStepComment('click', opElementLabel());  // 默认按「点击」生成；切类型时自动跟随
   opCommentAuto = true;
-  $('el-comment').value = '';
-  $('el-case-comment').value = '';
   $('el-page-file').value = '';
   setElLinkNote('');
   onOpTypeChange();
   await loadCaseFiles();
-  // 录制会话回显：预选上次入库的用例文件 + 用例备注；元素/页面文件由 onCaseFileChange 自动对齐
+  // 录制会话回显：预选上次入库的用例文件；元素/页面文件由 onCaseFileChange 自动对齐
   if (state.tempCase) {
     const caseFile = 'test_' + state.tempCase.base + '.py';
     if ((state.caseFiles || []).some(c => c.file === caseFile)) {
       $('el-case-file').value = caseFile;
-      $('el-case-comment').value = state.tempCase.caseComment || '';
       onCaseFileChange();
     } else {
       state.tempCase = null;   // 用例文件已不存在（被删除）→ 会话失效
@@ -1143,7 +1138,6 @@ async function saveElement(checkDup) {
     value: $('el-value').value.trim(),
     wait_type: $('el-wait').value,
     wait_seconds: (isNaN(waitSec) || waitSec < 1) ? '' : waitSec,  // 空 = 沿用框架默认 30
-    comment: $('el-comment').value.trim(),                          // 元素备注 → 元素行行尾注释
     cn_name: $('el-cn-name').value.trim(),                          // 元素中文名 → desc= 参数（元素管理显示名）
     check_dup: checkDup ? 1 : 0,
   };
@@ -1446,15 +1440,12 @@ function elementLinePreview() {
   const val = $('el-value').value.trim();
   const sec = parseInt($('el-wait-sec').value, 10);
   const cn = $('el-cn-name').value.trim();
-  const c = $('el-comment').value.trim();
   let line = "self." + name + " = CreateElement.create(Locator_Type." + $('el-type').value
     + ", '" + escQ(val) + "', wait_type=Wait_By." + $('el-wait').value;
   if (!isNaN(sec) && sec >= 1) line += ", wait_seconds=" + sec;
-  const descText = cn || c;   // desc= 参数：中文名优先，其次备注（与后端 element_line 同规则）
-  if (descText) line += ", desc='" + escQ(descText) + "'";
+  if (cn) line += ", desc='" + escQ(cn) + "'";
   line += ')';
-  const tail = cn ? (cn + (c ? ' · ' + c : '')) : c;
-  if (tail) line += '  # ' + tail;
+  if (cn) line += '  # ' + cn;
   return line;
 }
 /* 操作栏：选③时将生成到页面文件的页面方法（镜像后端 page_method_code） */
@@ -1486,6 +1477,27 @@ async function loadCaseFiles() {
   else if (files.length) sel.value = files[0];
   onCaseFileChange();
 }
+function updatePkgTrio() {
+  /* 新建用例模式：三个文件名全部由用例名派生并锁死，实时回显让锁死关系一眼可见 */
+  const el = $('pkg-trio');
+  if (!el) return;
+  if (!isNewCase()) { el.textContent = ''; return; }
+  if (!pkgBase()) { el.textContent = '输入用例名后，用例 / 页面 / 元素 三个文件名自动派生并锁死'; return; }
+  el.textContent = '将生成并锁死：test_' + pkgBase() + '.py · ' + pkgPageFileName() + ' · ' + pkgElementFileName();
+}
+
+function syncElFileNote() {
+  /* 手动改「写入元素文件」时如实提示：与页面引用的元素文件不一致 → 保存时会自动同步过去（同名覆盖），
+     不再留着上次「已自动对齐」的过期提示让人生疑 */
+  const f = $('el-case-file').value;
+  const info = (state.caseFiles || []).filter(c => c.file === f).find(c => c.page_file);
+  if (purposeValue() !== 'all' || isNewElementFile() || !info || !info.elements_file) return;
+  if ($('el-file').value !== info.elements_file) {
+    setElLinkNote('⚠ 「写入元素文件」(' + $('el-file').value + ') 与页面 ' + info.page_file + ' 引用的 ' +
+                  info.elements_file + ' 不一致——保存时会自动把元素同步到 ' + info.elements_file + '（同名覆盖，不影响保存）');
+  }
+}
+
 function onCaseFileChange() {
   // 新建用例：切换到「新建输入模式」——方法/插入位置无意义，页面/元素文件自动派生
   const newCase = isNewCase();
@@ -1494,6 +1506,7 @@ function onCaseFileChange() {
   $('el-insert-pos').disabled = newCase;
   $('el-page-file').value = newCase ? (newCaseBase() ? capFirst(newCaseBase()) + 'Page.py（随用例包新建）' : '（输入用例名后自动派生）')
                                     : '';
+  updatePkgTrio();
   if (newCase) { renderStepsList([]); return; }
   const f = $('el-case-file').value;
   const infos = (state.caseFiles || []).filter(c => c.file === f);
@@ -1538,7 +1551,12 @@ function onCaseFileChange() {
     setElLinkNote('⚠ 该用例没有页面对象（self.page），③ 无法生成操作——请换有页面对象的用例，或先补页面文件后重试');
   } else if (p === 'all' && info && info.elements_file) {
     if ($('el-file').value !== info.elements_file) {
-      $('el-file').value = info.elements_file;
+      const sel = $('el-file');
+      // 下拉里没有该文件时 set value 会静默失效（提示却说已对齐）——缺选项就先补上
+      if (!Array.from(sel.options).some(o => o.value === info.elements_file)) {
+        sel.add(new Option(info.elements_file, info.elements_file));
+      }
+      sel.value = info.elements_file;
       setElLinkNote('🔗 页面 ' + info.page_file + ' 引用元素文件 ' + info.elements_file + '，「写入元素文件」已自动对齐');
     } else {
       setElLinkNote('🔗 三件套去向：页面 ' + info.page_file + ' ← 元素文件 ' + info.elements_file);
@@ -1724,7 +1742,7 @@ async function onSaveElement(continueMode) {
       if (state.tempCase && state.tempCase.base !== pkgBase()) {
         if (!confirm('上次录制会话是「' + state.tempCase.base + '」。换用例名将切换会话，继续？')) return;
       }
-      const tc = state.tempCase = { base: pkgBase(), caseComment: $('el-case-comment').value.trim() };
+      const tc = state.tempCase = { base: pkgBase() };
       const r = await fetch('api/save_case_package', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ package: tc.base, files: pkgFiles(), uploader: special ? 'locator' : name }),
@@ -1734,7 +1752,6 @@ async function onSaveElement(continueMode) {
       await loadCaseFiles();
       $('el-case-file').value = pkgCaseFileName();
       onCaseFileChange();
-      $('el-case-comment').value = tc.caseComment;   // 用例备注回显（onCaseFileChange 不动该字段）
       $('modal-mask').style.display = 'none';
       showToast(continueMode ? '请继续添加用例' : '保存成功');
       return;
@@ -1782,10 +1799,11 @@ async function onSaveElement(continueMode) {
   const step = {
     type: special || $('el-op-type').value,   // 特殊操作优先（不依赖元素）
     element: savedName,
+    element_file: special ? '' : fname,       // 元素刚保存进的文件（元素不在页面引用文件时后端优先从这复制）
     param: $('el-op-param').value.trim(),
     desc: '',
     comment: $('el-op-comment').value.trim(),        // 操作备注 → 页面方法 docstring
-    case_comment: $('el-case-comment').value.trim(), // 用例备注 → 追加行上方注释
+    case_comment: '',   // 用例备注字段已删：留空由后端自动生成步骤描述
   };
   const res = $('el-result');
   res.className = 'el-result'; res.textContent = purpose === 'all'

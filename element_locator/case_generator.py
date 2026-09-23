@@ -571,11 +571,17 @@ def _sync_method_docstring(content, method_name):
     body_end = body_start + (nxt.start() + 1 if nxt else len(tail))
     body = content[body_start:body_end]
     doc_line = IND * 2 + '"""' + ' → '.join(steps) + '"""\n'
-    dm = re.match(r'^%s(?:"""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\')[ \t]*\n' % IND, body)
-    if dm:   # 已有 docstring → 整段替换（追加步骤后保持汇总最新）
-        new_body = doc_line + body[dm.end():].lstrip('\n')
-    else:    # 没有 docstring → 插到方法体最前（必须是第一条语句）
-        new_body = doc_line + body.lstrip('\n')
+    # docstring 在方法体第一层（IND*2 缩进）。历史 bug：这里曾用 ^IND（4 空格）锚定，
+    # 永远匹配不上 → 替换分支成死代码，每次保存都新插一层、旧层永远堆着。循环剥掉全部旧层再插新的。
+    dm = None
+    rest = body
+    while True:
+        m2 = re.match(r'^%s(?:"""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\')[ \t]*\n' % (IND * 2,), rest)
+        if not m2:
+            break
+        dm = m2
+        rest = rest[dm.end():]
+    new_body = doc_line + rest.lstrip('\n')
     return content[:body_start] + new_body + content[body_end:]
 
 
@@ -687,15 +693,24 @@ def append_code_to_method(case_file, method_name, step, gen_page_method=False, i
 
     # 2) 元素必须在页面引用的元素文件里（一个页面只 import 一个元素文件）
     el_name = step.get('element') or ''
-    if el_name and elements_file:
-        if el_name not in element_library.list_element_names(elements_file):
-            where = [ff for ff in element_library.list_element_files()
-                     if el_name in element_library.list_element_names(ff)]
+    if el_name and elements_file and el_name not in element_library.list_element_names(elements_file):
+        # 元素不在页面引用的元素文件里时不再中断三件套：自动把元素整行从其所在文件
+        # 复制/覆盖到目标文件（同名覆盖，用户口径「重复元素覆盖就好了」）；任何文件里都没有才报错
+        srcs = [ff for ff in element_library.list_element_files()
+                if el_name in element_library.list_element_names(ff)]
+        pref = step.get('element_file') or ''
+        if pref in srcs:                       # 本步刚保存的文件是最新定义，优先从这复制
+            srcs = [pref] + [f for f in srcs if f != pref]
+        if not srcs:
             return {'ok': False, 'case_before': case_before, 'page_file': page_file,
-                    'msg': ('已追加用例行，但元素 %s 不在页面 %s 引用的元素文件 %s 里（元素实际在: %s）。'
-                            '请把元素保存到 %s（保存元素时「写入元素文件」选它），或在元素库统一后重试'
-                            % (el_name, page_file, elements_file,
-                               '、'.join(where) or '任何文件中都没有', elements_file))}
+                    'msg': ('已追加用例行，但元素 %s 还没保存进任何元素文件，无法生成页面方法'
+                            '——请重新保存一次本步操作（三件套会把元素一并入库）' % el_name)}
+        cr = element_library.copy_element(srcs[0], elements_file, el_name)
+        if not cr.get('ok'):
+            return {'ok': False, 'case_before': case_before, 'page_file': page_file,
+                    'msg': '已追加用例行，但元素自动同步失败：%s' % cr.get('msg', '')}
+        result['msg'] += '；元素 %s 已自动同步到 %s（页面引用的元素文件，取自 %s，同名覆盖）' \
+            % (el_name, elements_file, srcs[0])
 
     # 3) upsert 页面方法：同名元素操作方法覆盖更新；工具方法已存在则不重复生成
     ppath = os.path.join(PAGES_DIR, page_file)

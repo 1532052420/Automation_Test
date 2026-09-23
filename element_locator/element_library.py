@@ -326,6 +326,51 @@ def add_element(filename, name, locator_type, value, wait_type='VISIBILITY_OF', 
             'msg': '元素 %s 已添加到 %s' % (name, filename)}
 
 
+def copy_element(src_file, dst_file, name, elements_dir=None):
+    """把元素定义整行从 src 元素文件复制/覆盖到 dst 元素文件（三件套兜底：
+    保存时元素不在页面引用的元素文件里 → 自动同步过去，同名覆盖不报错）。
+    整行原样复制（保留 desc= 中文名、行尾注释、等待秒数）。返回 {'ok': bool, 'msg': str}"""
+    if src_file == dst_file:
+        return {'ok': True, 'msg': '元素 %s 已在 %s' % (name, dst_file)}
+    scan_dir = elements_dir or ELEMENTS_DIR
+    spath = os.path.join(scan_dir, src_file)
+    m = re.search(r'^[ \t]*self\.%s\s*=.*$' % re.escape(name), _read(spath), re.MULTILINE) \
+        if os.path.exists(spath) else None
+    if not m:
+        return {'ok': False, 'msg': '元素 %s 不在 %s 里' % (name, src_file)}
+    line = m.group(0)
+
+    dpath = os.path.join(scan_dir, dst_file)
+    if not os.path.exists(dpath):
+        content = HEADER + 'class %s:\n' % to_class_name(dst_file) + '    def __init__(self):\n' + line + '\n'
+        _write(dpath, content)
+        return {'ok': True, 'msg': '元素 %s 已从 %s 复制到新建的 %s' % (name, src_file, dst_file)}
+
+    content = _ensure_imports(_read(dpath))
+    pat = re.compile(r'^[ \t]*self\.%s\s*=.*$' % re.escape(name), re.MULTILINE)
+    if pat.search(content):
+        content = pat.sub(lambda _: line, content, count=1)
+        _write(dpath, content)
+        return {'ok': True, 'msg': '元素 %s 已从 %s 覆盖更新到 %s' % (name, src_file, dst_file)}
+
+    init_m = re.search(r'def __init__\(self\):\n', content)
+    if not init_m:
+        return {'ok': False, 'msg': '元素库文件缺少 __init__ 方法，无法添加元素'}
+    body_start = init_m.end()
+    after = content[body_start:]
+    pass_m = re.search(r'^[ \t]*pass[ \t]*$', after, re.MULTILINE)
+    last_elem = list(re.finditer(r'^[ \t]*self\.%s\s*=.*$' % _NAME_CLS, after, re.MULTILINE))
+    if pass_m:
+        after = re.sub(r'^[ \t]*pass[ \t]*$', line, after, count=1)
+    elif last_elem:
+        after = after[:last_elem[-1].end()] + '\n' + line + after[last_elem[-1].end():]
+    else:
+        after = line + '\n' + after
+    content = content[:body_start] + after
+    _write(dpath, content)
+    return {'ok': True, 'msg': '元素 %s 已从 %s 复制到 %s' % (name, src_file, dst_file)}
+
+
 if __name__ == '__main__':
     import sys
     print('现有元素文件:', list_element_files())

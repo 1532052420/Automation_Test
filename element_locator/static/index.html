@@ -111,41 +111,38 @@ try {
     <div class="modal-body">
       <div class="flow-step">
         <span class="fs-label">保存到哪一步：</span>
-        <label class="purpose"><input type="radio" name="el-purpose" value="only" checked> <span class="help-icon" data-help="只把元素写进元素库（先攒元素，之后统一写用例）。右侧②③栏熄灭不可用。">?</span> ① 仅元素</label>
-        <label class="purpose"><input type="radio" name="el-purpose" value="all"> <span class="help-icon" data-help="三件套一次完成（推荐）：元素入库 + 用例行追加 + 页面操作方法自动生成/更新到目标用例的页面文件。用例、元素、操作缺一不可，选这个就不会漏。目标用例选「➕ 新建…」并填用例名时：首次保存即三件套（用例+页面+元素）直接入库，弹窗回显文件信息，后续步骤继续追加。">?</span> ② 元素 + 用例 + 操作（推荐）</label>
-        <label class="purpose"><input type="radio" name="el-purpose" value="popup"> <span class="help-icon" data-help="把当前选中的元素登记为「随机弹窗关闭规则」：写进 popupElements.py 规则库（不进普通元素库、不写用例）。用例执行时框架在元素等待的间隙按规则被动扫描，偶遇弹窗就截图存证并自动关闭——不为弹窗写用例，正常用例"无感"。建议配锚点防误关。">?</span> 🎯 ③ 登记随机弹窗</label>
+        <label class="purpose"><input type="radio" name="el-purpose" value="only" checked> <span class="help-icon" data-help="只把元素写入元素库">?</span> ① 仅元素</label>
+        <label class="purpose"><input type="radio" name="el-purpose" value="all"> <span class="help-icon" data-help="三件套一次完成（推荐）">?</span> ② 元素 + 用例 + 操作（推荐）</label>
+        <label class="purpose"><input type="radio" name="el-purpose" value="popup"> <span class="help-icon" data-help="登记为随机弹窗自动关闭规则"无感"。建议配锚点防误关。">?</span> 🎯 ③ 登记随机弹窗</label>
       </div>
 
       <div class="flow-cols">
         <!-- 第一栏：元素 -->
         <section class="flow-col" id="col-element">
           <div class="col-head">① 元素 <span class="hint">入库必需</span></div>
-          <label>元素名称 <span class="help-icon" data-help="元素在代码里的引用名，生成 self.元素名 = CreateElement.create(...)；用例、页面方法都靠它找到这个元素，三件套以它为纽带。命名：支持中文/字母/数字/下划线，不能以数字开头，不能是 Python 关键字。已按截图元素自动推荐，可改。">?</span>
+          <label>元素名称 <span class="help-icon" data-help="代码里的元素引用名">?</span>
             <input id="el-name" type="text" placeholder="如: search_btn">
           </label>
-          <label>元素中文名 <span class="help-icon" data-help="元素管理/测试报告里显示的名称（如：悬浮球），让不懂代码的人也能看懂。选截图元素时若节点有中文文案会自动预填。不填则元素管理直接显示代码名。">?</span>
+          <label>元素中文名 <span class="help-icon" data-help="元素管理和报告里的显示名">?</span>
             <input id="el-cn-name" type="text" placeholder="如：悬浮球（元素管理中显示的名称，可不填）">
           </label>
-          <label>定位方式 <span class="help-icon" data-help="用什么方式找这个元素。ID = 资源 id（最稳最快，首选）；XPATH = 表达式（按文本/层级找）；ACCESSIBILITY_ID = 无障碍标签；其他少用。定位器已按元素特点给出候选，一般不用改。">?</span>
+          <label>定位方式 <span class="help-icon" data-help="ID 最稳首选，XPATH 次之">?</span>
             <select id="el-type"></select>
           </label>
-          <label>定位值 <span class="help-icon" data-help="和定位方式配套的具体值，已自动填好；改定位方式时记得一起核对。">?</span>
+          <label>定位值 <span class="help-icon" data-help="与定位方式配套的值，已自动填好">?</span>
             <input id="el-value" type="text">
           </label>
-          <label>等待方式 <span class="help-icon" data-help="操作这个元素之前，框架要等它先达到什么状态。可见 = 显示出来再操作（默认，最常用）；存在 = 可能在屏幕外/加载慢，存在即可；可点击 = 适合按钮。选错可能等超时或点击时机不对。">?</span>
+          <label>等待方式 <span class="help-icon" data-help="操作前等元素达到的状态">?</span>
             <select id="el-wait">
               <option value="VISIBILITY_OF">VISIBILITY_OF（可见）</option>
               <option value="PRESENCE_OF_ELEMENT_LOCATED">PRESENCE_OF_ELEMENT_LOCATED（存在）</option>
               <option value="ELEMENT_TO_BE_CLICKABLE">ELEMENT_TO_BE_CLICKABLE（可点击）</option>
             </select>
           </label>
-          <label>等待时间(秒) <span class="help-icon" data-help="等待方式最多等多少秒（默认 6，慢页面元素可单独调大）。元素找到的瞬间就继续执行——所以有的操作快、有的慢；一直没找到就等满这里填的秒数才报错。加载慢的页面调大，想快点暴露定位问题调小。">?</span>
+          <label>等待时间(秒) <span class="help-icon" data-help="最多等待秒数，默认 6">?</span>
             <input id="el-wait-sec" type="number" min="1" max="600" step="1" value="6">
           </label>
-          <label>元素备注 <span class="help-icon" data-help="这个元素是什么（如「登录页-手机号输入框」），写在元素库生成行的行尾注释里，以后回看元素库一眼知道每个元素是干嘛的。可不填。">?</span>
-            <input id="el-comment" type="text" placeholder="如: 登录页-登录按钮（可不填）">
-          </label>
-          <label>写入元素文件 <span class="help-icon" data-help="元素写进哪个元素文件。选②时这里会自动对齐到目标用例页面引用的元素文件（页面只认一个元素文件，必须一致）；选「➕ 新建…」则随用例包一起新建元素文件（文件名自动按用例名推荐，可改）。">?</span>
+          <label>写入元素文件 <span class="help-icon" data-help="②时自动对齐页面引用的元素文件">?</span>
             <select id="el-file"></select>
             <span id="el-file-new-wrap" style="display:none;margin-top:6px">
               <input id="el-file-new" type="text" placeholder="新元素文件名，如: loginFlow（后缀自动补）">
@@ -157,21 +154,19 @@ try {
         <!-- 第二栏：用例 -->
         <section class="flow-col" id="col-case">
           <div class="col-head">② 用例 <span class="hint">这步操作追加到哪条用例</span></div>
-          <label>目标用例文件 <span class="help-icon" data-help="操作代码行追加到哪个用例文件（test_*.py）。下拉列出现有用例文件；选「➕ 新建…」并输入用例名后：首次保存即创建用例文件并写入当前步骤——「保存并继续」继续录后续步骤（自动追加到该用例）。">?</span>
+          <label>目标用例文件 <span class="help-icon" data-help="操作追加到的用例文件">?</span>
             <select id="el-case-file"></select>
             <span id="el-case-new-wrap" style="display:none;margin-top:6px">
               <span class="hint" style="font-size:12px;font-weight:600">test_</span><input id="el-case-new" type="text" placeholder="如: login_flow" style="width:calc(100% - 40px)">
               <span class="hint" style="font-size:11px">最终文件名 test_&lt;输入&gt;.py（前缀固定不可改）</span>
               <input id="el-case-cn" type="text" placeholder="用例中文名（可选，显示在平台选择用例列表）" style="width:100%;margin-top:6px">
+              <div id="pkg-trio" class="hint" style="font-size:11px;color:#409eff;margin-top:4px;word-break:break-all"></div>
             </span>
           </label>
-          <label>页面操作 <span class="help-icon" data-help="这步操作的代码行（如 page.click_qs_frame()）追加到用例文件里哪个 def test_xxx 测试方法的末尾。注意：页面操作方法不用在这里选——它由③的操作类型+元素名称自动生成（如 click_qs_frame），并自动写入目标用例绑定的页面文件（见③「写入页面文件」）。">?</span>
+          <label>页面操作 <span class="help-icon" data-help="追加到哪个测试方法末尾">?</span>
             <select id="el-case-method"></select>
           </label>
-          <label>用例备注 <span class="help-icon" data-help="这一步在用例里的注释（如「第3步：点登录」），写在追加代码行的上一行，读用例时一眼看懂每步在干嘛。可不填——留空会自动生成（如「点击 login_btn」）。">?</span>
-            <input id="el-case-comment" type="text" placeholder="留空=自动生成（可不填）">
-          </label>
-          <label>插入位置 <span class="help-icon" data-help="这步插到目标方法的哪个位置。默认「末尾」；录流程时发现漏了一步（如漏点某个按钮），选「第 N 步之后」补插到中间。步骤列表在下方实时可见。">?</span>
+          <label>插入位置 <span class="help-icon" data-help="插到末尾或第 N 步之后">?</span>
             <select id="el-insert-pos"></select>
           </label>
           <div id="el-steps-list" class="steps-list"></div>
@@ -181,23 +176,23 @@ try {
         <!-- 第三栏：操作 -->
         <section class="flow-col" id="col-op">
           <div class="col-head">③ 操作 <span class="hint">对这个元素做什么</span></div>
-          <label>操作类型 <span class="help-icon" data-help="保存后要「对这个元素做什么」，决定生成的代码。按分组找：基本操作=点击/输入/长按/坐标/截图/固定等待；断言=存在/文本/Toast/消失（弹窗关了才算过）；长流程=轮询等待出现（生成中/加载慢）、出现才点击（偶发弹窗分支）。断言也是操作的一种：框架把断言逻辑封装在页面方法里（Page Object 惯例），用例只调用 page.assert_xxx()。不需要参数的类型参数框自动隐藏。">?</span>
+          <label>操作类型 <span class="help-icon" data-help="对这个元素做什么">?</span>
             <select id="el-op-type"></select>
           </label>
-          <label>特殊操作 <span class="help-icon" data-help="与元素无关的用例级动作（不写元素库，元素栏随之禁用）：收起键盘=只在键盘可见时收起，否则不动；首次启动弹窗处理=点掉隐私协议/系统权限弹窗，无弹窗自动跳过，且固定插在所有步骤之前。选择后只需选目标用例和插入位置。">?</span>
+          <label>特殊操作 <span class="help-icon" data-help="与元素无关的用例级动作">?</span>
             <select id="el-op-special">
               <option value="">无（使用上方操作类型）</option>
               <option value="hide_keyboard">收起键盘（键盘在才收，否则不动）</option>
               <option value="deal_first_launch_dialogs">首次启动弹窗处理（无弹窗自动跳过）</option>
             </select>
           </label>
-          <label id="el-op-param-wrap">操作参数 <span class="help-icon" data-help="操作需要的额外内容：输入→文本；断言Toast→toast 文案；断言文本→期望文字；坐标点击→x,y；轮询等待出现→最长等待秒数（超时用例失败）；出现才点击→探测秒数，例填 3=最多等 3 秒找弹窗，出现就点、没出现就跳过；固定等待→秒数；截图→截图名。不需要时自动隐藏。">?</span>
+          <label id="el-op-param-wrap">操作参数 <span class="help-icon" data-help="输入内容/期望文本/坐标/秒数">?</span>
             <input id="el-op-param" type="text" placeholder="输入内容 / 期望文本 / toast文本 / 坐标(x,y) / 秒数">
           </label>
-          <label>步骤描述 <span class="help-icon" data-help="这一步做了什么（如「点击消息进入消息详情」），生成到用例注释和页面方法说明里，测试报告里也按它显示。已按「操作类型 + 元素中文名」自动生成并实时跟随：改元素中文名、换操作类型、填参数都会立刻刷新；手输过描述就不再自动覆盖，需要自动描述时清空即可。">?</span>
+          <label>步骤描述 <span class="help-icon" data-help="自动按操作类型+中文名生成，可改">?</span>
             <input id="el-op-comment" type="text" placeholder="留空=自动生成（可不填）">
           </label>
-          <label>写入页面文件 <span class="help-icon" data-help="页面操作方法（如 click_login_btn）写进哪个 xxxPage.py——这个文件由目标用例决定（用例的 self.page 用的就是它），所以只读不可改：换页面文件 = 换目标用例。元素文件+页面文件就是操作牵涉的两个文件。">?</span>
+          <label>写入页面文件 <span class="help-icon" data-help="由目标用例决定，自动带出">?</span>
             <input id="el-page-file" type="text" readonly placeholder="选择目标用例后自动带出">
           </label>
           <div id="op-note" class="op-note"></div>
@@ -206,35 +201,35 @@ try {
         <!-- 弹窗规则栏：用途③（登记随机弹窗）专用，与三件套流程互斥显示 -->
         <section class="flow-col" id="col-popup" style="display:none">
           <div class="col-head">③ 登记随机弹窗 <span class="hint">写进弹窗规则库，不进普通元素库</span></div>
-          <label>规则名 <span class="help-icon" data-help="规则在 popupElements.py 里的引用名（popup_xxx_close 风格）。同名再次登记 = 覆盖更新该规则。">?</span>
+          <label>规则名 <span class="help-icon" data-help="规则在规则库里的引用名">?</span>
             <input id="pp-name" type="text" placeholder="如: popup_promo_close">
           </label>
-          <label>关闭按钮定位 <span class="help-icon" data-help="弹窗的关闭按钮（×/以后再说/跳过），已按当前选中元素预填。ID 优先（最稳最快）；自绘 View 无 id 时用 XPATH。执行时框架按此定位找按钮并点击关闭。">?</span>
+          <label>关闭按钮定位 <span class="help-icon" data-help="弹窗关闭按钮的定位方式">?</span>
             <select id="pp-type">
               <option value="ID">ID（资源 id，首选）</option>
               <option value="XPATH">XPATH（表达式）</option>
             </select>
           </label>
-          <label>定位值 <span class="help-icon" data-help="关闭按钮的具体定位值，与上方定位方式配套。">?</span>
+          <label>定位值 <span class="help-icon" data-help="关闭按钮的具体定位值">?</span>
             <input id="pp-value" type="text" placeholder="如: com.recordlife.kuaige:id/btnClose">
           </label>
-          <label>锚点（强烈建议） <span class="help-icon" data-help="弹窗的特征元素：同一个关闭按钮 id 常被登录弹层等非弹窗界面复用，不配锚点会把它们误当弹窗关掉（实测踩坑）。取弹窗的标题文案或背景 id：在元素树里点选弹窗标题 → 看它的定位写法，抄到这里。XPATH 文本锚点示例：//*[contains(@text,'今日签到')]。留空 = 全页面扫描（仅当关闭按钮 id 全局唯一时才安全）。">?</span>
+          <label>锚点（强烈建议） <span class="help-icon" data-help="弹窗特征元素，防误关其他弹层">?</span>
             <select id="pp-anchor-type">
               <option value="">不配锚点（仅 id 唯一时安全）</option>
               <option value="XPATH">XPATH（弹窗文案，推荐）</option>
               <option value="ID">ID（弹窗背景/容器 id）</option>
             </select>
           </label>
-          <label>锚点定位值 <span class="help-icon" data-help="与锚点方式配套的具体值。场上出现该特征才允许点关闭——把「误关」概率压到零。">?</span>
+          <label>锚点定位值 <span class="help-icon" data-help="场上出现该特征才允许点关闭">?</span>
             <input id="pp-anchor-value" type="text" placeholder="如: //*[contains(@text,'今日签到')]">
           </label>
-          <label>冷却秒数 <span class="help-icon" data-help="同一条规则两次点击关闭的最小间隔（默认 2 秒）。防「关了又弹」时疯狂连点。">?</span>
+          <label>冷却秒数 <span class="help-icon" data-help="两次关闭的最小间隔秒，默认 2">?</span>
             <input id="pp-cooldown" type="number" min="1" max="60" step="1" value="2">
           </label>
-          <label>活动页约束（可选） <span class="help-icon" data-help="该弹窗只在特定 Activity 内出现时填（如 .feature.recharge.RechargeKCoinActivity），其他页面跳过扫描。不确定就留空。">?</span>
+          <label>活动页约束（可选） <span class="help-icon" data-help="仅指定页面出现的弹窗才扫描">?</span>
             <input id="pp-activity" type="text" placeholder="如: .feature.recharge.RechargeKCoinActivity（可不填）">
           </label>
-          <label>备注 <span class="help-icon" data-help="这条规则对应什么弹窗（如「签到弹窗-任务中心/广场通用」），写在规则行尾注释里。可不填。">?</span>
+          <label>备注 <span class="help-icon" data-help="规则说明，写在行尾注释里">?</span>
             <input id="pp-comment" type="text" placeholder="如: 签到弹窗-关闭按钮（可不填）">
           </label>
           <div class="pv-title">已有规则 <span class="hint">popupElements.py · 点 × 删除</span></div>

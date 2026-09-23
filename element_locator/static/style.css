@@ -313,7 +313,7 @@ html.night .flow-col.soft .col-head::after { color: #6b7280; }
 .help-icon {
   display: inline-block; width: 15px; height: 15px; line-height: 15px; text-align: center;
   font-size: 11px; font-weight: 700; color: #6b7280; background: #f3f4f6;
-  border: 1px solid #dcdfe6; border-radius: 50%; cursor: help; vertical-align: 1px;
+  border: 1px solid #dcdfe6; border-radius: 50%; cursor: pointer; vertical-align: 1px;
   user-select: none;
 }
 .help-icon:hover { color: #fff; background: #409eff; border-color: #409eff; }
