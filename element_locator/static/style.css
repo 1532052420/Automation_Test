@@ -850,3 +850,7 @@ html.night .flow-col { background: #1b1c1f; border-color: #303236; }
 html.night .anchor-card { background: rgba(64,158,255,.08); border-color: #2b4a6f; }
 html.night .steps-list { background: #1b1c1f; border-color: #303236; }
 html.night .el-content { background: #111214; color: #e5e7eb; }
+
+/* ===== 选中元素栏 800×800 起步（v6.11.6）：小屏出滚动条兜底，字段增减长度不变 ===== */
+main { min-width: 1420px; min-height: 820px; }
+.col.right { flex: 0 0 800px; min-width: 800px; min-height: 800px; }
