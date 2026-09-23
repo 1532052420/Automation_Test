@@ -674,9 +674,10 @@ function renderElements() {
     const nameCell = e.cn_name
       ? '<b>' + esc(e.cn_name) + '</b>' + (e.popup ? ' <span class="el-popup-badge">规则</span>' : '') + '<br><span class="el-file">' + esc(e.name) + '</span>'
       : '<b>' + esc(e.name) + '</b>' + (e.popup ? ' <span class="el-popup-badge">规则</span>' : '') + '<br><span class="el-file">' + esc(e.file) + '</span>';
-    /* 弹窗规则库行只读：文件里 RULE_OPTIONS/WHITELIST 与元素行共存，普通编辑会重写整文件抹掉规则 */
+    /* 弹窗规则库行：定位器「登记随机弹窗」专管锚点/冷却/白名单；此处仅支持删除（单行移除，不影响同文件规则常量） */
     const actions = e.popup
-      ? '<span class="el-popup-note" title="由元素定位器「登记随机弹窗」专管（锚点/冷却/白名单同文件存放），此处只读">规则库 · 到定位器「登记随机弹窗」管理</span>'
+      ? '<div class="ops"><span class="el-popup-note" title="由元素定位器「登记随机弹窗」专管（锚点/冷却/白名单同文件存放），仅支持删除">规则库</span>' +
+        '<button class="mini danger-ghost" data-act="del" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">删除</button></div>'
       : '<div class="ops">' +
     '<button class="ghost mini" data-act="edit" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">编辑</button>' +
     '<button class="ghost mini" data-act="copy" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">复制</button>' +
