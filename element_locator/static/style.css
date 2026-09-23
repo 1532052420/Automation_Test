@@ -752,3 +752,8 @@ select.locked { opacity: .45; }
 #col-popup-rules .col-head { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 13px; color: #111827;
   padding: 11px 14px 9px; border-bottom: 1px solid #eef0f3; margin-bottom: 10px; }
 #col-popup-rules .col-head::before { content: '📋'; }
+
+/* 操作类型图标卡：iOS 线性 SVG 图标（currentColor 跟随选中态反白） */
+.op-card .oi { color: #4b5563; }
+.op-card .oi svg { width: 17px; height: 17px; display: block; }
+.op-card.on .oi { color: #fff; }

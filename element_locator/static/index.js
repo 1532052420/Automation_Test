@@ -2068,9 +2068,24 @@ async function saveCollect() {
    纯样式配套 JS：不新增字段、不改保存逻辑。el-op-type 原生 select 保留（全量操作类型），
    图标卡只是常用 6 类的快捷入口，两者写同一字段并互相同步高亮。 */
 const OP_GRID_TYPES = STEP_TYPES.map(t => t.v);   // 全部操作类型铺满图标卡，区域内滚动
-const OP_GRID_ICONS = { click: '👆', input: '⌨️', long_press: '✊', tap: '🎯', screenshot: '📷', sleep: '⏱',
-  assert_visible: '👁', assert_text: '🔍', assert_toast: '💬', assert_gone: '🚫',
-  wait_element: '⏳', if_click: '🔀', custom: '🧩' };
+/* 简约 iOS 线性图标（24×24 网格 · stroke 1.8 · currentColor，跟随选中态反白） */
+const svgIcon = (inner) =>
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
+const OP_GRID_ICONS = {
+  click: svgIcon('<circle cx="12" cy="14" r="1.8" fill="currentColor" stroke="none"/><path d="M8.2 9.8a5.4 5.4 0 0 1 7.6 0"/>'),
+  input: svgIcon('<rect x="4" y="7" width="16" height="10" rx="2"/><path d="M8 10.5h8M8 13.5h5"/>'),
+  long_press: svgIcon('<circle cx="12" cy="14" r="1.8" fill="currentColor" stroke="none"/><path d="M8.2 9.8a5.4 5.4 0 0 1 7.6 0M5.8 7.2a8.6 8.6 0 0 1 12.4 0"/>'),
+  tap: svgIcon('<circle cx="12" cy="12" r="5.5"/><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3"/>'),
+  screenshot: svgIcon('<rect x="3.5" y="7" width="17" height="12" rx="2.5"/><path d="M8.5 7l1.2-2h4.6L15.5 7"/><circle cx="12" cy="13" r="3"/>'),
+  sleep: svgIcon('<circle cx="12" cy="12" r="7.5"/><path d="M12 8v4l2.8 1.8"/>'),
+  assert_visible: svgIcon('<path d="M3.5 12s3.2-5.5 8.5-5.5S20.5 12 20.5 12s-3.2 5.5-8.5 5.5S3.5 12 3.5 12z"/><circle cx="12" cy="12" r="2.4"/>'),
+  assert_text: svgIcon('<path d="M5 6h14M5 10h14M5 14h8"/><path d="M14.5 17.5l2 2 3.5-3.5"/>'),
+  assert_toast: svgIcon('<path d="M4.5 6h15a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 1-1.5 1.5H11l-4 3.5V15H4.5A1.5 1.5 0 0 1 3 13.5v-6A1.5 1.5 0 0 1 4.5 6z"/>'),
+  assert_gone: svgIcon('<path d="M5 5l14 14"/><path d="M3.5 12s3.2-5.5 8.5-5.5c1.6 0 3 .4 4.3 1.1M20.5 12s-3.2 5.5-8.5 5.5c-1.6 0-3-.4-4.3-1.1"/>'),
+  wait_element: svgIcon('<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.7 3.5v3.6h-3.6"/>'),
+  if_click: svgIcon('<circle cx="6" cy="6" r="2.2"/><circle cx="18" cy="6" r="2.2"/><path d="M6 8.2V14a4 4 0 0 0 4 4h7"/><path d="M14.5 15.5l2.5 2.5-2.5 2.5"/>'),
+  custom: svgIcon('<path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/>'),
+};
 
 function syncOpCards() {
   const cur = $('el-op-type').value;
@@ -2088,7 +2103,7 @@ function buildOpGrid() {
     card.className = 'op-card';
     card.dataset.op = v;
     const shortName = t.n.replace(/\(.*$/, '');
-    card.innerHTML = '<span class="oi">' + (OP_GRID_ICONS[v] || '🔧') + '</span><span class="ot" title="' + esc(t.n) + '">' + esc(shortName) + '</span>';
+    card.innerHTML = '<span class="oi">' + (OP_GRID_ICONS[v] || svgIcon('<circle cx="12" cy="12" r="7.5"/>')) + '</span><span class="ot" title="' + esc(t.n) + '">' + esc(shortName) + '</span>';
     card.addEventListener('click', () => {
       $('el-op-special').value = '';            // 严格互斥：切到操作类型侧，特殊操作清空置灰
       onSpecialOpChange();

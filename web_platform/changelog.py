@@ -10,11 +10,19 @@
 两端不再各自硬编码版本号。
 """
 
-APP_VERSION = '6.10.4'
+APP_VERSION = '6.10.5'
 
 # 最新版本在最前；time 精确到秒（YYYY-MM-DD HH:MM:SS）
 # 每条变更一句话 10~20 字，只说改了什么（详细背景见项目 memory 与设计文档）
 CHANGELOG = [
+    {
+        'version': '6.10.5',
+        'time': '2026-09-23 17:03:03',
+        'title': '操作类型图标改iOS线性风格',
+        'changes': [
+            '调整 操作类型emoji改iOS线性SVG图标',
+        ],
+    },
     {
         'version': '6.10.4',
         'time': '2026-09-23 16:57:03',
