@@ -10,7 +10,7 @@
   执行按各用例编译产物的 pytest nodeid 顺序展开；
 - AppTestExecution + Celery 回写 → 复用 runner.ExecutionManager，套件统计在读时惰性同步。
 
-持久化走 api_testing.yaml_store.YamlStore（data_dir 参数化到 config/app_testing/）。
+持久化走 web_platform.yaml_store.YamlStore（data_dir 参数化到 config/app_testing/）。
 """
 import ast
 import os
@@ -21,7 +21,7 @@ from flask import Blueprint, jsonify, request
 
 from web_platform import runner
 from web_platform.app_testing import codegen
-from web_platform.api_testing.yaml_store import YamlStore
+from web_platform.yaml_store import YamlStore
 from web_platform.runtime_config import BASE_DIR, list_devices_conf_files, scan_case_tree
 
 bp = Blueprint('app_testing', __name__, url_prefix='/app-testing')

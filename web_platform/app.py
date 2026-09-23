@@ -60,12 +60,6 @@ app.register_blueprint(platform_bp)
 from web_platform.admin_routes import bp as admin_bp
 app.register_blueprint(admin_bp)
 
-# 接口测试（testhub_platform 功能移植：YAML 存储 + 定时任务调度）
-from web_platform.api_testing.routes import bp as api_testing_bp
-app.register_blueprint(api_testing_bp)
-from web_platform.api_testing import scheduler as api_task_scheduler
-api_task_scheduler.start_scheduler()
-
 # AppUI 用例编排 / 测试用例 / 测试套件（testhub_platform app_automation 移植：复用 runner 链路）
 from web_platform.app_testing.routes import bp as app_testing_bp
 app.register_blueprint(app_testing_bp)

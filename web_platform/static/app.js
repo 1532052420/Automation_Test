@@ -1,7 +1,7 @@
 /* 自动化测试平台 · 前端逻辑
    ------------------------------------------------------------------
    页面分发：body[data-page] → initXxx()（见文件末尾）
-   共享件（APP UI 与接口测试共用，避免两套重复实现）：
+   共享件（避免多页重复实现）：
      api / postJson / del      统一请求（自动解析 JSON + 兜底错误信息）
      esc                       唯一转义函数
      statusBadge               状态徽章（run 大写 / allure 小写归一）
@@ -354,7 +354,7 @@ function selectedCases(boxSel) {
     .map(n => n.dataset.node);
 }
 
-/* ================= 执行面板（APP UI 与接口测试共用） ================= */
+/* ================= 执行面板（APP UI 执行页共用） ================= */
 let _pollTimer = null, _logOffset = 0;
 
 function pollTask(runId) {
@@ -885,9 +885,7 @@ async function startRun() {
   pollTask(d.run_id);
 }
 
-/* ================= 接口测试页 =================
-   接口测试已整体移植 testhub_platform 功能（接口管理/套件/定时任务/环境），
-   页面初始化由 static/api_testing.js 接管；这里不再保留旧 pytest 选例逻辑。 */
+/* 接口测试页：模块已移除，首页入口为死按钮，无页面无前端逻辑 */
 
 /* ================= 执行详情页 ================= */
 let _detailTimer = null;
@@ -1229,5 +1227,5 @@ document.addEventListener('DOMContentLoaded', () => {
   else if (page === 'detail') initRunDetail();
   else if (page === 'report') initReport();
   else if (page === 'perf') initPerf();
-  /* api-test 页由 static/api_testing.js 自行初始化 */
+  /* api-test 页已随接口测试模块移除，首页入口为死按钮 */
 });

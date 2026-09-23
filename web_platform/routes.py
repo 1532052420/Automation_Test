@@ -84,12 +84,6 @@ def page_perf():
     return render_template('perf.html')
 
 
-@bp.route('/api-test')
-def page_api_test():
-    """🔌 接口测试（接口自动化用例执行，与 APP UI 共用执行器）"""
-    return render_template('api_test.html')
-
-
 # ---------------------------------------------------------------- API
 # 框架 import 冒烟自检：结果按进程缓存 60s，避免每次 /api/status 都 fork 子进程
 _fw_cache = {'ts': 0.0, 'ok': False, 'msg': ''}
@@ -267,7 +261,7 @@ def api_appui_elements_delete():
     return jsonify({'ok': ok, 'msg': msg}), (200 if ok else 400)
 
 
-# ---------------------------------------------------------------- 接口测试（testhub 移植版见 api_testing 蓝图）
+# ---------------------------------------------------------------- API
 @bp.route('/api/devices')
 def api_devices():
     adb = adb_devices()

@@ -206,7 +206,7 @@ class ExecutionManager(object):
                   setup_reset=None, teardown_reset=None):
         """创建并启动一个执行任务。case_nodes 为用例节点路径列表（文件/类/方法级）。
 
-        APP UI 设备自动化专用执行器（接口测试已由 api_testing 模块独立承接）。
+        APP UI 设备自动化专用执行器。
         overrides={udid?, appPackage?, appActivity?} 覆盖式生效（仅本次执行，不写回 conf 文件）。
         owner 为发起人（多人共用平台时区分谁跑的）；marker 为 pytest 标记表达式（-m）；
         timeout_minutes 覆盖默认任务超时。
@@ -355,8 +355,6 @@ class ExecutionManager(object):
         # 6. 组装 pytest 命令并启动子进程（独立进程组，便于整组停止）
         #    --log-cli-level=INFO：appOperator 的 操作日志(点击/输入/toast/断言)实时打到 stdout，
         #    平台实时日志框与 logs/test.log 双通道收集
-        #    注意：接口任务不需要额外参数——环境通过第 5 步写入的 config/tmp/env.json 传递，
-        #    与 run_api_test.py 的 -e 语义一致（-e 是它的 argparse 参数，不是 pytest 参数）。
         pytest_args = [PYTHON_BIN, '-u', '-m', 'pytest', '-c', 'config/pytest.ini',
                        '-v', '--log-cli-level=INFO',
                        '--alluredir', os.path.relpath(allure_dir, BASE_DIR).replace(os.sep, '/')]
@@ -388,7 +386,7 @@ class ExecutionManager(object):
 
         task['process'] = proc
         task['status'] = 'RUNNING'
-        # 超时可按任务覆盖（接口任务通常远短于设备任务）；下限 1 分钟防误填
+        # 超时可按任务覆盖；下限 1 分钟防误填
         try:
             timeout_s = int(timeout_minutes) * 60 if timeout_minutes else RUN_TIMEOUT_SECONDS
         except (TypeError, ValueError):
@@ -434,7 +432,7 @@ class ExecutionManager(object):
             task['status'] = 'STOPPED'
         elif task.get('timed_out'):
             task['status'] = 'ERROR'
-            task['error_msg'] = ('执行超时(%d分钟)被强制停止，疑似设备/驱动挂起(uiautomator 崩溃或连接无响应)或接口服务无响应，'
+            task['error_msg'] = ('执行超时(%d分钟)被强制停止，疑似设备/驱动挂起(uiautomator 崩溃或连接无响应)，'
                                  '请查看日志最后输出与 Appium 服务日志(logs/appium.log)'
                                  % ((task.get('timeout_seconds') or RUN_TIMEOUT_SECONDS) // 60))
         elif exit_code == 0:

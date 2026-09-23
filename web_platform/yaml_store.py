@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-"""接口测试模块 · YAML 存储层（唯一持久化出入口）
+"""平台 · YAML 存储层（唯一持久化出入口）
 
 设计约定（为后续迁移数据库预留）：
-- 全部实体（项目/集合/请求/环境/历史/套件/执行/定时任务/任务日志）都通过
-  YamlStore 的 list/get/create/update/delete 访问，业务代码不直接碰文件；
-- 每类实体一个 YAML 文件（config/api_testing/<name>.yaml），格式：
+- 全部实体都通过 YamlStore 的 list/get/create/update/delete 访问，
+  业务代码不直接碰文件；
+- 每类实体一个 YAML 文件（<data_dir>/<name>.yaml），格式：
     meta:   {next_id: int}          # 自增主键
-    items:  [ {...}, ... ]          # 实体列表，dict 字段与 testhub 模型字段同名
+    items:  [ {...}, ... ]          # 实体列表，dict 字段与模型字段同名
 - 未来换库时只需把 YamlStore 换成同等接口的 DB 实现（list/get/create/update/delete），
   调用方零改动；字段结构即表结构。
 """
@@ -17,7 +17,7 @@ import time
 import yaml
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DATA_DIR = os.path.join(BASE_DIR, 'config', 'api_testing')
+DATA_DIR = os.path.join(BASE_DIR, 'config')
 
 _write_lock = threading.Lock()
 
@@ -117,30 +117,3 @@ class YamlStore:
             doc = self._read()
             doc['items'] = list(items or [])
             self._write(doc)
-
-
-# 模块级单例：业务代码统一从这里拿仓库
-projects = YamlStore('projects')            # ApiProject
-collections = YamlStore('collections')      # ApiCollection（树形，parent_id）
-requests = YamlStore('requests')            # ApiRequest
-environments = YamlStore('environments')    # Environment
-histories = YamlStore('histories')          # RequestHistory
-suites = YamlStore('suites')                # TestSuite（内嵌 suite_requests 列表）
-executions = YamlStore('executions')        # TestExecution
-tasks = YamlStore('tasks')                  # ScheduledTask
-task_logs = YamlStore('task_logs')          # TaskExecutionLog
-settings = YamlStore('settings')            # 通知等全局配置（单条 id=1）
-
-
-def get_settings():
-    """全局配置（通知设置），单例：id=1"""
-    s = settings.get(1)
-    if not s:
-        s = settings.create({
-            'id': 1,
-            'notify_on_success': False, 'notify_on_failure': True,
-            'notify_emails': [], 'webhook_url': '',
-            'smtp_host': '', 'smtp_port': 465, 'smtp_user': '', 'smtp_password': '',
-            'smtp_from': '', 'smtp_use_ssl': True,
-        })
-    return s
