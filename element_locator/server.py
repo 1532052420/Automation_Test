@@ -137,12 +137,18 @@ def api_status():
 
 @app.route('/api/refresh', methods=['POST'])
 def api_refresh():
-    """刷新 = 截图 + 元素树。失败自愈链：设备层已各自重试 3 次 →
-    这里升级重启 adb server 再试一轮（USB 闪断/offline 类故障的最终自愈手段；
-    平台有测试在跑时不重启，防打断执行链路）→ 仍失败才报错，且带真实原因。"""
+    """刷新 = 截图 + 元素树。
+    fast=true（⚡ 刷新按钮）：只做一次 dump，失败立即报错——最快路径，不做任何自愈；
+    fast=false（♻ 重启按钮）：完整自愈链——设备层各自重试 3 次 → 这里升级重启 adb server
+    再试一轮（USB 闪断/offline 类故障的最终自愈手段；平台有测试在跑时不重启，防打断执行链路）
+    → 仍失败才报错，且带真实原因。"""
+    data = request.get_json(silent=True) or {}
+    fast = bool(data.get('fast'))
     payload, reason = _refresh_once()
     if payload:
         return jsonify({'ok': True, **payload})
+    if fast:
+        return jsonify({'ok': False, 'msg': reason + '（快速刷新失败；可点「♻ 重启」走完整自愈后重试）'})
     if not _platform_running():
         if device.restart_adb():
             payload, reason2 = _refresh_once()

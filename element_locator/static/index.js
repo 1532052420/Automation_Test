@@ -157,8 +157,10 @@ async function init() {
   }
   loadLibraryFiles();
   loadPages();
-  if (st && st.ok) refresh();
-  $('btn-refresh').addEventListener('click', refresh);
+  if (st && st.ok) refresh(true);
+  $('btn-refresh').addEventListener('click', () => refresh(true));
+  const brs = $('btn-restart');
+  if (brs) brs.addEventListener('click', () => refresh(false));
   const bc = $('btn-collect');
   if (bc) {
     bc.addEventListener('click', startCollect);
@@ -409,7 +411,7 @@ function onDeviceChange() {
   $('tree').innerHTML = '';
   const dv = $('dev-info');
   dv.textContent = '切换中…'; dv.className = 'dev-info';
-  refresh();
+  refresh(true);
 }
 
 /* ---------- 刷新：截图 + 元素树 ----------
@@ -426,14 +428,17 @@ function settleTapTip(ok, msg) {
   clearTimeout(settleTapTip._t);
   settleTapTip._t = setTimeout(() => { tip.textContent = ''; tip.className = 'tap-tip'; }, 4000);
 }
-async function refresh() {
+/* fast=true ⚡刷新：单次 dump 最快路径；fast=false ♻ 重启：完整自愈链（可重启 adb） */
+async function refresh(fast = false) {
   const myToken = ++refreshSeq;
-  $('btn-refresh').textContent = '刷新中…'; $('btn-refresh').disabled = true;
+  const btn = $(fast ? 'btn-refresh' : 'btn-restart');
+  const other = $(fast ? 'btn-restart' : 'btn-refresh');
+  btn.textContent = fast ? '刷新中…' : '重启中…'; btn.disabled = true; other.disabled = true;
   try {
     const r = await fetch('api/refresh', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ serial: state.serial }),
+      body: JSON.stringify({ serial: state.serial, fast: !!fast }),
     }).then(r => r.json()).catch(() => null);
     if (myToken !== refreshSeq) return;          // 已有更新的刷新/切换，丢弃过期响应
     if (!r || !r.ok) {
@@ -445,6 +450,7 @@ async function refresh() {
       dv.textContent = '⚠ ' + msg;
       dv.className = 'dev-info bad';
       settleTapTip(false, msg);
+      if (fast) showToast('⚡ 快速刷新失败——可点「♻ 重启」走完整自愈');
       return;
     }
     // 掉线回退校正：请求的 A 已掉线，服务端用 B 响应并标记 fallback → 更正下拉并提示
@@ -489,7 +495,8 @@ async function refresh() {
     $('shot-empty').style.display = 'block';
     settleTapTip(false, '刷新出错');
   } finally {
-    $('btn-refresh').textContent = '🔄 刷新'; $('btn-refresh').disabled = false;
+    btn.textContent = fast ? '⚡ 刷新' : '♻ 重启';
+    btn.disabled = false; other.disabled = false;
   }
 }
 
@@ -673,7 +680,7 @@ async function tapOnDevice(center, label) {
   if (r && r.ok) {
     tip.textContent = '✓ 已点击设备（' + label + '）(' + x + ',' + y + ')，刷新中…';
     tip.className = 'tap-tip ok';
-    refresh();
+    refresh(true);
   } else {
     tip.textContent = (r && r.msg ? r.msg : '点击失败');
     tip.className = 'tap-tip err';
