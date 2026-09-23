@@ -451,6 +451,7 @@ async function refresh(fast = false) {
       dv.className = 'dev-info bad';
       settleTapTip(false, msg);
       if (fast) showToast('⚡ 快速刷新失败——可点「♻ 重启」走完整自愈');
+      else showToast('重启失败：' + msg);
       return;
     }
     // 掉线回退校正：请求的 A 已掉线，服务端用 B 响应并标记 fallback → 更正下拉并提示
@@ -487,6 +488,7 @@ async function refresh(fast = false) {
     const img = $('shot');
     img.src = r.screenshot; img.style.display = 'block';
     renderTree(state.tree);
+    if (!fast) showToast('重启完成');
     settleTapTip(true);
   } catch (err) {
     console.error('[locator] refresh error:', err);
@@ -784,6 +786,7 @@ function toggleTreeDiff() {
   state.treeDiffOn = !state.treeDiffOn;
   $('btn-tree-diff').querySelector('.bt-tx').textContent = state.treeDiffOn ? '树对比：开' : '树对比：关';
   $('btn-tree-diff').classList.toggle('on', state.treeDiffOn);
+  showToast(state.treeDiffOn ? '开启成功' : '已关闭');
   state.prevSigs = null;
   state.goneSigs = [];
   if (state.tree) {
@@ -1219,9 +1222,7 @@ function toggleCoordMode() {
   if (!state.coordMode) state.coordPoint = null;
   $('btn-coord-mode').querySelector('.bt-tx').textContent = state.coordMode ? '坐标模式：开' : '坐标模式：关';
   $('btn-coord-mode').classList.toggle('on', state.coordMode);
-  showToast(state.coordMode
-    ? '⌖ 坐标模式已开启：现在点截图选的就是精确坐标（不再命中元素）；双击 = 真机点该点'
-    : '⌖ 坐标模式已关闭：恢复元素命中');
+  showToast(state.coordMode ? '开启成功' : '已关闭');
 }
 
 function onPurposeChange() {

@@ -176,7 +176,7 @@ body.col-resizing * { cursor: col-resize !important; }
 .tree .tnode .clickable-badge { color: #409eff; font-size: 11px; border: 1px solid #c6e2ff; border-radius: 3px; padding: 0 3px; }
 
 .detail { flex: 1 1 auto; min-height: 0; border-top: 2px solid #e5e7eb; background: #fafafa; padding: 8px 12px; overflow: auto; }
-.detail-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 0 2px; border-top: 1px solid #e5e7eb; margin-top: 8px; position: sticky; bottom: 0; background: #fafafa; }
+.detail-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 56px 2px 0; border-top: 1px solid #e5e7eb; margin-top: 8px; position: sticky; bottom: 0; background: #fafafa; }
 .tnode.search-hit { background: #fff7d6; outline: 1.5px solid #f0c94a; border-radius: 4px; }
 html.night .tnode.search-hit { background: rgba(64, 158, 255, .18); outline-color: var(--sky); }
 .detail-head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; margin-bottom: 6px; gap: 8px; }
