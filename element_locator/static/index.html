@@ -24,23 +24,39 @@ try {
 } catch (e) { /* 隐私模式等场景忽略 */ }
 </script>
 <link rel="stylesheet" href="/static/nav.css">
-<link rel="stylesheet" href="static/style.css?v=68">
+<link rel="stylesheet" href="static/style.css?v=69">
 </head>
 <body>
 <header class="gnav" id="gnav"></header>
 <div id="embed-bar" class="embed-bar"></div>
 <aside class="side">
-  <div class="brand">🎯
+  <div class="brand">
+    <svg class="bi brand-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.2-6.5-10a6.5 6.5 0 0 1 13 0c0 4.8-6.5 10-6.5 10z"/><circle cx="12" cy="11" r="2.2"/></svg>
     <div class="bt">App 元素定位器
       <span id="app-version" class="ver">v3.3</span>
       <small>截图点选 → 一键写进元素库</small>
     </div>
   </div>
-  <button id="btn-collect" class="btn ghost side-btn" title="一次性解析当前页面全部节点：过滤纯布局容器 → 去重 → 自动命名与定位候选 → 勾选后批量写入元素库。原始 hierarchy 自动存档到 element_collect/">📦 采集全部元素</button>
-  <button id="btn-tree-diff" class="btn ghost side-btn" title="每次刷新与上一次元素树对比：🟢 新增 / 🔴 消失（快速发现跳转与弹窗）">🟢 树对比：开</button>
-  <button id="btn-coord-mode" class="btn ghost side-btn" title="点截图选精确坐标（不再命中容器节点）。用于无障碍盲区：自绘弹层的选项等定位不到的元素；双击=真机点该点，添加到用例默认生成「坐标点击」">⌖ 坐标模式：关</button>
-  <button id="btn-restart" class="btn ghost side-btn" title="♻ 重启：完整刷新（截图+元素树），失败时自动重启 adb 服务自愈——最可靠但较慢，画面异常/刷新失败时使用">♻ 重启</button>
-  <button id="btn-refresh" class="btn primary side-btn" title="⚡ 刷新：快速重新截图并解析元素树（单次尝试，最快）；画面异常刷不出来时请用「♻ 重启」">⚡ 刷新</button>
+  <button id="btn-collect" class="btn ghost side-btn" title="一次性解析当前页面全部节点：过滤纯布局容器 → 去重 → 自动命名与定位候选 → 勾选后批量写入元素库。原始 hierarchy 自动存档到 element_collect/">
+    <svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v9"/><path d="M8.5 9.5L12 13l3.5-3.5"/><path d="M4.5 16.5v2A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5v-2"/></svg>
+    <span class="bt-tx">采集全部元素</span>
+  </button>
+  <button id="btn-tree-diff" class="btn ghost side-btn" title="每次刷新与上一次元素树对比：新增 / 消失（快速发现跳转与弹窗）">
+    <svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="6.5" r="2.3"/><circle cx="17.5" cy="17.5" r="2.3"/><path d="M6.5 8.8v3.2a3 3 0 0 0 3 3h4.3"/><path d="M17.5 15.2V12a3 3 0 0 0-3-3h-4.3"/></svg>
+    <span class="bt-tx">树对比：开</span>
+  </button>
+  <button id="btn-coord-mode" class="btn ghost side-btn" title="点截图选精确坐标（不再命中容器节点）。用于无障碍盲区：自绘弹层的选项等定位不到的元素；双击=真机点该点，添加到用例默认生成「坐标点击」">
+    <svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5.5"/><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3"/></svg>
+    <span class="bt-tx">坐标模式：关</span>
+  </button>
+  <button id="btn-restart" class="btn ghost side-btn" title="♻ 重启：完整刷新（截图+元素树），失败时自动重启 adb 服务自愈——最可靠但较慢，画面异常/刷新失败时使用">
+    <svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.7 3.5v3.6h-3.6"/></svg>
+    <span class="bt-tx">重启</span>
+  </button>
+  <button id="btn-refresh" class="btn primary side-btn" title="⚡ 刷新：快速重新截图并解析元素树（单次尝试，最快）；画面异常刷不出来时请用「♻ 重启」">
+    <svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L5.5 13.5H11L10 21l7.5-10.5H12z"/></svg>
+    <span class="bt-tx">刷新</span>
+  </button>
   <div class="side-foot">
     <div class="dev-row">
       <span class="side-label">📱 设备</span>
@@ -305,6 +321,6 @@ try {
 </div>
 <script src="/static/nav.js"></script>
 <script src="/static/theme.js"></script>
-<script src="static/index.js?v=68"></script>
+<script src="static/index.js?v=69"></script>
 </body>
 </html>

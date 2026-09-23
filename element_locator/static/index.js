@@ -433,7 +433,7 @@ async function refresh(fast = false) {
   const myToken = ++refreshSeq;
   const btn = $(fast ? 'btn-refresh' : 'btn-restart');
   const other = $(fast ? 'btn-restart' : 'btn-refresh');
-  btn.textContent = fast ? '刷新中…' : '重启中…'; btn.disabled = true; other.disabled = true;
+  btn.querySelector('.bt-tx').textContent = fast ? '刷新中…' : '重启中…'; btn.disabled = true; other.disabled = true;
   try {
     const r = await fetch('api/refresh', {
       method: 'POST',
@@ -495,7 +495,7 @@ async function refresh(fast = false) {
     $('shot-empty').style.display = 'block';
     settleTapTip(false, '刷新出错');
   } finally {
-    btn.textContent = fast ? '⚡ 刷新' : '♻ 重启';
+    btn.querySelector('.bt-tx').textContent = fast ? '刷新' : '重启';
     btn.disabled = false; other.disabled = false;
   }
 }
@@ -782,7 +782,8 @@ function truncate(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, 
 /* 树 Diff 开关：开启时以当前树为新基线（当前刷新不标新增），之后每次刷新对比上次 */
 function toggleTreeDiff() {
   state.treeDiffOn = !state.treeDiffOn;
-  $('btn-tree-diff').textContent = state.treeDiffOn ? '🟢 树对比：开' : '⚪ 树对比：关';
+  $('btn-tree-diff').querySelector('.bt-tx').textContent = state.treeDiffOn ? '树对比：开' : '树对比：关';
+  $('btn-tree-diff').classList.toggle('on', state.treeDiffOn);
   state.prevSigs = null;
   state.goneSigs = [];
   if (state.tree) {
@@ -1215,7 +1216,8 @@ async function saveElement(checkDup) {
 function toggleCoordMode() {
   state.coordMode = !state.coordMode;
   if (!state.coordMode) state.coordPoint = null;
-  $('btn-coord-mode').textContent = state.coordMode ? '⌖ 坐标模式：开' : '⌖ 坐标模式：关';
+  $('btn-coord-mode').querySelector('.bt-tx').textContent = state.coordMode ? '坐标模式：开' : '坐标模式：关';
+  $('btn-coord-mode').classList.toggle('on', state.coordMode);
   showToast(state.coordMode
     ? '⌖ 坐标模式已开启：现在点截图选的就是精确坐标（不再命中元素）；双击 = 真机点该点'
     : '⌖ 坐标模式已关闭：恢复元素命中');

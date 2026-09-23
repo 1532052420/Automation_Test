@@ -757,3 +757,13 @@ select.locked { opacity: .45; }
 .op-card .oi { color: #4b5563; }
 .op-card .oi svg { width: 17px; height: 17px; display: block; }
 .op-card.on .oi { color: #fff; }
+
+/* ===== 侧栏按钮 iOS 线性图标（v6.11.3）：icon + 文字横排，动态文字走 .bt-tx ===== */
+.side-btn { display: flex; align-items: center; gap: 9px; text-align: left; }
+.side-btn .bi { width: 18px; height: 18px; flex: none; }
+.side-btn.primary { color: #fff; }
+.side-btn.on { border-color: var(--sky); color: var(--sky-deep); background: #ecf5ff; }
+html.night .side-btn.on { background: rgba(64,158,255,.14); color: var(--sky-2); }
+.brand { align-items: flex-start; }
+.brand .brand-ic { width: 22px; height: 22px; flex: none; margin-top: 2px; color: var(--sky); }
+html.night .brand .brand-ic { color: var(--sky-2); }
