@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:-apple-system,"PingFang SC",sans-serif; }
+  body { width:1160px; height:690px; background:#e2e3e8; display:flex; align-items:center; justify-content:center; }
+  .modal { width:980px; background:#fff; border-radius:16px; box-shadow:0 24px 64px rgba(0,0,0,.22); overflow:hidden; }
+  /* 头部 */
+  .head { display:flex; align-items:center; gap:10px; padding:18px 24px 14px; }
+  .head h1 { font-size:17px; font-weight:700; color:#1d1d1f; }
+  .head .sub { font-size:12px; color:#86868b; }
+  .close { margin-left:auto; width:28px; height:28px; border-radius:50%; background:#f5f5f7; color:#6e6e73; display:flex; align-items:center; justify-content:center; font-size:14px; }
+  /* 步骤条 */
+  .steps { display:flex; align-items:center; justify-content:center; gap:0; padding:6px 0 18px; }
+  .step { display:flex; align-items:center; gap:8px; }
+  .dot { width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600; background:#f5f5f7; color:#86868b; border:1.5px solid #e5e5ea; }
+  .step.active .dot { background:#0071e3; color:#fff; border-color:#0071e3; box-shadow:0 0 0 4px rgba(0,113,227,.14); }
+  .step.done .dot { background:#e8f2fd; color:#0071e3; border-color:#b8dbfa; }
+  .step .st { font-size:13px; font-weight:600; color:#86868b; }
+  .step.active .st { color:#0071e3; }
+  .step.done .st { color:#1d1d1f; }
+  .bar { width:64px; height:2px; background:#e5e5ea; margin:0 14px; border-radius:2px; }
+  .bar.done { background:#0071e3; }
+  /* 主体 */
+  .body { padding:6px 44px 0; }
+  .notice { display:flex; gap:10px; align-items:center; background:#f5f8ff; border:1px solid #d8e7fb; border-radius:10px; padding:10px 14px; margin-bottom:18px; }
+  .notice .ic { width:34px; height:34px; border-radius:8px; background:#dbe9fd; display:flex; align-items:center; justify-content:center; font-size:16px; }
+  .notice .tx { font-size:12.5px; color:#3a3a3c; line-height:1.5; }
+  .notice .tx b { color:#1d1d1f; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px 18px; }
+  .field label { display:flex; font-size:12.5px; font-weight:600; color:#3a3a3c; margin-bottom:6px; }
+  .field label .q { width:15px; height:15px; border-radius:50%; background:#e5e5ea; color:#86868b; font-size:10px; display:inline-flex; align-items:center; justify-content:center; margin-left:5px; font-weight:400; }
+  .inp, .sel { width:100%; height:38px; border:1px solid #d2d2d7; border-radius:9px; padding:0 12px; font-size:13.5px; color:#1d1d1f; background:#fff; display:flex; align-items:center; }
+  .inp.focus { border-color:#0071e3; box-shadow:0 0 0 3px rgba(0,113,227,.12); }
+  .sel { justify-content:space-between; }
+  .sel .arr { color:#86868b; font-size:11px; }
+  .pair { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  /* 预览条 */
+  .preview { margin:18px 0 0; background:#fbfbfd; border:1px dashed #d2d2d7; border-radius:10px; padding:10px 14px; display:flex; align-items:center; gap:12px; }
+  .preview .tag { font-size:11px; color:#0071e3; background:#e8f2fd; border-radius:6px; padding:2px 8px; font-weight:600; white-space:nowrap; }
+  .preview code { font-size:12px; color:#3a3a3c; font-family:ui-monospace,Menlo,monospace; }
+  /* 底部 */
+  .foot { display:flex; align-items:center; padding:16px 24px 20px; gap:10px; }
+  .foot .hint { font-size:12px; color:#86868b; margin-right:auto; }
+  .btn { height:36px; padding:0 18px; border-radius:9px; font-size:13.5px; font-weight:600; display:flex; align-items:center; justify-content:center; }
+  .btn.ghost { background:#f5f5f7; color:#1d1d1f; }
+  .btn.primary { background:#0071e3; color:#fff; box-shadow:0 2px 8px rgba(0,113,227,.3); }
+  .btn.dis { background:#f5f5f7; color:#c7c7cc; }
+  /* 未激活步骤示意 */
+  .ghoststep { display:flex; gap:14px; margin-top:16px; opacity:.45; }
+  .ghoststep .g { flex:1; height:44px; border-radius:10px; background:repeating-linear-gradient(45deg,#f5f5f7,#f5f5f7 8px,#fafafa 8px,#fafafa 16px); border:1px solid #e5e5ea; display:flex; align-items:center; padding:0 14px; font-size:12px; color:#86868b; }
+</style>
+</head>
+<body>
+  <div class="modal">
+    <div class="head">
+      <h1>➕ 添加测试用例</h1>
+      <span class="sub">按「元素 → 用例 → 操作」三步走，每步只关注一件事</span>
+      <div class="close">✕</div>
+    </div>
+    <div class="steps">
+      <div class="step active"><div class="dot">1</div><div class="st">元素</div></div>
+      <div class="bar"></div>
+      <div class="step"><div class="dot">2</div><div class="st">用例</div></div>
+      <div class="bar"></div>
+      <div class="step"><div class="dot">3</div><div class="st">操作</div></div>
+    </div>
+    <div class="body">
+      <div class="notice">
+        <div class="ic">🎯</div>
+        <div class="tx">已从截图选中元素 <b>互动成歌</b>，定位方式与定位值已自动生成；确认无误后点「下一步」，元素将随第 3 步保存时一并入库。</div>
+      </div>
+      <div class="grid">
+        <div class="field"><label>元素名称 <span class="q">?</span></label><div class="inp focus">互动成歌</div></div>
+        <div class="field"><label>元素中文名 <span class="q">?</span></label><div class="inp">互动成歌</div></div>
+        <div class="field"><label>定位方式 <span class="q">?</span></label><div class="sel"><span>XPATH（表达式）</span><span class="arr">▼</span></div></div>
+        <div class="field"><label>定位值 <span class="q">?</span></label><div class="inp" style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px">//*[@text="互动成歌"]</div></div>
+        <div class="pair">
+          <div class="field"><label>等待方式 <span class="q">?</span></label><div class="sel"><span>可见</span><span class="arr">▼</span></div></div>
+          <div class="field"><label>等待时间(秒) <span class="q">?</span></label><div class="inp">6</div></div>
+        </div>
+        <div class="field"><label>写入元素文件 <span class="q">?</span></label><div class="sel"><span>aaaaElements.py</span><span class="arr">▼</span></div></div>
+      </div>
+      <div class="preview">
+        <span class="tag">将写入</span>
+        <code>self.互动成歌 = CreateElement.create(Locator_Type.XPATH, '//*[@text="互动成歌"]', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)</code>
+      </div>
+      <div class="ghoststep">
+        <div class="g">② 用例 · 下一步后填写（目标用例已预选：测试 test_aaaa.py）</div>
+        <div class="g">③ 操作 · 下一步后填写（默认：点击）</div>
+      </div>
+    </div>
+    <div class="foot">
+      <span class="hint">元素定位器已自动识别截图选中元素，字段均可修改</span>
+      <div class="btn dis">← 上一步</div>
+      <div class="btn primary">下一步：选择用例 →</div>
+    </div>
+  </div>
+</body>
+</html>
