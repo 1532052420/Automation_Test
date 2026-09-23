@@ -198,6 +198,9 @@ body.col-resizing * { cursor: col-resize !important; }
 .attrs { width: 100%; border-collapse: collapse; font-size: 12px; }
 .attrs td { border-bottom: 1px solid #f0f0f0; padding: 3px 6px; }
 .attrs td:first-child { color: #6b7280; width: 110px; }
+/* 属性表固定高度：字段多少不改变选中元素面板的长度，超出内部滚动 */
+.attrs-wrap { height: 220px; overflow-y: auto; border-bottom: 1px solid #f0f0f0; }
+html.night .attrs-wrap { border-bottom-color: #2c2d31; }
 .loc-title { margin: 10px 0 4px; font-weight: 600; font-size: 13px; }
 .loc-item {
   background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px;
