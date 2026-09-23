@@ -252,7 +252,7 @@ body.col-resizing * { cursor: col-resize !important; }
 /* ---------- 用例工作台 ---------- */
 .modal.modal-wide { width: 860px; }
 /* 添加到元素库：横向流程弹窗（元素 → 用例 → 操作 三栏） */
-.modal.modal-flow { width: 1040px; }
+.modal.modal-flow { width: 1240px; max-width: 96vw; }
 /* 用途分段控件（radio 保留但视觉隐藏，label 即分段按钮） */
 .flow-step { display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
   padding: 5px 6px; background: #f3f4f6; border-radius: 10px; font-size: 13px; }
@@ -264,7 +264,10 @@ body.col-resizing * { cursor: col-resize !important; }
   box-shadow: 0 1px 4px rgba(0,0,0,.12); }
 .flow-step label.purpose:hover { color: var(--sky-deep); }
 /* 三栏卡片化：白底圆角 + 编号圆片栏头，等高拉伸 */
-.flow-cols { display: grid; grid-template-columns: 1.02fr 0.94fr 1.02fr; gap: 12px; align-items: stretch; }
+.flow-cols { display: grid; grid-template-columns: 1fr 0.95fr 1fr; gap: 14px; align-items: stretch; }
+.modal-flow .modal-body label { font-size: 13px; margin-bottom: 8px; }
+.modal-flow .modal-body input, .modal-flow .modal-body select { height: 38px; font-size: 13.5px; border-radius: 9px; }
+.flow-col .el-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .flow-col { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 0 0 10px; transition: opacity .15s, border-color .15s; overflow: hidden; }
 .flow-col .col-head { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 13px; color: #111827;
   padding: 11px 14px 9px; border-bottom: 1px solid #eef0f3; margin-bottom: 10px; }
@@ -285,7 +288,10 @@ body.col-resizing * { cursor: col-resize !important; }
 /* 双列字段（名称|中文名、方式|值、等待方式|秒） */
 .el-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 /* 操作类型图标卡（常用 6 类快捷入口；el-op-type 下拉保留全量） */
-.op-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-bottom: 8px; }
+.op-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px;
+  max-height: 228px; overflow-y: auto; padding: 2px; }
+.op-grid.locked, select.locked { opacity: .45; }
+.op-grid.locked .op-card:hover { border-color: var(--sky-2); }
 .op-card { border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 7px 4px 6px; display: flex; flex-direction: column;
   align-items: center; gap: 4px; cursor: pointer; transition: all .12s; }
 .op-card:hover { border-color: var(--sky-2); }
@@ -730,3 +736,6 @@ html.night .steps-list .sl-title { color: #f3f4f6; }
 html.night .steps-list .sl-row { color: #e5e7eb; }
 html.night .steps-list .sl-marker { background: rgba(64,158,255,.12); }
 html.night .tri-bar { background: rgba(36,138,61,.12); border-color: #2f5e3e; color: #6ee7a0; }
+
+/* 操作类型/特殊操作 视觉互斥：未生效侧置灰（仍可点击切换） */
+select.locked { opacity: .45; }

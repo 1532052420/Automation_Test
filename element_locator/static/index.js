@@ -205,7 +205,19 @@ async function init() {
   window.addEventListener('beforeunload', (e) => {
   });
   document.querySelectorAll('input[name="el-purpose"]').forEach(r => r.addEventListener('change', onPurposeChange));
-  $('el-op-type').addEventListener('change', () => { onOpTypeChange(); onCaseFileChange(); syncOpCards(); });
+  $('el-op-type').addEventListener('change', (e) => {
+    onOpTypeChange(); onCaseFileChange(); syncOpCards();
+    if (e.isTrusted) {                        // 用户显式选操作类型 → 特殊操作清空并视觉置灰
+      $('el-op-special').value = '';
+      onSpecialOpChange();
+      applyOpMutual();
+    }
+  });
+  $('el-op-special').addEventListener('change', (e) => {
+    onSpecialOpChange();
+    if (e.isTrusted && $('el-op-special').value) $('el-op-type').value = currentOpType();   // 特殊侧生效时类型回显当前兜底值
+    applyOpMutual();
+  });
   buildOpGrid();
   $('el-op-special').addEventListener('change', onSpecialOpChange);
   $('el-op-param').addEventListener('input', () => { paramAuto = false; followStepDesc(); });
@@ -1064,7 +1076,7 @@ async function openModal() {
     $('el-op-comment').value = '点击坐标(' + state.coordPoint[0] + ', ' + state.coordPoint[1] + ')';
     paramAuto = false;   // 用户选的是具体坐标，不让自动预填逻辑覆盖
   }
-  fillCaseHead(); syncOpCards();   // 弹窗改版：锚点卡/状态条回显 + 图标卡高亮同步
+  fillCaseHead(); syncOpCards(); applyOpMutual();   // 弹窗改版：锚点卡/状态条回显 + 图标卡高亮与互斥复位
   $('modal-mask').style.display = 'flex';
 }
 /* ---- 新建文件输入（元素文件 / 用例文件）：选「➕ 新建…」时显示 ---- */
@@ -1389,7 +1401,7 @@ function onOpTypeChange() {
    取消（选「无」）→ 全部恢复。deal_first_launch_dialogs 的插入位置锁定由 onCaseFileChange 处理 */
 function onSpecialOpChange() {
   const isSpecial = !!$('el-op-special').value;
-  $('el-op-type').disabled = isSpecial;
+  // 操作类型的禁用改由 applyOpMutual 视觉互斥承担（物理 disabled 会造成两侧都无法切回的死锁）
   if (isSpecial && purposeValue() !== 'all') {
     document.querySelector('input[name="el-purpose"][value="all"]').checked = true;
     onPurposeChange();
@@ -2034,8 +2046,10 @@ async function saveCollect() {
 /* ================= 弹窗改版（v6.98）：图标卡快捷选择 / 锚点卡 / 三件套状态条 =================
    纯样式配套 JS：不新增字段、不改保存逻辑。el-op-type 原生 select 保留（全量操作类型），
    图标卡只是常用 6 类的快捷入口，两者写同一字段并互相同步高亮。 */
-const OP_GRID_TYPES = ['click', 'input', 'long_press', 'assert_text', 'assert_toast', 'wait_element'];
-const OP_GRID_ICONS = { click: '👆', input: '⌨️', long_press: '✊', assert_text: '🔍', assert_toast: '💬', wait_element: '⏳' };
+const OP_GRID_TYPES = STEP_TYPES.map(t => t.v);   // 全部操作类型铺满图标卡，区域内滚动
+const OP_GRID_ICONS = { click: '👆', input: '⌨️', long_press: '✊', tap: '🎯', screenshot: '📷', sleep: '⏱',
+  assert_visible: '👁', assert_text: '🔍', assert_toast: '💬', assert_gone: '🚫',
+  wait_element: '⏳', if_click: '🔀', custom: '🧩' };
 
 function syncOpCards() {
   const cur = $('el-op-type').value;
@@ -2052,9 +2066,10 @@ function buildOpGrid() {
     const card = document.createElement('div');
     card.className = 'op-card';
     card.dataset.op = v;
-    card.innerHTML = '<span class="oi">' + (OP_GRID_ICONS[v] || '🔧') + '</span><span class="ot">' + esc(t.n) + '</span>';
+    const shortName = t.n.replace(/\(.*$/, '');
+    card.innerHTML = '<span class="oi">' + (OP_GRID_ICONS[v] || '🔧') + '</span><span class="ot" title="' + esc(t.n) + '">' + esc(shortName) + '</span>';
     card.addEventListener('click', () => {
-      $('el-op-special').value = '';            // 与旧下拉同语义：选类型即清除特殊操作
+      $('el-op-special').value = '';            // 严格互斥：切到操作类型侧，特殊操作清空置灰
       onSpecialOpChange();
       $('el-op-type').value = v;
       $('el-op-type').dispatchEvent(new Event('change'));
@@ -2062,6 +2077,15 @@ function buildOpGrid() {
     grid.appendChild(card);
   });
   syncOpCards();
+}
+
+/* 视觉互斥（不物理禁用，防死锁）：一侧生效时另一侧置灰；置灰侧仍可点击，点击即切换到该侧 */
+function applyOpMutual() {
+  const specialOn = !!$('el-op-special').value;
+  const grid = $('op-grid');
+  if (grid) grid.classList.toggle('locked', specialOn);
+  $('el-op-type').classList.toggle('locked', specialOn);
+  $('el-op-special').classList.toggle('locked', !specialOn);
 }
 
 /* 打开弹窗时：回显锚点卡（已选元素）与三件套落点状态条 */
