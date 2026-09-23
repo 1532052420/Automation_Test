@@ -416,6 +416,15 @@ function onDeviceChange() {
    每次请求带自增 token，响应回来时 token 已不是最新 → 丢弃；
    服务端标记 fallback（请求设备掉线回退）→ 校正下拉；其余 serial 不一致（过期响应）→ 丢弃 */
 let refreshSeq = 0;
+/* 设备点击后的提示收尾：把「…刷新中…」替换为最终结果（修复提示永久卡在刷新中） */
+function settleTapTip(ok, msg) {
+  const tip = $('tap-tip');
+  if (!tip || tip.textContent.indexOf('刷新中…') < 0) return;
+  tip.textContent = ok ? '✓ 已点击设备，页面已刷新' : '✕ 刷新失败：' + (msg || '未知原因');
+  tip.className = 'tap-tip ' + (ok ? 'ok' : 'err');
+  clearTimeout(settleTapTip._t);
+  settleTapTip._t = setTimeout(() => { tip.textContent = ''; tip.className = 'tap-tip'; }, 4000);
+}
 async function refresh() {
   const myToken = ++refreshSeq;
   $('btn-refresh').textContent = '刷新中…'; $('btn-refresh').disabled = true;
@@ -434,6 +443,7 @@ async function refresh() {
       const dv = $('dev-info');
       dv.textContent = '⚠ ' + msg;
       dv.className = 'dev-info bad';
+      settleTapTip(false, msg);
       return;
     }
     // 掉线回退校正：请求的 A 已掉线，服务端用 B 响应并标记 fallback → 更正下拉并提示
@@ -470,11 +480,13 @@ async function refresh() {
     const img = $('shot');
     img.src = r.screenshot; img.style.display = 'block';
     renderTree(state.tree);
+    settleTapTip(true);
   } catch (err) {
     console.error('[locator] refresh error:', err);
     // 把错误直接显示在页面上，避免 try/finally 静默吞掉异常导致"点了没反应"
     $('shot-empty').textContent = '刷新出错: ' + (err && err.message ? err.message : String(err));
     $('shot-empty').style.display = 'block';
+    settleTapTip(false, '刷新出错');
   } finally {
     $('btn-refresh').textContent = '🔄 刷新'; $('btn-refresh').disabled = false;
   }
