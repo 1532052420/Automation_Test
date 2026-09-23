@@ -16,6 +16,7 @@ from flask import Flask, jsonify, request, send_file
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import collect
 import device
 import element_library
 import case_generator
@@ -195,6 +196,47 @@ def api_add_element():
                     'duplicate': r.get('duplicate'),
                     'filename': data.get('filename') or element_library.DEFAULT_FILE,
                     'content': r.get('content', '')})
+
+
+@app.route('/api/collect_all', methods=['POST'])
+def api_collect_all():
+    """采集全部元素（方案第一阶段）：当前页面 hierarchy → 过滤 → 去重 → 命名 → 定位候选。
+    原始 hierarchy 存档到 element_collect/<时间戳>/hierarchy.xml（原则：过滤的是入库数据，不是原始数据）。"""
+    asked = _request_serial()
+    serial = device.get_device(asked)
+    if not serial:
+        return jsonify({'ok': False, 'msg': '未检测到在线设备（USB 断开、未授权或 adb 掉线）'})
+    xml = device.dump_xml(serial)
+    if not xml:
+        return jsonify({'ok': False, 'msg': '界面 dump 失败：' + (device.last_error or '未知原因')})
+    try:
+        result = collect.collect_from_xml(xml)
+    except Exception as e:
+        return jsonify({'ok': False, 'msg': '元素树解析失败: %s' % str(e)[:80]})
+    try:
+        root_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                'element_collect')
+        stamp = __import__('time').strftime('%Y%m%d_%H%M%S')
+        page_dir = os.path.join(root_dir, stamp)
+        os.makedirs(page_dir, exist_ok=True)
+        with open(os.path.join(page_dir, 'hierarchy.xml'), 'w', encoding='utf-8') as f:
+            f.write(xml)
+        result['archive'] = 'element_collect/%s/hierarchy.xml' % stamp
+    except Exception as e:
+        result['archive'] = ''            # 存档失败不阻塞采集，只透出
+        result['archive_err'] = str(e)[:80]
+    result['ok'] = True
+    result['serial'] = serial
+    return jsonify(result)
+
+
+@app.route('/api/collect_save', methods=['POST'])
+def api_collect_save():
+    """采集结果批量入库：复用现有元素库文件（不建新体系），一次读、分类、一次写回。"""
+    data = request.get_json(silent=True) or {}
+    items = data.get('items') or []
+    r = element_library.add_elements_batch(data.get('filename') or '', items)
+    return jsonify(r)
 
 
 @app.route('/api/cases')

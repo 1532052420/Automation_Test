@@ -160,6 +160,19 @@ async function init() {
   renderTutorials();
   if (st && st.ok) refresh();
   $('btn-refresh').addEventListener('click', refresh);
+  const bc = $('btn-collect');
+  if (bc) {
+    bc.addEventListener('click', startCollect);
+    $('collect-file').addEventListener('change', () => {
+      $('collect-file-new-wrap').style.display = $('collect-file').value === '__new__' ? '' : 'none';
+    });
+    $('collect-check-all').addEventListener('change', e => {
+      _collectItems.forEach(i => { i._pick = e.target.checked; });
+      renderCollectItems();
+    });
+    $('btn-collect-cancel').addEventListener('click', () => { $('collect-mask').style.display = 'none'; });
+    $('btn-collect-save').addEventListener('click', saveCollect);
+  }
   $('shot').addEventListener('click', onShotClick);
   $('shot').addEventListener('dblclick', onShotDblClick);   // 双击执行器：设备真实点击
   // 截图显示尺寸：机型预设切换 + 记住上次选择
@@ -1874,3 +1887,100 @@ function buildTutItem(item) {
 document.addEventListener('DOMContentLoaded', init);
 /* 日间/夜间模式切换按钮由平台的 /static/theme.js 统一注入（两端共用存储键、全局同步）；
    本文件不再创建按钮——重复创建会叠出空按钮（同 id），表现为"图标消失"。 */
+
+/* ================= 批量采集全部元素（方案第一阶段） =================
+   采集 → 结果弹层（勾选/改名）→ 批量写进选定的元素文件（复用现有元素库格式），
+   平台「元素管理」读同一目录，保存后立即可见。 */
+let _collectItems = [];   // 弹层当前展示的采集项（含勾选状态）
+
+function collectTargetFile() {
+  const sel = $('collect-file'), nw = $('collect-file-new');
+  if (sel.value === '__new__') {
+    let f = (nw.value || '').trim().replace(/\.py$/i, '');
+    if (!f) return '';
+    f = /Elements$/i.test(f) ? f : f + 'Elements';
+    return f + '.py';
+  }
+  return sel.value;
+}
+
+function collectUpdateCount() {
+  $('collect-pick-count').textContent = _collectItems.filter(i => i._pick).length;
+}
+
+function renderCollectItems() {
+  const box = $('collect-list');
+  box.innerHTML = _collectItems.map((it, i) => {
+    return '<div class="collect-row">' +
+      '<input type="checkbox" data-ci="' + i + '"' + (it._pick ? ' checked' : '') + '>' +
+      '<input type="text" class="ci-name" data-ni="' + i + '" value="' + esc(it.name) + '" title="元素引用名（可改）">' +
+      '<input type="text" class="ci-cn" data-cni="' + i + '" value="' + esc(it.cn_name) + '" placeholder="中文名（可改）" title="元素管理/报告显示的中文名（可改）">' +
+      '<span class="ci-loc"><b>' + esc(it.locator_type) + '</b> ' + esc(truncate(it.value, 42)) + '</span>' +
+      '<span class="ci-cand" title="' + esc(it.candidates.map(c => c.kind + ': ' + c.value).join('\n')) + '">' + it.candidates.length + ' 个候选</span>' +
+      '</div>';
+  }).join('') || '<div class="empty">本页没有可采集的有效元素</div>';
+  box.querySelectorAll('input[type=checkbox][data-ci]').forEach(cb => {
+    cb.addEventListener('change', () => { _collectItems[+cb.dataset.ci]._pick = cb.checked; collectUpdateCount(); });
+  });
+  box.querySelectorAll('.ci-name').forEach(inp => {
+    inp.addEventListener('change', () => { _collectItems[+inp.dataset.ni].name = inp.value.trim(); });
+  });
+  box.querySelectorAll('.ci-cn').forEach(inp => {
+    inp.addEventListener('change', () => { _collectItems[+inp.dataset.cni].cn_name = inp.value.trim(); });
+  });
+  collectUpdateCount();
+}
+
+async function openCollectModal(result) {
+  _collectItems = (result.items || []).map(it => Object.assign({ _pick: true }, it));
+  const s = result.stats || {};
+  $('collect-stats').textContent = '原始节点 ' + s.raw + ' · 无效过滤 ' + s.filtered +
+    ' · 重复 ' + s.dup + ' · 最终候选 ' + s.final + (result.archive ? ' · 原始树已存档 ' + result.archive : '');
+  await loadLibraryFiles();   // 拿最新元素文件清单
+  const files = state.eleFiles || [];
+  $('collect-file').innerHTML = files.map(f => '<option value="' + esc(f) + '">' + esc(f) + '</option>').join('')
+    + '<option value="__new__">➕ 新建元素文件…</option>';
+  $('collect-file-new-wrap').style.display = 'none';
+  renderCollectItems();
+  $('collect-filtered').innerHTML = (result.filtered || [])
+    .map(f => '<div class="cf-row">' + esc(f.name) + ' <span class="muted">' + esc(f.reason) + '</span></div>').join('')
+    || '<div class="muted">无</div>';
+  $('collect-mask').style.display = '';
+}
+
+async function startCollect() {
+  const btn = $('btn-collect');
+  btn.disabled = true; btn.textContent = '⏳ 采集中…';
+  try {
+    const r = await fetch('api/collect_all', { method: 'POST' }).then(r => r.json()).catch(() => null);
+    if (!r || !r.ok) { showToast((r && r.msg) || '采集失败'); return; }
+    showToast('采集完成：候选 ' + (r.stats || {}).final + ' 个');
+    await openCollectModal(r);
+  } finally {
+    btn.disabled = false; btn.textContent = '📦 采集全部元素';
+  }
+}
+
+async function saveCollect() {
+  const file = collectTargetFile();
+  if (!file) return showToast('请选择或填写目标元素文件');
+  const items = _collectItems.filter(i => i._pick)
+    .map(i => ({ name: i.name, locator_type: i.locator_type, value: i.value,
+                 cn_name: i.cn_name, comment: i.comment }));
+  if (!items.length) return showToast('未勾选任何元素');
+  const btn = $('btn-collect-save');
+  btn.disabled = true;
+  try {
+    const r = await fetch('api/collect_save', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: file, items })
+    }).then(r => r.json()).catch(() => null);
+    if (!r || !r.ok) { showToast((r && r.msg) || '保存失败'); return; }
+    const skips = (r.skipped || []).map(s => s.name + '（' + s.reason + '）');
+    showToast('已新增 ' + r.added + ' 个' + (r.created_file ? '（新建文件 ' + file + '）' : '')
+      + (skips.length ? '；跳过 ' + skips.length + '：' + skips.slice(0, 3).join('、') + (skips.length > 3 ? '…' : '') : ''));
+    $('collect-mask').style.display = 'none';
+  } finally {
+    btn.disabled = false;
+  }
+}

@@ -659,3 +659,18 @@ html.night .ui-dlg-btn.primary { background: #409eff; color: #fff; }
   padding-right: 26px;
 }
 .mini-select, .modal-body select { cursor: pointer; }
+
+/* ===== 批量采集全部元素（collect- 前缀） ===== */
+.collect-modal { width: min(880px, 94vw); max-height: 88vh; display: flex; flex-direction: column; }
+.collect-bar { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--line, #e5e5ea); flex-wrap: wrap; }
+.collect-list { flex: 1; min-height: 200px; max-height: 46vh; overflow-y: auto; padding: 6px 14px; }
+.collect-row { display: grid; grid-template-columns: 26px 150px 140px minmax(0, 1fr) 70px; gap: 8px; align-items: center; padding: 5px 4px; border-bottom: 1px dashed var(--line-soft, #ececf0); }
+.collect-row:hover { background: var(--hover, rgba(0, 113, 227, .06)); }
+.collect-row .ci-loc, .collect-row .ci-cand { font-size: 12px; color: var(--muted, #6e6e73); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.collect-row input[type=text] { width: 100%; border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 4px 6px; font: inherit; color: inherit; }
+.collect-row input[type=text]:hover, .collect-row input[type=text]:focus { border-color: var(--line, #e5e5ea); background: var(--panel, #fff); outline: none; }
+.collect-filtered-wrap { border-top: 1px solid var(--line, #e5e5ea); padding: 8px 14px; font-size: 12px; }
+.collect-filtered-wrap summary { cursor: pointer; color: var(--muted, #6e6e73); }
+.collect-filtered { max-height: 150px; overflow-y: auto; margin-top: 6px; }
+.cf-row { padding: 3px 0; border-bottom: 1px dashed var(--line-soft, #ececf0); }
+.collect-modal .modal-foot { border-top: 1px solid var(--line, #e5e5ea); }

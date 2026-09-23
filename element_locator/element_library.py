@@ -121,6 +121,77 @@ def list_element_names(filename=None):
     return names
 
 
+def add_elements_batch(filename, items, elements_dir=None):
+    """批量采集入库（方案 §14/§15）：一次读文件、逐项分类（新增/跳过）、一次写回。
+    items: [{name, locator_type, value, cn_name, comment}]
+    分类规则：
+    - 库内已有相同「定位方式+定位值」（find_duplicate）→ 跳过（标已有元素名，方案 §15「不自动覆盖」）；
+    - 批内 locator 重复 → 后者跳过；
+    - 库内同名元素 → 跳过（不覆盖，方案 §15）；
+    - 其余新增。
+    返回 {'ok': bool, 'added': N, 'skipped': [{name, reason}], 'added_names': [...],
+          'created_file': bool, 'content': 最新文件内容}"""
+    scan_dir = elements_dir or ELEMENTS_DIR
+    if not re.match(r'^[A-Za-z_\u4e00-\u9fff][\w\u4e00-\u9fff]*\.py$', filename or '') \
+            or filename == POPUP_FILE or is_generated_backup(filename):
+        return {'ok': False, 'msg': '目标元素文件名不合法'}
+    if not items:
+        return {'ok': False, 'msg': '没有可保存的元素'}
+    path = os.path.join(scan_dir, filename)
+    created_file = not os.path.exists(path)
+    if created_file:
+        content = HEADER + 'class %s:\n' % to_class_name(filename) + '    def __init__(self):\n'
+    else:
+        content = _ensure_imports(_read(path))
+        if not re.search(r'def __init__\(self\):\n', content):
+            return {'ok': False, 'msg': '元素库文件缺少 __init__ 方法，无法添加元素'}
+
+    added, skipped, added_names, batch_locators = 0, [], [], set()
+    new_lines = []
+    for it in items:
+        name = (it.get('name') or '').strip()
+        lt = (it.get('locator_type') or '').strip().upper()
+        value = (it.get('value') or '').strip()
+        if not (is_valid_element_name(name) and lt and value):
+            skipped.append({'name': name or '(空)', 'reason': '名称/定位不合法'})
+            continue
+        if (lt, _escape(value)) in batch_locators:
+            skipped.append({'name': name, 'reason': '与本批前一项定位重复'})
+            continue
+        batch_locators.add((lt, _escape(value)))
+        dup = find_duplicate(lt, value, elements_dir=elements_dir)
+        if dup:
+            skipped.append({'name': name, 'reason': '库内已有 %s（%s）同定位' % (dup['name'], dup['filename'])})
+            continue
+        if re.search(r'^[ \t]*self\.%s\s*=' % re.escape(name), content, re.MULTILINE):
+            skipped.append({'name': name, 'reason': '同名元素已存在（不覆盖）'})
+            continue
+        new_lines.append(element_line(name, lt, value, 'VISIBILITY_OF', None,
+                                      it.get('comment'), cn_name=it.get('cn_name')))
+        batch_locators.add(('SELF', name))       # 同名覆盖检测用（上面 re 已判，这里仅语义标记）
+        added += 1
+        added_names.append(name)
+
+    if added:
+        init_m = re.search(r'def __init__\(self\):\n', content)
+        body_start = init_m.end()
+        after = content[body_start:]
+        block = '\n'.join(new_lines) + '\n'
+        pass_m = re.search(r'^([ \t]*)pass[ \t]*\n', after, re.MULTILINE)
+        last_elem = list(re.finditer(r'^[ \t]*self\.%s\s*=.*\n?' % _NAME_CLS, after, re.MULTILINE))
+        if pass_m:
+            after = re.sub(r'^[ \t]*pass[ \t]*\n', block, after, count=1)
+        elif last_elem:
+            idx = body_start + last_elem[-1].end()
+            after = after[:idx] + '\n' + block + after[idx:]
+        else:
+            after = block + after
+        content = content[:body_start] + after
+        _write(path, content)
+    return {'ok': True, 'added': added, 'skipped': skipped, 'added_names': added_names,
+            'created_file': created_file, 'content': content if added else None}
+
+
 def find_duplicate(locator_type, value, elements_dir=None):
     """跨元素文件查找相同「定位方式 + 定位值」的已存在元素（重复元素检测）。
     返回 {'name':..., 'filename':...} 或 None。文件里存的定位值是转义后的，比对时同样转义。

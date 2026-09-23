@@ -37,6 +37,7 @@ try {
     </div>
   </div>
   <button id="btn-refresh" class="btn primary side-btn">🔄 刷新</button>
+  <button id="btn-collect" class="btn ghost side-btn" title="一次性解析当前页面全部节点：过滤纯布局容器 → 去重 → 自动命名与定位候选 → 勾选后批量写入元素库。原始 hierarchy 自动存档到 element_collect/">📦 采集全部元素</button>
   <button id="btn-tree-diff" class="btn ghost side-btn" title="每次刷新与上一次元素树对比：🟢 新增 / 🔴 消失（快速发现跳转与弹窗）">🟢 树对比：开</button>
   <button id="btn-coord-mode" class="btn ghost side-btn" title="点截图选精确坐标（不再命中容器节点）。用于无障碍盲区：自绘弹层的选项等定位不到的元素；双击=真机点该点，添加到用例默认生成「坐标点击」">⌖ 坐标模式：关</button>
   <div class="side-foot">
@@ -249,6 +250,31 @@ try {
       <button id="btn-modal-cancel" class="btn">取消</button>
       <button id="btn-modal-save-continue" class="btn" title="保存后不结束：回到定位器点下一个元素，自动弹出本窗口连续录入">💾 保存并继续</button>
       <button id="btn-modal-save" class="btn primary">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 采集全部元素 结果弹层 -->
+<div id="collect-mask" class="modal-mask" style="display:none">
+  <div class="modal collect-modal">
+    <div class="modal-title">📦 采集结果 <span class="hint" id="collect-stats"></span></div>
+    <div class="collect-bar">
+      <span>写入元素文件</span>
+      <select id="collect-file"></select>
+      <span id="collect-file-new-wrap" style="display:none">
+        <input id="collect-file-new" type="text" placeholder="新文件名，如: kuaige">
+        <span class="hint" style="font-size:11px">自动补 Elements.py</span>
+      </span>
+      <label class="hint" style="margin-left:auto"><input type="checkbox" id="collect-check-all" checked> 全选</label>
+    </div>
+    <div id="collect-list" class="collect-list"></div>
+    <details id="collect-filtered-wrap" class="collect-filtered-wrap">
+      <summary>被过滤 / 重复明细</summary>
+      <div id="collect-filtered" class="collect-filtered"></div>
+    </details>
+    <div class="modal-foot">
+      <button id="btn-collect-cancel" class="btn">取消</button>
+      <button id="btn-collect-save" class="btn primary">💾 保存选中 <span id="collect-pick-count">0</span> 个</button>
     </div>
   </div>
 </div>
