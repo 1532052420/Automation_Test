@@ -157,7 +157,6 @@ async function init() {
   }
   loadLibraryFiles();
   loadPages();
-  renderTutorials();
   if (st && st.ok) refresh();
   $('btn-refresh').addEventListener('click', refresh);
   const bc = $('btn-collect');
@@ -188,7 +187,9 @@ async function init() {
   const devSel = document.getElementById('device-sel');
   if (devSel) devSel.addEventListener('change', onDeviceChange);
   $('tree-search').addEventListener('input', onTreeSearch);
-  $('tut-search').addEventListener('input', onTutSearch);
+  $('tree-search').addEventListener('keydown', (e) => { if (e.key === 'Enter') locateSearchTree(); });
+  const bts = $('btn-tree-search');
+  if (bts) bts.addEventListener('click', locateSearchTree);
   $('btn-add').addEventListener('click', openModal);
   $('btn-modal-cancel').addEventListener('click', () => {
     $('modal-mask').style.display = 'none';
@@ -788,10 +789,12 @@ function toggleTreeDiff() {
 function onTreeSearch(e) {
   if (!state.tree) return;
   const kw = e.target.value.trim().toLowerCase();
+  searchHitIdx = -1; searchHitKw = '';       // 新搜索词重置循环定位
   if (!kw) { renderTree(state.tree); return; }
   const filtered = filterTree(state.tree, kw);
   $('tree').innerHTML = '';
-  $('tree').appendChild(buildTreeUl(filtered));
+  if (filtered) $('tree').appendChild(buildTreeUl(filtered));
+  else $('tree').innerHTML = '<div class="empty" style="padding:16px">没有匹配的元素（改关键词或清空恢复全树）</div>';
 }
 function filterTree(node, kw) {
   const children = (node.children || [])
@@ -821,6 +824,32 @@ function selectNode(uid) {
   });
   renderDetail(node);
   highlightShot(node);
+  scrollTreeToUid(uid);
+}
+/* 元素树滚动定位到指定节点并短暂高亮（截图点选 / 搜索定位共用） */
+function scrollTreeToUid(uid) {
+  const li = document.querySelector('.tree .tnode[data-uid="' + uid + '"]');
+  if (!li) return;
+  li.scrollIntoView({ block: 'nearest' });
+  li.classList.remove('search-hit');
+  void li.offsetWidth;
+  li.classList.add('search-hit');
+  setTimeout(() => li.classList.remove('search-hit'), 2600);
+}
+/* 搜索定位：回车/点🔍 → 循环定位到匹配节点（全树文本匹配），并联动选中与高亮 */
+let searchHitIdx = -1, searchHitKw = '';
+function locateSearchTree() {
+  const kw = ($('tree-search').value || '').trim().toLowerCase();
+  if (!kw || !state.tree) return;
+  if (kw !== searchHitKw) { searchHitIdx = -1; searchHitKw = kw; }
+  const nodes = (state.all || []).filter(n =>
+    [n.text, n['resource-id'], n.class].some(v => String(v || '').toLowerCase().includes(kw)));
+  if (!nodes.length) { showToast('没有匹配的元素'); return; }
+  searchHitIdx = (searchHitIdx + 1) % nodes.length;
+  const n = nodes[searchHitIdx];
+  showToast('定位到匹配元素 ' + (searchHitIdx + 1) + '/' + nodes.length);
+  if (n.uid != null && n.uid >= 0) selectNode(n.uid);
+  else scrollTreeToUid(-1);
 }
 function highlightShot(node) {
   highlightBounds(node.bounds_num);

@@ -676,7 +676,8 @@ function renderElements() {
       : '<b>' + esc(e.name) + '</b>' + (e.popup ? ' <span class="el-popup-badge">规则</span>' : '') + '<br><span class="el-file">' + esc(e.file) + '</span>';
     /* 弹窗规则库行：定位器「登记随机弹窗」专管锚点/冷却/白名单；此处仅支持删除（单行移除，不影响同文件规则常量） */
     const actions = e.popup
-      ? '<div class="ops"><span class="el-popup-note" title="由元素定位器「登记随机弹窗」专管（锚点/冷却/白名单同文件存放），仅支持删除">规则库</span>' +
+      ? '<div class="ops">' +
+        '<button class="ghost mini" data-act="rename" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">重命名</button>' +
         '<button class="mini danger-ghost" data-act="del" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">删除</button></div>'
       : '<div class="ops">' +
     '<button class="ghost mini" data-act="edit" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">编辑</button>' +
@@ -767,6 +768,43 @@ function onElTableClick(e) {
   if (btn.dataset.act === 'edit') openElModal('edit', name, file);
   else if (btn.dataset.act === 'copy') openElModal('copy', name, file);
   else if (btn.dataset.act === 'del') deleteElement(name, file);
+  else if (btn.dataset.act === 'rename') startRename(name, file, btn);
+}
+
+/* 随机弹窗元素重命名（行内编辑，回车/失焦提交；Esc 取消）：
+   走 save 接口改名（删旧行增新行，同文件 RULE_OPTIONS 规则常量不受影响） */
+function startRename(name, file, btn) {
+  const tr = btn.closest('tr');
+  const b = tr ? tr.querySelector('td b') : null;
+  if (!b || b.dataset.editing) return;
+  const e2 = (_elements || []).find(x => x.name === name && x.file === file);
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = name;
+  inp.style.cssText = 'width:100%;border:1px solid #409eff;border-radius:6px;padding:2px 6px;font:inherit;';
+  b.replaceWith(inp);
+  inp.focus(); inp.select();
+  let done = false;
+  const cancel = () => { done = true; loadElements(); };
+  const commit = async () => {
+    if (done) return; done = true;
+    const nv = inp.value.trim();
+    if (!nv || nv === name) { loadElements(); return; }
+    const d = await postJson('/api/appui/elements/save', {
+      file: file, name: nv, orig_name: name,
+      locator_type: e2 ? e2.type : '', value: e2 ? e2.value : '',
+      wait_type: e2 ? (e2.wait_type || 'VISIBILITY_OF') : 'VISIBILITY_OF',
+      wait_seconds: e2 ? e2.wait_seconds : null,
+      desc: e2 ? (e2.desc || '') : '', cn_name: e2 ? (e2.cn_name || '') : '',
+    });
+    toast(d.msg || (d.ok ? '已重命名为 ' + nv : '重命名失败'), !!d.ok);
+    loadElements();
+  };
+  inp.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') commit();
+    else if (ev.key === 'Escape') cancel();
+  });
+  inp.addEventListener('blur', () => { if (!done) commit(); });
 }
 
 function initElementsPanel() {

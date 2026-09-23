@@ -75,13 +75,18 @@ try {
   <section class="col middle">
     <div class="col-title">元素 / 坐标</div>
     <div class="toolbar">
-      <input id="tree-search" type="text" placeholder="搜索元素：text / resource-id / class">
+      <input id="tree-search" type="text" placeholder="搜索元素：text / resource-id / class（回车定位）">
+      <button id="btn-tree-search" class="btn small" title="定位到匹配元素并高亮">🔍</button>
     </div>
     <div id="tree" class="tree"></div>
+  </section>
+  <div class="col-resizer" data-resize="middle" title="拖动调整中间与选中元素栏宽度"></div>
+
+  <!-- 右：选中元素（原「操作教学」栏位改造；定高不随字段增减变化） -->
+  <section class="col right">
+    <div class="col-title">选中元素 <span class="hint">点选截图或元素树节点后展示详情</span></div>
     <div id="detail" class="detail" style="display:none">
-      <div class="detail-head">选中元素 <span class="hint">双击截图可直达设备点击</span>
-        <span class="head-btns"><button id="btn-tap" class="btn small primary">▶ 设备上点击</button> <button id="btn-add" class="btn small primary">➕ 添加测试用例</button></span>
-      </div>
+      <div class="detail-head">选中元素 <span class="hint">双击截图可直达设备点击</span></div>
       <div id="tap-tip" class="tap-tip"></div>
       <div id="hit-cands" class="hit-cands"></div>
       <div id="detail-attrs-wrap" class="attrs-wrap"><table id="detail-attrs" class="attrs"></table></div>
@@ -90,17 +95,11 @@ try {
       <div id="locators"></div>
       <button id="btn-locate-check" class="check-btn" title="按上面选中的定位方式，在当前页面真实查找该元素并高亮">🎯 体检：实查当前页面</button>
       <div id="check-result" class="check-result" style="display:none"></div>
+      <div class="detail-foot">
+        <button id="btn-tap" class="btn small primary">▶ 设备上点击</button>
+        <button id="btn-add" class="btn small primary">➕ 添加测试用例</button>
+      </div>
     </div>
-  </section>
-  <div class="col-resizer" data-resize="middle" title="拖动调整中间与教学栏宽度"></div>
-
-  <!-- 右：操作教学 -->
-  <section class="col right">
-    <div class="col-title">操作教学 <span class="hint">点击 / 滑动 / toast / 断言…不用上网查</span></div>
-    <div class="toolbar">
-      <input id="tut-search" type="text" placeholder="搜索：点击 滑动 toast 断言 输入…">
-    </div>
-    <div id="tutorials" class="tutorials"></div>
   </section>
 </main>
 
