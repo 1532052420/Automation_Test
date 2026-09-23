@@ -148,10 +148,12 @@ def list_elements():
 
 
 def delete_element(filename, name):
-    """从元素文件中删除一行元素定义（同名只删第一处；找不到报错）"""
+    """从元素文件中删除一行元素定义（同名只删第一处；找不到报错）。
+    popupElements.py（随机弹窗规则库）受管可删：单行正则移除，同文件 RULE_OPTIONS/WHITELIST
+    常量不受影响（v6.11.0 用户要求：元素管理支持删除随机弹窗元素）。"""
     if not is_valid_element_name(name or ''):
         return False, '元素名称不合法'
-    if filename not in list_element_files():
+    if filename != POPUP_FILE and filename not in list_element_files():
         return False, '元素文件不存在或不受管: %s' % filename
     path = os.path.join(ELEMENTS_DIR, filename)
     if not os.path.isfile(path):
