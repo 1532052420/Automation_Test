@@ -10,13 +10,13 @@
 两端不再各自硬编码版本号。
 """
 
-APP_VERSION = '6.102'
+APP_VERSION = '6.10.2'
 
 # 最新版本在最前；time 精确到秒（YYYY-MM-DD HH:MM:SS）
 # 每条变更一句话 10~20 字，只说改了什么（详细背景见项目 memory 与设计文档）
 CHANGELOG = [
     {
-        'version': '6.102',
+        'version': '6.10.2',
         'time': '2026-09-23 16:42:12',
         'title': '登记随机弹窗改左右双栏布局',
         'changes': [

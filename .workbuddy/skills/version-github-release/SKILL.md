@@ -17,16 +17,19 @@ agent_created: true
 
 唯一依据是 `web_platform/changelog.py` 里 `APP_VERSION` 的**当前值**（递增后的值），不得凭记忆或对话历史推断。
 
+版本号格式为 **`x.xx.x`**（见 version-changelog 铁律 2）：奇偶只看**尾号（修订号，最后一段）**——尾号 % 2 == 0 即双数。
+
 | 版本号 | 动作 |
 |---|---|
-| **双数**（6.28 / 6.30 / 6.32 …） | **提交 + 推送到 GitHub** |
-| **单数**（6.29 / 6.31 / 6.33 …） | **不上传**（只保留本地版本号与 changelog 递增） |
+| **尾号双数**（6.10.0 / 6.10.2 / 6.10.4 / 6.11.0 …） | **提交 + 推送到 GitHub** |
+| **尾号单数**（6.10.1 / 6.10.3 / 6.10.5 …） | **不上传**（只保留本地版本号与 changelog 递增） |
 
-读取方式（勿手抄版本号）：
+读取与判定（勿手抄版本号）：
 
 ```bash
 cd /Users/ouyang/Desktop/AutomationTest
-env -u PYTHONPATH ./.venv/bin/python -c "from web_platform.changelog import APP_VERSION; print(APP_VERSION)"
+env -u PYTHONPATH ./.venv/bin/python -c "from web_platform.changelog import APP_VERSION as v; print(v, int(v.split('.')[-1]) % 2)"
+# 输出尾号 % 2 == 0 → 双数上传；== 1 → 单数不上传
 ```
 
 ## 执行步骤
