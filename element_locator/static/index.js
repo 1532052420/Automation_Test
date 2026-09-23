@@ -560,7 +560,7 @@ function onShotClick(e) {
   if (!r) return;
   state.hitCands = r.cands;
   selectNode(r.hit.uid);
-  showHitToast(r.hit, r.cands.length, '');
+  // 命中提示 toast 已移除：元素树会自动跳转高亮到该元素，信息不重复（v6.11.4）
 }
 // 双击执行器：双击截图 = 在设备上真实点击该元素（验证定位是否准确）
 function onShotDblClick(e) {
