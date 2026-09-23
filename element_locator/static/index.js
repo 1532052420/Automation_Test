@@ -256,21 +256,11 @@ function bindColumnResizers() {
   const mid = document.querySelector('.col.middle');
   const right = document.querySelector('.col.right');
   if (!left || !mid || !right) return;
-  const contentWidth = () => {
-    const m = document.querySelector('main');
-    return m.getBoundingClientRect().width - 24;   // 减去 main 左右 padding
-  };
-  // 恢复上次拖拽的宽度（仅宽屏生效；窄屏纵向堆叠忽略）
-  try {
-    const saved = JSON.parse(localStorage.getItem('locator_col_widths') || 'null');
-    if (saved && window.matchMedia('(min-width: 921px)').matches) {
-      const cw = contentWidth();
-      if (cw > 600 && saved.leftFrac && saved.midFrac) {
-        left.style.flex = '0 1 ' + Math.round(cw * saved.leftFrac) + 'px';
-        mid.style.flex = '0 1 ' + Math.round(cw * saved.midFrac) + 'px';
-      }
-    }
-  } catch (e) {}
+  // 右栏固定 340px（v6.11.1：历史拖拽记忆导致右栏被挤窄且无法复原——不再恢复/记忆列宽）
+  try { localStorage.removeItem('locator_col_widths'); } catch (e) {}
+  right.style.flex = '0 0 340px';
+  mid.style.flex = '1 1 auto';
+  left.style.flex = '0 1 360px';
   document.querySelectorAll('.col-resizer').forEach(handle => {
     handle.addEventListener('mousedown', (e) => {
       e.preventDefault();
@@ -285,23 +275,13 @@ function bindColumnResizers() {
         const relX = ev.clientX - mainRect.left - 12;  // 减 main 左 padding
         const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
         if (which === 'left') {
-          const avail = cw - 60 - 280;                 // 60=4个gap+2个手柄，280=右栏下限
+          // 右栏固定 340（v6.11.1），中栏 flex:1 吸收差值
+          const rightW = right.getBoundingClientRect().width || 340;
+          const avail = cw - 60 - rightW;
           const leftW = clamp(relX, 280, avail - 280);
           left.style.flex = '0 1 ' + Math.round(leftW) + 'px';
-          mid.style.flex = '0 1 ' + Math.round(avail - leftW) + 'px';
-        } else {
-          const leftW = left.getBoundingClientRect().width;
-          const avail = cw - 60 - Math.round(leftW) - 280;
-          const midW = clamp(relX - leftW - 20, 280, Math.max(280, avail));
-          mid.style.flex = '0 1 ' + Math.round(midW) + 'px';
+          mid.style.flex = '1 1 auto';
         }
-        // 宽度按内容宽度比例记忆（窗口尺寸变化也能按比例恢复）
-        try {
-          localStorage.setItem('locator_col_widths', JSON.stringify({
-            leftFrac: left.getBoundingClientRect().width / cw,
-            midFrac: mid.getBoundingClientRect().width / cw,
-          }));
-        } catch (err) {}
       };
       const onUp = () => {
         handle.classList.remove('dragging');
@@ -2190,3 +2170,24 @@ function flashField(labelEl) {
   clearTimeout(fieldFlashTimer);
   fieldFlashTimer = setTimeout(() => labelEl.classList.remove('field-flash'), 3000);
 }
+
+/* 配色切换（iPhone 18 配色：默认 → 银色 → 冰川蓝 → 灰白 循环；全站生效，夜间模式下切回日间可见） */
+const SKIN_SEQ = [['', '默认'], ['silver', '银色'], ['glacier', '冰川蓝'], ['graywhite', '灰白']];
+function applySkinBtn() {
+  const cur = (window.__setPlatformSkin ? (localStorage.getItem('platform_skin') || '') : '');
+  const label = (SKIN_SEQ.find(s => s[0] === cur) || SKIN_SEQ[0])[1];
+  const tx = document.querySelector('#btn-skin .bt-tx');
+  if (tx) tx.textContent = '配色：' + label;
+}
+function cycleSkin() {
+  const cur = localStorage.getItem('platform_skin') || '';
+  const idx = SKIN_SEQ.findIndex(s => s[0] === cur);
+  const next = SKIN_SEQ[(idx + 1) % SKIN_SEQ.length];
+  if (window.__setPlatformSkin) window.__setPlatformSkin(next[0]);
+  else { localStorage.setItem('platform_skin', next[0]); document.documentElement.dataset.skin = next[0]; }
+  const tx = document.querySelector('#btn-skin .bt-tx');
+  if (tx) tx.textContent = '配色：' + next[1];
+  showToast('配色已切换：' + next[1]);
+}
+const bs = $('btn-skin');
+if (bs) { bs.addEventListener('click', cycleSkin); applySkinBtn(); }

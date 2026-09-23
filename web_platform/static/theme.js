@@ -13,6 +13,17 @@
    契约现已统一，故只驱动 night 一个类；day 类同时挂上，供历史选择器兼容。 */
 (function () {
   const KEY = 'platform_theme';
+  /* 配色皮肤（iPhone 18 配色：银色/冰川蓝/灰白）——浅色态全站生效，夜间模式优先级更高。
+     选择存 localStorage['platform_skin']；定位器左侧「🎨 配色」按钮循环切换，全站跟随。 */
+  const SKIN_KEY = 'platform_skin';
+  function applySkin() {
+    try {
+      const s = localStorage.getItem(SKIN_KEY) || '';
+      const root = document.documentElement;
+      if (s) root.setAttribute('data-skin', s);
+      else root.removeAttribute('data-skin');
+    } catch (e) { /* 忽略 */ }
+  }
   /* SF Symbols 风格：细线太阳 / 实心月牙 */
   const ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">'
     + '<circle cx="12" cy="12" r="4.1"/>'
@@ -22,6 +33,7 @@
 
   function apply(mode) {
     const root = document.documentElement;
+    applySkin();
     const isDay = mode !== 'night';
     root.classList.toggle('night', !isDay);
     root.classList.toggle('day', isDay);
@@ -43,6 +55,12 @@
     apply(m);
   }
 
+  /* 供定位器「🎨 配色」按钮调用：写入并全站立即应用 */
+  window.__setPlatformSkin = function (s) {
+    try { localStorage.setItem(SKIN_KEY, s || ''); } catch (e) { /* 忽略 */ }
+    applySkin();
+  };
+
   // 立即生效（脚本在 <head>，先于样式表与首帧）
   apply(current());
 
@@ -58,6 +76,7 @@
       document.body.appendChild(fab);
     }
     apply(current());
+    applySkin();
     // 首屏按已存主题直接渲染（不动画）；首帧之后开启过渡，点击切换时颜色平滑渐变
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
