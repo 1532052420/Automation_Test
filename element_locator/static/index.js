@@ -1317,6 +1317,7 @@ function updateOpNote() {
     ? '🔗 保存时将自动生成/更新页面操作方法（三件套一次完成）'
     : (p === 'case' ? '⚠ 不会生成页面方法——目标页面须已存在同名方法，否则执行报错' : '');
   const notes = {
+    assert_toast: '💬 断言 Toast 只看屏幕提示文案，不依赖元素——上方元素字段仍会照常入库（可作为该步骤的定位参考），不会被弃用。',
     wait_element: '⏱ 适合「生成中/加载慢」的页面：一直等它出现，最长 N 秒；超时用例失败。和「固定等待」不同——元素一出现立刻继续，不干等。',
     assert_gone: '✅ 反向断言：元素必须「找不到」才算通过（验证弹窗已关闭、页面已跳走）。元素还在 = 用例失败并截图。',
     if_click: '🔀 分支处理（举例）：发布歌曲后偶发「今日首次发布歌曲」领金豆弹窗——'
@@ -1390,8 +1391,9 @@ function onOpTypeChange() {
     $('col-element').classList.add('dim');
     $('col-element').classList.remove('soft');
   } else {
-    // 常规里无需元素的类型（Toast/坐标/截图/固定等待/自定义）：只弱化不禁点，元素仍会入库
-    $('col-element').classList.toggle('soft', t.el === false);
+    // 常规类型（含 Toast 断言等不依赖元素的类型）：元素栏一律正常显示——
+    // 置灰会让用户误以为已选的元素失效（用户实测反馈 v6.100）；「不依赖元素」的说明走 op-note 文字提示
+    $('col-element').classList.remove('soft');
     $('col-element').classList.remove('dim');
   }
   updateOpNote();

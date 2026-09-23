@@ -142,11 +142,11 @@ try {
             </label>
           </div>
           <div class="el-duo">
-            <label>等待方式 <span class="help-icon" data-help="操作前等元素达到的状态">?</span>
+            <label>元素等待方式 <span class="help-icon" data-help="点这个元素前，框架会先等它达到所选状态（最多等 N 秒）再操作。一般选『元素可见再操作』即可；按钮类可选『可点击后再操作』。">?</span>
               <select id="el-wait">
-                <option value="VISIBILITY_OF">VISIBILITY_OF（可见）</option>
-                <option value="PRESENCE_OF_ELEMENT_LOCATED">PRESENCE_OF_ELEMENT_LOCATED（存在）</option>
-                <option value="ELEMENT_TO_BE_CLICKABLE">ELEMENT_TO_BE_CLICKABLE（可点击）</option>
+                <option value="VISIBILITY_OF">元素可见再操作（推荐）</option>
+                <option value="PRESENCE_OF_ELEMENT_LOCATED">元素存在可操作（适合加载慢/屏幕外）</option>
+                <option value="ELEMENT_TO_BE_CLICKABLE">元素可点击后再操作（适合按钮）</option>
               </select>
             </label>
             <label>等待时间(秒) <span class="help-icon" data-help="最多等待秒数，默认 6">?</span>
