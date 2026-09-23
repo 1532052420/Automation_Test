@@ -742,3 +742,11 @@ html.night .tri-bar { background: rgba(36,138,61,.12); border-color: #2f5e3e; co
 
 /* 操作类型/特殊操作 视觉互斥：未生效侧置灰（仍可点击切换） */
 select.locked { opacity: .45; }
+
+/* ===== 用途③ 双栏：规则表单在左、已有规则在右（v6.102） ===== */
+.flow-cols.cols-popup { grid-template-columns: 1fr 1fr; }
+#col-popup-rules .popup-rules-wrap { padding: 10px 14px; overflow-y: auto; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+#col-popup-rules .pp-rules { flex: 1; }
+#col-popup-rules .col-head { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 13px; color: #111827;
+  padding: 11px 14px 9px; border-bottom: 1px solid #eef0f3; margin-bottom: 10px; }
+#col-popup-rules .col-head::before { content: '📋'; }

@@ -1184,6 +1184,9 @@ function onPurposeChange() {
   }
   const popup = p === 'popup';
   $('col-popup').style.display = popup ? '' : 'none';
+  const pr = $('col-popup-rules');
+  if (pr) pr.style.display = popup ? '' : 'none';   // 已有规则列表：右侧独立栏（仅用途③显示）
+  document.querySelector('.flow-cols').classList.toggle('cols-popup', popup);   // 用途③：左右双栏布局
   ['col-element', 'col-case', 'col-op'].forEach(id => {
     $(id).style.display = popup ? 'none' : '';
   });
