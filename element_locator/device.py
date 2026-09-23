@@ -478,6 +478,13 @@ def gen_locators(node, all_nodes):
         cands.append({'kind': 'ID', 'locator_type': 'ID', 'value': rid,
                       'desc': 'resource-id 唯一，最稳'})
 
+    # ID 优先口径：非唯一 id 的 resource-id XPATH 排第二（id 属性比 text 稳——文案改版/动态内容会让 text 失效）
+    if rid:
+        dup = same_rid_count()
+        cands.append({'kind': 'XPATH', 'locator_type': 'XPATH',
+                      'value': '//*[@resource-id=%s]' % escape_xpath(rid),
+                      'desc': 'resource-id 定位（页面%s共 %d 个同名）' % ('仅有 1 个' if dup == 1 else '共有', dup)})
+
     if text and unique('text', text):
         cands.append({'kind': 'XPATH', 'locator_type': 'XPATH',
                       'value': '//*[@text=%s]' % escape_xpath(text),
@@ -487,16 +494,11 @@ def gen_locators(node, all_nodes):
         cands.append({'kind': 'ACCESSIBILITY_ID', 'locator_type': 'ACCESSIBILITY_ID', 'value': desc,
                       'desc': 'content-desc 唯一（无障碍标签）'})
 
-    # XPath：带 text 或 resource-id 的组合（不要求唯一，用户可自行确认）
+    # XPath：text 组合（不要求唯一，用户可自行确认）；resource-id XPATH 已提前至第二顺位
     if text:
         cands.append({'kind': 'XPATH', 'locator_type': 'XPATH',
                       'value': '//*[@text=%s]' % escape_xpath(text),
                       'desc': 'text 定位（页面可能存在多个同名）'})
-    if rid:
-        dup = same_rid_count()
-        cands.append({'kind': 'XPATH', 'locator_type': 'XPATH',
-                      'value': '//*[@resource-id=%s]' % escape_xpath(rid),
-                      'desc': 'resource-id 定位（页面%s共 %d 个同名）' % ('仅有 1 个' if dup == 1 else '共有', dup)})
 
     # 重复元素：给出带下标/instance 的写法（解决"页面多个一模一样"的定位偏差）
     if rid and same_rid_count() > 1:
