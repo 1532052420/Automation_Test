@@ -253,9 +253,11 @@ body.col-resizing * { cursor: col-resize !important; }
 .modal.modal-wide { width: 860px; }
 /* 添加到元素库：横向流程弹窗（元素 → 用例 → 操作 三栏） */
 .modal.modal-flow { width: 1240px; max-width: 96vw; height: min(86vh, 800px); }
-/* 字段名高亮 3 秒（操作类型切换导致新字段出现时引导视线，v6.101） */
-@keyframes fieldFlash { 0%, 55% { background: rgba(64, 158, 255, .18); } 100% { background: transparent; } }
-.field-flash { animation: fieldFlash 3s ease; border-radius: 6px; }
+/* 字段名高亮 3 秒（每次切换操作类型都触发）：白天实色暖黄（白底清晰），夜间蓝调 */
+@keyframes fieldFlash { 0%, 45% { background: #ffe9a8; } 100% { background: transparent; } }
+@keyframes fieldFlashNight { 0%, 45% { background: rgba(64, 158, 255, .32); } 100% { background: transparent; } }
+.field-flash { animation: fieldFlash 3s ease; border-radius: 6px; padding: 2px 4px; margin: -2px -4px; }
+html.night .field-flash { animation-name: fieldFlashNight; }
 /* 用途分段控件（radio 保留但视觉隐藏，label 即分段按钮） */
 .flow-step { display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
   padding: 5px 6px; background: #f3f4f6; border-radius: 10px; font-size: 13px; }

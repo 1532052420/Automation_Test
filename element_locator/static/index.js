@@ -1381,11 +1381,11 @@ function onOpTypeChange() {
   const special = $('el-op-special').value;
   const t = stepTypeInfo(currentOpType());
   const paramWrap = $('el-op-param-wrap');
-  const paramWasShown = paramWrap.style.display !== 'none';
   paramWrap.style.display = t.param ? '' : 'none';
   $('el-op-param').placeholder = t.ph || '参数';
-  // 新出现的字段：字段名高亮 3 秒引导视线（弹窗高度已固定，显隐不再拉伸弹窗）
-  if (!paramWasShown && t.param) flashField(paramWrap);
+  // 每次切换操作类型：参数（若显示）与步骤描述的字段名都高亮 3 秒，提示「随类型变化」
+  flashField(paramWrap);
+  flashField($('el-op-comment').closest('label'));
   // 换类型时：参数为空或是上个类型的自动预填值 → 换成当前类型默认值（用户手输过则保留）
   if (t.param && (paramAuto || !$('el-op-param').value.trim())) {
     if (t.defv !== undefined) $('el-op-param').value = t.defv;
