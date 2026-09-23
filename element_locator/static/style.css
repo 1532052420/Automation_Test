@@ -252,21 +252,51 @@ body.col-resizing * { cursor: col-resize !important; }
 /* ---------- 用例工作台 ---------- */
 .modal.modal-wide { width: 860px; }
 /* 添加到元素库：横向流程弹窗（元素 → 用例 → 操作 三栏） */
-.modal.modal-flow { width: 980px; }
-.flow-step { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 18px; margin-bottom: 12px;
-  padding: 8px 12px; background: #ecf5ff; border: 1px solid #c6e2ff; border-radius: 8px; font-size: 13px; }
-.flow-step .fs-label { font-weight: 600; color: #337ecc; }
-.flow-step label.purpose { display: flex; align-items: center; gap: 4px; margin: 0; cursor: pointer; font-weight: 500; }
-.flow-step input[type="radio"] { width: auto; margin: 0; }
-.flow-cols { display: grid; grid-template-columns: 1.12fr 0.94fr 1fr; gap: 14px; align-items: start; }
-.flow-col { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px 4px; transition: opacity .15s; }
-.flow-col .col-head { font-weight: 600; font-size: 13px; color: #111827; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #e5e7eb; }
-.flow-col .col-head .hint { font-weight: 400; font-size: 12px; color: #9ca3af; margin-left: 4px; }
+.modal.modal-flow { width: 1040px; }
+/* 用途分段控件（radio 保留但视觉隐藏，label 即分段按钮） */
+.flow-step { display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+  padding: 5px 6px; background: #f3f4f6; border-radius: 10px; font-size: 13px; }
+.flow-step .fs-label { font-weight: 600; color: #6b7280; padding: 0 8px; }
+.flow-step label.purpose { display: flex; align-items: center; gap: 5px; margin: 0; cursor: pointer;
+  font-weight: 600; padding: 7px 16px; border-radius: 8px; color: #6b7280; transition: all .15s; }
+.flow-step label.purpose input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+.flow-step label.purpose:has(input:checked) { background: #fff; color: var(--sky-deep);
+  box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.flow-step label.purpose:hover { color: var(--sky-deep); }
+/* 三栏卡片化：白底圆角 + 编号圆片栏头，等高拉伸 */
+.flow-cols { display: grid; grid-template-columns: 1.02fr 0.94fr 1.02fr; gap: 12px; align-items: stretch; }
+.flow-col { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 0 0 10px; transition: opacity .15s, border-color .15s; overflow: hidden; }
+.flow-col .col-head { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 13px; color: #111827;
+  padding: 11px 14px 9px; border-bottom: 1px solid #eef0f3; margin-bottom: 10px; }
+.flow-col .col-head::before { content: attr(data-n); width: 20px; height: 20px; border-radius: 50%; background: var(--sky);
+  color: #fff; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+.flow-col .col-head .hint { font-weight: 400; font-size: 11.5px; color: #9ca3af; margin-left: auto; text-align: right; }
 .flow-col.dim { opacity: .45; pointer-events: none; }
 /* 元素栏「此操作不依赖元素」弱化：只降透明度不禁交互（元素本身仍需填写入库） */
 .flow-col.soft { opacity: .6; }
-.flow-col.soft .col-head::after { content: '（此操作类型不依赖元素，元素仍会照常入库）'; font-weight: 400; font-size: 11px; color: #9ca3af; margin-left: 4px; }
-html.night .flow-col.soft .col-head::after { color: #6b7280; }
+.flow-col.soft .col-head::after { content: '（此操作类型不依赖元素，元素仍会照常入库）'; font-weight: 400; font-size: 11px; color: #9ca3af; }
+/* 已选元素锚点卡（来源：元素树点选 / 坐标选中） */
+.anchor-card { margin: 0 12px 10px; background: linear-gradient(180deg, #f0f7ff, #f8fbff);
+  border: 1px solid #c6e2ff; border-radius: 10px; padding: 8px 12px; }
+.anchor-card .ac-head { font-size: 11px; font-weight: 700; color: var(--sky-deep); margin-bottom: 3px; }
+.anchor-card .ac-head .hint { font-weight: 400; margin-left: 4px; }
+.anchor-card .ac-main { font-size: 13px; color: #111827; margin-bottom: 2px; }
+.anchor-card .ac-loc { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: #6b7280; word-break: break-all; }
+/* 双列字段（名称|中文名、方式|值、等待方式|秒） */
+.el-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* 操作类型图标卡（常用 6 类快捷入口；el-op-type 下拉保留全量） */
+.op-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-bottom: 8px; }
+.op-card { border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 7px 4px 6px; display: flex; flex-direction: column;
+  align-items: center; gap: 4px; cursor: pointer; transition: all .12s; }
+.op-card:hover { border-color: var(--sky-2); }
+.op-card.on { border-color: var(--sky); background: #ecf5ff; box-shadow: 0 0 0 3px rgba(64,158,255,.14); }
+.op-card .oi { width: 28px; height: 28px; border-radius: 50%; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.op-card.on .oi { background: var(--sky); }
+.op-card .ot { font-size: 11px; font-weight: 600; color: #374151; }
+.op-card.on .ot { color: var(--sky-deep); }
+/* 三件套落点状态条（用途②显示） */
+.tri-bar { display: flex; align-items: center; font-size: 12px; color: #248a3d; background: #eaf7ee;
+  border: 1px solid #cdebd6; border-radius: 8px; padding: 7px 14px; margin: 10px 20px 0; }
 .op-note { font-size: 12px; color: #337ecc; margin: 2px 0 8px; min-height: 16px; }
 /* 字段行内红字提示（必填缺失 / 元素名·中文名重复）：标签行右侧、输入框上方，≤8 字简短提示 */
 /* 操作类型下拉弹层：分组标题（基本操作/断言/长流程）白色加粗；
@@ -674,3 +704,29 @@ html.night .ui-dlg-btn.primary { background: #409eff; color: #fff; }
 .collect-filtered { max-height: 150px; overflow-y: auto; margin-top: 6px; }
 .cf-row { padding: 3px 0; border-bottom: 1px dashed var(--line-soft, #ececf0); }
 .collect-modal .modal-foot { border-top: 1px solid var(--line, #e5e5ea); }
+
+/* ===== 弹窗改版（v6.98）新增件：插入点可视化 / 锚点卡 / 图标卡 / 状态条 · 夜间覆盖 ===== */
+.steps-list .sl-marker { display: flex; align-items: center; margin: 5px 0; padding: 5px 8px;
+  background: #eaf3fd; border-top: 1.5px dashed var(--sky); border-bottom: 1.5px dashed var(--sky);
+  border-radius: 4px; font-size: 11.5px; font-weight: 700; color: var(--sky-deep); }
+html.night .flow-step { background: #232428; }
+html.night .flow-step label.purpose { color: #9ca3af; }
+html.night .flow-step label.purpose:has(input:checked) { background: #1b1c1f; color: var(--sky-2); }
+html.night .flow-col { background: #1b1c1f; border-color: #303236; }
+html.night .flow-col .col-head { color: #f3f4f6; border-bottom-color: #303236; }
+html.night .flow-col .col-head .hint { color: #9ca3af; }
+html.night .anchor-card { background: rgba(64,158,255,.08); border-color: #2b4a6f; }
+html.night .anchor-card .ac-head { color: var(--sky-2); }
+html.night .anchor-card .ac-main { color: #f3f4f6; }
+html.night .anchor-card .ac-loc { color: #9ca3af; }
+html.night .op-card { border-color: #303236; }
+html.night .op-card .oi { background: #232428; }
+html.night .op-card .ot { color: #e5e7eb; }
+html.night .op-card.on { border-color: var(--sky); background: rgba(64,158,255,.12); }
+html.night .op-card.on .oi { background: var(--sky); }
+html.night .op-card.on .ot { color: var(--sky-2); }
+html.night .steps-list { background: #1b1c1f; border-color: #303236; color: #e5e7eb; }
+html.night .steps-list .sl-title { color: #f3f4f6; }
+html.night .steps-list .sl-row { color: #e5e7eb; }
+html.night .steps-list .sl-marker { background: rgba(64,158,255,.12); }
+html.night .tri-bar { background: rgba(36,138,61,.12); border-color: #2f5e3e; color: #6ee7a0; }

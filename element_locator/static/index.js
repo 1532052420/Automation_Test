@@ -205,7 +205,8 @@ async function init() {
   window.addEventListener('beforeunload', (e) => {
   });
   document.querySelectorAll('input[name="el-purpose"]').forEach(r => r.addEventListener('change', onPurposeChange));
-  $('el-op-type').addEventListener('change', () => { onOpTypeChange(); onCaseFileChange(); });
+  $('el-op-type').addEventListener('change', () => { onOpTypeChange(); onCaseFileChange(); syncOpCards(); });
+  buildOpGrid();
   $('el-op-special').addEventListener('change', onSpecialOpChange);
   $('el-op-param').addEventListener('input', () => { paramAuto = false; followStepDesc(); });
   $('el-case-file').addEventListener('change', onCaseFileChange);
@@ -213,6 +214,7 @@ async function init() {
   $('el-file').addEventListener('change', () => {
     $('el-file-new-wrap').style.display = isNewElementFile() ? '' : 'none';
     syncElFileNote();
+    fillCaseHead();
   });
   $('el-case-new').addEventListener('input', () => {
     onCaseFileChange();
@@ -1062,6 +1064,7 @@ async function openModal() {
     $('el-op-comment').value = '点击坐标(' + state.coordPoint[0] + ', ' + state.coordPoint[1] + ')';
     paramAuto = false;   // 用户选的是具体坐标，不让自动预填逻辑覆盖
   }
+  fillCaseHead(); syncOpCards();   // 弹窗改版：锚点卡/状态条回显 + 图标卡高亮同步
   $('modal-mask').style.display = 'flex';
 }
 /* ---- 新建文件输入（元素文件 / 用例文件）：选「➕ 新建…」时显示 ---- */
@@ -1124,8 +1127,9 @@ function renderStepsList(steps) {
     html += '<div class="sl-row"><span class="sl-idx">' + (i + 1) + '</span><span>' + esc(s) + '</span></div>';
   });
   const posTxt = pos === 'front' ? '（放在第 1 步之前）' : (pos > 0 ? '（插到第 ' + pos + ' 步之后）' : '');
+  html += '<div class="sl-marker">＋ 新步骤将插入到这里' + posTxt + '</div>';
   html += '<div class="sl-row new"><span class="sl-idx">' + newNo + '</span><span>➕ 本步：'
-    + esc(desc) + posTxt + '</span></div>';
+    + esc(desc) + '</span></div>';
   box.innerHTML = html;
 }
 /* 组装添加元素请求；checkDup=true 时后端先做重复检测（命中返回 duplicate 不落盘） */
@@ -1159,6 +1163,8 @@ function toggleCoordMode() {
 
 function onPurposeChange() {
   let p = purposeValue();
+  const tb = $('tri-bar');
+  if (tb) tb.style.display = (p === 'only' || p === 'popup') ? 'none' : '';   // 仅元素/弹窗规则库：无三件套落点
   // 特殊操作必须写用例（不写元素库），用途不允许停在「仅元素」
   if (p === 'only' && $('el-op-special').value) {
     document.querySelector('input[name="el-purpose"][value="all"]').checked = true;
@@ -1507,6 +1513,7 @@ function onCaseFileChange() {
   $('el-page-file').value = newCase ? (newCaseBase() ? capFirst(newCaseBase()) + 'Page.py（随用例包新建）' : '（输入用例名后自动派生）')
                                     : '';
   updatePkgTrio();
+  fillCaseHead();
   if (newCase) { renderStepsList([]); return; }
   const f = $('el-case-file').value;
   const infos = (state.caseFiles || []).filter(c => c.file === f);
@@ -2022,4 +2029,56 @@ async function saveCollect() {
   } finally {
     btn.disabled = false;
   }
+}
+
+/* ================= 弹窗改版（v6.98）：图标卡快捷选择 / 锚点卡 / 三件套状态条 =================
+   纯样式配套 JS：不新增字段、不改保存逻辑。el-op-type 原生 select 保留（全量操作类型），
+   图标卡只是常用 6 类的快捷入口，两者写同一字段并互相同步高亮。 */
+const OP_GRID_TYPES = ['click', 'input', 'long_press', 'assert_text', 'assert_toast', 'wait_element'];
+const OP_GRID_ICONS = { click: '👆', input: '⌨️', long_press: '✊', assert_text: '🔍', assert_toast: '💬', wait_element: '⏳' };
+
+function syncOpCards() {
+  const cur = $('el-op-type').value;
+  document.querySelectorAll('#op-grid .op-card').forEach(c =>
+    c.classList.toggle('on', c.dataset.op === cur));
+}
+
+function buildOpGrid() {
+  const grid = $('op-grid');
+  if (!grid || grid.dataset.built) return;
+  grid.dataset.built = '1';
+  OP_GRID_TYPES.forEach(v => {
+    const t = stepTypeInfo(v);
+    const card = document.createElement('div');
+    card.className = 'op-card';
+    card.dataset.op = v;
+    card.innerHTML = '<span class="oi">' + (OP_GRID_ICONS[v] || '🔧') + '</span><span class="ot">' + esc(t.n) + '</span>';
+    card.addEventListener('click', () => {
+      $('el-op-special').value = '';            // 与旧下拉同语义：选类型即清除特殊操作
+      onSpecialOpChange();
+      $('el-op-type').value = v;
+      $('el-op-type').dispatchEvent(new Event('change'));
+    });
+    grid.appendChild(card);
+  });
+  syncOpCards();
+}
+
+/* 打开弹窗时：回显锚点卡（已选元素）与三件套落点状态条 */
+function fillCaseHead() {
+  const name = $('el-name').value.trim();
+  const cn = $('el-cn-name').value.trim();
+  const typeSel = $('el-type');
+  const typeTxt = typeSel.options[typeSel.selectedIndex] ? typeSel.options[typeSel.selectedIndex].textContent : (typeSel.value || '');
+  $('ac-name').textContent = name || '—';
+  $('ac-cn').textContent = cn ? '（' + cn + '）' : '';
+  $('ac-loc').textContent = (typeSel.value || '') + ' · ' + ($('el-value').value || '—');
+  const parts = [
+    '元素 → ' + ($('el-file').value || '—'),
+    '用例行 → ' + ($('el-case-file').value === NEW_FILE_OPT ? '新建 ' + ($('el-case-new').value || '?') : ($('el-case-file').value || '—')),
+    '页面方法 → ' + ($('el-page-file').value || '选择用例后带出'),
+  ];
+  const bar = $('tri-bar');
+  bar.textContent = '🛡 三件套一次完成：' + parts.join(' · ');
+  bar.style.display = purposeValue() === 'only' ? 'none' : '';
 }

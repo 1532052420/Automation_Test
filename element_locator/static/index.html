@@ -119,29 +119,40 @@ try {
       <div class="flow-cols">
         <!-- 第一栏：元素 -->
         <section class="flow-col" id="col-element">
-          <div class="col-head">① 元素 <span class="hint">入库必需</span></div>
-          <label>元素名称 <span class="help-icon" data-help="代码里的元素引用名">?</span>
-            <input id="el-name" type="text" placeholder="如: search_btn">
-          </label>
-          <label>元素中文名 <span class="help-icon" data-help="元素管理和报告里的显示名">?</span>
-            <input id="el-cn-name" type="text" placeholder="如：悬浮球（元素管理中显示的名称，可不填）">
-          </label>
-          <label>定位方式 <span class="help-icon" data-help="ID 最稳首选，XPATH 次之">?</span>
-            <select id="el-type"></select>
-          </label>
-          <label>定位值 <span class="help-icon" data-help="与定位方式配套的值，已自动填好">?</span>
-            <input id="el-value" type="text">
-          </label>
-          <label>等待方式 <span class="help-icon" data-help="操作前等元素达到的状态">?</span>
-            <select id="el-wait">
-              <option value="VISIBILITY_OF">VISIBILITY_OF（可见）</option>
-              <option value="PRESENCE_OF_ELEMENT_LOCATED">PRESENCE_OF_ELEMENT_LOCATED（存在）</option>
-              <option value="ELEMENT_TO_BE_CLICKABLE">ELEMENT_TO_BE_CLICKABLE（可点击）</option>
-            </select>
-          </label>
-          <label>等待时间(秒) <span class="help-icon" data-help="最多等待秒数，默认 6">?</span>
-            <input id="el-wait-sec" type="number" min="1" max="600" step="1" value="6">
-          </label>
+          <div class="col-head" data-n="1">① 元素 <span class="hint">入库必需</span></div>
+          <div id="col-el-anchor" class="anchor-card">
+            <div class="ac-head">已选元素 · 元素定位 <span class="hint">来源：元素树点选 / 坐标选中</span></div>
+            <div class="ac-main"><b id="ac-name">—</b> <span class="hint" id="ac-cn"></span></div>
+            <code class="ac-loc" id="ac-loc">—</code>
+          </div>
+          <div class="el-duo">
+            <label>元素名称 <span class="help-icon" data-help="代码里的元素引用名">?</span>
+              <input id="el-name" type="text" placeholder="如: search_btn">
+            </label>
+            <label>元素中文名 <span class="help-icon" data-help="元素管理和报告里的显示名">?</span>
+              <input id="el-cn-name" type="text" placeholder="如：悬浮球（可不填）">
+            </label>
+          </div>
+          <div class="el-duo">
+            <label>定位方式 <span class="help-icon" data-help="ID 最稳首选，XPATH 次之">?</span>
+              <select id="el-type"></select>
+            </label>
+            <label>定位值 <span class="help-icon" data-help="与定位方式配套的值，已自动填好">?</span>
+              <input id="el-value" type="text">
+            </label>
+          </div>
+          <div class="el-duo">
+            <label>等待方式 <span class="help-icon" data-help="操作前等元素达到的状态">?</span>
+              <select id="el-wait">
+                <option value="VISIBILITY_OF">VISIBILITY_OF（可见）</option>
+                <option value="PRESENCE_OF_ELEMENT_LOCATED">PRESENCE_OF_ELEMENT_LOCATED（存在）</option>
+                <option value="ELEMENT_TO_BE_CLICKABLE">ELEMENT_TO_BE_CLICKABLE（可点击）</option>
+              </select>
+            </label>
+            <label>等待时间(秒) <span class="help-icon" data-help="最多等待秒数，默认 6">?</span>
+              <input id="el-wait-sec" type="number" min="1" max="600" step="1" value="6">
+            </label>
+          </div>
           <label>写入元素文件 <span class="help-icon" data-help="②时自动对齐页面引用的元素文件">?</span>
             <select id="el-file"></select>
             <span id="el-file-new-wrap" style="display:none;margin-top:6px">
@@ -153,7 +164,7 @@ try {
 
         <!-- 第二栏：用例 -->
         <section class="flow-col" id="col-case">
-          <div class="col-head">② 用例 <span class="hint">这步操作追加到哪条用例</span></div>
+          <div class="col-head" data-n="2">② 用例 <span class="hint">这步操作追加到哪条用例</span></div>
           <label>目标用例文件 <span class="help-icon" data-help="操作追加到的用例文件">?</span>
             <select id="el-case-file"></select>
             <span id="el-case-new-wrap" style="display:none;margin-top:6px">
@@ -175,8 +186,11 @@ try {
 
         <!-- 第三栏：操作 -->
         <section class="flow-col" id="col-op">
-          <div class="col-head">③ 操作 <span class="hint">对这个元素做什么</span></div>
+          <div class="col-head" data-n="3">③ 操作 <span class="hint">对这个元素做什么</span></div>
           <label>操作类型 <span class="help-icon" data-help="对这个元素做什么">?</span>
+            <div id="op-grid" class="op-grid"></div>
+          </label>
+          <label>全部操作类型 <span class="hint" style="font-weight:400">（含断言/等待/分支等全部类型）</span>
             <select id="el-op-type"></select>
           </label>
           <label>特殊操作 <span class="help-icon" data-help="与元素无关的用例级动作">?</span>
@@ -200,7 +214,7 @@ try {
 
         <!-- 弹窗规则栏：用途③（登记随机弹窗）专用，与三件套流程互斥显示 -->
         <section class="flow-col" id="col-popup" style="display:none">
-          <div class="col-head">③ 登记随机弹窗 <span class="hint">写进弹窗规则库，不进普通元素库</span></div>
+          <div class="col-head" data-n="3">③ 登记随机弹窗 <span class="hint">写进弹窗规则库，不进普通元素库</span></div>
           <label>规则名 <span class="help-icon" data-help="规则在规则库里的引用名">?</span>
             <input id="pp-name" type="text" placeholder="如: popup_promo_close">
           </label>
@@ -241,6 +255,7 @@ try {
       <div id="el-result" class="el-result"></div>
       <pre id="el-content" class="el-content"></pre>
     </div>
+    <div id="tri-bar" class="tri-bar" style="display:none"></div>
     <div class="modal-foot">
       <button id="btn-modal-cancel" class="btn">取消</button>
       <button id="btn-modal-save-continue" class="btn" title="保存后不结束：回到定位器点下一个元素，自动弹出本窗口连续录入">💾 保存并继续</button>
