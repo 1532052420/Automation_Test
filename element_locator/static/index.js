@@ -207,7 +207,7 @@ async function init() {
   document.querySelectorAll('input[name="el-purpose"]').forEach(r => r.addEventListener('change', onPurposeChange));
   $('el-op-type').addEventListener('change', () => { onOpTypeChange(); onCaseFileChange(); });
   $('el-op-special').addEventListener('change', onSpecialOpChange);
-  $('el-op-param').addEventListener('input', () => { paramAuto = false; });
+  $('el-op-param').addEventListener('input', () => { paramAuto = false; followStepDesc(); });
   $('el-case-file').addEventListener('change', onCaseFileChange);
   // 新建文件输入联动：元素文件切「新建」显隐输入行；用例名输入实时派生页面/元素文件名
   $('el-file').addEventListener('change', () => {
@@ -219,6 +219,9 @@ async function init() {
   // 定位方式切换：从当前元素的定位候选里取该类型的值回填（ID→ID值，XPATH→XPATH值…）
   $('el-type').addEventListener('change', onElTypeChange);
   $('el-op-comment').addEventListener('input', () => { opCommentAuto = false; });
+  // 步骤描述实时拼接：改元素中文名/元素名称立刻刷新描述（手输过描述则不覆盖）
+  $('el-cn-name').addEventListener('input', followStepDesc);
+  $('el-name').addEventListener('input', followStepDesc);
   $('el-insert-pos').addEventListener('change', () => { renderStepsList(currentSteps()); });
   // 顶部快速打开：用例 / 元素文件 / 页面操作 下拉打开编辑
   loadHeaderOpeners();
@@ -1033,10 +1036,10 @@ async function openModal() {
     $('el-op-type').value = 'tap';
     $('el-op-param').value = state.coordPoint[0] + ',' + state.coordPoint[1];
   }
-  // 步骤描述自动预填：优先元素文本（报告更友好），无文本则留空由后端按元素名生成
+  // 步骤描述自动预填：操作类型 + 「元素中文名」（中文名未填回退元素名称）；切类型/改名实时跟随
   $('el-op-comment').value = coordPick
     ? '点击坐标(' + state.coordPoint[0] + ', ' + state.coordPoint[1] + ')'
-    : autoStepComment('click', node.text);  // 默认按「点击」生成；切类型时自动跟随
+    : autoStepComment('click', opElementLabel());  // 默认按「点击」生成；切类型时自动跟随
   opCommentAuto = true;
   $('el-comment').value = '';
   $('el-case-comment').value = '';
@@ -1322,17 +1325,37 @@ function updateOpNote() {
 var paramAuto = true;
 var opCommentAuto = true;
 
-function autoStepComment(type, elementText) {
-  /* 按类型自动生成步骤描述（用元素文本更友好，无文本回退元素名） */
-  const t = (elementText || '').trim();
+function opElementLabel() {
+  /* 步骤描述用的元素显示名：元素中文名优先，未填回退元素名称 */
+  return $('el-cn-name').value.trim() || $('el-name').value.trim();
+}
+
+function followStepDesc() {
+  /* 步骤描述实时拼接：操作类型 + 元素中文名（+ 参数）随输入即时刷新；手输过描述(opCommentAuto=false)则不覆盖 */
+  if (opCommentAuto) {
+    $('el-op-comment').value = autoStepComment(currentOpType(), opElementLabel(), $('el-op-param').value);
+  }
+}
+
+function autoStepComment(type, elementLabel, param) {
+  /* 按类型自动生成步骤描述：操作类型 + 「元素中文名」拼接，带参数的类型把参数也拼进去 */
+  const t = (elementLabel || '').trim();
+  const p = (param == null ? '' : String(param)).trim();
   switch (type) {
     case 'click': return t ? '点击「' + t + '」' : '';
-    case 'input': return t ? '在「' + t + '」输入' : '';
+    case 'input': return t ? ('在「' + t + '」输入' + (p ? '「' + p + '」' : '')) : '';
     case 'long_press': return t ? '长按「' + t + '」' : '';
-    case 'wait_element': return t ? '等待「' + t + '」出现' : '';
-    case 'assert_gone': return t ? '断言「' + t + '」已消失' : '';
-    case 'if_click': return t ? '若「' + t + '」出现则点击' : '';
+    case 'tap': return '点击坐标' + (p ? '(' + p + ')' : '');
+    case 'screenshot': return '截图' + (p ? '「' + p + '」' : '');
+    case 'sleep': return '固定等待 ' + (p || '2') + ' 秒';
     case 'assert_visible': return t ? '断言「' + t + '」出现' : '';
+    case 'assert_text': return t ? ('断言「' + t + '」文本为「' + p + '」') : '';
+    case 'assert_toast': return '断言Toast' + (p ? '包含「' + p + '」' : '');
+    case 'assert_gone': return t ? '断言「' + t + '」已消失' : '';
+    case 'wait_element': return t ? '等待「' + t + '」出现' : '';
+    case 'if_click': return t ? '若「' + t + '」出现则点击' : '';
+    case 'custom': return '执行自定义代码';
+    case 'hide_keyboard': return '收起键盘（键盘在才收，否则不动）';
     case 'deal_first_launch_dialogs': return '首次启动弹窗处理（无弹窗自动跳过）';
     default: return '';
   }
@@ -1349,9 +1372,7 @@ function onOpTypeChange() {
     paramAuto = true;
   }
   // 步骤描述是自动预填时跟随类型重生成（避免「等待」步骤还挂着「点击…」描述）
-  if (opCommentAuto) {
-    $('el-op-comment').value = autoStepComment(currentOpType(), $('el-name').value);
-  }
+  followStepDesc();
   if (special) {
     // 特殊操作：与元素无关且不写元素库 → 元素栏整体禁用（dim = 禁点 + 弱化）
     $('col-element').classList.add('dim');

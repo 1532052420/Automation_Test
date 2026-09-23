@@ -194,7 +194,7 @@ try {
           <label id="el-op-param-wrap">操作参数 <span class="help-icon" data-help="操作需要的额外内容：输入→文本；断言Toast→toast 文案；断言文本→期望文字；坐标点击→x,y；轮询等待出现→最长等待秒数（超时用例失败）；出现才点击→探测秒数，例填 3=最多等 3 秒找弹窗，出现就点、没出现就跳过；固定等待→秒数；截图→截图名。不需要时自动隐藏。">?</span>
             <input id="el-op-param" type="text" placeholder="输入内容 / 期望文本 / toast文本 / 坐标(x,y) / 秒数">
           </label>
-          <label>步骤描述 <span class="help-icon" data-help="这一步做了什么（如「点击消息进入消息详情」），生成到用例注释和页面方法说明里，测试报告里也按它显示。已按元素文本自动生成，报告需要更友好的文字时再改；留空也会自动补。">?</span>
+          <label>步骤描述 <span class="help-icon" data-help="这一步做了什么（如「点击消息进入消息详情」），生成到用例注释和页面方法说明里，测试报告里也按它显示。已按「操作类型 + 元素中文名」自动生成并实时跟随：改元素中文名、换操作类型、填参数都会立刻刷新；手输过描述就不再自动覆盖，需要自动描述时清空即可。">?</span>
             <input id="el-op-comment" type="text" placeholder="留空=自动生成（可不填）">
           </label>
           <label>写入页面文件 <span class="help-icon" data-help="页面操作方法（如 click_login_btn）写进哪个 xxxPage.py——这个文件由目标用例决定（用例的 self.page 用的就是它），所以只读不可改：换页面文件 = 换目标用例。元素文件+页面文件就是操作牵涉的两个文件。">?</span>
