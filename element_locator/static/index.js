@@ -913,8 +913,9 @@ function renderDetail(node) {
     candBox.style.display = 'none';
   }
   const ATTRS = ['text', 'resource-id', 'class', 'content-desc', 'bounds', 'clickable', 'focusable', 'scrollable', 'selected', 'enabled', 'package', 'index'];
+  const HOT_KEYS = { 'text': 1, 'resource-id': 1 };   // 核心定位字段：值加粗强调
   const rows = ATTRS.filter(k => node[k] !== undefined && node[k] !== '' && node[k] !== false)
-    .map(k => '<tr><td>' + esc(k) + '</td><td>' + esc(node[k]) + '</td></tr>')
+    .map(k => '<tr' + (HOT_KEYS[k] ? ' class="hot"' : '') + '><td>' + esc(k) + '</td><td>' + esc(node[k]) + '</td></tr>')
     .join('');
   // 重复 resource-id 提示
   const rid = node['resource-id'];
@@ -923,7 +924,7 @@ function renderDetail(node) {
     ? '<div class="dup-tip">⚠ 该 resource-id 页面有 <b>' + sameCount + '</b> 个相同的，定位会不准。' +
       '用例里用 <code>appOperator.getElements(元素)[i]</code> 按下标取第 i 个（0 开始），' +
       '或用下面带 <code>instance</code> / 下标 的写法。</div>' : '';
-  $('detail-attrs').innerHTML = rows + '<tr><td>中心坐标</td><td>' + (node.center ? node.center.join(', ') : '-') + '</td></tr>';
+  $('detail-attrs').innerHTML = rows + '<tr class="hot"><td>中心坐标</td><td>' + (node.center ? node.center.join(', ') : '-') + '</td></tr>';
   $('dup-tip').innerHTML = dupTip;
   // 定位写法
   const locs = node.locators || [];
