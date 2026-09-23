@@ -9,7 +9,6 @@ class AaaaElements:
     def __init__(self):
         self.workspace_screen = CreateElement.create(Locator_Type.ID, 'com.huawei.android.launcher:id/workspace_screen', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)
         self.xxxxxx = CreateElement.create(Locator_Type.XPATH, '//*[@text="阅读快看版"]', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6, desc='阅读快看版')  # 阅读快看版
-        self.ccccc = CreateElement.create(Locator_Type.XPATH, '//*[@text="音乐"]', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6, desc='音乐')  # 音乐
         self.workspace = CreateElement.create(Locator_Type.ID, 'com.huawei.android.launcher:id/workspace', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)
         self.widget_home = CreateElement.create(Locator_Type.ID, 'com.huawei.android.totemweather:id/widget_home', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)
         self.widget_city_date = CreateElement.create(Locator_Type.XPATH, '//*[@text="9月21日星期一  八月十一"]', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6, desc='9月21日星期一  八月十一')  # 9月21日星期一  八月十一

@@ -24,7 +24,7 @@ class TestAaaa:
 
     @allure.title('点击「workspace_screen」')
     def test_aaaa(self):
-        """点击「workspace_screen」 → 点击xxxxxx → cccc → cccc → 点击workspace → 点击workspace_screen → 点击workspace_screen → 点击widget_home → 点击widget_city_date → 点击element_45 → 点击left_widget_area → 点击阅读快看版 → 点击应用市场 → 点击华为商城 → 点击钱包 → 点击钱包 → 点击主题 → 点击主题 → 点击主题 → 点击主题 → 点击主题11111 → 点击主题 → 点击主题 → 点击workspace → 点击workspace → 点击workspace → 点击workspace → 点击workspace → 点击workspace → 点击element_9 → 点击workspace_screen → 点击workspace_screen → 点击workspace_screen → 点击workspace_screen → 点击workspace_screen → 点击workspace → 点击workspace → 点击workspace → 点击workspace → 点击workspace → 点击workspace → 点击drag_layer → 点击drag_layer → 点击widget_time_hour"""
+        """点击「workspace_screen」 → 点击xxxxxx → cccc → cccc → 点击workspace → 点击workspace_screen → 点击workspace_screen → 点击widget_home → 点击widget_city_date → 点击element_45 → 点击left_widget_area → 点击阅读快看版 → 点击应用市场 → 点击华为商城 → 点击钱包 → 点击钱包 → 点击主题 → 点击主题 → 点击主题 → 点击主题11111 → 点击主题 → 点击主题 → 点击workspace → 点击workspace → 点击workspace → 点击workspace → 点击workspace → 点击workspace → 点击element_9 → 点击workspace_screen → 点击workspace_screen → 点击workspace_screen → 点击workspace_screen → 点击workspace_screen → 点击workspace → 点击workspace → 点击workspace → 点击workspace → 点击workspace → 点击workspace → 点击drag_layer → 点击drag_layer → 点击widget_time_hour"""
         page = self.page
 
         # 1. 点击「workspace_screen」
@@ -59,8 +59,6 @@ class TestAaaa:
         page.click_钱包()
         # 点击钱包
         page.click_钱包()
-        # 点击主题
-        page.click_主题()
         # 点击主题
         page.click_主题()
         # 点击主题
