@@ -265,6 +265,15 @@ def case_step_line(step):
 # ---------------------------------------------------------------------------
 # 页面对象文件生成
 # ---------------------------------------------------------------------------
+def _elements_class_of(elements_file):
+    """元素文件的真实类名：直接读文件 class 行（唯一可信来源）。
+    派生规则（to_class_name）与前端 capFirst 规则在多词文件名上不一致，
+    曾导致追加步骤时插入错误类名 import 使整条用例 ImportError。读不到再回退派生。"""
+    path = os.path.join(element_library.ELEMENTS_DIR, elements_file)
+    m = re.search(r'^\s*class\s+(\w+)', _read(path), re.MULTILINE) if os.path.isfile(path) else None
+    return m.group(1) if m else element_library.to_class_name(elements_file)
+
+
 def _ensure_elements_import(content, elements_file, elements_class):
     """页面文件缺失元素类 import 时自动补全（class 行之前）"""
     need = 'from page_objects.app_ui.android.demoProject.elements.%s import %s' % (
@@ -721,7 +730,7 @@ def append_code_to_method(case_file, method_name, step, gen_page_method=False, i
     if not (mname in exists and mname in TOOL_METHODS):
         if elements_file:
             pcontent = _ensure_elements_import(pcontent, elements_file,
-                                               element_library.to_class_name(elements_file))
+                                               _elements_class_of(elements_file))
         # 探针类步骤（wait_element/assert_gone/if_click）还要补 CreateElement 等三件 import
         if step.get('type') in PROBE_STEP_TYPES:
             pcontent = _ensure_probe_imports(pcontent)

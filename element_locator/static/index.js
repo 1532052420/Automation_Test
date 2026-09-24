@@ -1860,7 +1860,7 @@ async function onSaveElement(continueMode) {
     param: $('el-op-param').value.trim(),
     desc: '',
     comment: $('el-op-comment').value.trim(),        // 操作备注 → 页面方法 docstring
-    case_comment: '',   // 用例备注字段已删：留空由后端自动生成步骤描述
+    case_comment: $('el-op-comment').value.trim(),   // 步骤描述 → 追加行上方注释（与弹窗所见一致）
   };
   const res = $('el-result');
   res.className = 'el-result'; res.textContent = purpose === 'all'
