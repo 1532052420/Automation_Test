@@ -27,7 +27,8 @@ SHELL_CANDIDATES = [
 ]
 FFMPEG = 'ffmpeg'
 FFPROBE = 'ffprobe'
-FRAME_INTERVAL_MS = 250          # 时间轴帧间隔（连续铺满）
+FRAME_INTERVAL_MS = 80           # 时间轴帧间隔：渲染器按固定帧率（~14fps）播放，
+                                 # 帧密度决定播放时长——80ms 间隔使播放时长≈真实执行时长
 
 
 def find_shell():
@@ -79,6 +80,23 @@ def video_size(path):
         return {'width': int(w), 'height': int(h), 'dpr': 1}
     except Exception:
         return {'width': 1080, 'height': 2400, 'dpr': 1}
+
+
+def extract_all_frames(video, interval_ms, out_dir):
+    """一次 ffmpeg 按固定间隔抽全部帧（fps=1000/interval），返回 [(offset_ms, path)]。"""
+    os.makedirs(out_dir, exist_ok=True)
+    fps = 1000.0 / interval_ms
+    pattern = os.path.join(out_dir, 'f_%04d.jpg')
+    try:
+        subprocess.run([FFMPEG, '-y', '-i', video, '-vf', 'fps=%f' % fps,
+                        '-q:v', '5', pattern], capture_output=True, timeout=300)
+    except Exception:
+        pass
+    frames = []
+    for f in sorted(glob.glob(os.path.join(out_dir, 'f_*.jpg'))):
+        n = int(re.search(r'f_(\d+)\.jpg$', f).group(1))
+        frames.append((int((n - 0.5) * interval_ms), f))
+    return frames
 
 
 def frame_at(video, offset_ms):
@@ -163,6 +181,15 @@ def build_data(run_id, meta, results, run_dir):
         reason = ((res.get('statusDetails') or {}).get('message') or '')[:2000]
         failed = status != 'passed'
 
+        # 批量抽帧：录屏全时长按 FRAME_INTERVAL_MS 一次 ffmpeg 抽帧（帧文件 → report/media/）
+        media_dir = os.path.join(run_dir, 'report', 'media')
+        os.makedirs(media_dir, exist_ok=True)
+        all_frames = []
+        if v0:
+            vkey = re.sub(r'[^A-Za-z0-9_.]', '__', os.path.basename(v0))[:60]
+            all_frames = extract_all_frames(v0, FRAME_INTERVAL_MS,
+                                            os.path.join(media_dir, 'frames_' + vkey))
+
         # 用例级证据：失败截图 + 失败录屏
         case_shots = []
         for att in res.get('attachments', []) or []:
@@ -203,18 +230,21 @@ def build_data(run_id, meta, results, run_dir):
                         shots.append(d)
             main_shot = shots[0] if shots else None
             rec = []
-            # 录屏帧：该步骤时间窗内按 FRAME_INTERVAL_MS 取帧（时间轴连续铺满）
-            if v0 and v_dur > 0:
-                rel_a = max(0, s_start - case_start)
-                rel_b = max(rel_a + FRAME_INTERVAL_MS, s_end - case_start)
-                ts = rel_a
-                while ts <= rel_b:
-                    # 录屏比用例短时：超出段用录屏末帧延续（teardown 静止画面，保证全程有画面）
-                    d = frame_at(v0, min(ts, v_dur - 100))
-                    if d:
-                        rec.append({'type': 'screenshot', 'ts': int(case_start + ts),
-                                    'screenshot': d, 'timing': 'after-calling'})
-                    ts += FRAME_INTERVAL_MS
+            # 该步骤时间窗内的帧（帧文件已在批量抽帧阶段生成 → base64 dataURI）
+            rel_a = max(0, s_start - case_start)
+            rel_b = max(rel_a + FRAME_INTERVAL_MS, s_end - case_start)
+            for off, fpath in all_frames:
+                if rel_a <= off <= rel_b:
+                    rec.append({'type': 'screenshot', 'ts': int(case_start + off),
+                                'screenshot': b64_image(fpath), 'timing': 'after-calling'})
+            # 录屏比用例短时：超出段用录屏末帧延续（teardown 静止画面）
+            if all_frames and rel_b > (all_frames[-1][0]):
+                last_off, last_path = all_frames[-1]
+                _t = rel_b
+                while _t > last_off + FRAME_INTERVAL_MS // 2 and _t <= rel_b:
+                    rec.append({'type': 'screenshot', 'ts': int(case_start + _t),
+                                'screenshot': b64_image(last_path), 'timing': 'after-calling'})
+                    _t -= FRAME_INTERVAL_MS
             if main_shot and not any(r['ts'] == s_end for r in rec):
                 rec.append({'type': 'screenshot', 'ts': s_end, 'screenshot': main_shot,
                             'timing': 'after-calling'})
