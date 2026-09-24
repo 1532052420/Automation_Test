@@ -936,7 +936,21 @@ html.night ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, .26
   font-weight: 700; line-height: 1; padding: 4px 0;
 }
 
-/* ---------- 元素管理·文件列表：操作列固定靠右（文件名占满余下宽度） ---------- */
-#elFilesView th:last-child, #elFilesView td:last-child { width: 150px; text-align: right; }
-#elFilesView td .ops { justify-content: flex-end; }
+/* ---------- 列表操作列统一右对齐：项目管理/元素管理(两级)/执行用例/用例管理/测试套件/执行历史 ---------- */
+#panel-projects th:last-child, #panel-projects td:last-child,
+#elFilesView th:last-child, #elFilesView td:last-child,
+#elElemsView th:last-child, #elElemsView td:last-child,
+#panel-cases th:last-child, #panel-cases td:last-child,
+#panel-caselist th:last-child, #panel-caselist td:last-child,
+#panel-suites th:last-child, #panel-suites td:last-child,
+#histMask th:last-child, #histMask td:last-child {
+  text-align: right;
+}
+#panel-projects td:last-child .ops,
+#elFilesView td .ops,
+#elElemsView td:last-child .ops,
+#panel-cases td:last-child .ops,
+#panel-caselist td:last-child .ops,
+#panel-suites td:last-child .ops,
+#histMask td:last-child .ops { justify-content: flex-end; }
 
