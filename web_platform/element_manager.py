@@ -170,10 +170,13 @@ def delete_element(filename, name):
 
 def delete_file(filename):
     """删除整个元素文件（直接删除，不留备份——用户口径：删就删干净）。
-    规则库 popupElements.py / 备份文件不在 list_element_files 白名单，天然删不到。"""
+    规则库 popupElements.py / 备份文件不在 list_element_files 白名单，天然删不到。
+    默认落点文件可能本就不存在（list_element_files 恒插入 DEFAULT_FILE）——幂等返回成功。"""
     if filename not in list_element_files():
         return False, '元素文件不存在或不可删除: %s' % filename
     src = os.path.join(ELEMENTS_DIR, filename)
+    if not os.path.isfile(src):
+        return True, '文件 %s 本就不存在，无需删除' % filename
     try:
         os.remove(src)
     except OSError as e:

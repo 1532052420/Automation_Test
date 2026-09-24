@@ -227,8 +227,13 @@ def api_appui_elements():
             return any(kw in str(e.get(k, '')).lower() for k in ('name', 'value', 'desc', 'type', 'file'))
         elements = [e for e in elements if _hit(e)]
     elements.sort(key=lambda e: (e['file'], e['name']))
+    files = element_manager.list_element_files()
+    # 磁盘上真实存在的文件（默认落点不存在时 list_element_files 会恒插入，文件列表视图只显示真实存在的）
+    import os as _os
+    existing_files = [f for f in files
+                      if _os.path.isfile(os.path.join(element_manager.ELEMENTS_DIR, f))]
     return jsonify({'ok': True, 'elements': elements,
-                    'files': element_manager.list_element_files(),
+                    'files': files, 'existing_files': existing_files,
                     'locator_types': element_manager.LOCATOR_TYPES,
                     'wait_types': element_manager.WAIT_TYPES})
 

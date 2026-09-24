@@ -652,7 +652,7 @@ function initRunPanels() {
 /* ================= 元素管理（元素库列表 / 编辑 / 复制 / 删除） =================
    数据源与元素定位器、执行框架同一份元素库（page_objects/.../elements/*.py）；
    编辑/复制走后端 /api/appui/elements/save，写回复用定位器同一套行生成逻辑。 */
-let _elements = [], _elFiles = [], _elTypes = [], _elWaits = [];
+let _elements = [], _elFiles = [], _elExistingFiles = [], _elTypes = [], _elWaits = [];
 let _elModalMode = 'edit', _elModalOrig = null;
 let _elMgrFile = null;   // null = 元素文件列表视图；非空 = 已进入该文件（元素列表视图）
 
@@ -661,6 +661,7 @@ async function loadElements() {
   if (!d.ok) return toast(d.msg || '元素列表加载失败', false);
   _elements = d.elements || [];
   _elFiles = d.files || [];
+  _elExistingFiles = d.existing_files || _elFiles;   // 磁盘上真实存在的文件（默认落点不存在时不显示）
   _elTypes = d.locator_types || ['ID', 'XPATH'];
   _elWaits = d.wait_types || ['VISIBILITY_OF'];
   renderElMgr();
@@ -680,7 +681,8 @@ function renderElMgr() {
 }
 
 function renderElementFiles() {
-  const rows = _elFiles.map(f =>
+  /* 只显示磁盘上真实存在的文件；默认落点不存在时不显示幽灵行 */
+  const rows = _elExistingFiles.map(f =>
     '<tr><td><b>' + esc(f) + '</b></td><td><div class="ops">' +
     '<button class="ghost mini" data-act="open" data-file="' + esc(f) + '">编辑</button>' +
     '<button class="mini danger-ghost" data-act="delfile" data-file="' + esc(f) + '">删除</button>' +
@@ -690,7 +692,7 @@ function renderElementFiles() {
         '<button class="ghost mini" data-act="open" data-file="popupElements.py">编辑</button>' +
         '</div></td></tr>' : '');
   $('#elFilesTbody').innerHTML = rows;
-  $('#elFilesEmpty').style.display = _elFiles.length ? 'none' : '';
+  $('#elFilesEmpty').style.display = _elExistingFiles.length ? 'none' : '';
 }
 
 async function deleteElementFile(file) {
