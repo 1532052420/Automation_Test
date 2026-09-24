@@ -1164,15 +1164,15 @@ async function loadReportList() {
     '<td><div class="ops">' +
     '<button class="ghost mini" onclick="showRunDetail(\'' + esc(r.run_id) + '\')">详情</button>' +
     '<button class="ghost mini" onclick="openReportFor(\'' + esc(r.run_id) + '\', this)">打开报告</button>' +
-    '<button class="ghost mini" onclick="inReportFor(\'' + esc(r.run_id) + '\')" title="建设中">在线报告</button>' +
+    '<button class="ghost mini" onclick="openMidsceneFor(\'' + esc(r.run_id) + '\', this)" title="Midscene 风格在线回放报告：视频帧时间轴 + 失败证据">在线报告</button>' +
     '<button class="mini danger-ghost" onclick="deleteRunFor(\'' + esc(r.run_id) + '\')">删除数据</button>' +
     '</div></td></tr>').join('');
   renderPager('#reportPager', _reportPage, pages, (p) => { _reportPage = p; loadReportList(); }, runs.length);
 }
 
-/* 在线报告（占位）：按钮已就位，交互后续实现 */
+/* 在线报告 = Midscene 风格回放报告（与 Allure 报告并存，互不影响） */
 function inReportFor(runId) {
-  toast('「在线报告」建设中：' + runId);
+  openMidsceneFor(runId, null);
 }
 
 /* 打开报告（统一入口）：按钮 loading + 5 秒冷却防重复点击。
