@@ -481,6 +481,7 @@ function runRowHtml(r, withOps) {
     (withOps ? '<td><div class="ops">' +
       '<a class="btn ghost mini" href="/runs/' + esc(r.run_id) + '">详情</a>' +
       '<button class="ghost mini" onclick="openReportFor(\'' + esc(r.run_id) + '\', this)">报告</button>' +
+      '<button class="ghost mini" onclick="openMidsceneFor(\'' + esc(r.run_id) + '\', this)" title="Midscene 风格回放报告：步骤时间线 + 失败截图/录屏证据">回放</button>' +
       '<button class="mini danger-ghost" onclick="deleteRunFor(\'' + esc(r.run_id) + '\')">删除</button>' +
       '</div></td>' : '') +
     '</tr>';
@@ -565,7 +566,7 @@ async function clearAllRuns() {
 
 function refreshAfterOps() {
   const page = document.body.dataset.page;
-  if (page === 'report') { refreshStats(); loadRunsTable('#recentList', true, 10); loadReportList(); }
+  if (page === 'report') { refreshStats(); loadReportList(); }
 }
 
 /* ================= APP UI 执行页 ================= */
@@ -1132,8 +1133,8 @@ async function initReport() {
   $('#btnClearAll3').addEventListener('click', clearAllRuns);
   initStatIcons();
   setHtml('#runDetail', detailPlaceholder());
-  await Promise.all([refreshStats(), loadRunsTable('#recentList', true, 10), loadReportList()]);
-  setInterval(() => { refreshStats(); loadRunsTable('#recentList', true, 10); }, 8000);
+  await Promise.all([refreshStats(), loadReportList()]);
+  setInterval(() => { refreshStats(); }, 8000);
   setInterval(loadReportList, 8000);
 }
 
@@ -1143,7 +1144,7 @@ async function loadReportList() {
   if (!tb) return;
   const runs = d.runs || [];
   if (!runs.length) {
-    tb.innerHTML = '<tr><td colspan="6">' +
+    tb.innerHTML = '<tr><td colspan="8">' +
       emptyHtml('chart', '暂无执行记录，先生成一次执行') + '</td></tr>';
     setHtml('#reportPager', '');
     return;
@@ -1156,13 +1157,21 @@ async function loadReportList() {
     '<td>' + fmtTime(r.start_time) + '</td>' +
     '<td>' + statusBadge(r.status) + '</td>' +
     '<td class="muted">' + esc(runTarget(r)) + '</td>' +
+    '<td title="' + esc(r.app_package || r.conf_file || '') + '">' + esc(runSubject(r)) + '</td>' +
+    '<td><b>' + r.total + '</b> / <span class="num-ok">' + r.passed + '</span> / <span class="num-bad">' + r.failed + '</span></td>' +
     '<td>' + (r.report_dir ? '<span class="num-ok">已生成</span>' : '<span class="muted">未生成</span>') + '</td>' +
     '<td><div class="ops">' +
     '<button class="ghost mini" onclick="showRunDetail(\'' + esc(r.run_id) + '\')">详情</button>' +
     '<button class="ghost mini" onclick="openReportFor(\'' + esc(r.run_id) + '\', this)">打开报告</button>' +
+    '<button class="ghost mini" onclick="inReportFor(\'' + esc(r.run_id) + '\')" title="建设中">在线报告</button>' +
     '<button class="mini danger-ghost" onclick="deleteRunFor(\'' + esc(r.run_id) + '\')">删除数据</button>' +
     '</div></td></tr>').join('');
   renderPager('#reportPager', _reportPage, pages, (p) => { _reportPage = p; loadReportList(); }, runs.length);
+}
+
+/* 在线报告（占位）：按钮已就位，交互后续实现 */
+function inReportFor(runId) {
+  toast('「在线报告」建设中：' + runId);
 }
 
 /* 打开报告（统一入口）：按钮 loading + 5 秒冷却防重复点击。
@@ -1170,6 +1179,18 @@ async function loadReportList() {
    按钮级的 disabled 挡不住重建出来的新按钮。
    后端等报告服务就绪才返回，返回后只 window.open 一次（不会双开） */
 let _openReportLockUntil = 0;
+async function openMidsceneFor(runId, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '打开中…'; }
+  try {
+    toast('正在生成/打开 ' + runId + ' 的回放报告…');
+    const d = await postJson('/api/run/' + runId + '/midscene/open', {});
+    if (d.ok) { toast(d.reused ? '回放报告已就绪: ' + d.url : '回放报告已生成并打开: ' + d.url); window.open(d.url, '_blank'); }
+    else toast('打开失败: ' + (d.msg || ''), false);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '回放'; }
+  }
+}
+
 async function openReportFor(runId, btn) {
   if (Date.now() < _openReportLockUntil) return;
   _openReportLockUntil = Date.now() + 5000;

@@ -30,28 +30,47 @@ def load_run(run_id):
     return run_dir, meta, results
 
 
-def build_data(run_id, meta, results):
+def build_data(run_id, meta, results, run_dir_abs):
     """把 Allure results 映射成 Midscene 报告 schema（executions/tasks）。"""
     run_start = meta.get('start_time')
     run_end = meta.get('end_time')
     executions = []
     exec_name = 'APP UI 自动化 · %s · %s' % (meta.get('device_model') or meta.get('device_desc') or '设备',
                                             run_id)
+    ATT_BASE = '../allure-results/'          # 报告输出在 runs/<id>/report/ 下
     tasks = []
     for res in sorted(results, key=lambda r: r.get('start') or 0):
         case_name = res.get('name') or '用例'
         status = res.get('status') or 'unknown'
         case_start = res.get('start')
         case_stop = res.get('stop')
-        # 用例组头（Plan 类型任务，展示为 Action 分组标题）
+        # 用例级证据附件（失败截图 / 失败录屏 / 失败原因）
+        case_shots, case_videos, case_reason = [], [], ''
+        for att in res.get('attachments', []) or []:
+            src = ATT_BASE + att.get('source', '')
+            t = att.get('type') or ''
+            if t.startswith('image/'):
+                case_shots.append(src)
+            elif t.startswith('video/'):
+                case_videos.append(src)
+            elif att.get('name') == 'failure_reason':
+                try:
+                    fp = os.path.join(run_dir_abs, 'allure-results', att.get('source', ''))
+                    case_reason = open(fp, encoding='utf-8', errors='replace').read().strip()[:2000]
+                except Exception:
+                    pass
+        # 用例组头（Plan 类型任务，展示为 Action 分组标题；携带用例级证据）
         tasks.append({
             'status': 'finished' if status == 'passed' else 'failed',
             'type': 'Planning', 'subType': 'Case',
-            'param': {'name': case_name, 'node': (res.get('fullName') or '')},
+            'param': {'name': case_name, 'node': (res.get('fullName') or ''),
+                      'reason': case_reason},
             'timing': {'start': case_start, 'end': case_stop,
                        'cost': (case_stop or 0) - (case_start or 0)},
-            'uiContext': None, 'output': {'title': case_name},
+            'uiContext': None,
+            'output': {'title': case_name},
         })
+        step_tasks = []
         for st in res.get('steps') or []:
             st_time = st.get('time') or {}
             start = st_time.get('start')
@@ -59,20 +78,25 @@ def build_data(run_id, meta, results):
             shots = []
             for att in st.get('attachments', []) or []:
                 if (att.get('type') or '').startswith('image/'):
-                    shots.append('data/attachments/' + att.get('source', ''))
-            if not shots and res.get('attachments'):
-                for att in res.get('attachments', []):
-                    if (att.get('type') or '').startswith('image/'):
-                        shots.append('data/attachments/' + att.get('source', ''))
-            tasks.append({
+                    shots.append(ATT_BASE + att.get('source', ''))
+            if not shots and case_shots:
+                shots = list(case_shots)
+            step_tasks.append({
                 'status': ('finished' if st.get('status') in (None, 'passed', 'finished')
                            else st.get('status')),
                 'type': 'Action Space', 'subType': 'Step',
                 'param': {'name': st.get('name', ''), 'case': case_name},
                 'timing': {'start': start, 'end': end, 'cost': st_time.get('duration')},
-                'uiContext': {'size': None, 'screenshots': shots} if shots else None,
+                'uiContext': None,
                 'output': {'title': st.get('name', '')},
             })
+        # 非通过用例：失败证据（截图+录屏+原因）挂到最后一个步骤（失败点），便于步进直达
+        if status != 'passed' and step_tasks:
+            last = step_tasks[-1]
+            last['status'] = 'failed'
+            last['uiContext'] = {'size': None, 'screenshots': case_shots, 'videos': case_videos}
+            last['param']['reason'] = case_reason
+        tasks.extend(step_tasks)
     executions.append({'logTime': int(time.time() * 1000), 'name': exec_name, 'tasks': tasks})
     return {
         'sdkVersion': '6.12.0',
@@ -302,7 +326,7 @@ html.night .viewer { background: #0c0d0f; }
       if (+el.dataset.i === cur) el.scrollIntoView({ block: 'nearest' });
     });
     /* 时间轴：所有含截图的步骤 */
-    const withShots = FLAT.filter(x => x.kind === 'step' && shotUrls(x).length);
+    const withShots = FLAT.filter(x => shotUrls(x).length);
     tlInner.innerHTML = withShots.map(x => {
       const t = x.task.timing || {};
       const rel = (t.start && runEnd) ? Math.max(0, t.start - runStart) : 0;
@@ -315,9 +339,14 @@ html.night .viewer { background: #0c0d0f; }
     });
     const curCell = tlInner.querySelector('.tl-cell.cur');
     if (curCell) curCell.scrollIntoView({ block: 'nearest', inline: 'center' });
-    /* 主视图 */
-    const urls = it.kind === 'step' ? shotUrls(it) : [];
-    if (urls.length) {
+    /* 主视图：失败录屏优先，其次截图；用例组头无证据时给占位说明 */
+    const urls = shotUrls(it);
+    const vids = ((it.task.uiContext || {}).videos) || [];
+    if (vids.length) {
+      viewer.innerHTML = '<video controls playsinline preload="metadata" src="' + vids[0] +
+        '" style="max-width:92%;max-height:92%;border-radius:6px;box-shadow:0 6px 30px rgba(0,0,0,.25)"></video>' +
+        (urls.length ? '<div style="position:absolute;bottom:10px;left:14px;color:var(--muted);font-size:11.5px">录屏证据 · 失败截图见时间轴</div>' : '');
+    } else if (urls.length) {
       viewer.innerHTML = '<img src="' + urls[0] + '">';
     } else if (it.kind === 'case') {
       viewer.innerHTML = '<div class="noimg"><span class="big">📋</span>用例分组：' + esc(it.groupTitle) +
@@ -341,7 +370,10 @@ html.night .viewer { background: #0c0d0f; }
     if (it.task.timing && it.task.timing.start) extra.push('开始 ' + new Date(it.task.timing.start).toLocaleTimeString());
     if (it.task.status) extra.push('状态 ' + it.task.status);
     if (it.task.param && it.task.param.node) extra.push('节点 ' + it.task.param.node);
-    document.getElementById('dExtra').innerHTML = extra.map(x => '· ' + esc(x)).join('<br>');
+    const reason = it.task.param && it.task.param.reason;
+    document.getElementById('dExtra').innerHTML =
+      (reason ? '<div style="color:var(--bad);margin-bottom:6px;white-space:pre-wrap">✗ 失败原因：<br>' + esc(reason) + '</div>' : '') +
+      extra.map(x => '· ' + esc(x)).join('<br>');
     document.getElementById('detailBar').classList.remove('open');
   }
   document.getElementById('dChev').addEventListener('click', () => {
@@ -386,10 +418,11 @@ def main():
             raise SystemExit('output/runs 下没有运行记录')
         run_id = os.path.basename(runs[0])
     run_dir, meta, results = load_run(run_id)
-    data = build_data(run_id, meta, results)
+    data = build_data(run_id, meta, results, run_dir)
     payload = json.dumps(data, ensure_ascii=False)
     html = TEMPLATE.replace('__REPORT_DATA__', payload.replace('</', '<\\/'))
-    out = os.path.join(run_dir, 'midscene-report.html')
+    os.makedirs(os.path.join(run_dir, 'report'), exist_ok=True)
+    out = os.path.join(run_dir, 'report', 'midscene-report.html')
     with open(out, 'w', encoding='utf-8') as f:
         f.write(html)
     print('已生成:', out)
