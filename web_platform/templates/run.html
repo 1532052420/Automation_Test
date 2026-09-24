@@ -121,22 +121,38 @@
       <section class="panel" id="panel-elements">
         <div class="card">
           <h3>元素管理 <span class="muted">元素库与元素定位器共用同一份数据，编辑实时生效</span></h3>
-          <div class="treebar">
-            <select id="elFileFilter" style="max-width:190px" title="按元素文件筛选，只显示该文件下的元素"><option value="">全部元素文件</option></select>
-            <input type="search" id="elSearch" placeholder="搜索：名称 / 定位值 / 标签 / 类型 / 文件">
-            <button class="ghost mini" id="btnElRefresh">重置</button>
+          <!-- 一级：元素文件列表 -->
+          <div id="elFilesView">
+            <div class="treebar">
+              <button class="ghost mini" id="btnElRefresh">重置</button>
+            </div>
+            <div class="tblwrap">
+              <table>
+                <thead><tr><th>元素文件名</th><th>操作</th></tr></thead>
+                <tbody id="elFilesTbody"></tbody>
+              </table>
+            </div>
+            <div id="elFilesEmpty" class="empty" style="display:none">元素库为空</div>
           </div>
-          <div class="tblwrap">
-            <table>
-              <thead><tr>
-                <th>名称</th><th>类型</th><th>标签</th><th>预览</th>
-                <th>使用次数</th><th>创建时间</th><th>操作</th>
-              </tr></thead>
-              <tbody id="elTbody"></tbody>
-            </table>
+          <!-- 二级：文件内元素列表（字段与操作同原元素管理） -->
+          <div id="elElemsView" style="display:none">
+            <div class="treebar">
+              <button class="ghost mini" id="btnElBack">← 返回文件列表</button>
+              <b id="elCurFile" style="align-self:center;font-size:13px"></b>
+              <input type="search" id="elSearch" placeholder="搜索：名称 / 定位值 / 标签 / 类型">
+            </div>
+            <div class="tblwrap">
+              <table>
+                <thead><tr>
+                  <th>名称</th><th>类型</th><th>标签</th><th>预览</th>
+                  <th>使用次数</th><th>创建时间</th><th>操作</th>
+                </tr></thead>
+                <tbody id="elTbody"></tbody>
+              </table>
+            </div>
+            <div id="elEmpty" class="empty" style="display:none">该文件暂无元素</div>
+            <div class="list-pager" id="elPager"></div>
           </div>
-          <div id="elEmpty" class="empty" style="display:none">元素库为空</div>
-          <div class="list-pager" id="elPager"></div>
         </div>
       </section>
 

@@ -634,6 +634,7 @@ function initRunPanels() {
    编辑/复制走后端 /api/appui/elements/save，写回复用定位器同一套行生成逻辑。 */
 let _elements = [], _elFiles = [], _elTypes = [], _elWaits = [];
 let _elModalMode = 'edit', _elModalOrig = null;
+let _elMgrFile = null;   // null = 元素文件列表视图；非空 = 已进入该文件（元素列表视图）
 
 async function loadElements() {
   const d = await api('/api/appui/elements');
@@ -642,22 +643,59 @@ async function loadElements() {
   _elFiles = d.files || [];
   _elTypes = d.locator_types || ['ID', 'XPATH'];
   _elWaits = d.wait_types || ['VISIBILITY_OF'];
-  /* 元素文件筛选下拉：排除备份文件，重建时保留当前选择；弹窗规则库只读展示（见 renderElements） */
-  const curFile = $('#elFileFilter').value;
-  $('#elFileFilter').innerHTML = '<option value="">全部元素文件</option>' +
-    _elFiles.filter(f => !f.includes('_backup')).map(f =>
-      '<option value="' + esc(f) + '"' + (f === curFile ? ' selected' : '') + '>' + esc(f) + '</option>').join('') +
+  renderElMgr();
+}
+
+/* 一级视图：元素文件列表（文件名 + 编辑/删除）；popupElements.py 规则库只能进入查看，不提供删除 */
+function renderElMgr() {
+  const inFile = _elMgrFile !== null;
+  $('#elFilesView').style.display = inFile ? 'none' : '';
+  $('#elElemsView').style.display = inFile ? '' : 'none';
+  if (inFile) {
+    $('#elCurFile').textContent = _elMgrFile;
+    renderElements();
+  } else {
+    renderElementFiles();
+  }
+}
+
+function renderElementFiles() {
+  const rows = _elFiles.map(f =>
+    '<tr><td><b>' + esc(f) + '</b></td><td><div class="ops">' +
+    '<button class="ghost mini" data-act="open" data-file="' + esc(f) + '">编辑</button>' +
+    '<button class="mini danger-ghost" data-act="delfile" data-file="' + esc(f) + '">删除</button>' +
+    '</div></td></tr>').join('') +
     (_elements.some(e => e.popup)
-      ? '<option value="popupElements.py">popupElements.py（弹窗规则库）</option>' : '');
-  renderElements();
+      ? '<tr><td><b>popupElements.py</b> <span class="el-popup-badge">规则库</span></td><td><div class="ops">' +
+        '<button class="ghost mini" data-act="open" data-file="popupElements.py">编辑</button>' +
+        '</div></td></tr>' : '');
+  $('#elFilesTbody').innerHTML = rows;
+  $('#elFilesEmpty').style.display = _elFiles.length ? 'none' : '';
+}
+
+async function deleteElementFile(file) {
+  const cnt = _elements.filter(e => e.file === file).length;
+  const yes = await confirmModal('删除元素文件',
+    '将删除 ' + file + '（含 ' + cnt + ' 个元素），删除前自动备份。引用该文件的页面将无法定位元素，确定删除？', true);
+  if (!yes) return;
+  const d = await postJson('/api/appui/elements/file/delete', { file: file });
+  toast(d.msg || (d.ok ? '已删除' : '删除失败'), !!d.ok);
+  if (d.ok) loadElements();
+}
+
+function onElFilesClick(e) {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const file = btn.dataset.file;
+  if (btn.dataset.act === 'open') { _elMgrFile = file; _elPage = 1; renderElMgr(); }
+  else if (btn.dataset.act === 'delfile') deleteElementFile(file);
 }
 
 function renderElements() {
   const kw = ($('#elSearch').value || '').trim().toLowerCase();
-  const ff = $('#elFileFilter').value;
   const list = _elements.filter(e =>
-    (!ff || e.file === ff) &&
-    (!kw || [e.name, e.cn_name, e.value, e.desc, e.type, e.file].some(v =>
+    (!_elMgrFile || e.file === _elMgrFile) &&
+    (!kw || [e.name, e.cn_name, e.value, e.desc, e.type].some(v =>
       String(v || '').toLowerCase().includes(kw))));
   const perPage = 10;
   const pages = Math.max(1, Math.ceil(list.length / perPage));
@@ -677,7 +715,7 @@ function renderElements() {
     /* 弹窗规则库行：定位器「登记随机弹窗」专管锚点/冷却/白名单；此处仅支持删除（单行移除，不影响同文件规则常量） */
     const actions = e.popup
       ? '<div class="ops">' +
-        '<button class="ghost mini" data-act="rename" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">重命名</button>' +
+        '<button class="ghost mini" data-act="edit" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">编辑</button>' +
         '<button class="mini danger-ghost" data-act="del" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">删除</button></div>'
       : '<div class="ops">' +
     '<button class="ghost mini" data-act="edit" data-name="' + esc(e.name) + '" data-file="' + esc(e.file) + '">编辑</button>' +
@@ -768,7 +806,6 @@ function onElTableClick(e) {
   if (btn.dataset.act === 'edit') openElModal('edit', name, file);
   else if (btn.dataset.act === 'copy') openElModal('copy', name, file);
   else if (btn.dataset.act === 'del') deleteElement(name, file);
-  else if (btn.dataset.act === 'rename') startRename(name, file, btn);
 }
 
 /* 随机弹窗元素重命名（行内编辑，回车/失焦提交；Esc 取消）：
@@ -809,14 +846,15 @@ function startRename(name, file, btn) {
 
 function initElementsPanel() {
   $('#btnElRefresh').addEventListener('click', () => {
-    /* 重置：清空本面板已选择项（搜索词 / 元素文件筛选），列表回到初始视图 */
+    /* 重置：清空搜索词并回到文件列表视图 */
     $('#elSearch').value = '';
-    $('#elFileFilter').value = '';
+    _elMgrFile = null;
     loadElements();
   });
   $('#elSearch').addEventListener('input', () => { _elPage = 1; renderElements(); });
-  $('#elFileFilter').addEventListener('change', () => { _elPage = 1; renderElements(); });
   $('#elTbody').addEventListener('click', onElTableClick);
+  $('#elFilesTbody').addEventListener('click', onElFilesClick);
+  $('#btnElBack').addEventListener('click', () => { _elMgrFile = null; _elPage = 1; renderElMgr(); });
   $('#elMCancel').addEventListener('click', () => $('#elMask').classList.remove('show'));
   $('#elMSave').addEventListener('click', saveElModal);
   $('#elMask').addEventListener('click', (e) => {
