@@ -775,7 +775,15 @@ function openElModal(mode, name, file) {
   $('#elMValue').value = el.value || '';
   $('#elMWaitSec').value = el.wait_seconds || 6;
   $('#elMDesc').value = el.desc || '';
-  fillSelect($('#elMFile'), _elFiles, mode === 'edit' ? (el.file || _elFiles[0]) : (file || _elFiles[0]));
+  const targetFile = mode === 'edit' ? (el.file || _elFiles[0]) : (file || _elFiles[0]);
+  fillSelect($('#elMFile'), _elFiles, targetFile);
+  /* 目标文件不在受管下拉里（如 popupElements.py 规则库）时补上选项：
+     select 对不存在的 option 赋值会静默失败，提交就会写进别的文件 */
+  const mSel = $('#elMFile');
+  if (targetFile && ![...mSel.options].some(o => o.value === targetFile)) {
+    mSel.add(new Option(targetFile, targetFile));
+    mSel.value = targetFile;
+  }
   $('#elMFile').disabled = (mode === 'edit');   // 编辑不挪窝：换文件=先删后增，容易把页面引用弄丢
   $('#elMFileWrap').style.display = mode === 'edit' ? 'none' : '';
   $('#elMask').classList.add('show');
