@@ -195,14 +195,22 @@ body { font: 14px/1.5 -apple-system, "SF Pro Text", "PingFang SC", "Microsoft Ya
 .viewer .noimg .big { font-size: 40px; display: block; margin-bottom: 8px; }
 .progress { height: 5px; background: var(--line); flex: none; position: relative; }
 .progress .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--sky); transition: width .25s; }
-.detail-bar { flex: none; padding: 12px 20px; border-top: 1px solid var(--line); }
-.detail-bar .row1 { display: flex; align-items: center; gap: 10px; }
-.detail-bar .kind { font-weight: 800; font-size: 14.5px; }
-.detail-bar .chev { margin-left: auto; color: var(--muted); cursor: pointer; border: none; background: none; font-size: 14px; }
-.detail-bar .desc { color: var(--ink2); font-size: 13px; margin-top: 4px; }
-.detail-bar .extra { display: none; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line);
-  font-size: 12px; color: var(--muted); line-height: 1.7; word-break: break-all; }
-.detail-bar.open .extra { display: block; }
+.viewer-row { flex: 1; min-height: 0; display: flex; }
+.info-panel { width: 300px; flex: none; border-left: 1px solid var(--line); padding: 14px 16px;
+  overflow-y: auto; background: var(--panel); }
+.ip-kind { display: inline-block; font-weight: 800; font-size: 13px; color: var(--sky-deep, var(--sky));
+  background: var(--sky-tint); border-radius: 6px; padding: 2px 10px; }
+.ip-desc { font-size: 13.5px; font-weight: 600; line-height: 1.5; margin: 10px 0 12px; word-break: break-all; }
+.ip-status { margin-bottom: 12px; }
+.ip-sec { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px;
+  font-size: 12px; color: var(--ink2); line-height: 1.7; word-break: break-all; }
+.ip-sec .k { color: var(--muted); font-size: 11px; }
+.ip-sec .reason { color: var(--bad); background: var(--bad-bg); border-radius: 8px; padding: 8px 10px;
+  white-space: pre-wrap; margin-top: 4px; }
+.ip-st { display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; padding: 4px 12px;
+  font-weight: 700; font-size: 12.5px; }
+.ip-st.passed { background: var(--ok-bg); color: var(--ok); }
+.ip-st.failed { background: var(--bad-bg); color: var(--bad); }
 .overview { display: flex; gap: 12px; padding: 10px 18px; flex-wrap: wrap; }
 .ov-chip { background: var(--sky-tint); color: var(--sky-deep, var(--sky)); border-radius: 8px;
   padding: 5px 12px; font-size: 12px; font-weight: 600; }
@@ -236,14 +244,17 @@ html.night .viewer { background: #0c0d0f; }
   <section class="main">
     <div class="main-title">Record</div>
     <div class="timeline"><div class="tl-inner" id="tlInner"></div></div>
-    <div class="viewer" id="viewer"></div>
-    <div class="progress"><div class="fill" id="progFill" style="width:0%"></div></div>
-    <div class="detail-bar" id="detailBar">
-      <div class="row1"><span class="kind" id="dKind">—</span>
-        <button class="chev" id="dChev" title="展开详情">⌃</button></div>
-      <div class="desc" id="dDesc">—</div>
-      <div class="extra" id="dExtra"></div>
+    <div class="viewer-row">
+      <div class="viewer" id="viewer"></div>
+      <aside class="info-panel" id="infoPanel">
+        <span class="ip-kind" id="dKind">—</span>
+        <div class="ip-desc" id="dDesc">—</div>
+        <div class="ip-status" id="dStatus"></div>
+        <div class="ip-sec" id="dReason" style="display:none"></div>
+        <div class="ip-sec" id="dMeta"></div>
+      </aside>
     </div>
+    <div class="progress"><div class="fill" id="progFill" style="width:0%"></div></div>
   </section>
 </div>
 <script id="report-data" type="application/json">__REPORT_DATA__</script>
@@ -360,25 +371,29 @@ html.night .viewer { background: #0c0d0f; }
     const pct = (t.start && runEnd && runEnd > runStart)
       ? Math.min(100, Math.max(0, (t.start - runStart) / (runEnd - runStart) * 100)) : 0;
     document.getElementById('progFill').style.width = pct + '%';
-    /* 详情条 */
+    /* 右侧信息面板 */
+    const passed = it.kind === 'case' ? it.task.status === 'finished' : (it.task.status !== 'failed');
     document.getElementById('dKind').textContent =
-      it.kind === 'case' ? 'Case' : (it.task.subType || 'Step');
+      it.kind === 'case' ? 'Case · 用例' : (it.task.subType || 'Step');
     document.getElementById('dDesc').textContent =
       (it.task.param && it.task.param.name) || (it.task.output && it.task.output.title) || '—';
-    const extra = [];
-    if (it.task.timing && it.task.timing.cost) extra.push('耗时 ' + (it.task.timing.cost / 1000).toFixed(2) + 's');
-    if (it.task.timing && it.task.timing.start) extra.push('开始 ' + new Date(it.task.timing.start).toLocaleTimeString());
-    if (it.task.status) extra.push('状态 ' + it.task.status);
-    if (it.task.param && it.task.param.node) extra.push('节点 ' + it.task.param.node);
+    document.getElementById('dStatus').innerHTML = '<span class="ip-st ' + (passed ? 'passed' : 'failed') + '">' +
+      (passed ? '✓ 通过' : '✗ 失败') + '</span>';
+    const rows = [];
+    if (it.task.timing && it.task.timing.cost) rows.push(['耗时', (it.task.timing.cost / 1000).toFixed(2) + 's']);
+    if (it.task.timing && it.task.timing.start) rows.push(['开始', new Date(it.task.timing.start).toLocaleTimeString()]);
+    if (it.task.param && it.task.param.case) rows.push(['所属用例', it.task.param.case]);
+    if (it.task.param && it.task.param.node) rows.push(['节点', it.task.param.node]);
+    if (urls.length) rows.push(['失败截图', '见左侧时间轴缩略图']);
+    if (vids.length) rows.push(['录屏证据', '左侧播放器播放']);
+    document.getElementById('dMeta').innerHTML = rows.map(r =>
+      '<div style="margin-bottom:6px"><span class="k">' + r[0] + '</span><br>' + esc(r[1]) + '</div>').join('');
     const reason = it.task.param && it.task.param.reason;
-    document.getElementById('dExtra').innerHTML =
-      (reason ? '<div style="color:var(--bad);margin-bottom:6px;white-space:pre-wrap">✗ 失败原因：<br>' + esc(reason) + '</div>' : '') +
-      extra.map(x => '· ' + esc(x)).join('<br>');
-    document.getElementById('detailBar').classList.remove('open');
+    const sec = document.getElementById('dReason');
+    if (reason) { sec.style.display = 'block';
+      sec.innerHTML = '<span class="k">失败原因</span><div class="reason">✗ ' + esc(reason) + '</div>'; }
+    else sec.style.display = 'none';
   }
-  document.getElementById('dChev').addEventListener('click', () => {
-    document.getElementById('detailBar').classList.toggle('open');
-  });
   /* 键盘导航：↑↓ 或 Cmd/Ctrl+↑↓ */
   document.addEventListener('keydown', (e) => {
     if (!(e.key === 'ArrowUp' || e.key === 'ArrowDown')) return;
