@@ -2171,23 +2171,4 @@ function flashField(labelEl) {
   fieldFlashTimer = setTimeout(() => labelEl.classList.remove('field-flash'), 3000);
 }
 
-/* 配色切换（iPhone 18 配色：默认 → 银色 → 冰川蓝 → 灰白 循环；全站生效，夜间模式下切回日间可见） */
-const SKIN_SEQ = [['', '默认'], ['silver', '银色'], ['glacier', '冰川蓝'], ['graywhite', '灰白']];
-function applySkinBtn() {
-  const cur = (window.__setPlatformSkin ? (localStorage.getItem('platform_skin') || '') : '');
-  const label = (SKIN_SEQ.find(s => s[0] === cur) || SKIN_SEQ[0])[1];
-  const tx = document.querySelector('#btn-skin .bt-tx');
-  if (tx) tx.textContent = '配色：' + label;
-}
-function cycleSkin() {
-  const cur = localStorage.getItem('platform_skin') || '';
-  const idx = SKIN_SEQ.findIndex(s => s[0] === cur);
-  const next = SKIN_SEQ[(idx + 1) % SKIN_SEQ.length];
-  if (window.__setPlatformSkin) window.__setPlatformSkin(next[0]);
-  else { localStorage.setItem('platform_skin', next[0]); document.documentElement.dataset.skin = next[0]; }
-  const tx = document.querySelector('#btn-skin .bt-tx');
-  if (tx) tx.textContent = '配色：' + next[1];
-  showToast('配色已切换：' + next[1]);
-}
-const bs = $('btn-skin');
-if (bs) { bs.addEventListener('click', cycleSkin); applySkinBtn(); }
+

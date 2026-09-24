@@ -910,25 +910,3 @@ html.night ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, .26
 .list-pager { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-top: 1px solid var(--line-soft, #e8e8ed); }
 .list-pager .mono { font-variant-numeric: tabular-nums; }
 
-/* ===== 配色皮肤（iPhone 18 配色）——浅色态全站生效；夜间模式优先级更高 =====
-   银色 Silver：中性银灰底 + 石墨蓝点缀
-   冰川蓝 Glacier：冰蓝底 + 冰川深蓝点缀
-   灰白 Gray-white：灰白底 + iOS 灰点缀 */
-html[data-skin="silver"] {
-  --bg: #e9eaee; --panel: #f4f5f7; --panel2: #fafafb; --panel3: #eef0f3;
-  --line: #d8d9de; --line-soft: rgba(0, 0, 0, .06);
-  --brand: #4a5d73; --brand-hover: #556880; --brand-tint: rgba(74, 93, 115, .08); --brand-ring: rgba(74, 93, 115, .25);
-  --primary: #4a5d73; --primary2: #556880;
-}
-html[data-skin="glacier"] {
-  --bg: #e9f1f7; --panel: #f5f9fc; --panel2: #f0f6fa; --panel3: #e3eef6;
-  --line: #cfe0ec; --line-soft: rgba(47, 123, 163, .08);
-  --brand: #2f7ba3; --brand-hover: #3a8ab5; --brand-tint: rgba(47, 123, 163, .08); --brand-ring: rgba(47, 123, 163, .25);
-  --primary: #2f7ba3; --primary2: #3a8ab5;
-}
-html[data-skin="graywhite"] {
-  --bg: #f6f6f7; --panel: #fdfdfd; --panel2: #fafafa; --panel3: #f0f0f1;
-  --line: #e3e3e6; --line-soft: rgba(0, 0, 0, .05);
-  --brand: #55555a; --brand-hover: #636368; --brand-tint: rgba(85, 85, 90, .07); --brand-ring: rgba(85, 85, 90, .22);
-  --primary: #55555a; --primary2: #636368;
-}

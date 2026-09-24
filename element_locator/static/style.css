@@ -825,19 +825,6 @@ html.night .dup-tip code { background: rgba(251, 191, 36, .12); }
 /* 选中元素栏头部微调：hint 下移不抢标题 */
 .detail-head { font-size: 13.5px; }
 
-/* ===== 配色皮肤（iPhone 18 配色）——浅色态生效；夜间模式优先级更高 ===== */
-html[data-skin="silver"]:not(.night) { --sky: #5b8399; --sky-2: #7fa3ba; --sky-deep: #3f6a8a; }
-html[data-skin="glacier"]:not(.night) { --sky: #3f93bd; --sky-2: #6bb4d4; --sky-deep: #2b7397; }
-html[data-skin="graywhite"]:not(.night) { --sky: #6e6e73; --sky-2: #98989d; --sky-deep: #48484a; }
-html[data-skin="silver"]:not(.night) body { background: #e9eaee; }
-html[data-skin="glacier"]:not(.night) body { background: #e9f1f7; }
-html[data-skin="graywhite"]:not(.night) body { background: #f6f6f7; }
-html[data-skin="silver"]:not(.night) .col,
-html[data-skin="glacier"]:not(.night) .col,
-html[data-skin="graywhite"]:not(.night) .col { background: var(--panel, #fff); }
-html[data-skin="silver"]:not(.night) .col-title,
-html[data-skin="glacier"]:not(.night) .col-title,
-html[data-skin="graywhite"]:not(.night) .col-title { background: linear-gradient(180deg, var(--panel2, #fafafb), var(--panel3, #f0f0f2)); }
 /* 选中元素栏固定宽度：不参与拖拽挤压（v6.11.1 用户反馈） */
 .col.right { flex: 0 0 340px; min-width: 320px; }
 /* 夜间遗漏补：详情底栏 / 弹窗 / 锚点卡 / 流程卡 / 步骤列表 */
