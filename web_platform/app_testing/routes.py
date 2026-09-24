@@ -342,8 +342,7 @@ def api_cases_framework():
 
 @bp.route('/api/case/file', methods=['DELETE'])
 def api_case_file_delete():
-    """删除框架用例文件：未登记用例的删除通道（已登记的一并清理登记与套件引用）。
-    文件先备份到 output/backups/cases/ 再移除——未入库的文件直接删就找不回来了。"""
+    """删除框架用例文件：未登记用例的删除通道（已登记的一并清理登记与套件引用）。"""
     rel = (request.args.get('file') or '').strip().replace('\\', '/')
     base = os.path.realpath(BASE_DIR)
     if not rel.startswith('cases/app_ui') or not os.path.basename(rel).startswith('test_') \
@@ -352,12 +351,6 @@ def api_case_file_delete():
     path = os.path.realpath(os.path.join(base, rel))
     if not path.startswith(os.path.join(base, 'cases/app_ui')) or not os.path.isfile(path):
         return _bad('用例文件不存在', 404)
-    import shutil
-    backup_dir = os.path.join(base, 'output', 'backups', 'cases')
-    os.makedirs(backup_dir, exist_ok=True)
-    stamp = time.strftime('%Y%m%d_%H%M%S')
-    backup_name = '%s_%s' % (stamp, os.path.basename(rel))
-    shutil.copy2(path, os.path.join(backup_dir, backup_name))
     prefix = rel + '::'
     removed_ids = []
     for c in list(cases_store.list()):
@@ -370,8 +363,7 @@ def api_case_file_delete():
         if any(i in removed_ids for i in ids):
             suites_store.update(s['id'], {'case_ids': [i for i in ids if i not in removed_ids]})
     os.remove(path)
-    return _ok(removed_registrations=len(removed_ids),
-               backup='output/backups/cases/' + backup_name)
+    return _ok(removed_registrations=len(removed_ids))
 
 
 @bp.route('/api/case/steps')

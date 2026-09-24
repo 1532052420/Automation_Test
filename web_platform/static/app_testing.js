@@ -1519,10 +1519,10 @@ async function appTestingInit() {
     if (mv) return openCaseMove(mv.dataset.mvnode);
     if (delBtn) {
       const f = delBtn.dataset.delfile;
-      const ok = await confirmModal('删除用例', '确定删除 ' + f + ' ？将备份并移除用例文件，登记信息与套件引用同步清理；页面/元素文件可能被其他用例共用，不会自动删除。', true);
+      const ok = await confirmModal('删除用例', '确定删除该用例？删除后不可恢复，登记信息与套件引用将同步清理。', true);
       if (!ok) return;
       const d = await del(AT_PREFIX + '/api/case/file?file=' + encodeURIComponent(f));
-      toast(d.ok ? '已删除（备份：' + (d.backup || '—') + '）' : (d.msg || '删除失败'), d.ok);
+      toast(d.ok ? '已删除' : (d.msg || '删除失败'), d.ok);
       if (d.ok) {
         refreshOrchCaseOptions();
         if (_orchCaseId && !_cases.some(c => c.id === _orchCaseId)) selectOrchCase(0);
