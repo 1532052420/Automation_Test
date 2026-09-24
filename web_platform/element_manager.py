@@ -169,17 +169,16 @@ def delete_element(filename, name):
 
 
 def delete_file(filename):
-    """删除整个元素文件：按平台惯例先改名留时间戳备份（_backup 后缀文件绝不入任何清单），
-    原文件名即消失。规则库 popupElements.py / 备份文件不在 list_element_files 白名单，天然删不到。"""
+    """删除整个元素文件（直接删除，不留备份——用户口径：删就删干净）。
+    规则库 popupElements.py / 备份文件不在 list_element_files 白名单，天然删不到。"""
     if filename not in list_element_files():
         return False, '元素文件不存在或不可删除: %s' % filename
     src = os.path.join(ELEMENTS_DIR, filename)
-    bak = '%s_%s_backup.py' % (filename[:-3], time.strftime('%Y%m%d_%H%M%S'))
     try:
-        os.replace(src, os.path.join(ELEMENTS_DIR, bak))
+        os.remove(src)
     except OSError as e:
         return False, '删除失败：%s' % e
-    return True, '元素文件 %s 已删除，已备份为 %s' % (filename, bak)
+    return True, '元素文件 %s 已删除' % filename
 
 
 def save_element(filename, name, locator_type, value, wait_type='VISIBILITY_OF',

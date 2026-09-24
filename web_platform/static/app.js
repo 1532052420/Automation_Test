@@ -295,18 +295,32 @@ function renderCaseTable() {
   };
   $('#caseTbody').innerHTML = view.map(r => {
     const reg = r.ent;
-    const desc = (reg && reg.description) || r.desc || '';   // 场景描述：登记描述优先，兜底方法 docstring 首行
+    const desc = (reg && reg.description) || r.desc || '';   // 步骤描述：登记描述优先，兜底方法 docstring 首行（步骤以 → 相连）
     return '<tr>' +
       '<td><input type="checkbox" data-node="' + esc(r.node) + '" class="ck-node"></td>' +
       '<td><div class="clip" title="' + esc(r.cn_name ? (r.cn_name + '（' + r.method + '）') : r.method) + '"><b>' + esc(r.cn_name || r.method) + '</b>' +
         (reg ? '' : ' <span class="proj-status" title="尚未登记到项目，可到「用例管理」登记归属">未登记</span>') +
       '</div></td>' +
-      '<td><div class="clip" title="' + esc(desc) + '">' + esc(desc ? (desc.length > 10 ? desc.slice(0, 10) + '…' : desc) : '—') + '</div></td>' +
+      '<td>' + (desc
+        ? '<div class="step-desc" data-steps="' + esc(desc) + '" title="点击查看完整步骤">' +
+          esc(desc.length > 10 ? desc.slice(0, 10) + '…' : desc) + '</div>'
+        : '—') + '</td>' +
       '<td>' + fmtDate(r.mtime) + '</td>' +
       '<td class="ops"><button class="mini" data-runone="' + esc(r.node) + '">执行</button></td></tr>';
   }).join('');
   $('#caseEmpty').style.display = list.length ? 'none' : '';
   listPager('#casePager', list.length, _casePage, perPage, p => { _casePage = p; renderCaseTable(); });
+}
+
+/* 步骤描述弹窗：把「步骤A → 步骤B」拆成自上而下的步骤流（步骤卡片 + ↓ 连接），清晰不挤 */
+function openStepFlowModal(desc) {
+  const steps = desc.split('→').map(s => s.trim()).filter(Boolean);
+  $('#stepFlowTitle').textContent = '操作步骤（共 ' + steps.length + ' 步）';
+  $('#stepFlowBody').innerHTML = steps.map((s, i) =>
+    '<div class="sf-step"><span class="sf-no">' + (i + 1) + '</span><span class="sf-text">' + esc(s) + '</span></div>' +
+    (i < steps.length - 1 ? '<div class="sf-arrow">↓</div>' : '')
+  ).join('');
+  $('#stepFlowMask').classList.add('show');
 }
 
 function openCaseCnModal(file, cn) {
@@ -575,8 +589,14 @@ async function initRun() {
     renderCaseTable();
   });
   $('#caseTbody').addEventListener('click', e => {
+    const step = e.target.closest('.step-desc');
+    if (step) return openStepFlowModal(step.dataset.steps || '');
     const run = e.target.closest('[data-runone]');
     if (run) return runOneCase(run.dataset.runone);
+  });
+  $('#stepFlowClose').addEventListener('click', () => $('#stepFlowMask').classList.remove('show'));
+  $('#stepFlowMask').addEventListener('click', e => {
+    if (e.target === e.currentTarget) e.currentTarget.classList.remove('show');
   });
   $('#caseCnSave').addEventListener('click', () => saveCaseCn().catch(e => toast(e.message, false)));
   $('#caseCnCancel').addEventListener('click', () => $('#caseCnMask').classList.remove('show'));
@@ -676,7 +696,7 @@ function renderElementFiles() {
 async function deleteElementFile(file) {
   const cnt = _elements.filter(e => e.file === file).length;
   const yes = await confirmModal('删除元素文件',
-    '将删除 ' + file + '（含 ' + cnt + ' 个元素），删除前自动备份。引用该文件的页面将无法定位元素，确定删除？', true);
+    '将删除 ' + file + '（含 ' + cnt + ' 个元素），删除后不可恢复。引用该文件的页面将无法定位元素，确定删除？', true);
   if (!yes) return;
   const d = await postJson('/api/appui/elements/file/delete', { file: file });
   toast(d.msg || (d.ok ? '已删除' : '删除失败'), !!d.ok);

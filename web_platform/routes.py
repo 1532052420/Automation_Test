@@ -263,7 +263,7 @@ def api_appui_elements_delete():
 
 @bp.route('/api/appui/elements/file/delete', methods=['POST'])
 def api_appui_elements_file_delete():
-    """删除整个元素文件（删除前自动改名留时间戳备份，备份文件绝不入任何清单）"""
+    """删除整个元素文件（直接删除，不留备份）"""
     from web_platform import element_manager
     d = request.get_json(silent=True) or {}
     ok, msg = element_manager.delete_file((d.get('file') or '').strip())

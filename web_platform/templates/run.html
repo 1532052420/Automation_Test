@@ -223,7 +223,7 @@
                   <col style="width:36px"><col style="width:30%"><col><col style="width:110px"><col style="width:140px">
                 </colgroup>
                 <thead><tr>
-                  <th style="width:36px"></th><th>用例名称</th><th>场景描述</th>
+                  <th style="width:36px"></th><th>用例名称</th><th>步骤描述</th>
                   <th style="width:110px">更新时间</th><th style="width:140px">操作</th>
                 </tr></thead>
                 <tbody id="caseTbody"></tbody>
@@ -654,6 +654,14 @@
       <button class="ghost" id="cnSave">保存并继续</button>
       <button id="cnClose">保存</button>
     </div>
+  </div>
+</div>
+<!-- 步骤描述弹窗：纵向步骤流（步骤卡片 + ↓ 连接），点击用例列表「步骤描述」打开 -->
+<div class="mask" id="stepFlowMask">
+  <div class="modal" style="width:min(420px,92vw)">
+    <h4 id="stepFlowTitle">操作步骤</h4>
+    <div id="stepFlowBody" class="sf-body"></div>
+    <div class="mops mt"><button class="ghost" id="stepFlowClose">关闭</button></div>
   </div>
 </div>
 <!-- 用例文件中文名 弹窗（与元素中文名同款映射：写文件头「# 用例中文名：」，定位器同步显示） -->
