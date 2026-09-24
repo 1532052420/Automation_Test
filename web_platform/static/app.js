@@ -1070,6 +1070,7 @@ async function renderRunDetail(sel, runId) {
     '<div class="cardhead"><h3>用例执行记录 <span class="muted">· ' + esc(runId) + '</span></h3>' +
     '<div class="ops">' +
     '<button class="ghost mini" onclick="openReportFor(\'' + esc(runId) + '\', this)">打开报告</button>' +
+    '<button class="ghost mini" onclick="openMidsceneFor(\'' + esc(runId) + '\', this)" title="Midscene 风格回放报告：视频帧时间轴 + 录屏播放 + 失败原因">回放报告</button>' +
     '<button class="mini danger-ghost" onclick="deleteRunFor(\'' + esc(runId) + '\')">删除本记录</button>' +
     '</div></div>' +
     '<div class="meta" id="detailMeta">' + runMetaHtml(t, true) + '</div>' +

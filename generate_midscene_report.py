@@ -70,6 +70,28 @@ def video_duration_ms(path):
         return 0
 
 
+def frames_uniform(video, case_start, case_end, interval_ms=500, max_frames=80):
+    """按固定间隔全时长连续抽帧（原版时间轴机制：帧间隔恒定、连续铺满）。
+    返回 [(epoch_ms, dataURI)]。失败窗口（最后 2 秒）加密到 250ms。"""
+    dur = video_duration_ms(video)
+    if dur <= 0:
+        return []
+    out = []
+    ts = 0
+    while ts <= dur and len(out) < max_frames:
+        iv = 250 if ts >= max(0, dur - 2000) else interval_ms   # 失败窗口加密
+        d = frame_datauri(video, ts)
+        if d:
+            out.append((int(case_start + ts), d))
+        ts += iv
+    # 尾帧补齐（失败时刻）
+    if dur > 0:
+        d = frame_datauri(video, dur - 100)
+        if d:
+            out.append((int(case_start + dur - 100), d))
+    return out
+
+
 def frame_datauri(video, offset_ms):
     try:
         r = subprocess.run([FFMPEG, '-ss', '%.3f' % (offset_ms / 1000.0), '-i', video,
@@ -142,28 +164,25 @@ def build_data(run_id, meta, results, run_dir):
         node = node_of(meta, res)
         videos = find_case_videos(node, meta.get('udid'))
         v0 = videos[0] if videos else None
-        v_dur = video_duration_ms(v0) if v0 else 0
         desc = str(res.get('description') or '')
+        case_end = case_stop
+        all_frames = frames_uniform(v0, case_start, case_end) if v0 else []   # 全时长连续帧
+
+        def frames_in(ws, we):
+            """时间窗内的帧（epoch ts, dataURI）。"""
+            return [(ts, d) for ts, d in all_frames if ws <= ts <= we] or (
+                [(ts, d) for ts, d in all_frames if ts <= ws][-1:] if all_frames else [])
 
         def frames_for(ws, we, want):
-            """时间窗内从录屏取 want 帧 dataURI（窗口均分）。"""
-            out = []
-            if not v0 or v_dur <= 0:
-                return out
-            ra = max(0, ws - case_start)
-            rb = max(0, min(v_dur, we - case_start))
-            if rb <= ra:
-                ra, rb = 0, min(v_dur, 1000)
-            n = max(1, min(want, int((rb - ra) / 200) or 1))
-            for i in range(n):
-                ts = ra + (rb - ra) * (i + 0.5) / n
-                d = frame_datauri(v0, ts)
-                if d:
-                    out.append((int(case_start + ts), d))
-            return out
+            """时间窗内最多 want 帧。"""
+            fr = frames_in(ws, we)
+            if len(fr) <= want:
+                return fr
+            step = len(fr) / want
+            return [fr[int(i * step)] for i in range(want)]
 
-        # 1) 用例级 Plan 任务（组头）
-        pf = frames_for(case_start, case_stop, 2) if v0 else []
+        # 1) 用例级 Plan 任务（组头；时间窗 = 用例起始 500ms）
+        pf = frames_in(case_start, case_start + 500) if v0 else []
         rec_plan = [{'type': 'screenshot', 'ts': ts, 'screenshot': d, 'timing': 'after-calling'}
                     for ts, d in pf]
         uc_plan = {'size': None, 'screenshotBase64': rec_plan[-1]['screenshot']} if rec_plan else None
@@ -173,7 +192,8 @@ def build_data(run_id, meta, results, run_dir):
             'status': 'finished' if status == 'passed' else 'failed',
             'type': 'Planning', 'subType': 'Plan',
             'param': {'userInstruction': case_name, 'imagesIncludeCount': len(pf)},
-            'timing': {'start': case_start, 'end': case_stop, 'cost': case_stop - case_start},
+            'timing': {'start': case_start, 'end': min(case_stop, case_start + 500),
+                       'cost': min(case_stop - case_start, 500)},
             'uiContext': uc_plan,
             'log': {'rawResponse': desc or case_name},
             'output': {'actions': [], 'more_actions_needed_by_instruction': True,
@@ -182,11 +202,14 @@ def build_data(run_id, meta, results, run_dir):
             'cache': {'hit': False},
         })
 
-        # 2) 操作步骤 → Action Space
-        for st in res.get('steps') or []:
+        # 2) 操作步骤 → Action Space（allure steps 常无 time：按步骤数均分用例时间窗）
+        steps = res.get('steps') or []
+        n_steps = max(1, len(steps))
+        win = (case_stop - case_start) / n_steps
+        for si, st in enumerate(steps):
             st_time = st.get('time') or {}
-            s_start = st_time.get('start') or case_start
-            s_end = st_time.get('stop') or st_time.get('end') or (s_start + 500)
+            s_start = st_time.get('start') or int(case_start + si * win)
+            s_end = st_time.get('stop') or st_time.get('end') or int(case_start + (si + 1) * win)
             sub = step_to_action(st.get('name', ''))
             shots = []
             for att in st.get('attachments', []) or []:
@@ -195,15 +218,13 @@ def build_data(run_id, meta, results, run_dir):
                     if d:
                         shots.append(d)
             main_shot = shots[0] if shots else None
-            rec = []
-            if not main_shot and v0:
-                fr = frames_for(s_start, s_end, 2)
-                rec = [{'type': 'screenshot', 'ts': ts, 'screenshot': d, 'timing': 'after-calling'}
-                       for ts, d in fr]
+            rec = [{'type': 'screenshot', 'ts': ts, 'screenshot': d, 'timing': 'after-calling'}
+                   for ts, d in (frames_in(s_start, s_end) if v0 else [])]
+            if main_shot and not any(r['ts'] == s_end for r in rec):
+                rec.append({'type': 'screenshot', 'ts': s_end, 'screenshot': main_shot,
+                            'timing': 'after-calling'})
+            if not main_shot:
                 main_shot = rec[-1]['screenshot'] if rec else None
-            else:
-                rec = ([{'type': 'screenshot', 'ts': s_end, 'screenshot': main_shot,
-                         'timing': 'after-calling'}] if main_shot else [])
             m = re.search(r'\[id:([^\]]+)\]', st.get('name', ''))
             locate = {'description': st.get('name', '')}
             if m:
@@ -228,8 +249,7 @@ def build_data(run_id, meta, results, run_dir):
                     d = b64_image(os.path.join(ATT, att.get('source', '')))
                     if d:
                         fail_shots.append(d)
-            fail_vids = [v for v in videos if '_failure' in os.path.basename(v)]
-            fr = frames_for(case_stop - 1000, case_stop + 500, 3) if v0 else []
+            fr = frames_in(case_stop - 1500, case_stop + 200) if v0 else []
             rec = [{'type': 'screenshot', 'ts': ts, 'screenshot': d, 'timing': 'after-calling'}
                    for ts, d in fr]
             main_shot = fail_shots[0] if fail_shots else (rec[-1]['screenshot'] if rec else None)
@@ -246,8 +266,6 @@ def build_data(run_id, meta, results, run_dir):
                            'log': reason[:300]},
                 'recorder': rec,
             }
-            if fail_vids:
-                assert_task['video'] = 'file://' + fail_vids[0]
             tasks.append(assert_task)
 
     return {

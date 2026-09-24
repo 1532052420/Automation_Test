@@ -545,15 +545,15 @@ def api_open_midscene(run_id):
     run_dir = os.path.join(runner.RUNS_DIR, run_id)
     if not os.path.isfile(os.path.join(run_dir, 'result.json')):
         return jsonify({'ok': False, 'msg': '运行不存在: %s' % run_id}), 404
-    html = os.path.join(run_dir, 'report', 'midscene-report.html')
+    html = os.path.join(run_dir, 'report', 'report.html')
     if not os.path.isfile(html):
         r = subprocess.run([sys.executable, os.path.join(BASE_DIR, 'generate_midscene_report.py'), run_id],
-                           capture_output=True, text=True, timeout=120, cwd=BASE_DIR)
+                           capture_output=True, text=True, timeout=300, cwd=BASE_DIR)
         if not os.path.isfile(html):
             return jsonify({'ok': False, 'msg': '生成失败: %s' % ((r.stderr or r.stdout)[-200:])}), 500
     svc = _midscene_services.get(run_id)
     if svc and svc['proc'].poll() is None:
-        return jsonify({'ok': True, 'url': 'http://127.0.0.1:%d/report/midscene-report.html' % svc['port'],
+        return jsonify({'ok': True, 'url': 'http://127.0.0.1:%d/report/report.html' % svc['port'],
                         'reused': True})
     if svc:
         _midscene_services.pop(run_id, None)
@@ -566,7 +566,7 @@ def api_open_midscene(run_id):
     except Exception as e:
         return jsonify({'ok': False, 'msg': '启动报告服务失败: %s' % e}), 500
     _midscene_services[run_id] = {'proc': proc, 'port': port}
-    url = 'http://127.0.0.1:%d/report/midscene-report.html' % port
+    url = 'http://127.0.0.1:%d/report/report.html' % port
     deadline = time.time() + 8
     while time.time() < deadline:
         try:
