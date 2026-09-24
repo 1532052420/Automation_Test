@@ -182,11 +182,14 @@ def build_data(run_id, meta, results, run_dir):
             'cache': {'hit': False},
         })
 
-        # 2) 操作步骤 → Action Space
-        for st in res.get('steps') or []:
+        # 2) 操作步骤 → Action Space（allure steps 常无 time：按步骤数均分用例时间窗，帧时间轴才能连续铺满）
+        steps = res.get('steps') or []
+        n_steps = max(1, len(steps))
+        win = (case_stop - case_start) / n_steps
+        for si, st in enumerate(steps):
             st_time = st.get('time') or {}
-            s_start = st_time.get('start') or case_start
-            s_end = st_time.get('stop') or st_time.get('end') or (s_start + 500)
+            s_start = int(st_time.get('start') or (case_start + si * win))
+            s_end = int(st_time.get('stop') or st_time.get('end') or (case_start + (si + 1) * win))
             sub = step_to_action(st.get('name', ''))
             shots = []
             for att in st.get('attachments', []) or []:
@@ -197,7 +200,8 @@ def build_data(run_id, meta, results, run_dir):
             main_shot = shots[0] if shots else None
             rec = []
             if not main_shot and v0:
-                fr = frames_for(s_start, s_end, 2)
+                want = max(2, int((s_end - s_start) / 700) or 1)
+                fr = frames_for(s_start, s_end, want)
                 rec = [{'type': 'screenshot', 'ts': ts, 'screenshot': d, 'timing': 'after-calling'}
                        for ts, d in fr]
                 main_shot = rec[-1]['screenshot'] if rec else None
