@@ -954,3 +954,11 @@ html.night ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, .26
 #panel-suites td:last-child .ops,
 #histMask td:last-child .ops { justify-content: flex-end; }
 
+
+/* Appium 启停按钮：运行中绿色、未运行灰色（iOS 系统色） */
+.appium-btn { height: 38px; padding: 0 18px; border-radius: 980px; font-size: 13.5px; font-weight: 600;
+  border: 1.5px solid var(--line); background: var(--panel3); color: var(--muted);
+  cursor: pointer; transition: all .15s; }
+.appium-btn:hover { filter: brightness(.97); }
+.appium-btn:disabled { opacity: .55; cursor: wait; }
+.appium-btn.on { background: var(--ok-bg); border-color: rgba(52, 199, 89, .55); color: var(--ok-text); }

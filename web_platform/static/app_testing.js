@@ -1589,3 +1589,39 @@ async function appTestingInit() {
   await renderCaseList();
   await renderSuites();
 }
+
+/* ---------------- Appium 服务启停（设备配置面板；绿=运行中，灰=未运行，点击切换） ---------------- */
+function renderAppium(running) {
+  const btn = document.getElementById('btnAppium');
+  const hint = document.getElementById('appiumHint');
+  if (!btn) return;
+  btn.classList.toggle('on', running);
+  btn.textContent = running ? 'Appium 运行中 · 点击停止' : '启动 Appium';
+  if (hint) hint.textContent = running ? 'Appium 服务运行中（端口 4726）——App 用例执行依赖它'
+                                       : 'Appium 服务未运行——执行 App 用例前请先启动';
+}
+async function loadAppiumStatus() {
+  try {
+    const r = await (await fetch('/api/appium/status')).json();
+    renderAppium(!!r.running);
+  } catch (e) { /* 静默：状态拉取失败保持原样 */ }
+}
+async function toggleAppium() {
+  const btn = document.getElementById('btnAppium');
+  const running = btn.classList.contains('on');
+  btn.disabled = true;
+  btn.textContent = running ? '停止中…' : '启动中…';
+  try {
+    const r = await postJson('/api/appium/' + (running ? 'stop' : 'start'));
+    toast(r.msg || (r.ok ? '操作成功' : '操作失败'), !!r.ok);
+    const st = await (await fetch('/api/appium/status')).json();
+    renderAppium(!!st.running);
+  } catch (e) {
+    toast('操作失败：' + e, false);
+  } finally {
+    btn.disabled = false;
+  }
+}
+const btnAppium = document.getElementById('btnAppium');
+if (btnAppium) btnAppium.addEventListener('click', toggleAppium);
+if (btnAppium) loadAppiumStatus();

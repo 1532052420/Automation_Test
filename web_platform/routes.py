@@ -275,6 +275,83 @@ def api_appui_elements_file_delete():
     return jsonify({'ok': ok, 'msg': msg}), (200 if ok else 400)
 
 
+# ---------------- Appium 服务启停（设备配置面板按钮；run.sh 已精简为纯平台入口） ----------------
+APPIUM_PORT = 4726
+APPIUM_BIN = os.path.expanduser('~/appium2/node_modules/.bin/appium')
+
+
+def _appium_up():
+    """Appium 在线判定：端口通 + /wd/hub/status 返回 ready（防止任意进程占端口被误判）。"""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(
+                'http://127.0.0.1:%d/wd/hub/status' % APPIUM_PORT, timeout=2) as resp:
+            return b'"ready"' in resp.read()
+    except Exception:
+        return False
+
+
+def _port_pids(port):
+    out = subprocess.run(['lsof', '-ti', 'tcp:%d' % port, '-sTCP:LISTEN'],
+                         capture_output=True, text=True, timeout=10)
+    return [p for p in out.stdout.split() if p.strip()]
+
+
+@bp.route('/api/appium/status')
+def api_appium_status():
+    return jsonify({'ok': True, 'running': _appium_up(), 'port': APPIUM_PORT})
+
+
+@bp.route('/api/appium/start', methods=['POST'])
+def api_appium_start():
+    if _appium_up():
+        return jsonify({'ok': True, 'running': True, 'msg': 'Appium 已在运行'})
+    pids = _port_pids(APPIUM_PORT)
+    if pids:
+        return jsonify({'ok': False, 'msg': '端口 %d 被其他进程占用（pid: %s），请先清理' % (APPIUM_PORT, ','.join(pids))}), 400
+    if not os.path.isfile(APPIUM_BIN):
+        return jsonify({'ok': False, 'msg': '未找到 Appium: %s' % APPIUM_BIN}), 400
+    # 幂等补丁：uiautomator2 代理缺陷修复（已打则跳过）
+    patch = os.path.join(BASE_DIR, 'deploy', 'patch_appium_base_driver.py')
+    if os.path.isfile(patch):
+        subprocess.run([os.path.join(BASE_DIR, '.venv', 'bin', 'python'), patch],
+                       capture_output=True, timeout=60)
+    env = dict(os.environ)
+    env.setdefault('ANDROID_HOME', os.path.expanduser('~/Library/Android/sdk'))
+    env.setdefault('ANDROID_SDK_ROOT', env['ANDROID_HOME'])
+    env.setdefault('PATH', os.path.join(BASE_DIR, '.venv', 'bin') + ':/usr/local/bin:/usr/bin:/bin')
+    log = open(os.path.join(BASE_DIR, 'logs', 'appium.log'), 'ab')
+    subprocess.Popen([APPIUM_BIN, '--port', str(APPIUM_PORT), '--address', '127.0.0.1',
+                      '--base-path', '/wd/hub', '--log-level', 'info'],
+                     stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                     start_new_session=True, env=env, cwd=BASE_DIR)
+    for _ in range(60):                      # 最多等 30 秒就绪
+        time.sleep(0.5)
+        if _appium_up():
+            return jsonify({'ok': True, 'running': True, 'msg': 'Appium 已启动（端口 %d）' % APPIUM_PORT})
+    pids = _port_pids(APPIUM_PORT)
+    if not pids:
+        return jsonify({'ok': False, 'msg': 'Appium 启动失败（进程已退出），详见 logs/appium.log'}), 500
+    return jsonify({'ok': False, 'msg': 'Appium 进程已拉起但 30 秒未就绪，请稍后刷新状态'}), 500
+
+
+@bp.route('/api/appium/stop', methods=['POST'])
+def api_appium_stop():
+    pids = _port_pids(APPIUM_PORT)
+    if not pids:
+        return jsonify({'ok': True, 'running': False, 'msg': 'Appium 未在运行'})
+    for p in pids:
+        subprocess.run(['kill', p], capture_output=True)
+    time.sleep(1)
+    left = _port_pids(APPIUM_PORT)
+    for p in left:
+        subprocess.run(['kill', '-9', p], capture_output=True)
+    time.sleep(0.5)
+    if not _port_pids(APPIUM_PORT):
+        return jsonify({'ok': True, 'running': False, 'msg': 'Appium 已停止（端口 %d 已释放）' % APPIUM_PORT})
+    return jsonify({'ok': False, 'msg': '端口 %d 仍被占用，请手动处理' % APPIUM_PORT}), 500
+
+
 # ---------------------------------------------------------------- API
 @bp.route('/api/devices')
 def api_devices():

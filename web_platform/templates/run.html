@@ -160,6 +160,10 @@
       <section class="panel" id="panel-exec" hidden>
         <div class="card">
           <h3>设备配置</h3>
+          <div class="mt" style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+            <button id="btnAppium" class="appium-btn" title="Appium 服务（端口 4726）：运行中为绿色，点击停止；未运行为灰色，点击启动">检查中…</button>
+            <span id="appiumHint" class="muted">Appium 服务用于 App 自动化执行</span>
+          </div>
           <div class="devgrid" id="devState" style="margin-bottom:14px">加载中…</div>
           <div class="mt">
             <div class="field" style="max-width:520px;margin-bottom:14px">
