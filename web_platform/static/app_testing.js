@@ -1625,3 +1625,25 @@ async function toggleAppium() {
 const btnAppium = document.getElementById('btnAppium');
 if (btnAppium) btnAppium.addEventListener('click', toggleAppium);
 if (btnAppium) loadAppiumStatus();
+
+
+/* ---------------- 一键删除录制视频与断言失败截图（二次确认） ---------------- */
+(function () {
+  const btn = document.getElementById('btnEvidenceClear');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    const ok = await confirmModal('一键删除录制视频/截图',
+      '将删除：所有录制的完整视频、断言前后 5 秒视频、断言失败的截图（含历史运行）。' +
+      'Allure 报告与测试结果不受影响。删除后不可恢复，确定删除？', true);
+    if (!ok) return;
+    btn.disabled = true;
+    try {
+      const r = await postJson('/api/video-evidence/clear', {});
+      toast(r.msg || (r.ok ? '已删除' : '删除失败'), !!r.ok);
+    } catch (e) {
+      toast('删除失败：' + e, false);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+})();

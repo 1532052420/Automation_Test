@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
-"""生成 Midscene 原版渲染器测试报告（v3：复用官方构建产物壳 + 平台数据适配）。
+"""生成 Midscene 原版渲染器风格的测试报告（一比一复刻 su7.html）。
 
-原理（按 midscene_report_ui_拆离方案.md）：su7-full.html 的渲染器代码原样保留，
-仅替换数据 script（type="midscene_web_dump"）——UI/尺寸/交互与原版 100% 一致。
+原理（按 midscene_report_ui_拆离方案.md）：复用官方报告构建产物 su7-full.html 的
+渲染器（webpack 内嵌 script），仅替换其中的报告数据 JSON——UI/交互/尺寸与原版
+100% 一致（同一份代码），本脚本只承担「Adapter」职责：平台 Allure 数据 →
+Midscene 报告 schema（拆离方案第 6/7/8/10/12 节统一数据协议）。
 
 数据源：output/runs/<run_id>/allure-results/*.json + result.json
-录屏　：output/video_evidence/**（按用例 node 匹配；ffmpeg 抽帧 → recorder 时间轴）
-输出　：output/runs/<run_id>/report/report.html（单文件）
+输出　：output/runs/<run_id>/report/report.html（单文件，双击即可打开）
 
-用法：python generate_midscene_report.py [run_id] [壳HTML]
+用法：python generate_midscene_report.py [run_id] [壳HTML]（缺省 = 最新运行 + ~/Downloads/su7-full.html）
 """
 import base64
 import glob
@@ -27,8 +28,6 @@ SHELL_CANDIDATES = [
 ]
 FFMPEG = 'ffmpeg'
 FFPROBE = 'ffprobe'
-FRAME_INTERVAL_MS = 80           # 时间轴帧间隔：渲染器按固定帧率（~14fps）播放，
-                                 # 帧密度决定播放时长——80ms 间隔使播放时长≈真实执行时长
 
 
 def find_shell():
@@ -64,43 +63,14 @@ def b64_image(path):
 
 def video_duration_ms(path):
     try:
-        r = subprocess.run([FFPROBE, '-v', 'error', '-show_entries', 'format=duration',
-                            '-of', 'csv=p=0', path], capture_output=True, text=True, timeout=30)
-        return float(r.stdout.strip() or 0) * 1000
+        probe = subprocess.run([FFPROBE, '-v', 'error', '-show_entries', 'format=duration',
+                                '-of', 'csv=p=0', path], capture_output=True, text=True, timeout=30)
+        return float(probe.stdout.strip() or 0) * 1000
     except Exception:
         return 0
 
 
-def video_size(path):
-    try:
-        r = subprocess.run([FFPROBE, '-v', 'error', '-select_streams', 'v:0',
-                            '-show_entries', 'stream=width,height', '-of', 'csv=p=0', path],
-                           capture_output=True, text=True, timeout=30)
-        w, h = r.stdout.strip().split(',')[:2]
-        return {'width': int(w), 'height': int(h), 'dpr': 1}
-    except Exception:
-        return {'width': 1080, 'height': 2400, 'dpr': 1}
-
-
-def extract_all_frames(video, interval_ms, out_dir):
-    """一次 ffmpeg 按固定间隔抽全部帧（fps=1000/interval），返回 [(offset_ms, path)]。"""
-    os.makedirs(out_dir, exist_ok=True)
-    fps = 1000.0 / interval_ms
-    pattern = os.path.join(out_dir, 'f_%04d.jpg')
-    try:
-        subprocess.run([FFMPEG, '-y', '-i', video, '-vf', 'fps=%f' % fps,
-                        '-q:v', '5', pattern], capture_output=True, timeout=300)
-    except Exception:
-        pass
-    frames = []
-    for f in sorted(glob.glob(os.path.join(out_dir, 'f_*.jpg'))):
-        n = int(re.search(r'f_(\d+)\.jpg$', f).group(1))
-        frames.append((int((n - 0.5) * interval_ms), f))
-    return frames
-
-
-def frame_at(video, offset_ms):
-    """录屏 offset_ms 处抽一帧 → jpeg dataURI（失败返回 None）。"""
+def frame_datauri(video, offset_ms):
     try:
         r = subprocess.run([FFMPEG, '-ss', '%.3f' % (offset_ms / 1000.0), '-i', video,
                             '-frames:v', '1', '-q:v', '5', '-f', 'image2pipe',
@@ -155,72 +125,68 @@ def png_size(datauri):
         w, h = struct.unpack('>II', raw[16:24])
         return {'width': w, 'height': h, 'dpr': 3}
     except Exception:
-        return None
-
-
-def size_for(main_shot, v0):
-    if not main_shot:
-        return None
-    return png_size(main_shot) if main_shot.startswith('data:image/png') else video_size(v0)
+        return {'width': 1080, 'height': 2400, 'dpr': 3}
 
 
 def build_data(run_id, meta, results, run_dir):
-    """平台 Allure 数据 → Midscene 原版报告 schema（含录屏帧时间轴）。"""
+    """平台 Allure 数据 → Midscene 原版报告 schema。"""
     ATT = os.path.join(run_dir, 'allure-results')
+    run_start = None
     tasks = []
     for res in sorted(results, key=lambda r: r.get('start') or 0):
         case_name = res.get('name') or '用例'
         status = res.get('status') or 'unknown'
         case_start = res.get('start') or 0
-        case_stop = max(res.get('stop') or case_start, case_start + 1000)
+        case_stop = res.get('stop') or case_start
+        run_start = case_start if run_start is None else min(run_start, case_start)
         node = node_of(meta, res)
         videos = find_case_videos(node, meta.get('udid'))
         v0 = videos[0] if videos else None
         v_dur = video_duration_ms(v0) if v0 else 0
         desc = str(res.get('description') or '')
-        reason = ((res.get('statusDetails') or {}).get('message') or '')[:2000]
-        failed = status != 'passed'
 
-        # 批量抽帧：录屏全时长按 FRAME_INTERVAL_MS 一次 ffmpeg 抽帧（帧文件 → report/media/）
-        media_dir = os.path.join(run_dir, 'report', 'media')
-        os.makedirs(media_dir, exist_ok=True)
-        all_frames = []
-        if v0:
-            vkey = re.sub(r'[^A-Za-z0-9_.]', '__', os.path.basename(v0))[:60]
-            all_frames = extract_all_frames(v0, FRAME_INTERVAL_MS,
-                                            os.path.join(media_dir, 'frames_' + vkey))
-
-        # 用例级证据：失败截图 + 失败录屏
-        case_shots = []
-        for att in res.get('attachments', []) or []:
-            if (att.get('type') or '').startswith('image/'):
-                d = b64_image(os.path.join(ATT, att.get('source', '')))
+        def frames_for(ws, we, want):
+            """时间窗内从录屏取 want 帧 dataURI（窗口均分）。"""
+            out = []
+            if not v0 or v_dur <= 0:
+                return out
+            ra = max(0, ws - case_start)
+            rb = max(0, min(v_dur, we - case_start))
+            if rb <= ra:
+                ra, rb = 0, min(v_dur, 1000)
+            n = max(1, min(want, int((rb - ra) / 200) or 1))
+            for i in range(n):
+                ts = ra + (rb - ra) * (i + 0.5) / n
+                d = frame_datauri(v0, ts)
                 if d:
-                    case_shots.append(d)
+                    out.append((int(case_start + ts), d))
+            return out
 
         # 1) 用例级 Plan 任务（组头）
+        pf = frames_for(case_start, case_stop, 2) if v0 else []
+        rec_plan = [{'type': 'screenshot', 'ts': ts, 'screenshot': d, 'timing': 'after-calling'}
+                    for ts, d in pf]
+        uc_plan = {'size': None, 'screenshotBase64': rec_plan[-1]['screenshot']} if rec_plan else None
+        if uc_plan and uc_plan['screenshotBase64'].startswith('data:image/jpeg'):
+            uc_plan['size'] = None
         tasks.append({
-            'status': 'finished' if not failed else 'failed',
+            'status': 'finished' if status == 'passed' else 'failed',
             'type': 'Planning', 'subType': 'Plan',
-            'param': {'userInstruction': case_name},
+            'param': {'userInstruction': case_name, 'imagesIncludeCount': len(pf)},
             'timing': {'start': case_start, 'end': case_stop, 'cost': case_stop - case_start},
-            'uiContext': None,
+            'uiContext': uc_plan,
             'log': {'rawResponse': desc or case_name},
             'output': {'actions': [], 'more_actions_needed_by_instruction': True,
                        'log': desc or case_name, 'yamlFlow': []},
-            'recorder': [],
+            'recorder': rec_plan,
             'cache': {'hit': False},
         })
 
-        # 2) 操作步骤 → Action Space（allure steps 无 time：按步骤数均分用例时间窗）
-        steps = res.get('steps') or []
-        n_steps = max(1, len(steps))
-        win = (case_stop - case_start) / n_steps
-        step_tasks = []
-        for si, st in enumerate(steps):
+        # 2) 操作步骤 → Action Space
+        for st in res.get('steps') or []:
             st_time = st.get('time') or {}
-            s_start = int(st_time.get('start') or (case_start + si * win))
-            s_end = int(st_time.get('stop') or st_time.get('end') or (case_start + (si + 1) * win))
+            s_start = st_time.get('start') or case_start
+            s_end = st_time.get('stop') or st_time.get('end') or (s_start + 500)
             sub = step_to_action(st.get('name', ''))
             shots = []
             for att in st.get('attachments', []) or []:
@@ -230,68 +196,59 @@ def build_data(run_id, meta, results, run_dir):
                         shots.append(d)
             main_shot = shots[0] if shots else None
             rec = []
-            # 该步骤时间窗内的帧（帧文件已在批量抽帧阶段生成 → base64 dataURI）
-            rel_a = max(0, s_start - case_start)
-            rel_b = max(rel_a + FRAME_INTERVAL_MS, s_end - case_start)
-            for off, fpath in all_frames:
-                if rel_a <= off <= rel_b:
-                    rec.append({'type': 'screenshot', 'ts': int(case_start + off),
-                                'screenshot': b64_image(fpath), 'timing': 'after-calling'})
-            # 录屏比用例短时：超出段用录屏末帧延续（teardown 静止画面）
-            if all_frames and rel_b > (all_frames[-1][0]):
-                last_off, last_path = all_frames[-1]
-                _t = rel_b
-                while _t > last_off + FRAME_INTERVAL_MS // 2 and _t <= rel_b:
-                    rec.append({'type': 'screenshot', 'ts': int(case_start + _t),
-                                'screenshot': b64_image(last_path), 'timing': 'after-calling'})
-                    _t -= FRAME_INTERVAL_MS
-            if main_shot and not any(r['ts'] == s_end for r in rec):
-                rec.append({'type': 'screenshot', 'ts': s_end, 'screenshot': main_shot,
-                            'timing': 'after-calling'})
-            if not main_shot and rec:
-                main_shot = rec[-1]['screenshot']
-            # 失败用例：最后一个步骤 = 失败点，挂失败证据
-            if failed and si == n_steps - 1:
-                if case_shots and not main_shot:
-                    main_shot = case_shots[0]
-                if case_shots and not any(r['screenshot'] == case_shots[0] for r in rec):
-                    rec.append({'type': 'screenshot', 'ts': s_end, 'screenshot': case_shots[0],
-                                'timing': 'after-calling'})
+            if not main_shot and v0:
+                fr = frames_for(s_start, s_end, 2)
+                rec = [{'type': 'screenshot', 'ts': ts, 'screenshot': d, 'timing': 'after-calling'}
+                       for ts, d in fr]
+                main_shot = rec[-1]['screenshot'] if rec else None
+            else:
+                rec = ([{'type': 'screenshot', 'ts': s_end, 'screenshot': main_shot,
+                         'timing': 'after-calling'}] if main_shot else [])
+            m = re.search(r'\[id:([^\]]+)\]', st.get('name', ''))
+            locate = {'description': st.get('name', '')}
+            if m:
+                locate.update({'value': m.group(1), 'type': 'id'})
             tasks.append({
-                'status': 'finished' if not (failed and si == n_steps - 1) else 'failed',
+                'status': 'finished' if (st.get('status') in (None, 'passed', 'finished')) else 'failed',
                 'type': 'Action Space', 'subType': sub,
-                'param': {'locate': {'description': st.get('name', ''), 'type': 'id',
-                                     'value': (re.search(r'\[id:([^\]]+)\]', st.get('name', '')) or [None, ''])[1]
-                                     if re.search(r'\[id:([^\]]+)\]', st.get('name', '')) else ''}},
+                'param': {'locate': locate},
                 'subTask': True,
                 'timing': {'start': s_start, 'end': s_end, 'cost': s_end - s_start},
-                'uiContext': ({'size': size_for(main_shot, v0),
-                               'screenshotBase64': main_shot} if main_shot else None),
+                'uiContext': ({'size': png_size(main_shot), 'screenshotBase64': main_shot}
+                              if main_shot else None),
                 'recorder': rec,
             })
 
-        # 3) 失败：断言任务（Print_Assert_Result）
-        if failed:
-            fail_shots = case_shots
+        # 3) 失败：断言任务（含失败截图/录屏/原因）
+        if status != 'passed':
+            reason = ((res.get('statusDetails') or {}).get('message') or '')[:2000]
+            fail_shots = []
+            for att in res.get('attachments', []) or []:
+                if (att.get('type') or '').startswith('image/'):
+                    d = b64_image(os.path.join(ATT, att.get('source', '')))
+                    if d:
+                        fail_shots.append(d)
             fail_vids = [v for v in videos if '_failure' in os.path.basename(v)]
-            rec = [{'type': 'screenshot', 'ts': int(case_stop), 'screenshot': d,
-                    'timing': 'after-calling'} for d in fail_shots[:1]]
-            main_shot = fail_shots[0] if fail_shots else None
-            tasks.append({
+            fr = frames_for(case_stop - 1000, case_stop + 500, 3) if v0 else []
+            rec = [{'type': 'screenshot', 'ts': ts, 'screenshot': d, 'timing': 'after-calling'}
+                   for ts, d in fr]
+            main_shot = fail_shots[0] if fail_shots else (rec[-1]['screenshot'] if rec else None)
+            assert_task = {
                 'status': 'failed', 'type': 'Action Space', 'subType': 'Print_Assert_Result',
                 'param': {'result': 'failed', 'expect': '', 'actual': reason[:200]},
                 'subTask': True,
                 'timing': {'start': case_stop, 'end': case_stop, 'cost': 0},
-                'uiContext': ({'size': size_for(main_shot, v0),
-                               'screenshotBase64': main_shot} if main_shot else None),
+                'uiContext': ({'size': png_size(main_shot), 'screenshotBase64': main_shot}
+                              if main_shot else None),
                 'output': {'assertion': {'type': 'assertion', 'status': 'failed',
                                          'expected': '', 'actual': reason[:200],
                                          'message': reason[:500]},
                            'log': reason[:300]},
                 'recorder': rec,
-            })
+            }
             if fail_vids:
-                tasks[-1]['video'] = fail_vids[0]
+                assert_task['video'] = 'file://' + fail_vids[0]
+            tasks.append(assert_task)
 
     return {
         'sdkVersion': '1.0.3',
@@ -306,10 +263,11 @@ def build_data(run_id, meta, results, run_dir):
 
 
 def inject_data(shell_html, data):
-    """替换壳中的数据 script（官方协议 midscene_web_dump，渲染器启动时读取）。"""
+    """替换壳中的数据 script（官方协议：<script type="midscene_web_dump" type="application/json">，
+    位于文档尾；渲染器启动时读取该 dump 渲染报告——替换它即注入我们的数据）。"""
     payload = json.dumps(data, ensure_ascii=False).replace('</', '<\\/')
     scripts = list(re.finditer(
-        r'(<script type="midscene_web_dump"[^>]*>\s*)(\{.*?\})(\s*</script>)', shell_html, re.S))
+        r'(<script type="midscene_web_dump"[^>]*>\s*)(\{.*?})(\s*</script>)', shell_html, re.S))
     if not scripts:
         raise SystemExit('壳中未找到数据 script（midscene_web_dump）')
     m = scripts[-1]
@@ -332,14 +290,10 @@ def main():
     out = os.path.join(out_dir, 'report.html')
     with open(out, 'w', encoding='utf-8') as f:
         f.write(html)
-    n_frames = sum(len(t.get('recorder') or []) for t in data['executions'][0]['tasks'])
-    print('已生成: %s' % out)
-    print('任务数: %d | 帧数(recorder): %d | 总大小: %.1f MB' % (
-        n_tasks_len(data), n_frames, os.path.getsize(out) / 1048576))
-
-
-def n_tasks_len(data):
-    return len(data['executions'][0]['tasks'])
+    print('已生成: %s（壳: %s）' % (out, os.path.basename(shell)))
+    print('任务数: %d | 数据: %.1f MB | 总大小: %.1f MB' % (
+        len(data['executions'][0]['tasks']),
+        len(json.dumps(data)) / 1048576, os.path.getsize(out) / 1048576))
 
 
 if __name__ == '__main__':

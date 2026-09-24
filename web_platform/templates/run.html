@@ -186,6 +186,7 @@
             <label class="chk"><input type="checkbox" id="execSetupReset"> 前置清理（仅第 1 条用例前：清登录态+App 数据）</label>
             <label class="chk"><input type="checkbox" id="execTeardownReset"> 后置清理（仅最后 1 条用例后：清 App 数据）</label>
             <button class="ghost mini" id="btnCleanupSave" style="margin-left:auto">保存清理配置</button>
+            <button class="danger-ghost mini" id="btnEvidenceClear" title="删除所有录制的完整视频、断言前后5秒视频与断言失败截图，释放磁盘空间">🗑 一键删除录制视频/截图</button>
           </div>
           <p class="muted mt">保存后对后续所有执行生效（执行用例 / 测试套件 / 单用例执行共用，不写回 conf 文件）——用例之间无需每条写登录步骤。</p>
         </div>

@@ -598,6 +598,14 @@ class ExecutionManager(object):
             return False, 'allure generate 失败: %s' % e
         if p.returncode != 0:
             return False, 'allure generate 失败: %s' % p.stderr.decode('utf-8', 'ignore')[-500:]
+        # 同时生成 Midscene 风格在线回放报告（数据一边放 allure，一边放在线报告）
+        try:
+            ms = os.path.join(BASE_DIR, 'generate_midscene_report.py')
+            if os.path.isfile(ms):
+                subprocess.run([sys.executable, ms, run_id], cwd=BASE_DIR,
+                               capture_output=True, timeout=300)
+        except Exception:
+            pass                                  # 在线报告生成失败不影响 Allure 主流程
         report_rel = 'output/runs/%s/report' % run_id
         if task:
             task['report_dir'] = report_rel

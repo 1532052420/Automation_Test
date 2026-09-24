@@ -353,6 +353,43 @@ def api_appium_stop():
     return jsonify({'ok': False, 'msg': '端口 %d 仍被占用，请手动处理' % APPIUM_PORT}), 500
 
 
+@bp.route('/api/video-evidence/clear', methods=['POST'])
+def api_video_evidence_clear():
+    """一键删除录制视频与断言失败截图：
+    - output/video_evidence/** 全部（完整视频 / 断言前后 5 秒视频 / 失败截图）
+    - output/runs/*/allure-results/*-attachment.png（断言失败截图的 allure 附件副本）
+    不删除：设计截图（output/screenshots）、Allure 报告、测试结果 JSON。"""
+    import shutil as _shutil
+    removed = {'videos': 0, 'shots': 0}
+    ve = os.path.join(BASE_DIR, 'output', 'video_evidence')
+    if os.path.isdir(ve):
+        for root, dirs, files in os.walk(ve):
+            for f in files:
+                fp = os.path.join(root, f)
+                try:
+                    os.remove(fp)
+                    if f.endswith('.mp4'):
+                        removed['videos'] += 1
+                    elif f.endswith('.png'):
+                        removed['shots'] += 1
+                except Exception:
+                    pass
+        for root, dirs, files in os.walk(ve, topdown=False):
+            for d in dirs:
+                try:
+                    os.rmdir(os.path.join(root, d))
+                except OSError:
+                    pass
+    for f in glob.glob(os.path.join(BASE_DIR, 'output', 'runs', '*', 'allure-results', '*-attachment.png')):
+        try:
+            os.remove(f)
+            removed['shots'] += 1
+        except Exception:
+            pass
+    return jsonify({'ok': True, 'msg': '已删除录制视频 %d 个、断言失败截图 %d 张' %
+                    (removed['videos'], removed['shots'])})
+
+
 # ---------------------------------------------------------------- API
 @bp.route('/api/devices')
 def api_devices():
