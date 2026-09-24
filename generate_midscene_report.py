@@ -11,8 +11,84 @@ import glob
 import os
 import sys
 import time
+import shutil
+import subprocess
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+VIDEO_EVIDENCE_DIR = os.path.join(BASE_DIR, 'output', 'video_evidence')
+
+
+def node_to_video_prefix(node, udid):
+    """用例 node（cases/x/y.py::Class::test）→ 录屏文件名前缀（与 video_evidence 命名一致）。"""
+    if not node:
+        return ''
+    base = node.replace('/', '__').replace('::', '__')
+    return base + '__' + (udid or '')
+
+
+def find_case_videos(node, udid, run_dir):
+    """扫描 video_evidence 找该用例的全部录屏（artifacts 成品 + tmp 原始），复制进 report/media/。
+    返回相对报告的路径列表（按修改时间新→旧）。"""
+    prefix = node_to_video_prefix(node, udid)
+    if not prefix:
+        return []
+    out = []
+    media_dir = os.path.join(run_dir, 'report', 'media')
+    os.makedirs(media_dir, exist_ok=True)
+    for sub in ('artifacts', 'tmp'):
+        for f in glob.glob(os.path.join(VIDEO_EVIDENCE_DIR, sub, '**', '*.mp4'), recursive=True):
+            bn = os.path.basename(f)
+            if bn.startswith(prefix):
+                dst = os.path.join(media_dir, bn)
+                if not os.path.isfile(dst):
+                    try:
+                        shutil.copy2(f, dst)
+                    except Exception:
+                        continue
+                out.append('media/' + bn)
+    # 新→旧
+    out.sort(key=lambda rel: -os.path.getmtime(os.path.join(run_dir, 'report', rel)))
+    return out
+
+
+def extract_frames(video_rel, run_dir, count=12):
+    """用 ffmpeg 从录屏均匀抽 count 帧，存 report/frames/，返回 [{ts, src}]（ts 毫秒）。"""
+    media_dir = os.path.join(run_dir, 'report', os.path.dirname(video_rel))
+    video = os.path.join(run_dir, 'report', video_rel)
+    frame_dir = os.path.join(media_dir, 'frames_' + os.path.splitext(os.path.basename(video_rel))[0][:40])
+    os.makedirs(frame_dir, exist_ok=True)
+    if not glob.glob(os.path.join(frame_dir, 'f_*.jpg')):
+        try:
+            probe = subprocess.run(['ffprobe', '-v', 'error', '-show_entries',
+                                    'format=duration', '-of', 'csv=p=0', video],
+                                   capture_output=True, text=True, timeout=30)
+            dur = float(probe.stdout.strip() or 0)
+            if dur <= 0:
+                return []
+            fps = count / dur
+            subprocess.run(['ffmpeg', '-y', '-i', video, '-vf', 'fps=%f,scale=84:-2' % fps,
+                            os.path.join(frame_dir, 'f_%02d.jpg')],
+                           capture_output=True, timeout=120)
+        except Exception:
+            return []
+    frames = []
+    files = sorted(glob.glob(os.path.join(frame_dir, 'f_*.jpg')))
+    n = len(files)
+    vdur = _video_duration(video_rel, run_dir)
+    for i, f in enumerate(files):
+        frames.append({'ts': int(vdur * (i + 0.5) / n) if vdur else 0,
+                       'src': os.path.relpath(f, os.path.join(run_dir, 'report')).replace(os.sep, '/')})
+    return frames
+
+
+def _video_duration(video_rel, run_dir):
+    video = os.path.join(run_dir, 'report', video_rel)
+    try:
+        probe = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+                                '-of', 'csv=p=0', video], capture_output=True, text=True, timeout=30)
+        return float(probe.stdout.strip() or 0) * 1000
+    except Exception:
+        return 0
 
 
 def load_run(run_id):
@@ -59,17 +135,16 @@ def build_data(run_id, meta, results, run_dir_abs):
                     case_reason = open(fp, encoding='utf-8', errors='replace').read().strip()[:2000]
                 except Exception:
                     pass
-        # 用例组头（Plan 类型任务，展示为 Action 分组标题；携带用例级证据）
-        tasks.append({
-            'status': 'finished' if status == 'passed' else 'failed',
-            'type': 'Planning', 'subType': 'Case',
-            'param': {'name': case_name, 'node': (res.get('fullName') or ''),
-                      'reason': case_reason},
-            'timing': {'start': case_start, 'end': case_stop,
-                       'cost': (case_stop or 0) - (case_start or 0)},
-            'uiContext': None,
-            'output': {'title': case_name},
-        })
+        # allure fullName 尾段（Class#test）→ 在 case_nodes 中按 'Class::test' 尾段匹配源路径
+        _tail = (res.get('fullName') or '').split('#')[-1]     # 方法名（同文件内唯一）
+        node_full = next((n for n in (meta.get('case_nodes') or [])
+                          if n.endswith('::' + _tail) or n == _tail), '')
+        vids_all = find_case_videos(node_full, meta.get('udid'), run_dir_abs)
+        frames_all = []
+        if vids_all:
+            frames_all = extract_frames(vids_all[0], run_dir_abs)
+        case_uc = {'size': None, 'screenshots': case_shots, 'videos': vids_all,
+                   'frames': frames_all, 'frameDurMs': _video_duration(vids_all[0], run_dir_abs) if vids_all else 0}
         step_tasks = []
         for st in res.get('steps') or []:
             st_time = st.get('time') or {}
@@ -91,10 +166,20 @@ def build_data(run_id, meta, results, run_dir_abs):
                 'output': {'title': st.get('name', '')},
             })
         # 非通过用例：失败证据（截图+录屏+原因）挂到最后一个步骤（失败点），便于步进直达
+        # 用例组头：录屏 + 视频帧时间轴（成功/失败都有）；失败证据挂失败点步骤
+        tasks.append({'status': 'finished' if status == 'passed' else 'failed',
+                      'type': 'Planning', 'subType': 'Record',
+                      'param': {'name': case_name + ' · 录屏'},
+                      'timing': {'start': case_start, 'end': case_stop,
+                                 'cost': (case_stop or 0) - (case_start or 0)},
+                      'uiContext': case_uc,
+                      'output': {'title': case_name}})
         if status != 'passed' and step_tasks:
             last = step_tasks[-1]
             last['status'] = 'failed'
-            last['uiContext'] = {'size': None, 'screenshots': case_shots, 'videos': case_videos}
+            last['uiContext'] = {'size': None, 'screenshots': case_shots, 'videos': vids_all,
+                                 'frames': frames_all,
+                                 'frameDurMs': _video_duration(vids_all[0], run_dir_abs) if vids_all else 0}
             last['param']['reason'] = case_reason
         tasks.extend(step_tasks)
     executions.append({'logTime': int(time.time() * 1000), 'name': exec_name, 'tasks': tasks})
@@ -308,7 +393,8 @@ html.night .viewer { background: #0c0d0f; }
     FLAT.forEach((it, i) => { it.i = i; });
     FLAT.forEach(it => {
       if (it.kind === 'case') {
-        html += '<div class="case-group"><div class="case-title"><span class="st ' +
+        html += '<div class="case-group" data-gi="' + it.i + '"><div class="case-title" data-i="' + it.i +
+          '" style="cursor:pointer" title="点击查看该用例的录屏与帧时间轴"><span class="st ' +
           (it.task.status === 'finished' ? 'passed' : 'failed') + '"></span>Action - ' + esc(it.groupTitle) + '</div>';
         lastGroup = it;
       } else {
@@ -318,6 +404,9 @@ html.night .viewer { background: #0c0d0f; }
     html += '</div>';
     sideBody.innerHTML = html;
     sideBody.querySelectorAll('.step-row').forEach(el => {
+      el.addEventListener('click', () => { cur = +el.dataset.i; render(); });
+    });
+    sideBody.querySelectorAll('.case-title').forEach(el => {
       el.addEventListener('click', () => { cur = +el.dataset.i; render(); });
     });
   })();
@@ -336,23 +425,43 @@ html.night .viewer { background: #0c0d0f; }
       el.classList.toggle('cur', +el.dataset.i === cur);
       if (+el.dataset.i === cur) el.scrollIntoView({ block: 'nearest' });
     });
-    /* 时间轴：所有含截图的步骤 */
-    const withShots = FLAT.filter(x => shotUrls(x).length);
-    tlInner.innerHTML = withShots.map(x => {
-      const t = x.task.timing || {};
-      const rel = (t.start && runEnd) ? Math.max(0, t.start - runStart) : 0;
-      return '<div class="tl-cell' + (x.i === cur ? ' cur' : '') + '" data-i="' + x.i + '">' +
-        '<div class="ms">' + rel + 'ms</div>' +
-        '<img src="' + shotUrls(x)[0] + '" loading="lazy"><div class="bar"></div></div>';
-    }).join('');
-    tlInner.querySelectorAll('.tl-cell').forEach(c => {
-      c.addEventListener('click', () => { cur = +c.dataset.i; render(); });
-    });
+    /* 时间轴：当前项有视频帧 → 渲染帧（点击定位视频）；否则渲染有截图的步骤 */
+    const it0 = FLAT[cur];
+    const frames0 = (it0.task.uiContext || {}).frames || [];
+    if (it0.kind === 'case' && frames0.length) {
+      tlInner.innerHTML = frames0.map((f, fi) =>
+        '<div class="tl-cell" data-ts="' + f.ts + '" data-src="' + f.src + '">' +
+        '<div class="ms">' + f.ts + 'ms</div>' +
+        '<img src="' + f.src + '" loading="lazy"><div class="bar"></div></div>').join('');
+      tlInner.querySelectorAll('.tl-cell').forEach(c => {
+        c.addEventListener('click', () => {
+          tlInner.querySelectorAll('.tl-cell').forEach(x => x.classList.remove('cur'));
+          c.classList.add('cur');
+          const v = viewer.querySelector('video');
+          if (v) v.currentTime = (+c.dataset.ts) / 1000;
+          document.getElementById('progFill').style.width =
+            Math.min(100, (+c.dataset.ts) / ((FLAT[0].task.uiContext || {}).frameDurMs || 1) * 100) + '%';
+        });
+      });
+    } else {
+      const withShots = FLAT.filter(x => shotUrls(x).length);
+      tlInner.innerHTML = withShots.map(x => {
+        const t = x.task.timing || {};
+        const rel = (t.start && runEnd) ? Math.max(0, t.start - runStart) : 0;
+        return '<div class="tl-cell' + (x.i === cur ? ' cur' : '') + '" data-i="' + x.i + '">' +
+          '<div class="ms">' + rel + 'ms</div>' +
+          '<img src="' + shotUrls(x)[0] + '" loading="lazy"><div class="bar"></div></div>';
+      }).join('');
+      tlInner.querySelectorAll('.tl-cell').forEach(c => {
+        c.addEventListener('click', () => { cur = +c.dataset.i; render(); });
+      });
+    }
     const curCell = tlInner.querySelector('.tl-cell.cur');
     if (curCell) curCell.scrollIntoView({ block: 'nearest', inline: 'center' });
     /* 主视图：失败录屏优先，其次截图；用例组头无证据时给占位说明 */
     const urls = shotUrls(it);
     const vids = ((it.task.uiContext || {}).videos) || [];
+    const hasFrames = ((it.task.uiContext || {}).frames || []).length > 0;
     if (vids.length) {
       viewer.innerHTML = '<video controls playsinline preload="metadata" src="' + vids[0] +
         '" style="max-width:92%;max-height:92%;border-radius:6px;box-shadow:0 6px 30px rgba(0,0,0,.25)"></video>' +
