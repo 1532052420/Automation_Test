@@ -33,5 +33,6 @@ class Search_hotwordPage:
     def assert_user_first(self):
         """断言「用户结果首条」出现"""
         self.appOperator.getElement(self._elements.user_first)
+        self.appOperator.get_screenshot('断言·用户结果首条出现')
 
 

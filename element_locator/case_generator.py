@@ -108,6 +108,11 @@ def _method_block(name, doc, args, body):
         IND, name, args_str, IND * 2, doc, body_ind)
 
 
+def _shot_line(desc):
+    """断言成功后的缩略图截图行（appOperator.get_screenshot 自动 attach 到 allure）"""
+    return "        self.appOperator.get_screenshot(%s)" % repr(('断言·' + desc)[:40])
+
+
 def _probe_body_lines(element_name, seconds_var='timeout_seconds'):
     """构造探针元素代码体：复用元素库定义的定位（元素改定义方法不用改）。
     seconds_var：等待秒数变量名，须与页面方法签名参数一致。"""
@@ -136,13 +141,13 @@ def page_method_code(step):
                              'self.appOperator.touch_long_press(self._elements.%s, duration_sconds=2)' % el)
     if t == 'assert_visible':
         return _method_block('assert_%s' % el, desc, [],
-                             'self.appOperator.getElement(self._elements.%s)' % el)
+                             'self.appOperator.getElement(self._elements.%s)\n%s' % (el, _shot_line(desc)))
     if t == 'assert_text':
         return _method_block('assert_%s_text' % el, desc, ['expected'],
-                             "assert self.appOperator.getText(self._elements.%s) == expected, '%s'" % (el, desc))
+                             "assert self.appOperator.getText(self._elements.%s) == expected, '%s'\n%s" % (el, desc, _shot_line(desc)))
     if t == 'assert_toast':
         return _method_block('assert_toast', desc, ['text'],
-                             "assert self.appOperator.is_toast_visible(text, wait_seconds=5), '%s'" % desc)
+                             "assert self.appOperator.is_toast_visible(text, wait_seconds=5), '%s'\n%s" % (desc, _shot_line(desc)))
     if t == 'wait_element':
         # 轮询等待元素出现：探针按 PRESENCE 等待 timeout_seconds，超时 getElement 抛错=用例失败
         try:
@@ -161,7 +166,8 @@ def page_method_code(step):
                 + 'except Exception:\n'
                 + '    pass\n'
                 + "self.appOperator.assert_true_with_shot('%s', gone,\n" % desc
-                + "                                   '等待%s秒内元素仍可见' % wait_seconds)")
+                + "                                   '等待%s秒内元素仍可见' % wait_seconds)\n"
+                + _shot_line(desc))
         return _method_block('assert_%s_gone' % el, desc, ['wait_seconds=2'], body)
     if t == 'if_click':
         # 分支：元素出现才点击（探测超时不算失败，用例继续——用于「首发布弹窗」类分支处理）

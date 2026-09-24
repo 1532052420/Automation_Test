@@ -116,13 +116,17 @@ def _start_recording(item):
 
 
 def _finish_recording(item, keep=False):
-    """收尾录屏（成功/跳过场景），幂等。"""
+    """收尾录屏（成功/跳过场景），幂等。keep=True 时视频已按配置保留，日志给出实际路径。"""
     rec = getattr(item, '_ve_recorder', None)
     if rec is None:
         return
     try:
         rec.discard(keep=keep)
-        logger.info('用例无失败，临时录屏已清理')
+        if keep:
+            kept = getattr(rec, 'work_dir', None) or getattr(rec, 'frame_dir', '') or ''
+            logger.info('用例成功，原始视频已按配置保留: %s' % kept)
+        else:
+            logger.info('用例无失败，临时录屏已清理')
     except Exception as exc:
         logger.warning('录屏收尾异常(已忽略): %s' % exc)
     finally:

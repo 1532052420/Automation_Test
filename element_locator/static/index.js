@@ -1660,12 +1660,13 @@ function pkgMethodBlock(step) {
   const doc = $('el-op-comment').value.trim() || genStepDesc(step);
   const p = (step.param || '').trim();
   let sig = '', body = '';
+  const shotLine = "self.appOperator.get_screenshot('" + escQ('断言·' + doc.slice(0, 40)) + "')";
   if (t === 'click') sig = 'click_' + el + '(self)';
   else if (t === 'input') { sig = 'input_' + el + '(self, text)'; body = 'self.appOperator.sendText(self._elements.' + el + ', text)'; }
   else if (t === 'long_press') { sig = 'long_press_' + el + '(self)'; body = 'self.appOperator.touch_long_press(self._elements.' + el + ', duration_sconds=2)'; }
-  else if (t === 'assert_visible') { sig = 'assert_' + el + '(self)'; body = 'self.appOperator.getElement(self._elements.' + el + ')'; }
-  else if (t === 'assert_text') { sig = 'assert_' + el + '_text(self, expected)'; body = "assert self.appOperator.getText(self._elements." + el + ") == expected, '" + escQ(doc) + "'"; }
-  else if (t === 'assert_toast') { sig = 'assert_toast(self, text)'; body = "assert self.appOperator.is_toast_visible(text, wait_seconds=5), '" + escQ(doc) + "'"; }
+  else if (t === 'assert_visible') { sig = 'assert_' + el + '(self)'; body = 'self.appOperator.getElement(self._elements.' + el + ')\n' + shotLine; }
+  else if (t === 'assert_text') { sig = 'assert_' + el + '_text(self, expected)'; body = "assert self.appOperator.getText(self._elements." + el + ") == expected, '" + escQ(doc) + "'\n" + shotLine; }
+  else if (t === 'assert_toast') { sig = 'assert_toast(self, text)'; body = "assert self.appOperator.is_toast_visible(text, wait_seconds=5), '" + escQ(doc) + "'\n" + shotLine; }
   else if (t === 'wait_element') {
     const n = parseInt(p, 10); sig = 'wait_' + el + '(self, timeout_seconds=' + (isNaN(n) ? 60 : n) + ')';
     body = probeBodyLines(el, 'timeout_seconds') + '\nself.appOperator.getElement(probe)';
@@ -1674,7 +1675,7 @@ function pkgMethodBlock(step) {
     sig = 'assert_' + el + '_gone(self, wait_seconds=2)';
     body = probeBodyLines(el, 'wait_seconds') + '\ngone = True\ntry:\n    self.appOperator.getElement(probe)\n    gone = False\nexcept Exception:\n    pass\n'
       + "self.appOperator.assert_true_with_shot('" + escQ(doc) + "', gone,\n"
-      + "                                   '等待' + str(wait_seconds) + '秒内元素仍可见')";
+      + "                                   '等待' + str(wait_seconds) + '秒内元素仍可见')\n" + shotLine;
   }
   else if (t === 'if_click') {
     const n = parseInt(p, 10); sig = 'click_' + el + '_if_visible(self, timeout_seconds=' + (isNaN(n) ? 3 : n) + ')';
