@@ -186,7 +186,6 @@
             <label class="chk"><input type="checkbox" id="execSetupReset"> 前置清理（仅第 1 条用例前：清登录态+App 数据）</label>
             <label class="chk"><input type="checkbox" id="execTeardownReset"> 后置清理（仅最后 1 条用例后：清 App 数据）</label>
             <button class="ghost mini" id="btnCleanupSave" style="margin-left:auto">保存清理配置</button>
-            <button class="danger-ghost mini" id="btnEvidenceClear" title="删除所有录制的完整视频、断言前后5秒视频与断言失败截图，释放磁盘空间">🗑 一键删除录制视频/截图</button>
           </div>
           <p class="muted mt">保存后对后续所有执行生效（执行用例 / 测试套件 / 单用例执行共用，不写回 conf 文件）——用例之间无需每条写登录步骤。</p>
         </div>
@@ -203,6 +202,7 @@
             <label class="chk"><input type="checkbox" id="recEnabled"> 启用自动录屏</label>
             <label class="chk"><input type="checkbox" id="recKeep"> 成功后保留原始视频</label>
             <label class="chk"><input type="checkbox" id="recRequired"> 录屏失败时终止用例（默认仅告警）</label>
+            <button class="danger-ghost mini" id="btnEvidenceClear" style="margin-left:auto" title="删除所有录制的完整视频、断言前后5秒视频与断言失败截图，释放磁盘空间">🗑 一键删除录制视频/截图</button>
             <button class="ghost mini" id="btnRecSave" style="margin-left:auto">保存录屏配置</button>
           </div>
           <p class="muted mt">录屏时机固定为每条用例 setup 执行前启动（覆盖启动 App 现场），不做配置；证据视频随失败明细挂在测试报告里。</p>
