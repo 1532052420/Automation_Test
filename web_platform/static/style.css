@@ -936,3 +936,7 @@ html.night ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, .26
   font-weight: 700; line-height: 1; padding: 4px 0;
 }
 
+/* ---------- 元素管理·文件列表：操作列固定靠右（文件名占满余下宽度） ---------- */
+#elFilesView th:last-child, #elFilesView td:last-child { width: 150px; text-align: right; }
+#elFilesView td .ops { justify-content: flex-end; }
+

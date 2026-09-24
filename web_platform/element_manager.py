@@ -193,7 +193,9 @@ def save_element(filename, name, locator_type, value, wait_type='VISIBILITY_OF',
                               '不能是 Python 关键字，最长 64 字符）'}
     if not str(value or '').strip():
         return False, {'msg': '定位值不能为空'}
-    if filename not in list_element_files():
+    # popupElements.py（随机弹窗规则库）单行增改与 delete_element 同口径放行：
+    # 只动 self.xxx 元素行，同文件 RULE_OPTIONS/WHITELIST 常量不受影响
+    if filename != POPUP_FILE and filename not in list_element_files():
         return False, {'msg': '目标元素文件不存在或不受管: %s' % filename}
     locator_type = (locator_type or '').upper()
     if locator_type not in LOCATOR_TYPES:
