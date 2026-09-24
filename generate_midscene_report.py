@@ -104,6 +104,18 @@ def frame_datauri(video, offset_ms):
     return None
 
 
+def video_size(path):
+    """ffprobe 取视频分辨率 → uiContext.size（canvas 绘制必需，缺失即白屏）。"""
+    try:
+        probe = subprocess.run([FFPROBE, '-v', 'error', '-select_streams', 'v:0',
+                                '-show_entries', 'stream=width,height',
+                                '-of', 'csv=p=0', path], capture_output=True, text=True, timeout=30)
+        w, h = probe.stdout.strip().split(',')[:2]
+        return {'width': int(w), 'height': int(h), 'dpr': 1}
+    except Exception:
+        return {'width': 1080, 'height': 2400, 'dpr': 1}
+
+
 def find_case_videos(node, udid):
     if not node:
         return []
@@ -185,9 +197,8 @@ def build_data(run_id, meta, results, run_dir):
         pf = frames_in(case_start, case_start + 500) if v0 else []
         rec_plan = [{'type': 'screenshot', 'ts': ts, 'screenshot': d, 'timing': 'after-calling'}
                     for ts, d in pf]
-        uc_plan = {'size': None, 'screenshotBase64': rec_plan[-1]['screenshot']} if rec_plan else None
-        if uc_plan and uc_plan['screenshotBase64'].startswith('data:image/jpeg'):
-            uc_plan['size'] = None
+        uc_plan = ({'size': video_size(v0), 'screenshotBase64': rec_plan[-1]['screenshot']}
+                   if (rec_plan and v0) else None)
         tasks.append({
             'status': 'finished' if status == 'passed' else 'failed',
             'type': 'Planning', 'subType': 'Plan',
@@ -235,8 +246,9 @@ def build_data(run_id, meta, results, run_dir):
                 'param': {'locate': locate},
                 'subTask': True,
                 'timing': {'start': s_start, 'end': s_end, 'cost': s_end - s_start},
-                'uiContext': ({'size': png_size(main_shot), 'screenshotBase64': main_shot}
-                              if main_shot else None),
+                'uiContext': ({'size': (png_size(main_shot)
+                                        if main_shot.startswith('data:image/png') else video_size(v0)),
+                               'screenshotBase64': main_shot} if main_shot else None),
                 'recorder': rec,
             })
 
@@ -258,8 +270,9 @@ def build_data(run_id, meta, results, run_dir):
                 'param': {'result': 'failed', 'expect': '', 'actual': reason[:200]},
                 'subTask': True,
                 'timing': {'start': case_stop, 'end': case_stop, 'cost': 0},
-                'uiContext': ({'size': png_size(main_shot), 'screenshotBase64': main_shot}
-                              if main_shot else None),
+                'uiContext': ({'size': (png_size(main_shot)
+                                        if main_shot.startswith('data:image/png') else video_size(v0)),
+                               'screenshotBase64': main_shot} if main_shot else None),
                 'output': {'assertion': {'type': 'assertion', 'status': 'failed',
                                          'expected': '', 'actual': reason[:200],
                                          'message': reason[:500]},
