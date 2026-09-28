@@ -962,3 +962,21 @@ html.night ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, .26
 .appium-btn:hover { filter: brightness(.97); }
 .appium-btn:disabled { opacity: .55; cursor: wait; }
 .appium-btn.on { background: var(--ok-bg); border-color: rgba(52, 199, 89, .55); color: var(--ok-text); }
+
+/* ================= 接口测试（testhub 完整移植 v6.15 追加） ================= */
+.quick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+.quick-grid .nav-card { padding: 16px; display: block; text-decoration: none; }
+.quick-grid .nav-card h3 { margin: 6px 0 0; font-size: 14px; }
+.pagerbar { margin-top: 10px; text-align: right; font-size: 12.5px; }
+.apitree-box .t-ops { margin-left: auto; opacity: 0; cursor: pointer; padding: 0 6px; color: var(--muted); }
+.apitree-box .t-coll:hover .t-ops { opacity: 1; }
+.apitree-box .t-req { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 8px; cursor: pointer; }
+.apitree-box .t-coll { display: flex; align-items: center; gap: 6px; }
+#varList .kvrow { gap: 10px; }
+
+/* 调试栏防溢出：URL 输入可收缩，环境/类型选择不被挤出视口 */
+#panel-requests .debugbar input { flex: 1; min-width: 0; }
+#panel-requests .debugbar select { flex: 0 0 auto; }
+#panel-requests .namebar input { flex: 1; min-width: 0; }
+#panel-requests .debugbar #reqMethod { width: 110px; flex: 0 0 auto; }
+#panel-requests .debugbar #reqEnvSel { width: 170px; }

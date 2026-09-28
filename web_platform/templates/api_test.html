@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>接口测试 · 自动化测试平台</title>
+<script src="/assets/{{ asset_v }}/theme.js"></script>
+<link rel="stylesheet" href="/assets/{{ asset_v }}/nav.css">
+<link rel="stylesheet" href="/assets/{{ asset_v }}/style.css">
+</head>
+<body data-page="api-test">
+<header class="gnav" id="sidebar"></header>
+<main>
+  <!-- 布局与 AppUI 自动化页一致：左侧二级菜单 + 右侧面板区。
+       菜单结构与 testhub 一致：仪表盘/项目管理/接口管理/自动化测试/请求历史/环境管理/测试报告/定时任务/通知列表/AI服务 -->
+  <div class="runlayout">
+    <aside class="subnav" id="subnav">
+      <div class="subnav-label">接口测试</div>
+      <a href="#dashboard" data-panel="dashboard" data-icon="chart" class="on">仪表盘</a>
+      <a href="#projects" data-panel="projects" data-icon="folder">项目管理</a>
+      <a href="#requests" data-panel="requests" data-icon="flask">接口管理</a>
+      <a href="#suites" data-panel="suites" data-icon="layers">自动化测试</a>
+      <a href="#history" data-panel="history" data-icon="doc">请求历史</a>
+      <a href="#envs" data-panel="envs" data-icon="gear">环境管理</a>
+      <a href="#reports" data-panel="reports" data-icon="list">测试报告</a>
+      <a href="#tasks" data-panel="tasks" data-icon="flow">定时任务</a>
+      <a href="#notifications" data-panel="notifications" data-icon="hand">通知列表</a>
+      <a href="#ai" data-panel="ai" data-icon="bolt">AI 服务配置</a>
+    </aside>
+
+    <div class="submain">
+
+      <!-- ============ 仪表盘 ============ -->
+      <section class="panel" id="panel-dashboard">
+        <div class="pagehead">
+          <h1>接口测试</h1>
+          <p class="sub">接口管理 · 调试执行 · 自动化套件 · 定时任务 · 环境变量 · AI 辅助 —— 用例数据统一 YAML 存储（config/api_testing/，预留数据库迁移）。</p>
+        </div>
+        <div class="stats" id="dashStats"></div>
+        <div class="card mt">
+          <div class="cardhead"><h3>快速入口</h3></div>
+          <div class="quick-grid" id="dashQuick"></div>
+        </div>
+        <div class="card mt">
+          <div class="cardhead"><h3>最近活动</h3>
+            <div class="ops"><button class="ghost mini" id="btnDashRefresh">刷新</button></div></div>
+          <div class="tblwrap"><table><thead><tr>
+            <th style="width:80px">操作</th><th>描述</th><th style="width:110px">对象</th><th style="width:170px">时间</th>
+          </tr></thead><tbody id="dashActivity"><tr><td colspan="4" class="empty">加载中…</td></tr></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- ============ 项目管理 ============ -->
+      <section class="panel" id="panel-projects" hidden>
+        <div class="card">
+          <div class="cardhead">
+            <h3>项目列表</h3>
+            <div class="ops">
+              <button class="ghost mini" id="btnCreateSample">一键示例项目</button>
+              <select id="projFilterType" style="width:auto"><option value="">全部类型</option><option value="HTTP">HTTP</option><option value="WEBSOCKET">WebSocket</option></select>
+              <select id="projFilterStatus" style="width:auto"><option value="">全部状态</option><option value="NOT_STARTED">未开始</option><option value="IN_PROGRESS">进行中</option><option value="COMPLETED">已结束</option></select>
+              <button class="mini" id="btnNewProject">新建项目</button>
+            </div>
+          </div>
+          <div class="tblwrap"><table><thead><tr>
+            <th>名称</th><th>类型</th><th>状态</th><th>负责人</th><th>成员</th>
+            <th>开始日期</th><th>结束日期</th><th>操作</th>
+          </tr></thead><tbody id="projTbody"></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- ============ 接口管理 ============ -->
+      <section class="panel" id="panel-requests" hidden>
+    <div class="apilayout">
+      <div class="card apitree">
+        <div class="cardhead">
+          <h3>接口库</h3>
+          <div class="ops">
+            <button class="ghost mini" id="btnNewCollection">新建集合</button>
+            <button class="mini" id="btnNewRequest">新增接口</button>
+          </div>
+        </div>
+        <select id="reqProjectSel" style="margin-bottom:8px"></select>
+        <input type="search" id="apiSearch" placeholder="搜索接口名称 / URL / 方式…" style="margin-bottom:10px">
+        <div id="apiTree" class="apitree-box">加载中…</div>
+      </div>
+      <div class="apiedit">
+        <div class="card" id="reqEditor" style="display:none">
+          <!-- 调试栏（testhub 同款：方式 + URL + 环境 + 发送） -->
+          <div class="debugbar">
+            <select id="reqType" title="接口类型" style="max-width:110px"><option value="HTTP">HTTP</option><option value="WEBSOCKET">WebSocket</option></select>
+            <select id="reqMethod" title="请求方式"></select>
+            <select id="reqEnvSel" title="执行环境（全局激活 / 局部）" style="max-width:150px"></select>
+            <input type="text" id="reqUrl" placeholder="输入请求URL（支持 {{变量}} 与 ${函数}）">
+            <button id="btnReqSend">发送</button>
+            <button class="ghost" id="btnWsConnect" style="display:none">连接</button>
+            <button class="ghost" id="btnWsDisconnect" style="display:none">断开</button>
+          </div>
+          <!-- 名称行（testhub 同款：接口名称 + 保存 / 导入 / 生成代码 / 变量助手） -->
+          <div class="namebar">
+            <input type="text" id="reqName" placeholder="请输入接口名称">
+            <button class="ghost mini" id="btnReqSave">保存</button>
+            <button class="ghost mini" id="btnReqImport">导入 cURL</button>
+            <button class="ghost mini" id="btnReqCode">生成代码</button>
+            <button class="ghost mini" id="btnVarHelper">变量助手</button>
+            <button class="ghost mini danger-ghost" id="btnReqCopy">复制</button>
+          </div>
+
+          <!-- 参数 Tab（testhub 同款：Params / Headers / 请求体 / 断言 / 消息 / 执行历史） -->
+          <div class="reqtabs">
+            <a data-rtab="params" class="on">Params</a>
+            <a data-rtab="headers">Headers</a>
+            <a data-rtab="body" id="rtabBodyLink">请求体</a>
+            <a data-rtab="asserts">断言</a>
+            <a data-rtab="wsmsg" id="rtabWsLink" style="display:none">消息</a>
+            <a data-rtab="history">执行历史</a>
+          </div>
+
+          <div class="rtabpane" id="rtab-params">
+            <div class="kvtable">
+              <div class="kvhead"><span></span><span>Key</span><span>Value</span><span>描述</span><span></span></div>
+              <div id="reqParams"></div>
+            </div>
+            <div class="treebar mt">
+              <button class="ghost mini" id="btnAddParam">+ 添加</button>
+              <button class="ghost mini" data-varinsert="reqParams">插入变量函数</button>
+            </div>
+          </div>
+
+          <div class="rtabpane" id="rtab-headers" hidden>
+            <div class="kvtable">
+              <div class="kvhead"><span></span><span>Key</span><span>Value</span><span>描述</span><span></span></div>
+              <div id="reqHeaders"></div>
+            </div>
+            <div class="treebar mt">
+              <button class="ghost mini" id="btnAddHeader">+ 添加</button>
+              <button class="ghost mini" data-varinsert="reqHeaders">插入变量函数</button>
+            </div>
+          </div>
+
+          <div class="rtabpane" id="rtab-body" hidden>
+            <div class="fields" style="grid-template-columns:180px 1fr">
+              <div class="field"><label>类型</label>
+                <select id="reqBodyType">
+                  <option value="none">无</option><option value="json">JSON</option>
+                  <option value="raw">Raw</option><option value="form-data">Form-Data</option>
+                  <option value="x-www-form-urlencoded">x-www-form-urlencoded</option>
+                </select></div>
+              <div class="field"><label>内容</label><textarea id="reqBody" rows="7"
+                placeholder='{"username": "admin"}'></textarea></div>
+            </div>
+            <div class="treebar mt">
+              <button class="ghost mini" data-varinsert-text="reqBody">插入变量函数</button>
+            </div>
+          </div>
+
+          <div class="rtabpane" id="rtab-asserts" hidden>
+            <div id="reqAssertions"></div>
+            <button class="ghost mini mt" id="btnAddAssertion">+ 添加断言</button>
+          </div>
+
+          <div class="rtabpane" id="rtab-wsmsg" hidden>
+            <div class="fields" style="grid-template-columns:140px 1fr auto;align-items:end">
+              <div class="field"><label>消息类型</label>
+                <select id="wsMsgType"><option value="text">Text</option><option value="json">JSON</option></select></div>
+              <div class="field"><label>消息内容</label><textarea id="wsMsgText" rows="3" placeholder='{"action":"ping"}'></textarea></div>
+              <button class="ghost mini" id="btnWsSend" style="height:38px">发送消息</button>
+            </div>
+            <div class="treebar"><button class="ghost mini" id="btnWsClear">清空消息历史</button></div>
+            <pre class="logbox mt" id="wsLog" style="height:auto;max-height:260px">未连接</pre>
+          </div>
+
+          <div class="rtabpane" id="rtab-history" hidden>
+            <div class="tblwrap"><table><thead><tr>
+              <th>时间</th><th>状态码</th><th>耗时(ms)</th><th>断言</th><th>错误</th>
+            </tr></thead><tbody id="histTbody"><tr><td colspan="5" class="empty">打开接口后自动加载</td></tr></tbody></table></div>
+          </div>
+
+          <div class="card resp-inline" id="respArea" style="display:none">
+            <div class="cardhead">
+              <h3>响应</h3>
+              <div class="meta">
+                <span>状态 <b id="respStatus">-</b></span>
+                <span>耗时 <b id="respTime">-</b></span>
+                <span id="respAssertSummary"></span>
+              </div>
+            </div>
+            <pre class="logbox" id="respBody" style="height:auto;max-height:320px">-</pre>
+            <div id="respAssertions" class="mt"></div>
+          </div>
+        </div>
+        <div class="card" id="reqWelcome">
+          <div class="empty">从左侧选择一个接口，或「新增接口」开始调试</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+      <!-- ============ 自动化测试（测试套件） ============ -->
+      <section class="panel" id="panel-suites" hidden>
+    <div class="apilayout">
+      <div class="card apitree" style="max-width:340px">
+        <div class="cardhead">
+          <h3>测试套件</h3>
+          <div class="ops"><button class="mini" id="btnNewSuite">新建套件</button></div>
+        </div>
+        <select id="suiteProjectSel" style="margin-bottom:8px"></select>
+        <div id="suiteListBox"></div>
+      </div>
+      <div class="apiedit">
+        <div class="card" id="suiteDetail" style="display:none">
+          <div class="cardhead">
+            <h3 id="suiteDetailTitle">套件</h3>
+            <div class="ops">
+              <select id="suiteEnvSel" style="width:auto"></select>
+              <button class="ghost mini" id="btnSuiteEdit">编辑</button>
+              <button class="ghost mini" id="btnSuiteCopy">复制</button>
+              <button id="btnSuiteRun">运行测试</button>
+            </div>
+          </div>
+          <p class="muted" id="suiteMeta"></p>
+          <div class="tblwrap mt"><table><thead><tr>
+            <th style="width:60px">顺序</th><th>请求</th><th>方式</th><th>地址</th>
+            <th>启用</th><th>操作</th>
+          </tr></thead><tbody id="suiteReqTbody"></tbody></table></div>
+          <div class="treebar mt">
+            <button class="ghost mini" id="btnSuiteAddReqs">＋ 添加接口</button>
+          </div>
+          <h4 class="mt">执行记录</h4>
+          <div class="tblwrap"><table><thead><tr>
+            <th>#</th><th>状态</th><th>开始时间</th><th>结果(通过/总数)</th><th>发起人</th><th>操作</th>
+          </tr></thead><tbody id="execTbody"></tbody></table></div>
+        </div>
+        <div class="card" id="suiteWelcome"><div class="empty">从左侧选择一个测试套件</div></div>
+      </div>
+    </div>
+  </section>
+
+      <!-- ============ 请求历史 ============ -->
+      <section class="panel" id="panel-history" hidden>
+        <div class="card">
+          <div class="cardhead">
+            <h3>请求历史</h3>
+            <div class="ops">
+              <input type="search" id="histSearch" placeholder="搜索…" style="width:180px">
+              <button class="ghost mini" id="btnHistBatchDel" disabled>批量删除</button>
+              <button class="ghost mini danger-ghost" id="btnHistClear">清空历史</button>
+            </div>
+          </div>
+          <div class="reqtabs" style="margin-top:10px">
+            <a data-htab="HTTP" class="on">HTTP 请求</a>
+            <a data-htab="WEBSOCKET">WebSocket 请求</a>
+          </div>
+          <div class="tblwrap mt"><table><thead><tr>
+            <th><input type="checkbox" id="histChkAll"></th><th>接口</th><th>方式</th><th>URL</th><th>状态码</th>
+            <th>耗时(ms)</th><th>环境</th><th>执行时间</th><th>操作</th>
+          </tr></thead><tbody id="histListTbody"></tbody></table></div>
+          <div class="pagerbar muted" id="histPager"></div>
+        </div>
+      </section>
+
+      <!-- ============ 环境管理 ============ -->
+      <section class="panel" id="panel-envs" hidden>
+        <div class="card">
+          <div class="cardhead">
+            <h3>环境变量</h3>
+            <div class="ops"><button class="mini" id="btnNewEnv">新建环境</button></div>
+          </div>
+          <p class="muted">请求里用 <code>{{变量名}}</code> 引用（取「当前值」，无则取「初始值」）；同时只激活一个环境。</p>
+          <div class="reqtabs" style="margin-top:10px">
+            <a data-etab="GLOBAL" class="on">全局环境</a>
+            <a data-etab="LOCAL">项目环境</a>
+          </div>
+          <div class="tblwrap mt"><table><thead><tr>
+            <th>名称</th><th>作用域</th><th>关联项目</th><th>变量数</th><th>激活状态</th><th>操作</th>
+          </tr></thead><tbody id="envTbody2"></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- ============ 测试报告 ============ -->
+      <section class="panel" id="panel-reports" hidden>
+        <div class="card">
+          <div class="cardhead">
+            <h3>测试报告</h3>
+            <div class="ops"><button class="ghost mini" id="btnReportsRefresh">刷新报告</button></div>
+          </div>
+          <p class="muted">为套件执行记录生成 Allure 报告（内置概览页；完整报告需 Java + Allure 环境，缺失时自动降级为概览页）。</p>
+          <div class="tblwrap mt"><table><thead><tr>
+            <th>#</th><th>套件</th><th>状态</th><th>总数</th><th>通过</th><th>失败</th><th>执行人</th><th>时间</th><th>操作</th>
+          </tr></thead><tbody id="reportTbody"></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- ============ 定时任务 ============ -->
+      <section class="panel" id="panel-tasks" hidden>
+        <div class="card">
+          <div class="cardhead">
+            <h3>定时任务</h3>
+            <div class="ops">
+              <select id="taskFilterStatus" style="width:auto"><option value="">全部状态</option><option value="ACTIVE">激活</option><option value="PAUSED">暂停</option><option value="COMPLETED">已完成</option><option value="FAILED">失败</option></select>
+              <button class="mini" id="btnNewTask">新建任务</button>
+            </div>
+          </div>
+          <p class="muted">调度器每 60 秒检查一次到期任务（CRON / 固定间隔 / 单次执行）；可配任务级通知（成功/失败 × 邮件/Webhook）。</p>
+          <div class="tblwrap mt"><table><thead><tr>
+            <th>任务</th><th>类型</th><th>触发器</th><th>通知方式</th><th>下次运行</th><th>最后运行</th><th>状态</th>
+            <th>统计(成功/总)</th><th>操作</th>
+          </tr></thead><tbody id="taskTbody"></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- ============ 通知列表 ============ -->
+      <section class="panel" id="panel-notifications" hidden>
+        <div class="reqtabs" style="margin-top:2px">
+          <a data-ntab="logs" class="on">通知列表</a>
+          <a data-ntab="config">通知配置</a>
+        </div>
+        <div class="card" id="ntab-logs" style="margin-top:12px">
+          <div class="cardhead">
+            <h3>通知日志</h3>
+            <div class="ops">
+              <select id="notifFilterStatus" style="width:auto"><option value="">全部状态</option><option value="success">发送成功</option><option value="failed">发送失败</option></select>
+              <select id="notifFilterChannel" style="width:auto"><option value="">全部渠道</option><option value="webhook">Webhook</option><option value="email">邮件</option></select>
+              <button class="ghost mini" id="btnNotifRefresh">刷新</button>
+            </div>
+          </div>
+          <div class="tblwrap"><table><thead><tr>
+            <th>任务</th><th>渠道</th><th>收件人 / 机器人</th><th>状态</th><th>错误</th><th>发送时间</th><th>操作</th>
+          </tr></thead><tbody id="notifTbody"></tbody></table></div>
+        </div>
+        <div class="card" id="ntab-config" style="margin-top:12px;display:none">
+          <div class="cardhead"><h3>邮件（SMTP）配置</h3></div>
+          <div class="fields">
+            <div class="field"><label>SMTP 服务器</label><input type="text" id="setSmtpHost" placeholder="smtp.example.com"></div>
+            <div class="field"><label>端口</label><input type="text" id="setSmtpPort" placeholder="465"></div>
+            <div class="field"><label>账号</label><input type="text" id="setSmtpUser"></div>
+            <div class="field"><label>密码</label><input type="password" id="setSmtpPass"></div>
+            <div class="field"><label>发件人</label><input type="text" id="setSmtpFrom" placeholder="AutomationTest &lt;noreply@x.com&gt;"></div>
+            <div class="field"><label>SSL</label>
+              <select id="setSmtpSsl"><option value="1">SSL(465)</option><option value="0">STARTTLS(587)</option></select></div>
+          </div>
+          <div class="mt" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+            <label class="chk"><input type="checkbox" id="setNotifyFail" checked> 失败时通知</label>
+            <label class="chk"><input type="checkbox" id="setNotifyOk"> 成功时通知</label>
+            <div class="field" style="flex:1;min-width:220px"><label>全局通知邮箱（逗号分隔）</label>
+              <input type="text" id="setEmails" placeholder="a@x.com, b@x.com"></div>
+            <button class="ghost mini" id="btnSaveSettings" style="margin-left:auto">保存配置</button>
+          </div>
+          <div class="cardhead mt"><h3>Webhook 机器人</h3>
+            <div class="ops"><button class="ghost mini" id="btnNewBot">添加机器人</button></div></div>
+          <div class="tblwrap"><table><thead><tr>
+            <th>名称</th><th>类型</th><th>Webhook 地址</th><th>启用</th><th>操作</th>
+          </tr></thead><tbody id="botTbody"></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- ============ AI 服务配置 ============ -->
+      <section class="panel" id="panel-ai" hidden>
+        <div class="card">
+          <div class="cardhead">
+            <h3>AI 服务配置</h3>
+            <div class="ops"><button class="mini" id="btnNewAi">新建配置</button></div>
+          </div>
+          <p class="muted">OpenAI 兼容接口；按角色分工：文档提取 / 命名规范 / 模拟数据 / 描述补全。接口管理页的 AI 按钮取对应角色的启用配置。</p>
+          <div class="tblwrap mt"><table><thead><tr>
+            <th>名称</th><th>服务类型</th><th>角色</th><th>模型</th><th>状态</th><th>操作</th>
+          </tr></thead><tbody id="aiTbody"></tbody></table></div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</main>
+
+<div id="toast"></div>
+<div class="mask" id="mask">
+  <div class="modal">
+    <h4 id="mTitle"></h4>
+    <p id="mMsg"></p>
+    <div class="mops"><button class="ghost" id="mCancel">取消</button><button id="mOk">确定</button></div>
+  </div>
+</div>
+<!-- 通用小表单弹窗（项目/集合/环境/任务/套件/AI/机器人 编辑） -->
+<div class="mask" id="formMask">
+  <div class="modal envmodal" id="formModal">
+    <h4 id="fmTitle">编辑</h4>
+    <div id="fmBody"></div>
+    <div class="mops mt"><button class="ghost" id="fmCancel">取消</button><button id="fmSave">保存</button></div>
+  </div>
+</div>
+<!-- 变量助手 / 数据工厂 弹窗 -->
+<div class="mask" id="varMask">
+  <div class="modal envmodal">
+    <h4>变量助手 · 数据工厂函数</h4>
+    <input type="search" id="varSearch" placeholder="搜索函数名 / 描述…" style="margin-bottom:8px">
+    <div id="varCats" class="reqtabs" style="margin-bottom:8px"></div>
+    <div id="varList" style="max-height:340px;overflow:auto"></div>
+    <div class="mops mt"><button class="ghost" id="varClose">关闭</button></div>
+  </div>
+</div>
+
+<script src="/assets/{{ asset_v }}/nav.js"></script>
+<script src="/assets/{{ asset_v }}/app.js"></script>
+<script src="/assets/{{ asset_v }}/api_testing.js"></script>
+</body>
+</html>

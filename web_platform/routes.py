@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Web 执行平台 · 页面与 API 路由"""
 import atexit
+import glob
 import json
 import os
 import re
@@ -388,6 +389,12 @@ def api_video_evidence_clear():
             pass
     return jsonify({'ok': True, 'msg': '已删除录制视频 %d 个、断言失败截图 %d 张' %
                     (removed['videos'], removed['shots'])})
+
+
+@bp.route('/api-test')
+def page_api_test():
+    """🔌 接口测试（testhub api_testing 完整移植：接口管理/套件/任务/环境/报告/AI）"""
+    return render_template('api_test.html')
 
 
 # ---------------------------------------------------------------- API

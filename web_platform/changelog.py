@@ -10,12 +10,33 @@
 两端不再各自硬编码版本号。
 """
 
-APP_VERSION = '6.14.4'
+APP_VERSION = '6.14.6'
 
 # 最新版本在最前；time 精确到秒（YYYY-MM-DD HH:MM:SS）
 # 版本号格式 x.xx.x 自 6.11.0 起强制执行；更早的历史条目保留原始记录，不回溯改写
 # 每条变更一句话 10~20 字，只说改了什么（详细背景见项目 memory 与设计文档）
 CHANGELOG = [
+    {
+        'version': '6.14.6',
+        'time': '2026-09-28 15:15:19',
+        'title': '接口测试模块完整回归移植（testhub全功能对齐）',
+        'changes': [
+            '回归 接口测试模块：项目/接口/套件/任务/环境/历史/报告/AI/通知',
+            '新增 AI服务配置与四个AI动作（OpenAI兼容）+ Allure执行报告',
+            '新增 Webhook多机器人+邮件通知与通知日志；数据落 config/api_testing',
+            '修复 一键删除录制视频报响应解析失败（routes漏import glob）',
+            '修复 变量解析器内置时间函数分发参数错误',
+        ],
+    },
+    {
+        'version': '6.14.5',
+        'time': '2026-09-28 14:04:57',
+        'title': '双击启动修复：ryn.command改调run.command',
+        'changes': [
+            '修复 双击启动报 run.sh 不存在（run.sh已改名run.command）',
+            '调整 ryn.command 三处引用同步改名后的启动脚本',
+        ],
+    },
     {
         'version': '6.14.4',
         'time': '2026-09-28 12:27:38',
