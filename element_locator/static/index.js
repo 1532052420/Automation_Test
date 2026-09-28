@@ -1124,8 +1124,15 @@ function resetNewFileInputs() {
 /* 当前是否新建用例（选择器值为 __new__ 或元素文件为 __new__） */
 function isNewCase() { return $('el-case-file').value === NEW_FILE_OPT; }
 function isNewElementFile() { return $('el-file').value === NEW_FILE_OPT; }
-/* 新用例基础名（test_ 后面的部分）：非法字符过滤；同时派生元素文件名 */
-function newCaseBase() { return ($('el-case-new').value || '').trim().replace(/[^A-Za-z0-9_]/g, '_'); }
+/* 新用例基础名（test_ 后面的部分）：非法字符过滤；同时派生元素文件名。
+   容错：用户常把「完整文件名」填进输入框（test_xxx.py / xxx.py），这里统一剥掉
+   test_ 前缀与 .py 后缀，避免二次包装成 test_test_xxx_py.py 这类畸形文件名。 */
+function newCaseBase() {
+  let v = ($('el-case-new').value || '').trim();
+  v = v.replace(/\.py$/i, '');              // 剥 .py（放前面，避免 . 被过滤成 _）
+  v = v.replace(/^test_/i, '');             // 剥 test_ 前缀（前缀由 newCaseFileName 统一补）
+  return v.replace(/[^A-Za-z0-9_]/g, '_');
+}
 function newElementFileName() {
   const b = newCaseBase();
   return b ? b + 'Elements.py' : '';
@@ -1785,12 +1792,18 @@ async function onSaveElement(continueMode) {
   const special = $('el-op-special').value;   // 特殊操作：不碰元素库，只写用例
   const name = special ? '' : $('el-name').value.trim();
   if (purpose !== 'only') {
-    // 防误操作：「写入元素文件」与「目标用例文件」的新建状态必须同步——
-    // 一起新建（三件套随首次保存入库）或都选已有文件；不同步时 toast 提示并阻止保存
-    //（特殊操作不碰元素库，不受此约束）
+    // 新建状态组合校验：①都新建（三件套随首次保存入库）②都选已有 ③新建用例 + 已有元素文件
+    //（复用已入库元素库，常见场景）——这三种都放行；仅「新建元素文件 + 已有用例」需要确认，
+    // 因为已有用例的页面对象已绑定旧元素文件，此时新元素文件不会被引擎引用（易误以为是生效的）。
+    // 报错改为弹窗内持久提示（toast 3 秒消失，用户常看不到表现为「点了保存没反应」）。
     if (!special && isNewCase() !== isNewElementFile()) {
-      showToast('⚠️ 「写入元素文件」与「目标用例文件」需同步：要么都用「➕ 新建」，要么都选已有文件');
-      return;
+      const msg = isNewElementFile()
+        ? '⚠️ 「写入元素文件」选了新建，但目标用例是已有文件：已有用例的页面对象已绑定它自己的元素文件，' +
+          '本次新元素文件不会被该用例引用。建议改选已有元素文件，或把用例也改成「➕ 新建」。'
+        : '✅ 将新建用例「test_' + pkgBase() + '.py」，元素写入已有文件「' + $('el-file').value +
+          '」（复用已入库元素库）。';
+      showElResult(msg, !isNewElementFile());
+      if (isNewElementFile() && !confirm(msg + '\n\n仍要按此组合保存？')) return;
     }
     // 新建用例（填写了自定义文件名）：首次「保存并继续/保存」即三件套（元素+用例+页面，
     // 已含当前步骤）直接入库——与平台「保存并继续」同语义；之后弹窗回显文件信息，继续录走 add_code 追加
