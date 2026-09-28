@@ -24,6 +24,8 @@ import zipfile
 
 from flask import Blueprint, jsonify, redirect, request
 
+from web_platform.binding_check import check_staged_bindings
+
 from web_platform.runtime_config import BASE_DIR
 
 bp = Blueprint('admin', __name__)
@@ -217,6 +219,15 @@ def import_case_package(package='', files=None, uploader='admin'):
             _rm_quiet(tmp)
         return {'ok': False, 'errors': errors,
                 'msg': '用例包校验未通过，未写入任何文件：' + '；'.join(errors)}, 400
+    # 跨文件引用校验（静态绑定完整性护栏）：页面对象 import 的元素模块、
+    # 方法引用的元素属性必须存在——新文件读暂存内容、旧文件读磁盘，
+    # 悬空即整体回滚，杜绝「元素文件被删/改名后用例一执行就 ImportError」的半成品
+    ref_errors = check_staged_bindings(staged, BASE_DIR)
+    if ref_errors:
+        for _, _, _, tmp in staged:
+            _rm_quiet(tmp)
+        return {'ok': False, 'errors': ref_errors,
+                'msg': '用例包引用校验未通过，未写入任何文件：' + '；'.join(ref_errors)}, 400
     done = []
     for kind, name, target, tmp in staged:
         full_rel = os.path.relpath(target, ROOT).replace(os.sep, '/')
