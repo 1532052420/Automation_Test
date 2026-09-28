@@ -1212,7 +1212,15 @@ function toggleCoordMode() {
   showToast(state.coordMode ? '开启成功' : '已关闭');
 }
 
+/* 分段控件选中态同步：程序赋值 checked 不触发 change，统一在这里刷 .on 类 */
+function syncSegClasses() {
+  document.querySelectorAll('.seg-group .seg').forEach(lb => {
+    lb.classList.toggle('on', lb.querySelector('input').checked);
+  });
+}
+
 function onPurposeChange() {
+  syncSegClasses();
   let p = purposeValue();
   const tb = $('tri-bar');
   if (tb) tb.style.display = (p === 'only' || p === 'popup') ? 'none' : '';   // 仅元素/弹窗规则库：无三件套落点

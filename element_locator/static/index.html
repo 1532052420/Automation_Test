@@ -124,11 +124,13 @@ try {
   <div class="modal modal-flow">
     <div class="modal-title">➕ 添加测试用例 <span class="hint">按「元素 → 用例 → 操作」流程走：选下方用途决定走到哪一步；点字段旁「?」看说明</span></div>
     <div class="modal-body">
-      <div class="flow-step">
-        <span class="fs-label">保存到哪一步：</span>
-        <label class="purpose"><input type="radio" name="el-purpose" value="only" checked> <span class="help-icon" data-help="只把元素写入元素库">?</span> ① 仅元素</label>
-        <label class="purpose"><input type="radio" name="el-purpose" value="all"> <span class="help-icon" data-help="三件套一次完成（推荐）">?</span> ② 元素 + 用例 + 操作（推荐）</label>
-        <label class="purpose"><input type="radio" name="el-purpose" value="popup"> <span class="help-icon" data-help="登记为随机弹窗自动关闭规则"无感"。建议配锚点防误关。">?</span> 🎯 ③ 登记随机弹窗</label>
+      <div class="flow-step seg-row">
+        <span class="seg-title">保存到哪一步<span class="help-icon" title="选择本次保存的范围">?</span></span>
+        <div class="seg-group" role="radiogroup" aria-label="保存到哪一步">
+          <label class="seg" title="只把元素写入元素库，不生成用例"><input type="radio" name="el-purpose" value="only" checked><span class="num">1</span><span class="seg-txt">仅元素</span></label>
+          <label class="seg" title="三件套一次完成并入库（推荐）"><input type="radio" name="el-purpose" value="all"><span class="num">2</span><span class="seg-txt">元素 + 用例 + 操作</span><span class="badge">推荐</span></label>
+          <label class="seg" title="登记为随机弹窗自动关闭规则，建议配锚点防误关"><input type="radio" name="el-purpose" value="popup"><span class="num">3</span><span class="seg-txt">登记随机弹窗</span></label>
+        </div>
       </div>
 
       <div class="flow-cols">

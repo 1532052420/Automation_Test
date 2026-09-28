@@ -841,3 +841,35 @@ html.night .el-content { background: #111214; color: #e5e7eb; }
 /* ===== 选中元素栏 800×800 起步（v6.11.6）：小屏出滚动条兜底，字段增减长度不变 ===== */
 main { min-width: 1420px; min-height: 820px; }
 .col.right { flex: 0 0 800px; min-width: 800px; min-height: 800px; }
+
+/* ===== 保存到哪一步 · 分段控件（v6.14.3 · 设计文档 design/ui-proposals/样式方案V1-设计文档.md） ===== */
+.seg-row { display: flex; flex-direction: column; gap: 10px; }
+.seg-title { font-size: 13px; font-weight: 600; color: #606266; }
+.seg-title .help-icon { vertical-align: 1px; margin-left: 4px; }
+.seg-group { display: flex; width: 100%; background: #f2f3f5; border-radius: 10px; padding: 4px; }
+.seg {
+  position: relative; flex: 1; text-align: center; padding: 11px 8px; border-radius: 8px;
+  font-size: 13.5px; color: #606266; cursor: pointer; user-select: none;
+  transition: background-color .15s ease, color .15s ease, box-shadow .15s ease;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.seg:hover { background: #e9ebee; }
+.seg input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+.seg .num {
+  display: inline-flex; width: 18px; height: 18px; border-radius: 50%;
+  border: 1.5px solid currentColor; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600; margin-right: 7px; vertical-align: -4px;
+}
+.seg .seg-txt { display: inline-block; max-width: calc(100% - 70px); overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+.seg .badge {
+  display: inline-flex; font-size: 10px; line-height: 1; padding: 3px 6px; border-radius: 999px;
+  background: #ff9800; color: #fff; font-weight: 600; margin-left: 6px; vertical-align: 1px;
+}
+.seg.on { background: #fff; color: #409eff; font-weight: 600;
+          box-shadow: 0 1px 4px rgba(0,0,0,.14), 0 0 0 1px rgba(64,158,255,.18); }
+.seg:has(input:focus-visible) { outline: 2px solid #409eff; outline-offset: 2px; }
+html.night .seg-group { background: #2b2f36; }
+html.night .seg { color: #9ca3af; }
+html.night .seg:hover { background: #333945; }
+html.night .seg.on { background: #1e2b3a; color: #66b1ff;
+                     box-shadow: 0 1px 4px rgba(0,0,0,.3), 0 0 0 1px rgba(102,177,255,.25); }
