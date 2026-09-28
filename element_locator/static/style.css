@@ -843,13 +843,13 @@ main { min-width: 1420px; min-height: 820px; }
 .col.right { flex: 0 0 800px; min-width: 800px; min-height: 800px; }
 
 /* ===== 保存到哪一步 · 分段控件（v6.14.3 · 设计文档 design/ui-proposals/样式方案V1-设计文档.md） ===== */
-.seg-row { display: flex; flex-direction: column; gap: 10px; }
-.seg-title { font-size: 13px; font-weight: 600; color: #606266; }
+.seg-row { display: flex; flex-direction: column; gap: 5px; }
+.seg-title { font-size: 12.5px; line-height: 1.2; font-weight: 600; color: #606266; }
 .seg-title .help-icon { vertical-align: 1px; margin-left: 4px; }
-.seg-group { display: flex; width: 100%; background: #f2f3f5; border-radius: 10px; padding: 4px; }
+.seg-group { display: flex; width: 100%; background: #f2f3f5; border-radius: 10px; padding: 3px; }
 .seg {
-  position: relative; flex: 1; text-align: center; padding: 11px 8px; border-radius: 8px;
-  font-size: 13.5px; color: #606266; cursor: pointer; user-select: none;
+  position: relative; flex: 1; text-align: center; padding: 8px; border-radius: 8px;
+  font-size: 13px; color: #606266; cursor: pointer; user-select: none;
   transition: background-color .15s ease, color .15s ease, box-shadow .15s ease;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
