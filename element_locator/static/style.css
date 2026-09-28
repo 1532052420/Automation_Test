@@ -855,12 +855,7 @@ main { min-width: 1420px; min-height: 820px; }
 }
 .seg:hover { background: #e9ebee; }
 .seg input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
-.seg .num {
-  display: inline-flex; width: 18px; height: 18px; border-radius: 50%;
-  border: 1.5px solid currentColor; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 600; margin-right: 7px; vertical-align: -4px;
-}
-.seg .seg-txt { display: inline-block; max-width: calc(100% - 70px); overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+.seg .seg-txt { display: inline-block; max-width: calc(100% - 58px); overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
 .seg .badge {
   display: inline-flex; font-size: 10px; line-height: 1; padding: 3px 6px; border-radius: 999px;
   background: #ff9800; color: #fff; font-weight: 600; margin-left: 6px; vertical-align: 1px;
