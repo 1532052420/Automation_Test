@@ -1650,7 +1650,7 @@ function pkgElementFileName() {
   if (!stem) return '';
   // 元素文件名必须以 Elements 结尾（页面/用例生成逻辑依赖该后缀判定归属）：
   // 用户漏写或写成单数 Element 时自动规范化，.py 后缀同样自动补
-  const norm = stem.replace(/Elements?$/,'') + 'Elements';
+  const norm = stem.replace(/elements?$/i,'') + 'Elements';   // 大小写不敏感归一（防止 xxx_elementsElements.py）
   return norm + '.py';
 }
 function pkgElementClassName() { const f = pkgElementFileName(); return f ? capFirst(f.replace('.py', '')) : ''; }
@@ -1804,6 +1804,19 @@ async function onSaveElement(continueMode) {
         '⚠️ 「写入元素文件」与「目标用例文件」的新建状态需一致：要么都「➕ 新建」（一次生成三件套），' +
         '要么都选已有文件。原因：页面对象与元素文件是静态绑定，混搭会导致新元素不被引用或运行时报错。', false);
       return;
+    }
+    // 必填字段统一校验（保存失败后弹窗字段可能被重置——缺字段时生成残缺代码
+    // def : / Locator_Type. 让后端语法校验兜底，不如在这里明确提示）
+    if (!special) {
+      const missing = [];
+      if (!name) missing.push('元素名（左侧点选元素或手填）');
+      if (!$('el-type').value) missing.push('定位方式');
+      if (!$('el-value').value.trim()) missing.push('定位值');
+      if (!$('el-op-type').value) missing.push('操作类型');
+      if (missing.length) {
+        showElResult('⚠️ 请补齐必填项：' + missing.join('、'), false);
+        return;
+      }
     }
     // 新建用例（填写了自定义文件名）：首次「保存并继续/保存」即三件套（元素+用例+页面，
     // 已含当前步骤）直接入库——与平台「保存并继续」同语义；之后弹窗回显文件信息，继续录走 add_code 追加
