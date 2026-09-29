@@ -1678,8 +1678,8 @@ function renderAssertions() {
     switch (a.kind) {
       case 'text':    content = esc(a.content || '—'); break;
       case 'toast':   content = esc(a.content || '—'); break;
-      case 'exists':  content = (a.content || '3') + 's'; break;
-      case 'gone':    content = (a.content || '2') + 's'; break;
+      case 'exists':  content = '元素 ' + (a.content || '3') + '秒 内可见'; break;
+      case 'gone':    content = '元素 ' + (a.content || '2') + '秒 内消失'; break;
       case 'visual':
         content = (a.baseline
           ? `<img class="as-thumb" src="/api/appui/assertions/baseline-image?path=${encodeURIComponent(a.baseline)}" alt="基线图" onerror="this.remove()">`
