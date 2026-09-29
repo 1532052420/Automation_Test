@@ -170,7 +170,7 @@ function syncAssertSide() {
   var row = document.querySelector('.as-switch-row');
   if (row) row.classList.toggle('locked', sp);
   renderAssertCol();
-  if (opCommentAuto) $('el-op-comment').value = autoStepComment(currentOpType(), opElementLabel(), $('el-op-param').value) + assertsDescSuffix();
+  followStepDesc();
 }
 /* 当前生效的操作类型：特殊操作优先，否则用常规操作类型下拉 */
 function currentOpType() { return $('el-op-special').value || $('el-op-type').value || ''; }
@@ -349,6 +349,7 @@ async function init() {
   buildOpGrid();
   $('el-op-special').addEventListener('change', onSpecialOpChange);
   $('el-op-param').addEventListener('input', () => { paramAuto = false; followStepDesc(); });
+  $('el-op-comment').addEventListener('input', () => { renderStepsList(currentSteps()); });
   $('el-case-file').addEventListener('change', onCaseFileChange);
   // 新建文件输入联动：元素文件切「新建」显隐输入行；用例名输入实时派生页面/元素文件名
   $('el-file').addEventListener('change', () => {
@@ -1527,10 +1528,12 @@ function opElementLabel() {
 }
 
 function followStepDesc() {
-  /* 步骤描述实时拼接：操作类型 + 元素中文名（+ 参数）随输入即时刷新；手输过描述(opCommentAuto=false)则不覆盖 */
+  /* 步骤描述实时拼接：操作类型 + 元素中文名（+ 参数）随输入即时刷新；手输过描述(opCommentAuto=false)则不覆盖。
+     同时刷新②栏步骤预览（断言勾选/元素名/参数变化都要同步）——修复预览滞留旧内容 */
   if (opCommentAuto) {
     $('el-op-comment').value = autoStepComment(currentOpType(), opElementLabel(), $('el-op-param').value) + assertsDescSuffix();
   }
+  renderStepsList(currentSteps());
 }
 
 function autoStepComment(type, elementLabel, param) {
