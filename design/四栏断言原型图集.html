@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>四栏断言改版 · 原型图集（10 张）</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { color-scheme: light; scroll-behavior: smooth; }
+body {
+  font: 14px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: #303133; background: #f5f6f8; padding: 20px 16px 50px;
+}
+html.night { color-scheme: dark; }
+html.night body { background: #101012; color: #e5e7eb; }
+html.night .top, html.night .shot { background: #1b1c1f; border-color: #303236; }
+html.night .top nav a { color: #9ca3af; }
+html.night .top nav a.on { background: #0e2f4d; color: #7cc0ff; }
+html.night .cap { color: #9ca3af; }
+html.night .viewer { background: rgba(0,0,0,.9); }
+.top {
+  max-width: 1500px; margin: 0 auto 16px; background: #fff; border: 1px solid #e5e7eb;
+  border-radius: 12px; padding: 14px 18px; position: sticky; top: 10px; z-index: 10;
+  box-shadow: 0 4px 18px rgba(0,0,0,.08);
+}
+.top h1 { font-size: 16px; margin-bottom: 4px; }
+.top p { font-size: 12.5px; color: #6b7280; }
+.top nav { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.top nav a {
+  font-size: 12px; color: #374151; text-decoration: none; border: 1px solid #dcdfe6;
+  border-radius: 14px; padding: 3px 12px;
+}
+.top nav a:hover { border-color: #409eff; color: #409eff; }
+.top nav a.on { background: #ecf5ff; border-color: #409eff; color: #409eff; }
+.shot {
+  max-width: 1500px; margin: 0 auto 22px; background: #fff; border: 1px solid #e5e7eb;
+  border-radius: 12px; padding: 12px 14px 14px;
+}
+.shot h2 { font-size: 14px; margin-bottom: 2px; }
+.shot h2 .no { color: #409eff; margin-right: 6px; }
+.shot .cap { font-size: 12px; color: #6b7280; margin-bottom: 10px; }
+.shot img { width: 100%; border-radius: 8px; border: 1px solid #eef0f3; cursor: zoom-in; display: block; }
+.viewer {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 50;
+  align-items: center; justify-content: center; padding: 24px; cursor: zoom-out;
+}
+.viewer.show { display: flex; }
+.viewer img { max-width: 96vw; max-height: 94vh; border-radius: 8px; }
+.viewer .close { position: fixed; top: 14px; right: 18px; color: #fff; font-size: 26px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>添加测试用例 · 四栏断言改版 · 原型图集（10 张）</h1>
+  <p>①元素 → ②用例 → ③操作（纯动作，断言已移出） → ④断言（多选组合：存在/文本/Toast/消失/视觉断言）· 窄屏底部横向滚动 · 执行语义=全量执行、失败各自截图、最后汇总报错。点击任意图放大查看。交互原型：<b>proto-four-column.html</b>（同目录）。</p>
+  <nav id="nav"></nav>
+</div>
+
+<div id="shots"></div>
+<div class="viewer" id="viewer"><span class="close">✕</span><img id="viewerImg" alt=""></div>
+
+<script>
+'use strict';
+var FRAMES = [
+  ['01', '四栏全貌 · 默认态', '01-overview-default.jpg', '操作=点击、断言未勾选：与线上三栏相比，新增④断言栏（空态）与③栏「仅断言」类型；其余字段全部保留。'],
+  ['02', '窄屏横向滚动示意', '02-narrow-hscroll.jpg', '视口不足 1620px 时 modal-body 出现底部横向滚动条，④断言栏可滚入可视区（本图为窄容器实拍）。'],
+  ['03', '断言 · 断言存在', '03-assert-exists.jpg', '勾选「断言存在」展开参数行（等待秒数，默认 3）。'],
+  ['04', '断言 · 断言文本', '04-assert-text.jpg', '勾选「断言文本」展开期望文本输入；步骤描述自动追加「· 含1断言」。'],
+  ['05', '断言 · 断言Toast', '05-assert-toast.jpg', '页面级断言：不依赖当前元素，标注明确；参数为 Toast 文本。'],
+  ['06', '断言 · 断言消失', '06-assert-gone.jpg', '弹窗已关闭类校验；等待时间内仍可见则失败。'],
+  ['07', '断言 · 视觉断言（新）', '07-assert-visual.jpg', '相似度阈值滑杆（默认 0.95）+ 采集基线按钮 + 基线/实际/diff 三联图预览；基线随元素存 elements/baselines/ 进 git。'],
+  ['08', '组合态 · 点击 + 文本 + 视觉', '08-combo-click-text-visual.jpg', '一次录入操作与多条断言；生成代码预览展示「操作段+断言段循环、失败收集、汇总抛错」的全量执行语义。'],
+  ['09', '纯断言步骤 · 仅断言类型', '09-assert-only.jpg', '③操作新增「仅断言」类型：不执行动作，④栏组合生成纯断言方法 assert_btn_write_new_song()。'],
+  ['10', '夜间主题', '10-night-theme.jpg', '组合态夜间配色（html.night 变量覆盖，与平台主题契约一致）。'],
+];
+
+var nav = document.getElementById('nav');
+var shots = document.getElementById('shots');
+FRAMES.forEach(function (f, i) {
+  var a = document.createElement('a');
+  a.href = '#f' + f[0];
+  a.textContent = f[0] + ' ' + f[1];
+  nav.appendChild(a);
+  var sec = document.createElement('div');
+  sec.className = 'shot';
+  sec.id = 'f' + f[0];
+  sec.innerHTML = '<h2><span class="no">' + f[0] + '</span>' + f[1] + '</h2>' +
+    '<div class="cap">' + f[3] + '</div>' +
+    '<img src="四栏原型图/' + f[2] + '" alt="' + f[1] + '" loading="lazy">';
+  shots.appendChild(sec);
+});
+var viewer = document.getElementById('viewer'), vimg = document.getElementById('viewerImg');
+document.getElementById('shots').addEventListener('click', function (e) {
+  if (e.target.tagName === 'IMG') { vimg.src = e.target.src; viewer.classList.add('show'); }
+});
+viewer.addEventListener('click', function () { viewer.classList.remove('show'); });
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') viewer.classList.remove('show'); });
+var links = nav.querySelectorAll('a');
+new IntersectionObserver(function (entries) {
+  entries.forEach(function (en) {
+    if (en.isIntersecting) {
+      links.forEach(function (a) { a.classList.toggle('on', a.getAttribute('href') === '#' + en.target.id); });
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' }).observe && FRAMES.forEach(function (f) {
+  var el = document.getElementById('f' + f[0]);
+  if (el) new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (en.isIntersecting) links.forEach(function (a) { a.classList.toggle('on', a.getAttribute('href') === '#' + en.target.id); });
+    });
+  }, { rootMargin: '-15% 0px -70% 0px' }).observe(el);
+});
+</script>
+</body>
+</html>

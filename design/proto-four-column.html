@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>原型 · 添加测试用例四栏改版（操作+断言解耦）</title>
+<style>
+/* ============ 画布与主题（元素定位器：日间默认 + html.night） ============ */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { color-scheme: light; }
+body {
+  font: 14px/1.55 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: #303133; background: #e2e3e8; min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center; padding: 14px 10px 30px;
+}
+html.night { color-scheme: dark; }
+html.night body { background: #0c0c0e; color: #e5e7eb; }
+html.night .modal { background: #1b1c1f; color: #e5e7eb; }
+html.night .modal-title, html.night .modal-foot { border-color: #303236; }
+html.night .flow-col { background: #202126; border-color: #303236; }
+html.night .col-head { color: #f3f4f6; border-bottom-color: #303236; }
+html.night .col-head .hint { color: #9ca3af; }
+html.night .anchor-card { background: #0e2f4d; border-color: #1d4a75; }
+html.night .anchor-card .ac-loc { color: #7cc0ff; }
+html.night input, html.night select, html.night textarea {
+  background: #17181b; border-color: #3a3c42; color: #e5e7eb;
+}
+html.night input::placeholder { color: #6b7280; }
+html.night .seg { background: #17181b; }
+html.night .seg .seg-item { color: #9ca3af; }
+html.night .seg .seg-item.on { background: #202126; color: #409eff; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+html.night .op-card { border-color: #3a3c42; background: #232428; }
+html.night .op-card .ot { color: #d1d5db; }
+html.night .op-card.on { background: #0e2f4d; }
+html.night .op-card.on .ot { color: #7cc0ff; }
+html.night .steps-list, html.night .codebox, html.night .guide, html.night .canvasbar,
+html.night .demo-panel { background: #17181b; border-color: #303236; color: #e5e7eb; }
+html.night .codebox .cm { color: #7f8ea3; }
+html.night .sl-row, html.night .sl-marker, html.night .as-hint { color: #9ca3af; }
+html.night .sl-marker { background: #0e2f4d; border-color: #1d4a75; color: #7cc0ff; }
+html.night .tri-bar { background: #0e2f4d; color: #7cc0ff; }
+html.night .btn { background: #232428; border-color: #3a3c42; color: #e5e7eb; }
+html.night .btn:hover { border-color: #409eff; color: #7cc0ff; }
+html.night .btn.pri { background: #409eff; color: #fff; }
+html.night .as-card { background: #202126; border-color: #3a3c42; }
+html.night .as-item { background: #17181b; border-color: #3a3c42; }
+html.night .as-item.on { background: #0e2f4d; border-color: #409eff; }
+html.night .as-item .ai-n { color: #e5e7eb; }
+html.night .as-param { background: #232428; border-color: #3a3c42; }
+html.night .tri-slot { background: #141519; border-color: #3a3c42; }
+html.night .visual-tag { background: #3a2b00; color: #fbbf24; border-color: #7a5b00; }
+
+/* 画布顶栏 */
+.canvasbar {
+  width: 100%; max-width: 1660px; display: flex; align-items: center; gap: 12px;
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+  padding: 8px 16px; margin-bottom: 12px;
+}
+.canvasbar b { font-size: 13.5px; }
+.canvasbar .muted { font-size: 12px; color: #9ca3af; }
+.canvasbar .ops { margin-left: auto; display: flex; gap: 8px; }
+.canvasbar button {
+  border: 1px solid #dcdfe6; background: #fff; color: #303133;
+  border-radius: 8px; padding: 5px 13px; font-size: 12px; cursor: pointer;
+}
+.canvasbar button:hover { border-color: #409eff; color: #409eff; }
+body.narrow .modal-clip { max-width: 1180px; }   /* 图2：窄屏横滚演示 */
+
+/* ============ 弹窗（四栏版） ============ */
+.modal-clip { width: 100%; max-width: 1660px; overflow-x: auto; padding-bottom: 6px; }
+.modal { width: 1620px; background: #fff; border-radius: 10px; box-shadow: 0 18px 60px rgba(0,0,0,.22); overflow: hidden; }
+.modal-title { padding: 11px 18px; font-weight: 600; font-size: 14.5px; border-bottom: 1px solid #eee; }
+.modal-title .hint { font-weight: 400; font-size: 12px; color: #9ca3af; margin-left: 8px; }
+.modal-body { padding: 12px 16px; }
+
+.seg { background: #f3f4f6; border-radius: 10px; padding: 5px; display: flex; margin-bottom: 12px; }
+.seg-item { flex: 1; text-align: center; font-size: 13.5px; color: #6b7280; padding: 8px 0; border-radius: 8px; }
+.seg-item.on { background: #fff; color: #409eff; font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+.seg-item.on .badge {
+  display: inline-block; margin-left: 4px; font-size: 10px; font-weight: 700; color: #fff;
+  background: #f59e0b; border-radius: 8px; padding: 0 6px; vertical-align: 1px;
+}
+
+.flow-cols { display: grid; grid-template-columns: 1fr 0.98fr 1fr 1.02fr; gap: 13px; align-items: start; }
+.flow-col { background: #fff; border: 1px solid #eef0f3; border-radius: 10px; padding-bottom: 12px; }
+.col-head {
+  display: flex; align-items: center; gap: 8px; padding: 10px 14px 9px;
+  border-bottom: 1px solid #f0f1f4; margin-bottom: 11px; font-weight: 600; font-size: 13.5px;
+}
+.col-head .num {
+  width: 18px; height: 18px; border-radius: 50%; background: #409eff; color: #fff;
+  font-size: 11px; display: inline-flex; align-items: center; justify-content: center;
+}
+.col-head .hint { margin-left: auto; font-size: 11px; color: #9ca3af; font-weight: 400; }
+.col-head .hint.new { color: #529b2e; font-weight: 600; }
+.fcol-pad { padding: 0 14px; }
+.field { margin-bottom: 10px; }
+.field > label { display: block; font-size: 12.5px; color: #374151; margin-bottom: 4px; }
+.field > label .q {
+  display: inline-flex; width: 13px; height: 13px; border-radius: 50%; border: 1px solid #c0c4cc;
+  color: #c0c4cc; font-size: 9px; align-items: center; justify-content: center; margin-left: 3px;
+}
+.field input, .field select {
+  width: 100%; padding: 7px 10px; border: 1px solid #dcdfe6; border-radius: 6px;
+  font-size: 13px; outline: none; background: #fff; color: inherit;
+}
+.field input:focus, .field select:focus { border-color: #409eff; }
+.duo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.anchor-card { background: #ecf5ff; border: 1px solid #b3d8ff; border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; }
+.anchor-card .ac-head { font-size: 11.5px; color: #6b7280; }
+.anchor-card .ac-main { font-size: 13.5px; font-weight: 600; margin: 2px 0; }
+.anchor-card .ac-loc { font-size: 11.5px; color: #409eff; font-family: Menlo, Consolas, monospace; }
+
+.steps-list { background: #f9fafb; border: 1px dashed #e5e7eb; border-radius: 8px; padding: 8px 10px; font-size: 12.5px; }
+.steps-list .sl-title { color: #6b7280; margin-bottom: 6px; }
+.steps-list .sl-marker { color: #409eff; border: 1px dashed #b3d8ff; border-radius: 6px; text-align: center; padding: 3px; margin: 5px 0; font-size: 12px; background: #ecf5ff; }
+.steps-list .sl-row { display: flex; gap: 6px; padding: 2px 0; color: #303133; }
+.steps-list .sl-idx { color: #9ca3af; min-width: 14px; }
+.bind-note { font-size: 11.5px; color: #409eff; background: #ecf5ff; border-radius: 6px; padding: 6px 9px; margin-top: 9px; }
+
+.op-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-bottom: 10px; }
+.op-card {
+  border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 7px 4px 6px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 4px; transition: all .12s; background: #fff;
+}
+.op-card:hover { border-color: #9cc3ef; }
+.op-card.on { border-color: #409eff; background: #ecf5ff; box-shadow: 0 0 0 3px rgba(64,158,255,.14); }
+.op-card .oi { width: 27px; height: 27px; border-radius: 50%; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+.op-card.on .oi { background: #409eff; }
+.op-card .ot { font-size: 11px; font-weight: 600; color: #374151; white-space: nowrap; }
+.op-card.on .ot { color: #1f5faa; }
+.op-card.assert-only .oi { border: 1.5px dashed #409eff; background: #fff; }
+
+/* ============ ④ 断言栏 ============ */
+.as-list { display: flex; flex-direction: column; gap: 8px; }
+.as-card { border: 1px solid #eef0f3; border-radius: 10px; padding: 10px 12px; }
+.as-card .as-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.as-card .as-head b { font-size: 12.5px; }
+.as-card .as-head .hint { margin-left: auto; font-size: 10.5px; color: #9ca3af; }
+.as-item {
+  display: flex; align-items: center; gap: 8px; border: 1.5px solid #e5e7eb; border-radius: 8px;
+  padding: 8px 10px; cursor: pointer; transition: all .12s; background: #fff; margin-bottom: 7px;
+}
+.as-item:hover { border-color: #9cc3ef; }
+.as-item.on { border-color: #409eff; background: #ecf5ff; }
+.as-item input[type=checkbox] { accent-color: #409eff; width: 14px; height: 14px; }
+.as-item .ai-n { font-size: 12.5px; font-weight: 600; color: #303133; }
+.as-item .ai-d { margin-left: auto; font-size: 10.5px; color: #9ca3af; }
+.as-item .visual-tag {
+  font-size: 9.5px; font-weight: 700; border-radius: 4px; padding: 0 5px;
+  background: #fdf6e3; color: #b45309; border: 1px solid #f5d896;
+}
+.as-param {
+  border: 1px solid #d7e6f7; border-radius: 8px; background: #f9fbfe;
+  padding: 8px 10px; margin: -2px 0 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 7px 10px;
+}
+.as-param label { font-size: 11.5px; color: #374151; display: block; }
+.as-param input, .as-param select {
+  width: 100%; margin-top: 3px; padding: 5px 8px; border: 1px solid #dcdfe6;
+  border-radius: 6px; font-size: 12px; background: #fff; color: inherit; outline: none;
+}
+.as-param .wide { grid-column: 1 / -1; }
+.as-hint { font-size: 10.5px; color: #9ca3af; }
+/* 视觉断言三联图 */
+.tri { display: flex; gap: 7px; margin-top: 6px; }
+.tri-slot { flex: 1; border: 1px dashed #d7e6f7; border-radius: 7px; background: #f9fafb; padding: 5px; text-align: center; }
+.tri-slot .tt { font-size: 10px; font-weight: 600; color: #6b7280; margin-bottom: 4px; }
+.tri-img { height: 46px; border-radius: 5px; position: relative; background: linear-gradient(135deg, #dbe7f6, #e8eef7); overflow: hidden; }
+.tri-img .glyph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; opacity: .85; }
+.tri-img.diff { background: repeating-linear-gradient(45deg, #fdf2f2 0 7px, #fbe4e4 7px 14px); }
+.tri-badge { position: absolute; top: 3px; right: 3px; font-size: 9px; font-weight: 700; border-radius: 4px; padding: 0 4px; background: #d1fae5; color: #065f46; }
+.tri-badge.bad { background: #fee2e2; color: #991b1b; }
+.simline { font-size: 10px; color: #6b7280; margin-top: 4px; }
+.simline b.bad { color: #c0392b; }
+.thresh { display: flex; align-items: center; gap: 7px; }
+.thresh input[type=range] { flex: 1; accent-color: #409eff; margin-top: 0; }
+.thresh .val { font-size: 12px; font-weight: 700; color: #409eff; }
+.colorline { display: flex; align-items: center; gap: 7px; }
+.colorchip { width: 22px; height: 22px; border-radius: 5px; border: 1px solid rgba(0,0,0,.12); background: #2e6be6; flex: 0 0 22px; }
+
+.semibar {
+  border: 1px solid #d7e6f7; border-radius: 8px; background: #f5faff;
+  padding: 7px 10px; font-size: 10.5px; color: #374151; margin-top: 9px; line-height: 1.6;
+}
+.semibar b { color: #303133; }
+
+.tri-bar {
+  margin-top: 12px; background: #f0f9eb; border: 1px solid #c2e7b0; color: #529b2e;
+  border-radius: 8px; padding: 8px 12px; font-size: 12.5px;
+}
+.modal-foot { padding: 10px 18px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; gap: 10px; }
+.btn { border: 1px solid #dcdfe6; background: #fff; color: #303133; border-radius: 8px; padding: 6px 13px; font-size: 12px; cursor: pointer; }
+.btn:hover { border-color: #409eff; color: #409eff; }
+.btn.pri { background: #409eff; border-color: #409eff; color: #fff; }
+
+/* 演示区 */
+.demo-panel {
+  width: 100%; max-width: 1660px; margin-top: 12px; background: #fff;
+  border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px 16px 16px;
+}
+.demo-panel .dp-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.demo-panel .dp-head b { font-size: 13px; }
+.demo-panel .dp-head .hint { font-size: 11px; color: #9ca3af; }
+.codebox {
+  background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 11px 13px; font: 11px/1.7 "SF Mono", Menlo, Consolas, monospace; color: #374151;
+  white-space: pre; overflow-x: auto;
+}
+.codebox .cm { color: #9aa5b1; }
+.guide { margin-top: 12px; font-size: 12px; color: #374151; }
+.guide b { display: block; font-size: 12.5px; margin-bottom: 5px; }
+.guide table { width: 100%; border-collapse: collapse; }
+.guide td { padding: 3px 8px 3px 0; vertical-align: top; }
+.guide td:first-child { width: 42%; }
+</style>
+</head>
+<body>
+
+<div class="canvasbar">
+  <b>原型 · 添加测试用例四栏改版（操作 + 断言解耦）</b>
+  <span class="muted">①元素 → ②用例 → ③操作（纯动作） → ④断言（多选组合，含视觉断言）· 窄屏底部横向滚动</span>
+  <div class="ops">
+    <button id="narrowBtn">窄屏滚动演示</button>
+    <button id="themeBtn">夜间模式</button>
+  </div>
+</div>
+
+<div class="modal-clip">
+<div class="modal">
+  <div class="modal-title">➕ 添加测试用例<span class="hint">按「元素 → 用例 → 操作 → 断言」流程走：选下方用途决定走到哪一步；点字段旁「?」看说明</span></div>
+  <div class="modal-body">
+
+    <div class="seg">
+      <div class="seg-item">仅元素</div>
+      <div class="seg-item on">元素 + 用例 + 操作<span class="badge">推荐</span></div>
+      <div class="seg-item">登记随机弹窗</div>
+    </div>
+
+    <div class="flow-cols">
+      <!-- ① 元素 -->
+      <section class="flow-col">
+        <div class="col-head"><span class="num">1</span>① 元素<span class="hint">入库必需</span></div>
+        <div class="fcol-pad">
+          <div class="anchor-card">
+            <div class="ac-head">已选元素 · 元素定位 <span style="color:#9ca3af">来源：元素树点选 / 坐标选中</span></div>
+            <div class="ac-main">btnWriteNewSong</div>
+            <div class="ac-loc">ID · com.recordlife.kuaige:id/btnWriteNewSong</div>
+          </div>
+          <div class="duo">
+            <div class="field"><label>元素名称<span class="q">?</span></label><input value="btnWriteNewSong"></div>
+            <div class="field"><label>元素中文名<span class="q">?</span></label><input placeholder="如：写新歌按钮"></div>
+          </div>
+          <div class="duo">
+            <div class="field"><label>定位方式<span class="q">?</span></label><select><option>ID</option></select></div>
+            <div class="field"><label>定位值<span class="q">?</span></label><input value="com.recordlife.kuaige:id/btnW…"></div>
+          </div>
+          <div class="duo">
+            <div class="field"><label>元素等待方式<span class="q">?</span></label><select><option>元素可见再操作（推荐）</option></select></div>
+            <div class="field"><label>等待时间(秒)<span class="q">?</span></label><input type="number" value="6"></div>
+          </div>
+          <div class="field"><label>写入元素文件<span class="q">?</span></label><select><option>opcheckElements.py</option></select></div>
+        </div>
+      </section>
+
+      <!-- ② 用例 -->
+      <section class="flow-col">
+        <div class="col-head"><span class="num">2</span>② 用例<span class="hint">这步操作追加到哪条用例</span></div>
+        <div class="fcol-pad">
+          <div class="field"><label>目标用例文件<span class="q">?</span></label><select><option>操作类型真机验证（test_opcheck.py）</option></select></div>
+          <div class="field"><label>页面操作<span class="q">?</span></label><select id="methodSel"><option>test_01_click_ok</option></select></div>
+          <div class="field"><label>插入位置<span class="q">?</span></label><select><option>末尾（成为第 1 步）</option></select></div>
+          <div class="steps-list">
+            <div class="sl-title">当前方法还没有步骤，这一步将是第 1 步：</div>
+            <div class="sl-marker">＋ 新步骤将插入到这里</div>
+            <div class="sl-row"><span class="sl-idx">1</span><span>➕ 本步：<span id="stepDesc">点击「btnWriteNewSong」</span></span></div>
+          </div>
+          <div class="bind-note">🔗 三件套去向：页面 OpcheckPage.py ← 元素文件 opcheckElements.py</div>
+        </div>
+      </section>
+
+      <!-- ③ 操作（瘦身后：纯动作 + 仅断言） -->
+      <section class="flow-col">
+        <div class="col-head"><span class="num">3</span>③ 操作<span class="hint">动作类 · 断言已移至④栏</span></div>
+        <div class="fcol-pad">
+          <div class="field"><label>操作类型<span class="q">?</span></label>
+            <div class="op-grid" id="opGrid"></div>
+          </div>
+          <div class="field"><label>全部操作类型</label>
+            <select id="opTypeSel"></select></div>
+          <div class="field"><label>特殊操作<span class="q">?</span></label>
+            <select id="specialSel"><option value="">无（使用上方操作类型）</option><option value="hide_keyboard">收起键盘（键盘在才收，否则不动）</option><option value="deal_first_launch_dialogs">首次启动弹窗处理（无弹窗自动跳过）</option></select></div>
+          <div class="field" id="paramWrap" style="display:none"><label>操作参数<span class="q">?</span></label>
+            <input id="opParam" placeholder="输入内容 / 坐标(x,y) / 秒数 / 代码行"></div>
+          <div class="field"><label>步骤描述<span class="q">?</span></label><input id="stepDescInput" value="点击「btnWriteNewSong」"></div>
+          <div class="field"><label>写入页面文件<span class="q">?</span></label><input readonly value="OpcheckPage.py"></div>
+        </div>
+      </section>
+
+      <!-- ④ 断言（新栏） -->
+      <section class="flow-col">
+        <div class="col-head"><span class="num">4</span>④ 断言<span class="hint new">新增 · 可多选组合</span></div>
+        <div class="fcol-pad">
+          <div class="as-card">
+            <div class="as-head"><b>断言组合</b><span class="hint">勾选即启用 · 全量执行</span></div>
+            <div class="as-list" id="asList"></div>
+            <div class="semibar"><b>执行语义：</b>操作先执行 → 断言按勾选顺序逐条跑，<b>任何一条失败都不中断</b>；失败当场截图（视觉断言附 基线/实际/diff 三联图）；全部跑完若有失败，抛一条 AssertionError 汇总明细。全部不勾 = 纯操作步骤（与现状一致）。</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="tri-bar">🛡 三件套一次完成：元素 → opcheckElements.py · 用例行 → test_opcheck.py · 页面方法 → OpcheckPage.py</div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn">取消</button>
+    <button class="btn">💾 保存并继续</button>
+    <button class="btn pri">💾 保存</button>
+  </div>
+</div>
+</div>
+
+<div class="demo-panel">
+  <div class="dp-head"><b>生成代码预览</b><span class="hint">原型演示区 · 保存时写入页面文件的一个方法（所见即所得）</span></div>
+  <div class="codebox" id="codebox"></div>
+  <div class="guide">
+    <b>断什么 · 用什么</b>
+    <table>
+      <tr><td>按钮上的文字内容</td><td>→ 断言「文本 =」（读控件 text 属性，无需截图）</td></tr>
+      <tr><td><b>logo / icon / 切图型文案</b>（读不到内容）</td><td>→ 断言「视觉对比」：与基线比相似度，失败挂 基线/实际/diff 三联图</td></tr>
+      <tr><td>颜色状态（角标红点/禁用置灰/主题色）</td><td>→ 断言「颜色」：主色 RGB ± 容差（P1 可选类型）</td></tr>
+      <tr><td>只想校验不做事</td><td>→ ③操作选「仅断言」，④栏勾选组合，生成纯断言方法</td></tr>
+    </table>
+  </div>
+</div>
+
+<script>
+'use strict';
+var $ = function (s) { return document.querySelector(s); };
+var esc = function (s) { return String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+
+/* ③操作类型（断言已移至④栏；新增「仅断言」） */
+var OP_TYPES = [
+  { v: 'click', n: '点击', g: '👆' }, { v: 'input', n: '输入', g: '⌨️' },
+  { v: 'long_press', n: '长按', g: '✊' }, { v: 'tap', n: '坐标点击', g: '🎯' },
+  { v: 'screenshot', n: '截图', g: '📷' }, { v: 'sleep', n: '固定等待', g: '⏱️' },
+  { v: 'wait_element', n: '轮询等待出现', g: '🔄' }, { v: 'if_click', n: '出现才点击', g: '🔀' },
+  { v: 'custom', n: '自定义代码', g: '</>' },
+  { v: 'assert_only', n: '仅断言', g: '◎', only: true },
+];
+var TYPE_NAME = { click: '点击', input: '输入', long_press: '长按', tap: '坐标点击', screenshot: '截图',
+  sleep: '固定等待', wait_element: '轮询等待出现', if_click: '出现才点击', custom: '自定义代码', assert_only: '仅断言' };
+var PARAM_NEEDED = { input: '输入内容', tap: '坐标(x,y)', sleep: '秒数', wait_element: '最长等待秒数', custom: '代码行' };
+
+/* ④断言类型（多选组合） */
+var ASSERT_DEFS = [
+  { v: 'exists', n: '断言存在', d: '元素可见', p: 'wait' },
+  { v: 'text', n: '断言文本', d: '控件文案 =', p: 'text' },
+  { v: 'toast', n: '断言Toast', d: '页面级 · 不需元素', p: 'toast' },
+  { v: 'gone', n: '断言消失', d: '弹窗已关闭', p: 'wait' },
+  { v: 'visual', n: '视觉断言', d: '基线相似度比对', p: 'visual', isNew: true },
+];
+var state = { op: 'click', asserts: [] };   // asserts: [{v, ...params}]
+function findA(v) { return state.asserts.find(function (x) { return x.v === v; }); }
+
+$('#opGrid').innerHTML = OP_TYPES.map(function (t) {
+  return '<div class="op-card' + (t.only ? ' assert-only' : '') + '" data-op="' + t.v + '" title="' + t.n + '">' +
+    '<span class="oi">' + t.g + '</span><span class="ot">' + t.n + '</span></div>';
+}).join('');
+$('#opTypeSel').innerHTML = OP_TYPES.map(function (t) { return '<option value="' + t.v + '">' + t.n + '</option>'; }).join('');
+
+function paramRow(v, r) {
+  if (v === 'exists') return '<label>等待秒数<input type="number" value="' + esc((r && r.wait) || 3) + '" data-f="wait"></label>' +
+    '<label class="as-hint" style="align-self:end">元素可见即通过</label>';
+  if (v === 'text') return '<label>期望文本<input value="' + esc((r && r.text) || '') + '" data-f="text" placeholder="如：写新歌"></label>' +
+    '<label class="as-hint" style="align-self:end">读控件 text 属性，无需截图</label>';
+  if (v === 'toast') return '<label class="wide">Toast 文本<input value="' + esc((r && r.toast) || '') + '" data-f="toast" placeholder="如：已加入歌单"></label>' +
+    '<label class="wide as-hint">页面级断言：不依赖本元素，与其他断言可自由组合</label>';
+  if (v === 'gone') return '<label>等待秒数<input type="number" value="' + esc((r && r.wait) || 2) + '" data-f="wait"></label>' +
+    '<label class="as-hint" style="align-self:end">等待时间内仍可见则失败</label>';
+  if (v === 'visual') {
+    var th = (r && r.threshold) || 0.95, cap = r && r.captured;
+    return '<label>相似度阈值<div class="thresh"><input type="range" min="0.8" max="1" step="0.01" value="' + th + '" data-f="threshold">' +
+      '<span class="val" id="tv">' + (+th).toFixed(2) + '</span></div></label>' +
+      '<label style="align-self:end"><button class="btn' + (cap ? '' : ' pri') + '" id="capBtn" style="font-size:11px;padding:4px 10px">' + (cap ? '更新基线' : '采集基线') + '</button></label>' +
+      '<div class="wide"><div class="tri">' +
+      '<div class="tri-slot"><div class="tt">基线</div><div class="tri-img"><div class="glyph">🖼️</div></div><div class="simline">' + (cap ? 'btnWriteNewSong.png' : '未采集') + '</div></div>' +
+      '<div class="tri-slot"><div class="tt">实际</div><div class="tri-img"><div class="glyph">📱</div></div><div class="simline">执行时截取</div></div>' +
+      '<div class="tri-slot"><div class="tt">diff</div><div class="tri-img' + (cap && r.demoFail ? ' diff' : '') + '"><div class="glyph">🔍</div>' +
+      (cap ? '<span class="tri-badge' + (r.demoFail ? ' bad' : '') + '">' + (r.demoFail ? 'FAIL' : 'PASS') + '</span>' : '') + '</div>' +
+      '<div class="simline">' + (cap ? '相似度 <b class="' + (r.demoFail ? 'bad' : '') + '">' + (r.demoFail ? '0.71' : '0.99') + '</b> ≥ ' + (+th).toFixed(2) : '采集后预览') + '</div></div>' +
+      '<span class="as-hint">失败时三联图随 AssertionError 一起挂入 allure 报告 · 基线存 elements/baselines/ 随包进 git</span></div>';
+  }
+  return '';
+}
+
+function renderAsserts() {
+  var box = $('#asList');
+  box.innerHTML = ASSERT_DEFS.map(function (d) {
+    var r = findA(d.v), on = !!r;
+    var html = '<div class="as-item' + (on ? ' on' : '') + '" data-as="' + d.v + '">' +
+      '<input type="checkbox" ' + (on ? 'checked' : '') + '><span class="ai-n">' + d.n + '</span>' +
+      (d.isNew ? '<span class="visual-tag">新 · 视觉断言</span>' : '') +
+      '<span class="ai-d">' + d.d + '</span></div>';
+    if (on) html += '<div class="as-param" data-pv="' + d.v + '">' + paramRow(d.v, r) + '</div>';
+    return html;
+  }).join('');
+  box.querySelectorAll('.as-item').forEach(function (it) {
+    it.addEventListener('click', function (e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.type === 'range') return;
+      var v = it.dataset.as, r = findA(v);
+      if (r) state.asserts = state.asserts.filter(function (x) { return x.v !== v; });
+      else {
+        r = { v: v };
+        if (v === 'visual') { r.threshold = 0.95; r.captured = false; }
+        state.asserts.push(r);
+      }
+      renderAsserts(); renderCode();
+    });
+  });
+  box.querySelectorAll('[data-f]').forEach(function (inp) {
+    inp.addEventListener('input', function () {
+      var pv = inp.closest('.as-param').dataset.pv, r = findA(pv);
+      r[inp.dataset.f] = inp.type === 'range' ? +inp.value : inp.value;
+      if (inp.dataset.f === 'threshold') document.getElementById('tv').textContent = (+inp.value).toFixed(2);
+      renderCode();
+    });
+  });
+  var cap = box.querySelector('#capBtn');
+  if (cap) cap.addEventListener('click', function () {
+    var r = findA('visual'); r.captured = !r.captured; renderAsserts(); renderCode();
+  });
+  $('#specialSel').disabled = state.op === 'assert_only' ? false : false;
+  $('#specialSel').style.opacity = state.asserts.length && state.op !== 'assert_only' ? '.6' : '';
+}
+
+function syncOp() {
+  document.querySelectorAll('.op-card').forEach(function (c) { c.classList.toggle('on', c.dataset.op === state.op); });
+  $('#opTypeSel').value = state.op;
+  var pn = PARAM_NEEDED[state.op];
+  $('#paramWrap').style.display = pn ? '' : 'none';
+  if (pn) $('#opParam').placeholder = pn;
+  var n = state.asserts.length;
+  var act = TYPE_NAME[state.op];
+  $('#stepDescInput').value = state.op === 'assert_only'
+    ? '断言「btnWriteNewSong」' + (n ? '· ' + n + ' 断言' : '')
+    : act + '「btnWriteNewSong」' + (n ? '· 含' + n + '断言' : '');
+  $('#stepDesc').textContent = $('#stepDescInput').value;
+  renderAsserts(); renderCode();
+}
+$('#opGrid').addEventListener('click', function (e) {
+  var c = e.target.closest('.op-card'); if (!c) return;
+  state.op = c.dataset.op; syncOp();
+});
+$('#opTypeSel').addEventListener('change', function () { state.op = this.value; syncOp(); });
+
+function renderCode() {
+  var L = [], n = state.asserts.length;
+  var hasVisual = !!findA('visual');
+  L.push('<span class="cm"># 页面方法：操作段 + 断言段（全量执行，失败汇总）</span>');
+  if (state.op === 'assert_only') {
+    L.push('def assert_btn_write_new_song(self, wait_seconds=3):');
+    L.push('    """断言「写新歌按钮」' + (n ? '· ' + n + ' 断言' : '') + '：失败不中断、逐条截图，汇总抛错"""');
+    L.push('    failures = []');
+  } else {
+    var mname = state.op === 'click' ? 'click_btn_write_new_song'
+      : state.op === 'input' ? 'input_btn_write_new_song'
+      : state.op === 'long_press' ? 'long_press_btn_write_new_song'
+      : state.op === 'screenshot' ? 'wait_and_shot'
+      : state.op === 'sleep' ? 'sleep_before_next'
+      : state.op === 'wait_element' ? 'wait_btn_write_new_song'
+      : state.op === 'if_click' ? 'click_btn_write_new_song_if_visible'
+      : state.op === 'custom' ? 'custom_step'
+      : state.op === 'tap' ? 'tap_xy'
+      : 'step';
+    L.push('def ' + mname + '(self):');
+    L.push('    """' + TYPE_NAME[state.op] + '「写新歌按钮」' + (n ? '· 含' + n + '断言' : '') + '：失败不中断、逐条截图，汇总抛错"""');
+    L.push('    failures = []');
+    if (state.op === 'click') L.push('    self.appOperator.click(self._elements.btnWriteNewSong)');
+    else if (state.op === 'input') L.push("    self.appOperator.sendText(self._elements.btnWriteNewSong, '歌词内容')");
+    else if (state.op === 'long_press') L.push('    self.appOperator.touch_long_press(self._elements.btnWriteNewSong, duration_sconds=2)');
+    else if (state.op === 'tap') L.push('    self.appOperator.tap(720, 955)');
+    else if (state.op === 'screenshot') L.push("    self.appOperator.get_screenshot('btnWriteNewSong')");
+    else if (state.op === 'sleep') L.push('    time.sleep(1)');
+    else if (state.op === 'wait_element') L.push('    self.appOperator.getElement(self._elements.btnWriteNewSong, wait_seconds=60)');
+    else if (state.op === 'if_click') L.push('    self.appOperator.click_if_visible(self._elements.btnWriteNewSong, timeout_seconds=3)');
+    else if (state.op === 'custom') L.push('    ...  # 自定义代码行');
+  }
+  if (n) {
+    L.push('    <span class="cm"># [断言段] ' + n + ' 条组合断言</span>');
+    state.asserts.forEach(function (r, i) {
+      var no = i + 1;
+      if (r.v === 'exists') L.push("    self.appOperator.assert_element_or_record(failures, '断言" + no + "·存在', self._elements.btnWriteNewSong, wait=" + esc(r.wait || 3) + ')');
+      if (r.v === 'text') L.push("    self.appOperator.assert_shot_or_record(failures, '断言" + no + "·文本', self.appOperator.getText(self._elements.btnWriteNewSong) == '" + esc(r.text || '') + "', expect='" + esc(r.text || '') + "')");
+      if (r.v === 'toast') L.push("    self.appOperator.assert_record(failures, '断言" + no + "·Toast', self.appOperator.is_toast_visible('" + esc(r.toast || '') + "', wait_seconds=5))");
+      if (r.v === 'gone') L.push("    self.appOperator.assert_gone_or_record(failures, '断言" + no + "·消失', self._elements.btnWriteNewSong, wait=" + esc(r.wait || 2) + ')');
+      if (r.v === 'visual') L.push("    self.appOperator.assert_visual_or_record(failures, '断言" + no + "·视觉基线', self._elements.btnWriteNewSong,\n        baseline='elements/baselines/opcheck/btnWriteNewSong.png', threshold=" + (+r.threshold || 0.95).toFixed(2) + ')   # 失败挂三联图');
+    });
+    L.push('    if failures:');
+    L.push("        raise AssertionError('%d 项断言未通过：\\n%s' % (len(failures), '\\n'.join(failures)))");
+  }
+  $('#codebox').innerHTML = L.join('\n');
+}
+
+$('#themeBtn').addEventListener('click', function () {
+  var nn = document.documentElement.classList.toggle('night');
+  this.textContent = nn ? '日间模式' : '夜间模式';
+});
+$('#narrowBtn').addEventListener('click', function () {
+  var nn = document.body.classList.toggle('narrow');
+  this.textContent = nn ? '恢复宽屏' : '窄屏滚动演示';
+});
+
+/* 默认演示态：操作=点击，断言已勾 文本+视觉（组合态第一印象） */
+state.op = 'click';
+state.asserts = [
+  { v: 'text', text: '写新歌' },
+  { v: 'visual', threshold: 0.95, captured: true },
+];
+syncOp();
+</script>
+</body>
+</html>
