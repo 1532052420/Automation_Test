@@ -591,6 +591,104 @@ class AppOperator:
                            extra='%s（失败截图已入 allure）'%fail_msg)
         raise AssertionError('断言「%s」失败：%s'%(desc,fail_msg))
 
+    # ---------------------------------------------------------------- 多断言（④断言栏 · 全量执行）
+    # 设计：每条断言独立结算——通过挂成功截图；失败挂失败截图并记入 failures，
+    # 不抛错不中断，调用方（页面方法）在全部断言跑完后统一汇总抛 AssertionError。
+    def _assert_probe(self, element, wait_seconds=3, visible=True):
+        """按指定等待时长构造探针元素（复用元素自身定位，不改元素定义）"""
+        from page_objects.createElement import CreateElement
+        from page_objects.app_ui.locator_type import Locator_Type
+        from page_objects.app_ui.wait_type import Wait_Type as Wait_By
+        return CreateElement.create(element.locator_type, element.locator_value,
+                                    wait_type=Wait_By.VISIBILITY_OF if visible else Wait_By.PRESENCE_OF_ELEMENT_LOCATED,
+                                    wait_seconds=wait_seconds)
+
+    def _assert_step(self, failures, desc, ok, detail='', actual=None):
+        """多断言单条结算：通过→成功截图；失败→失败截图 + failures.append（不中断）"""
+        step_no = _next_action_step_no()
+        if ok:
+            with allure.step('断言「%s」：通过' % desc):
+                self.get_screenshot(('断言成功_' + desc)[:40])
+            _log_action_result(step_no, '断言「%s」' % desc, [], True, extra='成功截图已入 allure')
+            return True
+        detail_txt = str(detail)[:160]
+        with allure.step('断言失败：「%s」 %s' % (desc, detail_txt)):
+            self.get_screenshot(('断言失败_' + desc)[:40])
+        _log_action_result(step_no, '断言「%s」' % desc, [], False, extra=detail_txt + '（失败截图已入 allure）')
+        failures.append('%s: %s' % (desc, detail_txt))
+        return False
+
+    def assert_exists_or_record(self, failures, desc, element, wait_seconds=3):
+        """断言存在（多断言版）：出现即通过，超时记入 failures 不抛错"""
+        try:
+            self.getElement(self._assert_probe(element, wait_seconds))
+            self._assert_step(failures, desc, True)
+        except Exception as e:
+            self._assert_step(failures, desc, False, e)
+
+    def assert_text_or_record(self, failures, desc, element, expected, wait_seconds=3):
+        """断言文本（多断言版）：控件文案与期望相等，不等记入 failures"""
+        try:
+            actual = self.getText(self._assert_probe(element, wait_seconds))
+            self._assert_step(failures, desc, actual == expected,
+                              '期望「%s」实际「%s」' % (expected, actual), actual=actual)
+        except Exception as e:
+            self._assert_step(failures, desc, False, e)
+
+    def assert_toast_or_record(self, failures, desc, text, wait_seconds=5):
+        """断言Toast（多断言版）：页面级，不依赖元素"""
+        try:
+            ok = self.is_toast_visible(text, wait_seconds=wait_seconds)
+            self._assert_step(failures, desc, ok,
+                              '等待%ds内未出现包含「%s」的toast' % (wait_seconds, text))
+        except Exception as e:
+            self._assert_step(failures, desc, False, e)
+
+    def assert_gone_or_record(self, failures, desc, element, wait_seconds=2):
+        """断言消失（多断言版）：等待期内仍可见则记入 failures"""
+        try:
+            probe = self._assert_probe(element, wait_seconds, visible=False)
+            try:
+                self.getElement(probe)
+                gone = False
+            except Exception:
+                gone = True
+            self._assert_step(failures, desc, gone, '等待%ds内元素仍可见' % wait_seconds)
+        except Exception as e:
+            self._assert_step(failures, desc, False, e)
+
+    def assert_visual_or_record(self, failures, desc, element, baseline='', threshold=0.95, wait_seconds=3):
+        """视觉断言（多断言版）：元素区域截图 vs 基线相似度；
+        基线缺失→自动建立（通过并在报告注明）；尺寸不一致→不硬比；
+        失败挂 基线/实际/diff 三联图入 allure。"""
+        try:
+            from common.appium import visual_assertions as _va
+            probe = self._assert_probe(element, wait_seconds)
+            actual_path = self.save_element_image(probe, 'visual_%s' % abs(hash(desc)) )
+            if baseline and not os.path.isfile(baseline):
+                ok2, err2 = _va.ensure_baseline(actual_path, baseline)
+                if ok2:
+                    with allure.step('视觉基线自动建立：「%s」' % desc):
+                        self.get_screenshot(('基线已建立_' + desc)[:40])
+                    if os.path.isfile(baseline):
+                        allure.attach(name=('视觉基线_' + desc)[:40], body=open(baseline, 'rb').read(),
+                                      attachment_type=allure.attachment_type.PNG)
+                    failures_note = '基线已建立（首跑采集，本次视为通过）'
+                    step_no = _next_action_step_no()
+                    _log_action_result(step_no, '视觉断言「%s」' % desc, [], True, extra=failures_note)
+                    return
+            os.makedirs('output/tmp/', exist_ok=True)
+            triple_path = os.path.abspath('output/tmp/visual_triple_%s.png' % DateTimeTool.getNowTime('%Y%m%d%H%M%S%f'))
+            ok, actual, err, triple = _va.compare_images(baseline, actual_path, threshold, triple_path)
+            if triple and os.path.isfile(triple):
+                with open(triple, 'rb') as f:
+                    allure.attach(name=('视觉三联图_' + desc)[:40], body=f.read(),
+                                  attachment_type=allure.attachment_type.PNG)
+            self._assert_step(failures, desc, ok, err or ('相似度 %s' % (actual or {}).get('similarity')),
+                              actual=actual)
+        except Exception as e:
+            self._assert_step(failures, desc, False, e)
+
     def get_geolocation(self):
         """
         返回定位信息,纬度/经度/高度
@@ -1313,11 +1411,14 @@ class AppOperator:
         """
         webElement = self._change_element_to_webElement_type(element)
         if webElement:
-            actions = TouchAction(self._driver)
-            actions.long_press(webElement,xoffset,yoffset,duration_sconds*1000)
+            # Appium 2/3 已移除 TouchAction 协议端点（服务端报 UnknownMethod），
+            # 改走原生手势 mobile:longClickGesture；x/y 为元素左上角偏移（与服务端语义一致）
+            params = {'elementId': webElement.id, 'duration': int(duration_sconds * 1000)}
+            if xoffset is not None and yoffset is not None:
+                params['x'] = int(xoffset)
+                params['y'] = int(yoffset)
             if is_perfrom:
-                actions.perform()
-            return actions
+                self._driver.execute_script('mobile: longClickGesture', params)
 
     def multi_touch_actions_perform(self,touch_actions):
         """

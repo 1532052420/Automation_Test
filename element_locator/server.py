@@ -321,6 +321,84 @@ def api_locate_check():
     return jsonify(r)
 
 
+# ---------------------------------------------------------------- ④断言栏 · 视觉基线采集
+@app.route('/api/element/baseline', methods=['POST'])
+def api_element_baseline():
+    """视觉断言基线采集：当前屏幕截图按元素 bounds 裁剪 → 落盘 baselines/<元素文件>/<元素名>.png。
+    入参 {locator_type, locator_value, element_file, element_name}；
+    元素不在当前屏幕时明确报错（不猜不兜底）。返回缩略图 dataURL 供弹窗预览。"""
+    import io
+    import re as _re
+    data = request.get_json(silent=True) or {}
+    element_file = (data.get('element_file') or '').strip()
+    element_name = (data.get('element_name') or '').strip()
+    if not _re.match(r'^[A-Za-z_][A-Za-z0-9_]*\.py$', element_file) or not _re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', element_name):
+        return jsonify({'ok': False, 'msg': '元素文件/元素名不合法（防路径穿越）'})
+    serial = device.get_device(_request_serial())
+    if not serial:
+        return jsonify({'ok': False, 'msg': '未检测到在线设备——基线采集需要元素真实在屏'})
+    png = device.screenshot_png(serial)
+    if not png:
+        return jsonify({'ok': False, 'msg': '屏幕截图失败：' + (device.last_error or '未知原因')})
+    xml = device.dump_xml(serial)
+    if not xml:
+        return jsonify({'ok': False, 'msg': '界面 dump 失败：' + (device.last_error or '未知原因')})
+    try:
+        tree = device.xml_to_tree(xml)
+    except Exception as e:
+        return jsonify({'ok': False, 'msg': '元素树解析失败: %s' % str(e)[:80]})
+
+    lt = (data.get('locator_type') or '').upper()
+    lv = (data.get('locator_value') or '').strip()
+    hit = None
+
+    def _walk(n):
+        nonlocal hit
+        if hit is not None:
+            return
+        rid = n.get('resource-id') or ''
+        if lt == 'ID' and rid == lv:
+            hit = n
+        elif lt == 'XPATH' and lv:
+            m = _re.search(r"@text='([^']*)'", lv)
+            if m and (n.get('text') or '') == m.group(1):
+                hit = n
+            else:
+                m2 = _re.search(r"@resource-id='([^']*)'", lv)
+                if m2 and rid == m2.group(1):
+                    hit = n
+        for c in n.get('children') or []:
+            _walk(c)
+
+    for n in tree.get('all') or []:
+        _walk(n)
+        if hit is not None:
+            break
+    bounds = (hit or {}).get('bounds_num')
+    if not bounds or len(bounds) != 4:
+        return jsonify({'ok': False, 'msg': '元素不在当前屏幕上（未在元素树命中该定位）——请先让元素出现在屏幕再采集基线'})
+
+    from PIL import Image
+    img = Image.open(io.BytesIO(png))
+    x1, y1, x2, y2 = [int(v) for v in bounds]
+    x2 = min(x2, img.size[0])
+    y2 = min(y2, img.size[1])
+    if x2 - x1 < 2 or y2 - y1 < 2:
+        return jsonify({'ok': False, 'msg': '元素区域为空（bounds=%s）' % bounds})
+    crop = img.crop((x1, y1, x2, y2))
+    base_dir = os.path.join(element_library.ELEMENTS_DIR, 'baselines', os.path.splitext(element_file)[0])
+    os.makedirs(base_dir, exist_ok=True)
+    out = os.path.join(base_dir, '%s.png' % element_name)
+    crop.save(out)
+    thumb = crop.copy()
+    thumb.thumbnail((180, 180))
+    buf = io.BytesIO()
+    thumb.save(buf, format='PNG')
+    import base64 as _b64
+    return jsonify({'ok': True, 'path': out.replace(os.sep, '/'), 'size': list(crop.size),
+                    'thumbnail': 'data:image/png;base64,' + _b64.b64encode(buf.getvalue()).decode()})
+
+
 # ---------------------------------------------------------------- 随机弹窗规则库
 @app.route('/api/popup_rules')
 def api_popup_rules():

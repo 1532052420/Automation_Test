@@ -868,3 +868,61 @@ html.night .seg { color: #9ca3af; }
 html.night .seg:hover { background: #333945; }
 html.night .seg.on { background: #1e2b3a; color: #66b1ff;
                      box-shadow: 0 1px 4px rgba(0,0,0,.3), 0 0 0 1px rgba(102,177,255,.25); }
+
+/* ================= ④断言栏（四栏改版 · 多选组合断言+视觉断言） ================= */
+.col-head .hint.new { color: #529b2e; font-weight: 600; }
+.fcol-pad { padding: 0 14px; }
+.as-card { border: 1px solid #d7e6f7; border-radius: 10px; background: #f5faff; padding: 10px 12px; }
+.as-head { display: flex; align-items: center; gap: 8px; }
+.as-head b { font-size: 12.5px; }
+.as-head-hint { margin-left: auto; font-size: 10.5px; color: #9ca3af; }
+.as-sub { font-size: 11px; color: #6b7280; margin: 2px 0 8px; }
+.as-list { display: flex; flex-direction: column; gap: 7px; }
+.as-item {
+  display: flex; align-items: center; gap: 8px; border: 1.5px solid #e5e7eb; border-radius: 8px;
+  padding: 8px 10px; cursor: pointer; transition: all .12s; background: #fff;
+}
+.as-item:hover { border-color: #9cc3ef; }
+.as-item.on { border-color: #409eff; background: #ecf5ff; }
+.as-item input[type=checkbox] { accent-color: #409eff; width: 14px; height: 14px; }
+.as-item .ai-n { font-size: 12.5px; font-weight: 600; color: #303133; }
+.as-item .ai-d { margin-left: auto; font-size: 10.5px; color: #9ca3af; }
+.as-item .visual-tag {
+  font-size: 9.5px; font-weight: 700; border-radius: 4px; padding: 0 5px;
+  background: #fdf6e3; color: #b45309; border: 1px solid #f5d896;
+}
+.as-param {
+  border: 1px solid #d7e6f7; border-radius: 8px; background: #f9fbfe;
+  padding: 8px 10px; margin: -2px 0 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 7px 10px;
+}
+.as-param label { font-size: 11.5px; color: #374151; display: block; }
+.as-param input, .as-param select {
+  width: 100%; margin-top: 3px; padding: 5px 8px; border: 1px solid #dcdfe6;
+  border-radius: 6px; font-size: 12px; background: #fff; color: inherit; outline: none;
+}
+.as-param input:focus, .as-param select:focus { border-color: #409eff; }
+.as-param .wide { grid-column: 1 / -1; }
+.as-hint { font-size: 10.5px; color: #9ca3af; }
+.as-card.locked { opacity: .55; pointer-events: none; }
+.tri { display: flex; gap: 7px; margin-top: 6px; }
+.tri-slot { flex: 1; border: 1px dashed #d7e6f7; border-radius: 7px; background: #f9fafb; padding: 5px; text-align: center; min-width: 0; }
+.tri-slot .tt { font-size: 10px; font-weight: 600; color: #6b7280; margin-bottom: 4px; }
+.tri-img { height: 46px; border-radius: 5px; position: relative; background: linear-gradient(135deg, #dbe7f6, #e8eef7); overflow: hidden; }
+.tri-img img { width: 100%; height: 100%; object-fit: cover; }
+.tri-img .glyph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; opacity: .85; }
+.tri-badge { position: absolute; top: 3px; right: 3px; font-size: 9px; font-weight: 700; border-radius: 4px; padding: 0 4px; background: #d1fae5; color: #065f46; }
+.tri-badge.bad { background: #fee2e2; color: #991b1b; }
+.simline { font-size: 10px; color: #6b7280; margin-top: 4px; }
+.semibar { border: 1px solid #d7e6f7; border-radius: 8px; background: #f5faff; padding: 7px 10px; font-size: 10.5px; color: #374151; margin-top: 9px; line-height: 1.6; }
+.semibar b { color: #303133; }
+html.night .as-card { background: #202126; border-color: #3a3c42; }
+html.night .as-sub, html.night .as-head-hint, html.night .as-item .ai-d,
+html.night .as-hint, html.night .as-param label, html.night .semibar,
+html.night .tri-slot .tt, html.night .simline { color: #9ca3af; }
+html.night .as-item { background: #17181b; border-color: #3a3c42; }
+html.night .as-item.on { background: #0e2f4d; border-color: #409eff; }
+html.night .as-item .ai-n { color: #e5e7eb; }
+html.night .as-param { background: #232428; border-color: #3a3c42; }
+html.night .as-param input, html.night .as-param select { background: #17181b; border-color: #3a3c42; color: #e5e7eb; }
+html.night .tri-slot { background: #141519; border-color: #3a3c42; }
+html.night .semibar { background: #202126; border-color: #303236; }

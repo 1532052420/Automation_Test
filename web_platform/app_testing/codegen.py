@@ -34,7 +34,7 @@ GENERATED_MARK = '# 由平台「用例编排」生成'
 
 # 步骤类型 → 是否必须带元素 / 参数（词表即 case_generator.STEP_TYPES）
 _NEEDS_ELEMENT = {'click', 'input', 'long_press', 'assert_visible', 'assert_text',
-                  'wait_element', 'assert_gone', 'if_click'}
+                  'wait_element', 'assert_gone', 'if_click', 'assert_only'}
 _NEEDS_PARAM = {'input', 'assert_text', 'assert_toast', 'sleep', 'tap', 'custom'}
 
 # setup_class 启动参数默认值（与定位器临时用例模板一致；用例 YAML 可覆盖）
