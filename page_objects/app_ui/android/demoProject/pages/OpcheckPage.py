@@ -11,10 +11,6 @@ class OpcheckPage:
         self._elements = OpcheckElements()
 
     # ---------- 点击 ----------
-    def click_content(self):
-        """点击「页面根布局」"""
-        self.appOperator.click(self._elements.content)
-
     def click_missing(self):
         """点击「不存在的元素」"""
         self.appOperator.click(self._elements.missing)
@@ -235,3 +231,27 @@ class OpcheckPage:
                 time.sleep(1)
             except Exception:
                 pass
+
+    def click_content(self):
+        """点击「content」· 含2断言"""
+        failures = []
+        try:
+                    self.appOperator.click(self._elements.content)
+        except Exception as _e:
+            self.appOperator.get_screenshot('操作失败_点击')
+            failures.append('主操作: %s' % str(_e)[:120])
+        probe = CreateElement.create(self._elements.content.locator_type,
+                                     self._elements.content.locator_value,
+                                     wait_type=Wait_By.VISIBILITY_OF,
+                                     wait_seconds=3)
+        self.appOperator.assert_text_or_record(failures, '断言1·文本', probe, expected='测试文本A')
+        probe = CreateElement.create(self._elements.content.locator_type,
+                                     self._elements.content.locator_value,
+                                     wait_type=Wait_By.VISIBILITY_OF,
+                                     wait_seconds=3)
+        self.appOperator.assert_visual_or_record(failures, '断言2·视觉', probe,
+                                                baseline='page_objects/app_ui/android/demoProject/elements/baselines/opcheckElements/content.png', threshold=0.9)
+        if failures:
+            raise AssertionError('%d 项断言未通过：\n%s' % (len(failures), '\n'.join(failures)))
+
+

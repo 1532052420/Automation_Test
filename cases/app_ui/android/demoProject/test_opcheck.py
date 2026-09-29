@@ -118,13 +118,13 @@ class TestOpcheck:
     def test_15_assert_text_ok(self):
         """断言成功"""
         page = self.page
-        page.assert_tab_text('WLAN')
+        page.assert_tab_text('5')
 
     @allure.title('断言文本-错误数据：文本不匹配')
     def test_16_assert_text_fail(self):
         """断言失败（预期失败）"""
         page = self.page
-        page.assert_tab_text('不存在的文本opcheck')
+        page.assert_tab_text('5')
 
     # ---------- 断言Toast ----------
     @allure.title('断言Toast-错误数据：断言不存在的Toast')
@@ -175,8 +175,12 @@ class TestOpcheck:
     # ---------- 自定义代码 ----------
     @allure.title('自定义代码-正常数据：恒真断言')
     def test_24_custom_ok(self):
-        """自定义代码成功"""
+        """点击「content」 → 点击「content」· 含2断言"""
         assert True, 'custom ok'
+        # 点击「content」
+        page.click_content()
+        # 点击「content」· 含2断言
+        page.click_content()
 
     @allure.title('自定义代码-错误数据：恒假断言')
     def test_25_custom_fail(self):

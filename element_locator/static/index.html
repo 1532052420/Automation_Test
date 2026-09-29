@@ -24,7 +24,7 @@ try {
 } catch (e) { /* 隐私模式等场景忽略 */ }
 </script>
 <link rel="stylesheet" href="/static/nav.css">
-<link rel="stylesheet" href="static/style.css?v=74">
+<link rel="stylesheet" href="static/style.css?v=75">
 </head>
 <body>
 <header class="gnav" id="gnav"></header>
@@ -123,15 +123,15 @@ try {
 <div id="modal-mask" class="modal-mask" style="display:none">
   <div class="modal modal-flow">
     <div class="modal-title">➕ 添加测试用例 <span class="hint">按「元素 → 用例 → 操作」流程走：选下方用途决定走到哪一步；点字段旁「?」看说明</span></div>
-    <div class="modal-body">
-      <div class="flow-step seg-row">
-        <span class="seg-title">保存到哪一步</span>
-        <div class="seg-group" role="radiogroup" aria-label="保存到哪一步">
-          <label class="seg" title="只把元素写入元素库，不生成用例"><input type="radio" name="el-purpose" value="only" checked><span class="seg-txt">仅元素</span></label>
-          <label class="seg" title="三件套一次完成并入库（推荐）"><input type="radio" name="el-purpose" value="all"><span class="seg-txt">元素 + 用例 + 操作</span><span class="badge">推荐</span></label>
-          <label class="seg" title="登记为随机弹窗自动关闭规则，建议配锚点防误关"><input type="radio" name="el-purpose" value="popup"><span class="seg-txt">登记随机弹窗</span></label>
-        </div>
+    <div class="seg-strip">
+      <span class="seg-title">保存到哪一步</span>
+      <div class="seg-group" role="radiogroup" aria-label="保存到哪一步">
+        <label class="seg" title="只把元素写入元素库，不生成用例"><input type="radio" name="el-purpose" value="only" checked><span class="seg-txt">仅元素</span></label>
+        <label class="seg" title="三件套一次完成并入库（推荐）"><input type="radio" name="el-purpose" value="all"><span class="seg-txt">元素 + 用例 + 操作</span><span class="badge">推荐</span></label>
+        <label class="seg" title="登记为随机弹窗自动关闭规则，建议配锚点防误关"><input type="radio" name="el-purpose" value="popup"><span class="seg-txt">登记随机弹窗</span></label>
       </div>
+    </div>
+    <div class="modal-body">
 
       <div class="flow-cols">
         <!-- 第一栏：元素 -->
@@ -335,6 +335,6 @@ try {
 </div>
 <script src="/static/nav.js"></script>
 <script src="/static/theme.js"></script>
-<script src="static/index.js?v=74"></script>
+<script src="static/index.js?v=75"></script>
 </body>
 </html>

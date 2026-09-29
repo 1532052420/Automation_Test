@@ -54,7 +54,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(AT.codegen, 'remove_generated', lambda cid: removed.append(cid))
     monkeypatch.setattr(AT.runner.manager, 'running_task', lambda: None)
     monkeypatch.setattr(AT.runner.manager, 'start_run',
-                        lambda conf, nodes, overrides=None, owner='': (True, 'run-fake-1'))
+                        lambda conf, nodes, overrides=None, owner='', **_kw: (True, 'run-fake-1'))
     monkeypatch.setattr(AT.runner.manager, 'get_task', lambda rid: None)
     from flask import Flask
     app = Flask(__name__)
@@ -223,7 +223,7 @@ def test_suite_run_expands_case_nodes_in_order(client, monkeypatch):
     s = _mk_suite(client, [c1['id'], c2['id']])
     seen = {}
     monkeypatch.setattr(AT.runner.manager, 'start_run',
-                        lambda conf, nodes, overrides=None, owner='': seen.update(
+                        lambda conf, nodes, overrides=None, owner='', **_kw: seen.update(
                             conf=conf, nodes=nodes) or (True, 'run-9'))
     monkeypatch.setattr(AT.runner.manager, 'get_task', lambda rid: {
         'run_id': rid, 'status': 'RUNNING', 'total': 0, 'passed': 0, 'failed': 0, 'error': 0})
@@ -241,7 +241,7 @@ def test_case_run_uses_compiled_node(client, monkeypatch):
     c = _mk_case(client)
     seen = {}
     monkeypatch.setattr(AT.runner.manager, 'start_run',
-                        lambda conf, nodes, overrides=None, owner='': seen.update(nodes=nodes) or (True, 'r'))
+                        lambda conf, nodes, overrides=None, owner='', **_kw: seen.update(nodes=nodes) or (True, 'r'))
     r = client.post(API + '/cases/%d/run' % c['id'], json={}).get_json()
     assert r['ok'] and seen['nodes'] == [_node(c['id'])]
 

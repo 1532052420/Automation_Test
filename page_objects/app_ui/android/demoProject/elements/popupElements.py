@@ -17,9 +17,9 @@ class PopupElements:
     """随机弹窗关闭按钮规则库：由 common/appium/popup_handler.py 在每次元素等待轮询时被动识别"""
 
     def __init__(self):
-        self.popup_checkin_close = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/btnClose', wait_type=Wait_By.VISIBILITY_OF)  # 随机弹窗·签到弹窗关闭按钮（任务中心/广场签到弹窗通用）
-        self.popup_recharge_exit_close = CreateElement.create(Locator_Type.XPATH, '//android.widget.ImageView[@clickable=\'true\' and not(@resource-id)]', wait_type=Wait_By.PRESENCE_OF_ELEMENT_LOCATED, wait_seconds=1)  # 随机弹窗·充值页返回挽留弹窗关闭×（无ID；仅在RechargeKCoinActivity内扫描，配合RULE_OPTIONS活动约束）
-        self.popup_promo_close = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/iv_close', wait_type=Wait_By.VISIBILITY_OF)  # 随机弹窗·限时充值优惠弹窗关闭按钮（个人页/充值后概率弹出，右上角×）
+        self.popup_checkin_close = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/btnClose', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6, desc='签到弹窗关闭')  # 签到弹窗关闭
+        self.popup_recharge_exit_close = CreateElement.create(Locator_Type.XPATH, '//android.widget.ImageView[@clickable=\'true\' and not(@resource-id)]', wait_type=Wait_By.PRESENCE_OF_ELEMENT_LOCATED, wait_seconds=1, desc='随机弹窗·充值页返回挽留弹窗关闭×')  # 随机弹窗·充值页返回挽留弹窗关闭× · 随机弹窗·充值页返回挽留弹窗关闭×（无ID；仅在RechargeKCoinActivity内扫描，配合RULE_OPTIONS活动约束）
+        self.popup_promo_close = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/iv_close', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6, desc='随机弹窗·限时充值优惠弹窗关闭按钮')  # 随机弹窗·限时充值优惠弹窗关闭按钮 · 随机弹窗·限时充值优惠弹窗关闭按钮（个人页/充值后概率弹出，右上角×）
         self.popup_btn_close_close = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/btn_close', wait_type=Wait_By.PRESENCE_OF_ELEMENT_LOCATED, wait_seconds=1, desc='音乐人升级弹窗关闭按钮')  # 音乐人升级弹窗关闭按钮
 
     # 规则附加约束（可选）：元素名 -> {anchor: 弹窗特征(类型,值)——场上出现特征才点关闭,

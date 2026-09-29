@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>保存到哪一步 · 6 个样式方案</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, 'PingFang SC', system-ui, sans-serif; }
+  body { background: #f5f7fa; padding: 28px 0; display: flex; justify-content: center; }
+  .shot { width: 960px; background: #fff; border-radius: 12px; padding: 20px 24px 26px; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+  .shot-label { font-size: 12px; color: #909399; letter-spacing: .5px; margin-bottom: 14px; }
+  .shot-label b { color: #303133; font-size: 13px; }
+  .row-title { font-size: 13px; font-weight: 600; color: #606266; margin-bottom: 12px; }
+  .q { display: inline-flex; width: 14px; height: 14px; border-radius: 50%; background: #c0c4cc; color: #fff;
+       font-size: 10px; align-items: center; justify-content: center; margin: 0 5px 0 4px; vertical-align: -2px; }
+  .badge { display: inline-flex; font-size: 10px; line-height: 1; padding: 3px 6px; border-radius: 999px;
+           background: #ff9800; color: #fff; font-weight: 600; margin-left: 6px; vertical-align: 1px; }
+  .num { display: inline-flex; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid currentColor;
+         align-items: center; justify-content: center; font-size: 11px; margin-right: 7px; vertical-align: -4px; font-weight: 600; }
+
+  /* V1 分段控件 */
+  .v1 { display: flex; background: #f2f3f5; border-radius: 10px; padding: 4px; }
+  .v1 .seg { flex: 1; text-align: center; padding: 11px 8px; border-radius: 8px; font-size: 13.5px;
+             color: #606266; cursor: pointer; transition: all .15s; }
+  .v1 .seg.on { background: #fff; color: #409eff; font-weight: 600;
+                box-shadow: 0 1px 4px rgba(0,0,0,.14), 0 0 0 1px rgba(64,158,255,.18); }
+  .v1 .seg .num { border-color: currentColor; }
+
+  /* V2 单选卡片 */
+  .v2 { display: flex; gap: 12px; }
+  .v2 .card { flex: 1; position: relative; border: 1px solid #dcdfe6; border-radius: 10px; padding: 11px 13px; cursor: pointer; background: #fff; }
+  .v2 .card .t { font-size: 13.5px; color: #303133; }
+  .v2 .card .d { font-size: 11px; color: #a8abb2; margin-top: 5px; }
+  .v2 .card.on { border-color: #409eff; background: #ecf5ff; }
+  .v2 .card.on .t { color: #409eff; font-weight: 600; }
+  .v2 .card .tick { position: absolute; top: -8px; right: -8px; width: 20px; height: 20px; border-radius: 50%;
+                    background: #409eff; color: #fff; font-size: 12px; display: flex; align-items: center;
+                    justify-content: center; box-shadow: 0 1px 4px rgba(64,158,255,.4); }
+
+  /* V3 步骤条 */
+  .v3 { display: flex; align-items: flex-start; padding: 2px 30px; }
+  .v3 .node { display: flex; flex-direction: column; align-items: center; width: 190px; }
+  .v3 .dot { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #c0c4cc; color: #909399;
+             font-size: 13px; display: flex; align-items: center; justify-content: center; background: #fff; font-weight: 600; }
+  .v3 .node.on .dot { border-color: #409eff; background: #409eff; color: #fff; box-shadow: 0 0 0 4px rgba(64,158,255,.15); }
+  .v3 .lb { font-size: 12.5px; color: #909399; margin-top: 8px; text-align: center; }
+  .v3 .node.on .lb { color: #409eff; font-weight: 600; }
+  .v3 .ln { flex: 1; height: 2px; background: #e4e7ed; margin-top: 14px; border-radius: 1px; }
+  .v3 .ln.done { background: #409eff; }
+
+  /* V4 胶囊 */
+  .v4 { display: flex; gap: 12px; }
+  .v4 .pill { flex: 1; text-align: center; padding: 11px 8px; border: 1px solid #dcdfe6; border-radius: 999px;
+              font-size: 13.5px; color: #606266; cursor: pointer; background: #fff; }
+  .v4 .pill.on { background: #409eff; border-color: #409eff; color: #fff; font-weight: 600;
+                 box-shadow: 0 2px 8px rgba(64,158,255,.35); }
+  .v4 .pill.on .num { border-color: rgba(255,255,255,.85); }
+  .v4 .pill .badge { background: #fff; color: #ff9800; }
+
+  /* V5 竖排列表 */
+  .v5 { display: flex; flex-direction: column; gap: 8px; }
+  .v5 .li { display: flex; align-items: center; padding: 10px 14px; border-radius: 8px; border: 1px solid #ebeef5;
+            background: #fff; cursor: pointer; }
+  .v5 .li.on { background: #ecf5ff; border-color: #d9ecff; box-shadow: inset 3px 0 0 #409eff; }
+  .v5 .li .t { font-size: 13.5px; color: #303133; font-weight: 500; }
+  .v5 .li.on .t { color: #409eff; }
+  .v5 .li .d { font-size: 11px; color: #a8abb2; margin-left: auto; }
+  .v5 .li .ok { margin-left: 12px; color: #409eff; font-size: 14px; font-weight: 700; }
+
+  /* V6 下划线 Tab */
+  .v6 { display: flex; border-bottom: 1px solid #e4e7ed; }
+  .v6 .tab { position: relative; padding: 10px 26px 13px; font-size: 13.5px; color: #909399; cursor: pointer; }
+  .v6 .tab.on { color: #409eff; font-weight: 600; }
+  .v6 .tab.on::after { content: ''; position: absolute; left: 22px; right: 22px; bottom: -1px; height: 3px;
+                       border-radius: 2px; background: #409eff; }
+  .v6 .tab .r { position: absolute; top: 2px; right: 8px; }
+</style>
+</head>
+<body>
+<div class="shot">
+  <div class="shot-label">样式 <b id="v"></b> · 预览（仅替换红框区域，弹窗其余部分维持现状）</div>
+  <div id="stage"></div>
+</div>
+<script>
+const TITLE = '保存到哪一步';
+const Q = '<span class="q">?</span>';
+const NUM = n => '<span class="num">' + n + '</span>';
+const REC = '<span class="badge">推荐</span>';
+const V = new URLSearchParams(location.search).get('v') || '1';
+document.getElementById('v').textContent = 'V' + V;
+const stage = document.getElementById('stage');
+const TPL = {
+  '1': `<div class="row-title">${TITLE}${Q}——分段控件：选中项白底浮起，一整条滑槽切换</div>
+    <div class="v1">
+      <div class="seg">${NUM(1)}仅元素</div>
+      <div class="seg on">${NUM(2)}元素 + 用例 + 操作${REC}</div>
+      <div class="seg">${NUM(3)}登记随机弹窗</div>
+    </div>`,
+  '2': `<div class="row-title">${TITLE}${Q}——单选卡片：每项带一句功能说明，选中描边+角标</div>
+    <div class="v2">
+      <div class="card"><div class="t">${NUM(1)}仅元素</div><div class="d">只把元素入库，不生成用例</div></div>
+      <div class="card on"><span class="tick">✓</span><div class="t">${NUM(2)}元素 + 用例 + 操作${REC}</div><div class="d">三件套一次完成并入库</div></div>
+      <div class="card"><div class="t">${NUM(3)}登记随机弹窗</div><div class="d">写入弹窗规则库，执行时自动处理</div></div>
+    </div>`,
+  '3': `<div class="row-title">${TITLE}${Q}——步骤条：呼应「保存到哪一步」的步骤语义</div>
+    <div class="v3">
+      <div class="node"><div class="dot">1</div><div class="lb">仅元素</div></div>
+      <div class="ln done"></div>
+      <div class="node on"><div class="dot">2</div><div class="lb">元素 + 用例 + 操作 ${REC}</div></div>
+      <div class="ln"></div>
+      <div class="node"><div class="dot">3</div><div class="lb">登记随机弹窗</div></div>
+    </div>`,
+  '4': `<div class="row-title">${TITLE}${Q}——胶囊：最紧凑，一行不占高度</div>
+    <div class="v4">
+      <div class="pill">${NUM(1)}仅元素</div>
+      <div class="pill on">${NUM(2)}元素 + 用例 + 操作${REC}</div>
+      <div class="pill">${NUM(3)}登记随机弹窗</div>
+    </div>`,
+  '5': `<div class="row-title">${TITLE}${Q}——竖排列表：说明文字放右侧，信息最全（占位较高，弹窗需加高约 60px）</div>
+    <div class="v5">
+      <div class="li"><span class="t">${NUM(1)}仅元素</span><span class="d">只把元素入库，不生成用例</span></div>
+      <div class="li on"><span class="t">${NUM(2)}元素 + 用例 + 操作${REC}</span><span class="d">三件套一次完成并入库</span><span class="ok">✓</span></div>
+      <div class="li"><span class="t">${NUM(3)}登记随机弹窗</span><span class="d">写入弹窗规则库，执行时自动处理</span></div>
+    </div>`,
+  '6': `<div class="row-title">${TITLE}${Q}——下划线 Tab：与平台导航语言一致</div>
+    <div class="v6">
+      <div class="tab">${NUM(1)}仅元素</div>
+      <div class="tab on">${NUM(2)}元素 + 用例 + 操作<span class="r">${REC}</span></div>
+      <div class="tab">${NUM(3)}登记随机弹窗</div>
+    </div>`
+};
+stage.innerHTML = TPL[V] || TPL['1'];
+</script>
+</body>
+</html>

@@ -831,12 +831,9 @@ main { min-width: 1320px; min-height: 780px; }
              height: 700px; min-height: 700px; max-height: 700px; }
 
 /* ===== 保存到哪一步 · 分段控件（v6.14.3 · 设计文档 design/ui-proposals/样式方案V1-设计文档.md） ===== */
-.seg-row {
-  position: sticky; top: -12px; z-index: 6;          /* 用途导航头钉在弹窗可视区顶部，不随内容滚走 */
-  display: flex; flex-direction: column; gap: 5px; align-items: center;
-  background: #fff; margin: -12px -16px 12px; padding: 12px 16px 10px;
-  border-bottom: 1px solid #f0f1f4;
-}
+/* 用途条在滚动区外（结构上不可能被裁切）：白底通栏 + 底部分隔线 */
+.seg-strip { background: #fff; padding: 10px 16px 8px; border-bottom: 1px solid #f0f1f4; }
+.seg-row { display: flex; flex-direction: column; gap: 5px; align-items: center; }
 .seg-title { text-align: center; width: 100%; }
 .seg-title { font-size: 12.5px; line-height: 1.2; font-weight: 600; color: #606266; }
 .seg-title .help-icon { vertical-align: 1px; margin-left: 4px; }
@@ -939,4 +936,11 @@ html.night .as-switch .slider { background: #3a3c42; }
 .as-switch-row.locked { opacity: .5; pointer-events: none; }
 #asArea.locked, #asLabel.locked { opacity: .5; pointer-events: none; }
 
-html.night .flow-step.seg-row { background: #1b1c1f; border-bottom-color: #303236; }
+html.night .seg-strip { background: #1b1c1f; border-bottom-color: #303236; }
+html.night .seg-strip .seg-title { color: #e5e7eb; }
+
+.as-badge {
+  display: inline-flex; width: 18px; height: 18px; border-radius: 50%;
+  background: #34c759; color: #fff; font-size: 10px; font-weight: 700;
+  align-items: center; justify-content: center; margin-right: 4px; flex: 0 0 18px;
+}

@@ -8,7 +8,7 @@ from page_objects.app_ui.wait_type import Wait_Type as Wait_By
 
 class OpcheckElements:
     def __init__(self):
-        self.content = CreateElement.create(Locator_Type.ID, 'android:id/content', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=3, desc='页面根布局')  # 页面根布局
+        self.content = CreateElement.create(Locator_Type.ID, 'android:id/content', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6)
         self.missing = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/opcheck_missing_404', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=3, desc='不存在的元素')  # 不存在的元素
         self.tab_text = CreateElement.create(Locator_Type.XPATH, "//*[@text='音乐MV']", wait_type=Wait_By.VISIBILITY_OF, wait_seconds=5, desc='顶部Tab音乐MV')  # 顶部Tab音乐MV
         self.tv_use = CreateElement.create(Locator_Type.ID, 'com.recordlife.kuaige:id/tvUse', wait_type=Wait_By.VISIBILITY_OF, wait_seconds=3, desc='去创作按钮')  # 去创作按钮

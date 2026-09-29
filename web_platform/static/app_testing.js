@@ -1668,16 +1668,29 @@ async function loadAssertions() {
 }
 
 function renderAssertions() {
-  const cf = $('#asMgrCase') ? $('#asMgrCase').value : '';
-  const kind = $('#asMgrKind') ? $('#asMgrKind').value : '';
-  const rows = _asMgrAll.filter(a =>
-    (!cf || a.case_file === cf) && (!kind || a.kind === kind));
+  const cf = (document.getElementById('asMgrCase') || {}).value || '';
+  const rawKind = (document.getElementById('asMgrKind') || {}).value || '';
+  const KN = { assert_visible: 'exists', assert_text: 'text', assert_toast: 'toast', assert_gone: 'gone' };
+  const rows = _asMgrAll.filter(a => {
+    const ak = KN[a.kind] || a.kind;
+    return (!cf || a.case_file === cf) && (!rawKind || ak === rawKind);
+  });
   const tb = $('#asMgrTbody');
   tb.innerHTML = rows.map((a, i) => {
-    const content = a.editable ? esc(a.content || '—') : '<span class="muted">—（无内容参数）</span>';
+    let content;
+    switch (a.kind) {
+      case 'text':    content = esc(a.content || '—'); break;
+      case 'toast':   content = esc(a.content || '—'); break;
+      case 'exists':  content = (a.content || '3') + 's'; break;
+      case 'gone':    content = (a.content || '2') + 's'; break;
+      case 'visual':  content = '相似度 ≥ ' + (a.content || '0.95'); break;
+      case 'color':   content = esc(a.content || '—'); break;
+      default:        content = esc(a.content || '—');
+    }
+    if (!a.editable && a.kind !== 'exists') content = '<span class="muted">' + content + '</span>';
     return `<tr>
       <td class="muted" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.case_file)}</td>
-      <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.method)} · 第${a.step_no}步</td>
+      <td><span class="as-badge">${a.step_no}</span> ${esc(a.method)}</td>
       <td>${esc(a.kind_name)}</td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.element || '—')}</td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${content}</td>
@@ -1735,3 +1748,37 @@ function openAssertEdit(a) {
       loadAssertions();
     });
 }
+
+/* 断言管理面板 · 事件绑定（DOMContentLoaded 后一次性绑定） */
+document.addEventListener('DOMContentLoaded', function () {
+  var asCase = document.getElementById('asMgrCase');
+  var asKind = document.getElementById('asMgrKind');
+  var asRefresh = document.getElementById('btnAsMgrRefresh');
+  var asPager = document.getElementById('asMgrPager');
+  if (asCase) asCase.addEventListener('change', function () { _asMgrPage = 1; loadAssertions(); });
+  if (asKind) asKind.addEventListener('change', function () { _asMgrPage = 1; renderAssertions(); });
+  if (asRefresh) asRefresh.addEventListener('click', function () { _asMgrPage = 1; loadAssertions(); });
+  if (asPager) asPager.addEventListener('click', function (e) {
+    var pg = e.target.closest('[data-aspage]');
+    if (pg) { _asMgrPage = +pg.dataset.aspage; renderAssertions(); }
+  });
+});
+
+/* 断言管理 · 交互绑定（等待 DOM 就绪后自动执行，最多重试 20 次） */
+(function bindAsMgrEvents(retry) {
+  retry = retry || 0;
+  var el = document.getElementById('asMgrKind');
+  if (!el && retry < 20) { setTimeout(function () { bindAsMgrEvents(retry + 1); }, 300); return; }
+  if (!el) return;
+  var kindSel = document.getElementById('asMgrKind');
+  var caseSel = document.getElementById('asMgrCase');
+  var refreshBtn = document.getElementById('btnAsMgrRefresh');
+  var pager = document.getElementById('asMgrPager');
+  if (kindSel) kindSel.addEventListener('change', function () { _asMgrPage = 1; renderAssertions(); });
+  if (caseSel) caseSel.addEventListener('change', function () { _asMgrPage = 1; loadAssertions(); });
+  if (refreshBtn) refreshBtn.addEventListener('click', function () { _asMgrPage = 1; loadAssertions(); });
+  if (pager) pager.addEventListener('click', function (e) {
+    var a = e.target.closest('[data-aspage]');
+    if (a) { _asMgrPage = +a.dataset.aspage; renderAssertions(); }
+  });
+})(0);
