@@ -381,9 +381,9 @@ function bindColumnResizers() {
   const mid = document.querySelector('.col.middle');
   const right = document.querySelector('.col.right');
   if (!left || !mid || !right) return;
-  // 右栏固定 340px（v6.11.1：历史拖拽记忆导致右栏被挤窄且无法复原——不再恢复/记忆列宽）
+  // 右栏固定 700px（v6.14.23：700×700 固定，历史拖拽记忆不再恢复/记忆列宽）
   try { localStorage.removeItem('locator_col_widths'); } catch (e) {}
-  right.style.flex = '0 0 340px';
+  right.style.flex = '0 0 700px';
   mid.style.flex = '1 1 auto';
   left.style.flex = '0 1 360px';
   document.querySelectorAll('.col-resizer').forEach(handle => {
@@ -400,8 +400,8 @@ function bindColumnResizers() {
         const relX = ev.clientX - mainRect.left - 12;  // 减 main 左 padding
         const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
         if (which === 'left') {
-          // 右栏固定 340（v6.11.1），中栏 flex:1 吸收差值
-          const rightW = right.getBoundingClientRect().width || 340;
+          // 右栏固定 700（v6.14.23），中栏 flex:1 吸收差值
+          const rightW = right.getBoundingClientRect().width || 700;
           const avail = cw - 60 - rightW;
           const leftW = clamp(relX, 280, avail - 280);
           left.style.flex = '0 1 ' + Math.round(leftW) + 'px';

@@ -813,7 +813,7 @@ html.night .dup-tip code { background: rgba(251, 191, 36, .12); }
 .detail-head { font-size: 13.5px; }
 
 /* 选中元素栏固定宽度：不参与拖拽挤压（v6.11.1 用户反馈） */
-.col.right { flex: 0 0 340px; min-width: 320px; }
+.col.right { flex: 0 0 700px; min-width: 700px; }
 /* 夜间遗漏补：详情底栏 / 弹窗 / 锚点卡 / 流程卡 / 步骤列表 */
 html.night .detail-foot { background: #1b1c1f; border-top-color: #303236; }
 html.night .modal { background: #1b1c1f; }
@@ -825,12 +825,18 @@ html.night .anchor-card { background: rgba(64,158,255,.08); border-color: #2b4a6
 html.night .steps-list { background: #1b1c1f; border-color: #303236; }
 html.night .el-content { background: #111214; color: #e5e7eb; }
 
-/* ===== 选中元素栏 800×800 起步（v6.11.6）：小屏出滚动条兜底，字段增减长度不变 ===== */
-main { min-width: 1420px; min-height: 820px; }
-.col.right { flex: 0 0 800px; min-width: 800px; min-height: 800px; }
+/* ===== 选中元素栏 700×700 固定（v6.14.23 用户要求）：小屏出滚动条兜底，字段增减长度不变 ===== */
+main { min-width: 1320px; min-height: 780px; }
+.col.right { flex: 0 0 700px; width: 700px; min-width: 700px; max-width: 700px;
+             height: 700px; min-height: 700px; max-height: 700px; }
 
 /* ===== 保存到哪一步 · 分段控件（v6.14.3 · 设计文档 design/ui-proposals/样式方案V1-设计文档.md） ===== */
-.seg-row { display: flex; flex-direction: column; gap: 5px; align-items: center; }
+.seg-row {
+  position: sticky; top: -12px; z-index: 6;          /* 用途导航头钉在弹窗可视区顶部，不随内容滚走 */
+  display: flex; flex-direction: column; gap: 5px; align-items: center;
+  background: #fff; margin: -12px -16px 12px; padding: 12px 16px 10px;
+  border-bottom: 1px solid #f0f1f4;
+}
 .seg-title { text-align: center; width: 100%; }
 .seg-title { font-size: 12.5px; line-height: 1.2; font-weight: 600; color: #606266; }
 .seg-title .help-icon { vertical-align: 1px; margin-left: 4px; }
@@ -932,3 +938,5 @@ html.night .as-switch .slider { background: #3a3c42; }
 .as-item .ai-d { flex: 0 0 auto; }
 .as-switch-row.locked { opacity: .5; pointer-events: none; }
 #asArea.locked, #asLabel.locked { opacity: .5; pointer-events: none; }
+
+html.night .flow-step.seg-row { background: #1b1c1f; border-bottom-color: #303236; }
