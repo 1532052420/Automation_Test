@@ -68,6 +68,7 @@
       <div class="subnav-label">APP自动化</div>
       <a href="#projects" data-panel="projects" data-icon="folder" class="on">项目管理</a>
       <a href="#elements" data-panel="elements" data-icon="target">元素管理</a>
+      <a href="#asserts" data-panel="asserts" data-icon="check">断言管理</a>
       <a href="#caselist" data-panel="caselist" data-icon="doc">用例管理</a>
       <a href="#cases" data-panel="cases" data-icon="list">执行用例</a>
       <a href="#orch" data-panel="orch" data-icon="flow">用例编排</a>
@@ -261,6 +262,52 @@
       <!-- 测试报告（原一级模块并入）：iframe 嵌入 /report，子页自动隐藏自带导航 -->
       <section class="panel" id="panel-report" hidden>
         <iframe id="reportFrame" class="report-frame" title="测试报告"></iframe>
+      </section>
+
+      <!-- 断言管理（按用例筛选断言列表，编辑断言内容） -->
+      <section class="panel" id="panel-asserts" hidden>
+        <div class="card">
+          <div class="cardhead">
+            <h3>断言管理 <span class="muted">扫描用例中的断言步骤（含组合断言/视觉断言），仅支持修改断言内容</span></h3>
+            <div class="treebar" style="margin-left:auto">
+              <select id="asMgrCase" style="max-width:280px"><option value="">全部用例</option></select>
+              <select id="asMgrKind" style="max-width:180px">
+                <option value="">全部断言方式</option>
+                <option value="exists">断言元素是否可见</option>
+                <option value="text">断言文本是否正确</option>
+                <option value="toast">断言Toast是否出现</option>
+                <option value="gone">断言元素是否消失</option>
+                <option value="visual">断言外观是否一致（视觉）</option>
+                <option value="color">断言颜色是否正确</option>
+              </select>
+              <button class="ghost mini" id="btnAsMgrRefresh">刷新</button>
+            </div>
+          </div>
+          <div class="tblwrap">
+            <table>
+              <thead><tr>
+                <th>用例</th><th>方法</th><th>断言方式</th><th>元素 / 描述</th>
+                <th>断言内容</th><th>操作</th>
+              </tr></thead>
+              <tbody id="asMgrTbody"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <!-- 断言内容编辑弹窗（静态字段 + 动态内容字段） -->
+        <div class="mask" id="asEditMask">
+          <div class="modal envmodal">
+            <h4 id="asEditTitle">编辑断言内容</h4>
+            <p class="muted" style="font-size:11.5px;margin-top:2px">仅支持修改断言内容；断言方式（类型）修改后续版本放开</p>
+            <div class="fields mt" style="grid-template-columns:1fr 1fr">
+              <div class="field"><label>用例</label><input id="asEdCase" readonly></div>
+              <div class="field"><label>方法 · 步骤</label><input id="asEdMethod" readonly></div>
+              <div class="field"><label>断言方式</label><input id="asEdKind" readonly></div>
+              <div class="field"><label>元素</label><input id="asEdEl" readonly></div>
+            </div>
+            <div class="field mt"><label id="asEdContentLabel">断言内容</label><input id="asEdVal" autocomplete="off"></div>
+            <div class="mops mt"><button class="ghost" id="asEditCancel">取消</button><button id="asEditSave">保存</button></div>
+          </div>
+        </div>
       </section>
 
       <!-- 用例管理（原独立模块并入）：上传用例包 zip，覆盖确认 + 自动备份 -->

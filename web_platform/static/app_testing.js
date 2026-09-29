@@ -1647,3 +1647,91 @@ if (btnAppium) loadAppiumStatus();
     }
   });
 })();
+
+/* ================= 断言管理（④断言栏内容的平台侧维护） =================
+   列表 = 用例中的断言步骤（传统直调 + 组合断言展开）；仅支持编辑断言内容。
+   数据源 /api/appui/assertions（assertion_manager 扫描用例与页面方法）。 */
+let _asMgrAll = [], _asMgrKind = '';
+
+async function loadAssertions() {
+  try {
+    const qs = $('#asMgrKind') && $('#asMgrKind').value ? '?kind=' + $('#asMgrKind').value : '';
+    const d = await api('/api/appui/assertions' + qs);
+    _asMgrAll = d.assertions || [];
+    const cases = d.cases || [];
+    const sel = $('#asMgrCase');
+    if (sel && sel.options.length <= 1) {
+      sel.innerHTML = '<option value="">全部用例</option>' + cases.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+    renderAssertions();
+  } catch (e) { toast(e.message, false); }
+}
+
+function renderAssertions() {
+  const cf = $('#asMgrCase') ? $('#asMgrCase').value : '';
+  const kind = $('#asMgrKind') ? $('#asMgrKind').value : '';
+  const rows = _asMgrAll.filter(a =>
+    (!cf || a.case_file === cf) && (!kind || a.kind === kind));
+  const tb = $('#asMgrTbody');
+  tb.innerHTML = rows.map((a, i) => {
+    const content = a.editable ? esc(a.content || '—') : '<span class="muted">—（无内容参数）</span>';
+    return `<tr>
+      <td class="muted" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.case_file)}</td>
+      <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.method)} · 第${a.step_no}步</td>
+      <td>${esc(a.kind_name)}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.element || '—')}</td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${content}</td>
+      <td>${a.editable ? `<button class="ghost mini" data-edit="${i}">编辑</button>` : '<span class="muted">—</span>'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" class="empty">当前筛选下没有断言</td></tr>';
+  tb.querySelectorAll('[data-edit]').forEach(b =>
+    b.addEventListener('click', () => openAssertEdit(_asMgrAll[+b.dataset.edit])));
+}
+
+function assertContentLabel(kind) {
+  return { text: '期望文本', toast: 'Toast 文本', visual: '相似度阈值（0.80~1.00）',
+           gone: '等待秒数', color: '期望 RGB（R,G,B）', exists: '—' }[kind] || '断言内容';
+}
+
+function openAssertEdit(a) {
+  const mask = document.getElementById('asEditMask');
+  if (!mask) return;
+  document.getElementById('asEditTitle').textContent = '编辑断言内容 · ' + (a.kind_name || a.kind);
+  document.getElementById('asEdCase').value = a.case_file;
+  document.getElementById('asEdMethod').value = a.method + ' · 第' + a.step_no + '步';
+  document.getElementById('asEdKind').value = a.kind_name || a.kind;
+  document.getElementById('asEdEl').value = a.element || '—';
+  document.getElementById('asEdContentLabel').textContent = assertContentLabel(a.kind);
+  const val = document.getElementById('asEdVal');
+  val.value = a.content || '';
+  document.getElementById('asEditSave').onclick = async () => {
+    const v = val.value.trim();
+    if (!v && a.kind !== 'exists') { toast('断言内容不能为空', false); return; }
+    try {
+      await api('/api/appui/assertions/update', { method: 'POST', body: { target: a, content: v } });
+      mask.classList.remove('show');
+      toast('断言内容已保存', true);
+      loadAssertions();
+    } catch (e) { toast(e.message || '保存失败', false); }
+  };
+  document.getElementById('asEditCancel').onclick = () => mask.classList.remove('show');
+  mask.classList.add('show');
+}
+
+function openAssertEdit(a) {
+  openForm('编辑断言内容 · ' + (a.kind_name || a.kind),
+    fmField('用例', 'acCase', a.case_file) +
+    fmField('方法 · 步骤', 'acMethod', `${a.method} · 第${a.step_no}步`) +
+    fmField('元素', 'acEl', a.element || '—') +
+    assertEditFields(a.kind, a) +
+    `<div class="hint mt">仅支持修改断言内容；断言方式（类型）修改后续版本放开</div>`,
+    async () => {
+      const val = $('#acVal').value.trim();
+      if (!val && a.kind !== 'text') return toast('内容不能为空', false);
+      const r = await api('/api/appui/assertions/update', {
+        method: 'POST', body: { target: a, content: val } });
+      closeForm(); toast('断言内容已保存', true);
+      _asMgrKind = $('#asMgrKind') ? $('#asMgrKind').value : '';
+      loadAssertions();
+    });
+}

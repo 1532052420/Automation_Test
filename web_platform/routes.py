@@ -216,6 +216,26 @@ def page_perf_report(run_id):
     return send_file(os.path.join(BASE_DIR, t['report']))
 
 
+# ---------------------------------------------------------------- AppUI 断言管理（④断言栏内容维护）
+@bp.route('/api/appui/assertions')
+def api_appui_assertions():
+    """断言列表：扫描用例中的断言步骤（传统直调 + 组合断言页面方法展开）。
+    ?case= 只看某条用例。"""
+    from web_platform import assertion_manager
+    cases, entries = assertion_manager.list_assertions(
+        (request.args.get('case') or '').strip() or None)
+    return jsonify({'ok': True, 'cases': cases, 'assertions': entries})
+
+
+@bp.route('/api/appui/assertions/update', methods=['POST'])
+def api_appui_assertions_update():
+    """编辑单条断言内容（仅内容；断言方式修改后续版本放开）"""
+    from web_platform import assertion_manager
+    data = request.get_json(silent=True) or {}
+    ok, msg, _ = assertion_manager.update_assertion(data.get('target') or {}, data.get('content'))
+    return jsonify({'ok': ok, 'msg': msg})
+
+
 # ---------------------------------------------------------------- AppUI 元素管理（元素库可视化维护）
 @bp.route('/api/appui/elements')
 def api_appui_elements():

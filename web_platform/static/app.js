@@ -619,10 +619,10 @@ async function initRun() {
 }
 
 /* ---------------- 左侧二级菜单：hash 深链 + 记住上次所在面板 ---------------- */
-const RUN_PANELS = ['projects', 'elements', 'cases', 'caselist', 'caseedit', 'orch', 'suites', 'report', 'admin', 'exec'];
+const RUN_PANELS = ['projects', 'elements', 'asserts', 'cases', 'caselist', 'caseedit', 'orch', 'suites', 'report', 'admin', 'exec'];
 /* 面板名 → 顶部面包屑第三级文案 */
 const RUN_PANEL_NAMES = {
-  projects: '项目管理', elements: '元素管理', cases: '执行用例', caselist: '用例管理',
+  projects: '项目管理', elements: '元素管理', asserts: '断言管理', cases: '执行用例', caselist: '用例管理',
   caseedit: '步骤编辑', orch: '用例编排', suites: '测试套件', report: '测试报告', admin: '用例上传', exec: '设备配置',
 };
 function showRunPanel(name) {
@@ -634,6 +634,7 @@ function showRunPanel(name) {
   document.querySelectorAll('#subnav a').forEach(a =>
     a.classList.toggle('on', a.dataset.panel === name));
   setCrumbSub(RUN_PANEL_NAMES[name]);
+  if (name === 'asserts' && typeof loadAssertions === 'function') loadAssertions();
 }
 function initRunPanels() {
   document.querySelectorAll('#subnav a').forEach(a => {
