@@ -204,10 +204,13 @@ try {
         <!-- 第三栏：操作 -->
         <section class="flow-col" id="col-op">
           <div class="col-head" data-n="3">③ 操作 <span class="hint">对这个元素做什么</span></div>
-          <label>操作类型 <span class="help-icon" data-help="对这个元素做什么">?</span>
+          <label>操作类型 <span class="help-icon" data-help="动作在上（单选）；断言在下（可多选组合）">?</span>
             <div id="op-grid" class="op-grid"></div>
           </label>
-          <label>全部操作类型 <span class="hint" style="font-weight:400">（含断言/等待/分支等全部类型）</span>
+          <div id="asLabel" class="as-grid-label">断言 <span class="as-tag">可多选 · 组合执行</span><span class="as-tag new">含视觉断言</span>
+            <span class="as-grid-hint">动作在上（单选）、断言在下（勾选即启用）</span></div>
+          <div id="asGrid" class="as-grid"></div>
+          <label>全部操作类型 <span class="hint" style="font-weight:400">（动作与仅断言；组合断言用上方卡片勾选）</span>
             <select id="el-op-type"></select>
           </label>
           <label>特殊操作 <span class="help-icon" data-help="与元素无关的用例级动作">?</span>
