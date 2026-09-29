@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>流程图 v2 · UI用例中插入接口断言（修订：用例编排入口 + 环境集中）</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font: 14px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: #303133; background: #f5f6f8; padding: 24px 18px 60px; }
+.wrap { max-width: 1120px; margin: 0 auto; }
+h1 { font-size: 19px; color: #1f4e79; margin-bottom: 4px; }
+.sub { font-size: 12.5px; color: #6b7280; margin-bottom: 8px; }
+.revision {
+  background: #fffbeb; border: 1px solid #f59e0b; border-radius: 10px; padding: 10px 14px;
+  font-size: 12.5px; color: #92400e; margin-bottom: 20px; line-height: 1.7;
+}
+.revision b { color: #b45309; }
+
+.stage { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 16px 18px 18px; position: relative; box-shadow: 0 2px 10px rgba(0,0,0,.04); }
+.stage-no { position: absolute; top: -11px; left: 16px; background: #409eff; color: #fff; font-size: 11.5px; font-weight: 700; border-radius: 12px; padding: 2px 12px; letter-spacing: .04em; }
+.stage-title { font-size: 14.5px; font-weight: 700; margin: 6px 0 4px; }
+.stage-desc { font-size: 12px; color: #6b7280; margin-bottom: 12px; }
+.arrow { display: flex; flex-direction: column; align-items: center; padding: 6px 0; }
+.arrow .line { width: 2px; height: 14px; background: #409eff; }
+.arrow .tri { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid #409eff; }
+.arrow .tag { font-size: 11px; color: #409eff; background: #ecf5ff; border: 1px solid #b3d8ff; border-radius: 10px; padding: 1px 10px; margin-bottom: 2px; }
+
+.row { display: flex; gap: 12px; flex-wrap: wrap; }
+.box { flex: 1; min-width: 230px; border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 10px 12px; background: #fff; }
+.box b { display: block; font-size: 13px; margin-bottom: 4px; color: #111827; }
+.box .d { font-size: 11.5px; color: #6b7280; }
+.box.hl { border-color: #409eff; background: #f5faff; }
+.box.new { border-color: #34c759; background: #f6fef8; position: relative; }
+.box.new::before { content: '新增'; position: absolute; top: -9px; right: 10px; background: #34c759; color: #fff; font-size: 9.5px; font-weight: 700; border-radius: 8px; padding: 0 7px; }
+.box.exist::before { content: '现有'; position: absolute; top: -9px; right: 10px; background: #9ca3af; color: #fff; font-size: 9.5px; font-weight: 700; border-radius: 8px; padding: 0 7px; }
+.box.stop { border-color: #f87171; background: #fef2f2; }
+.box.stop b { color: #991b1b; }
+
+/* 用例编排步骤编辑器缩略 */
+.editor { border: 1.5px solid #dcdfe6; border-radius: 10px; overflow: hidden; margin-top: 10px; background: #fff; }
+.ed-title { background: #f9fafb; padding: 7px 12px; font-size: 12.5px; font-weight: 700; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 8px; }
+.ed-title .pill { font-size: 10px; font-weight: 700; color: #34c759; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 0 8px; }
+.ed-body { display: grid; grid-template-columns: 240px 1fr; gap: 10px; padding: 10px; }
+.ed-side { border: 1px solid #eef0f3; border-radius: 8px; padding: 8px; }
+.ed-side h4 { font-size: 11.5px; color: #6b7280; margin-bottom: 6px; }
+.srow { display: flex; gap: 8px; align-items: center; font-size: 12px; padding: 4px 6px; color: #303133; border-radius: 6px; }
+.srow .idx { width: 16px; height: 16px; border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center; flex: 0 0 16px; background: #e5e7eb; color: #6b7280; }
+.srow.ui .idx { background: #409eff; color: #fff; }
+.srow.api .idx { background: #34c759; color: #fff; }
+.srow .k { font-size: 9.5px; font-weight: 700; border-radius: 4px; padding: 0 5px; margin-left: auto; }
+.srow.ui .k { background: #ecf5ff; color: #409eff; }
+.srow.api .k { background: #f0fdf4; color: #16a34a; }
+.srow.ins { outline: 2px dashed #f59e0b; outline-offset: 1px; background: #fffbeb; }
+.marker { font-size: 11px; color: #b45309; background: #fef3c7; border: 1px dashed #f59e0b; border-radius: 6px; text-align: center; padding: 3px; margin: 4px 0; }
+.ed-form { border: 1px solid #eef0f3; border-radius: 8px; padding: 10px; font-size: 11.5px; }
+.ed-form h4 { font-size: 12px; margin-bottom: 8px; color: #111827; }
+.frow { display: flex; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.fitem { flex: 1; min-width: 130px; background: #f9fafb; border: 1px solid #eef0f3; border-radius: 6px; padding: 5px 8px; color: #374151; }
+.fitem b { font-size: 10.5px; color: #6b7280; display: block; font-weight: 600; }
+.fitem .v { color: #1f5faa; }
+.fitem.env .v { color: #92400e; }
+
+pre.code { background: #0f172a; color: #e2e8f0; border-radius: 10px; padding: 12px 14px; font: 11.5px/1.75 "SF Mono", Menlo, Consolas, monospace; overflow-x: auto; margin-top: 10px; }
+pre.code .c { color: #7dd3fc; }
+pre.code .k { color: #fbbf24; }
+pre.code .ins { background: rgba(52,211,153,.16); border-radius: 4px; padding: 0 4px; color: #6ee7b7; }
+
+.lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+.lane { border: 1.5px solid; border-radius: 10px; padding: 10px 12px; }
+.lane.ui-l { border-color: #b3d8ff; background: #f5faff; }
+.lane.api-l { border-color: #86efac; background: #f6fef8; }
+.lane h5 { font-size: 12.5px; margin-bottom: 6px; }
+.lane .st { font-size: 11.5px; background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; padding: 4px 8px; margin-bottom: 5px; color: #374151; }
+.lane .down { text-align: center; color: #9ca3af; font-size: 11px; margin: 2px 0; }
+.lane.ui-l h5 { color: #1f5faa; }
+.lane.api-l h5 { color: #166534; }
+
+.rules { border: 1.5px solid #f59e0b; background: #fffbeb; border-radius: 10px; padding: 10px 14px; margin-top: 10px; font-size: 12px; color: #78350f; line-height: 1.8; }
+.rules b { color: #b45309; }
+
+.rep { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.rep .chip { font-size: 11.5px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 5px 10px; background: #f9fafb; color: #374151; }
+.rep .chip b { color: #111827; }
+.foot { font-size: 11.5px; color: #9ca3af; margin-top: 18px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>UI 用例中插入接口断言 · 流程图 v2（修订版）</h1>
+  <div class="sub">以现平台为基础；<span style="color:#16a34a;font-weight:700">绿=新增</span> <span style="color:#9ca3af;font-weight:700">灰=现有</span> <span style="color:#409eff;font-weight:700">蓝=复用改造</span>。场景：写歌 5 分钟后断言产出的视频/音频。</div>
+  <div class="revision">
+    <b>v2 修订（开发者/产品视角复盘，替代 v1）：</b>
+    ① 录入入口从「元素定位器」改为「<b>用例编排</b>」——接口步骤无元素，不该进元素向导；用户心智也是“在用例的第 N 步插入”，与用例编排的步骤编辑器天然匹配；
+    ② 环境配置（接口地址/token）<b>第一天起</b>就集中到接口测试模块现成的环境变量体系（config/api_testing/environments.yaml，<code>{{base_url}}</code>/<code>{{token}}</code> 替换），不把 URL 写死进生成代码；
+    ③ 产品规则约束嵌入范围：UI 用例里的接口步骤只允许「异步状态轮询」与「产物内容校验」两类，业务接口校验仍归接口测试模块（保测试金字塔）。
+  </div>
+
+  <!-- 阶段1 -->
+  <div class="stage">
+    <div class="stage-no">阶段 1 · 录入：用例编排 · 步骤序列内插入</div>
+    <div class="stage-title">在哪配（产品入口）</div>
+    <div class="stage-desc">平台「APP自动化 → 用例编排」已按用例-步骤视角组织；新增步骤类型「接口断言」，在任意 UI 步骤之间点 ＋ 插入。定位器回归纯元素职责，本方案不动它。</div>
+    <div class="row">
+      <div class="box exist"><b>用例编排步骤编辑器（现有）</b><div class="d">用例 → 方法 → 步骤列表，增删/排序/插入位置已是现成交互</div></div>
+      <div class="box new"><b>步骤类型新增「接口断言」（2 种）</b><div class="d">轮询接口字段（异步等待）· 下载并校验音视频（产物验证）</div></div>
+      <div class="box stop"><b>定位器（不参与）</b><div class="d">接口步骤无元素，不再塞进元素向导；避免弹窗进一步膨胀</div></div>
+    </div>
+    <div class="editor">
+      <div class="ed-title">用例编排 · test_write_song <span class="pill">＋ 插入步骤：接口断言</span></div>
+      <div class="ed-body">
+        <div class="ed-side">
+          <h4>步骤序列（第 1 步后插入）</h4>
+          <div class="srow ui"><span class="idx">1</span>点击「写歌按钮」<span class="k">UI</span></div>
+          <div class="marker">＋ 插入到这里</div>
+          <div class="srow ins api"><span class="idx">2</span>轮询作品状态直至完成<span class="k">接口</span></div>
+          <div class="srow ins api"><span class="idx">3</span>下载并校验视频/音频<span class="k">接口</span></div>
+          <div class="srow ui"><span class="idx">4</span>断言「作品卡」出现<span class="k">UI</span></div>
+        </div>
+        <div class="ed-form">
+          <h4>接口断言参数（示例：轮询作品状态）</h4>
+          <div class="frow">
+            <div class="fitem env"><b>接口地址</b><span class="v">{{base_url}}/works/latest</span></div>
+            <div class="fitem"><b>JSONPath</b><span class="v">data.status</span></div>
+            <div class="fitem"><b>期望值</b><span class="v">2（完成）</span></div>
+          </div>
+          <div class="frow">
+            <div class="fitem"><b>最长等待</b><span class="v">300 秒</span></div>
+            <div class="fitem"><b>轮询间隔</b><span class="v">15 秒</span></div>
+            <div class="fitem env"><b>鉴权</b><span class="v">环境变量 {{token}} 自动带</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="arrow"><div class="tag">保存编排 → 生成三件套（现有 codegen 链路）</div><div class="line"></div><div class="tri"></div></div>
+
+  <!-- 阶段2 -->
+  <div class="stage">
+    <div class="stage-no">阶段 2 · 生成：地址走环境变量，代码零硬编码</div>
+    <div class="stage-title">落盘形态</div>
+<pre class="code"><span class="c"># 环境集中：config/api_testing/environments.yaml（接口测试模块现有体系，UI 用例共用）</span>
+<span class="c"># base_url: https://test-api.kuaige.cn   token: xxx（换环境只改这里）</span>
+
+<span class="c"># test_write_song.py —— 步骤 2/3 为插入的接口步骤</span>
+page.click_btn_write()                        <span class="c"># 1. UI</span>
+<span class="ins">page.api_wait_work_ready()                   # 2. 接口轮询（最长300s/间隔15s）</span>
+<span class="ins">page.api_check_work_media()                  # 3. 下载 + check_media 音视频校验</span>
+page.assert_tv_work_card()                    <span class="c"># 4. UI</span></pre>
+    <div class="row" style="margin-top:10px">
+      <div class="box new"><b>公共断言原语（~150 行，一处实现两处用）</b><div class="d">api_wait_json（轮询 JSONPath 断言）· api_download_and_check（下载 + ffprobe 校验）——放 common/，UI 用例与接口用例共用</div></div>
+      <div class="box hl"><b>用例编排 codegen（现有）</b><div class="d">步骤 YAML → 三件套生成链路不变，仅词表加两种类型</div></div>
+    </div>
+  </div>
+  <div class="arrow"><div class="tag">平台执行（runner → pytest，现有链路）</div><div class="line"></div><div class="tri"></div></div>
+
+  <!-- 阶段3 -->
+  <div class="stage">
+    <div class="stage-no">阶段 3 · 执行：两通道交替，互不干扰</div>
+    <div class="lanes">
+      <div class="lane ui-l">
+        <h5>UI 通道（Appium · 手机）</h5>
+        <div class="st">步骤1 点击写歌 → Appium</div>
+        <div class="down">↓（接口轮询期间手机空闲，不阻塞）</div>
+        <div class="st">步骤4 断言作品卡 → 等待+截图</div>
+      </div>
+      <div class="lane api-l">
+        <h5>接口通道（requests/ffprobe · 本机）</h5>
+        <div class="st">步骤2 GET /works/latest 轮询 → status=2</div>
+        <div class="down">↓</div>
+        <div class="st">步骤3 下载 video_url → 时长≥30s · 非静音 · 分辨率</div>
+      </div>
+    </div>
+    <div class="rules">
+      <b>产品规则（什么允许放进 UI 用例）：</b>① 异步状态轮询——UI 无法高效表达的等待（写歌 5 分钟）；② 产物内容校验——UI 渲染不了的文件（视频/音频）。<br>
+      <b>不放进来的：</b>业务接口逻辑校验（登录/计费/权限…）归接口测试模块——避免接口变更打红整批 UI 回归，保住测试金字塔。
+    </div>
+  </div>
+  <div class="arrow"><div class="tag">失败留证（现有 conftest 证据链）</div><div class="line"></div><div class="tri"></div></div>
+
+  <!-- 阶段4 -->
+  <div class="stage">
+    <div class="stage-no">阶段 4 · 报告：UI / 接口分列，定位一眼分流</div>
+    <div class="rep">
+      <div class="chip"><b>步骤1</b> 点击「写歌按钮」<span style="color:#409eff">UI</span> ✓ 截图</div>
+      <div class="chip"><b>步骤2</b> 接口轮询 <span style="color:#16a34a">接口</span> ✓ 响应体留痕</div>
+      <div class="chip"><b>步骤3</b> 音视频校验 <span style="color:#16a34a">接口</span> ✓ ffprobe 明细（31.2s/有声）</div>
+      <div class="chip"><b>步骤4</b> 断言作品卡 <span style="color:#409eff">UI</span> ✓ 截图</div>
+    </div>
+    <div class="stage-desc" style="margin-top:8px">失败分流：UI 步骤失败=界面回归（截图+录屏）；接口步骤失败=接口/环境问题（响应体+ffprobe 错误入 allure）——两类失败域在报告里天然分开。</div>
+  </div>
+
+  <div class="foot">新增仅：用例编排 2 种步骤类型 + 词表 + 公共断言原语（≈150 行）；定位器/执行器/报告链路零改动 · 环境体系复用接口测试模块现成 yaml</div>
+</div>
+</body>
+</html>
