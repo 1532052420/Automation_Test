@@ -25,12 +25,8 @@ STEP_TYPES = [
     'click', 'input', 'long_press', 'assert_visible', 'assert_text',
     'assert_toast', 'wait_element', 'assert_gone', 'if_click',
     'screenshot', 'tap', 'sleep', 'hide_keyboard', 'custom',
-    'deal_first_launch_dialogs', 'assert_only',
+    'deal_first_launch_dialogs',
 ]
-
-# ④断言栏 · 组合断言类型（操作与断言解耦：一步 = 操作 + 断言组合）
-# exists/text/gone/visual 绑定本元素；toast 页面级
-ASSERT_KINDS = ('exists', 'text', 'toast', 'gone', 'visual')
 
 # 页面里固定实现的工具方法：已存在则不重复生成
 TOOL_METHODS = {'wait_and_shot', 'tap_xy', 'assert_toast', 'dismiss_keyboard',
@@ -78,85 +74,10 @@ def _q(s):
     return "'%s'" % _escape(s)
 
 
-def _asserts_of(step):
-    """步骤里的组合断言列表（四栏改版）：非法项剔除"""
-    out = []
-    for a in step.get('asserts') or []:
-        if isinstance(a, dict) and a.get('type') in ASSERT_KINDS:
-            out.append(a)
-    return out
-
-
-def _asserts_desc_suffix(step):
-    n = len(_asserts_of(step))
-    return ('· 含%d断言' % n) if n else ''
-
-
-def _visual_baseline_path(step, el):
-    """视觉断言基线路径：elements/baselines/<元素文件名>/<元素名>.png（随包进 git）"""
-    ef = (step.get('element_file') or '').strip()
-    ef = os.path.splitext(os.path.basename(ef))[0] if ef else 'baselines'
-    return ('page_objects/app_ui/android/demoProject/elements/baselines/%s/%s.png'
-            % (ef, el or 'element'))
-
-
-def _assert_body_lines(step, el):
-    """④断言栏组合断言 → 页面方法断言段代码行（failures 收集式，全量执行）"""
-    lines = []
-    for i, a in enumerate(_asserts_of(step), 1):
-        no = '断言%d' % i
-        t = a['type']
-        if t == 'exists':
-            try:
-                w = int(a.get('wait'))
-            except (TypeError, ValueError):
-                w = 3
-            lines.append(_probe_line(el, w))
-            lines.append("self.appOperator.assert_exists_or_record(failures, '%s·存在', probe)" % no)
-        elif t == 'text':
-            try:
-                w = int(a.get('wait'))
-            except (TypeError, ValueError):
-                w = 3
-            lines.append(_probe_line(el, w))
-            lines.append("self.appOperator.assert_text_or_record(failures, '%s·文本', probe, expected=%s)"
-                         % (no, _q(a.get('text') or '')))
-        elif t == 'toast':
-            lines.append("self.appOperator.assert_toast_or_record(failures, '%s·Toast', %s, wait_seconds=5)"
-                         % (no, _q(a.get('toast') or '')))
-        elif t == 'gone':
-            try:
-                w = int(a.get('wait'))
-            except (TypeError, ValueError):
-                w = 2
-            lines.append(_probe_line(el, w, visible=False))
-            lines.append("self.appOperator.assert_gone_or_record(failures, '%s·消失', probe, wait_seconds=%d)"
-                         % (no, w))
-        elif t == 'visual':
-            try:
-                th = float(a.get('threshold'))
-            except (TypeError, ValueError):
-                th = 0.95
-            lines.append(_probe_line(el, 3))
-            lines.append("self.appOperator.assert_visual_or_record(failures, '%s·视觉', probe,\n"
-                         "                                        baseline=%s, threshold=%.2f)"
-                         % (no, _q(_visual_baseline_path(step, el)), th))
-    return lines
-
-
-def _probe_line(el, wait_seconds, visible=True):
-    """断言段探针行（VISIBILITY/PRESENCE 等待）"""
-    wt = 'VISIBILITY_OF' if visible else 'PRESENCE_OF_ELEMENT_LOCATED'
-    return ("probe = CreateElement.create(self._elements.%s.locator_type,\n"
-            "                             self._elements.%s.locator_value,\n"
-            "                             wait_type=Wait_By.%s,\n"
-            "                             wait_seconds=%d)") % (el, el, wt, wait_seconds)
-
-
 def step_desc(step):
     """步骤的可读描述（后端兜底；前端通常会自己生成并让用户可改）"""
     if step.get('desc'):
-        return step['desc'].strip() + _asserts_desc_suffix(step)
+        return step['desc'].strip()
     t = step.get('type', '')
     el = step.get('element') or ''
     p = step.get('param') or ''
@@ -175,9 +96,8 @@ def step_desc(step):
         'sleep': '等待%s秒' % p,
         'hide_keyboard': '收起键盘',
         'custom': (p or '自定义代码').splitlines()[0],
-        'assert_only': '断言%s' % el,
         'deal_first_launch_dialogs': '首次启动弹窗处理（无弹窗自动跳过）',
-    }.get(t, '未定义步骤') + _asserts_desc_suffix(step)
+    }.get(t, '未定义步骤')
 
 
 def _method_block(name, doc, args, body):
@@ -189,9 +109,8 @@ def _method_block(name, doc, args, body):
 
 
 def _shot_line(desc):
-    """断言成功后的缩略图截图行（appOperator.get_screenshot 自动 attach 到 allure）。
-    返回不带缩进的行——缩进由 _method_block 统一叠加（自带缩进会叠成 16 空格导致 IndentationError）"""
-    return "self.appOperator.get_screenshot(%s)" % repr(('断言·' + desc)[:40])
+    """断言成功后的缩略图截图行（appOperator.get_screenshot 自动 attach 到 allure）"""
+    return "        self.appOperator.get_screenshot(%s)" % repr(('断言·' + desc)[:40])
 
 
 def _probe_body_lines(element_name, seconds_var='timeout_seconds'):
@@ -207,17 +126,10 @@ def _probe_body_lines(element_name, seconds_var='timeout_seconds'):
 
 def page_method_code(step):
     """步骤 → 页面方法代码块；sleep/custom 返回 None（不需要页面方法）。
-    step.comment（操作备注）优先作为方法 docstring，缺省用步骤描述。
-    四栏改版：step.asserts 非空时生成「操作段+断言段」组合方法（全量执行，失败汇总）。"""
-    if _asserts_of(step):
-        return _combo_method_code(step)
+    step.comment（操作备注）优先作为方法 docstring，缺省用步骤描述。"""
     t = step.get('type', '')
     el = step.get('element') or ''
     desc = (step.get('comment') or '').strip() or step_desc(step)
-    if t == 'assert_only':
-        # 仅断言（无组合项）：等价旧「断言存在」
-        return _method_block('assert_%s' % el, desc, [],
-                             'self.appOperator.getElement(self._elements.%s)\n%s' % (el, _shot_line(desc)))
     if t == 'click':
         return _method_block('click_%s' % el, desc, [],
                              'self.appOperator.click(self._elements.%s)' % el)
@@ -305,45 +217,6 @@ def page_method_code(step):
     return None
 
 
-
-
-def _combo_method_code(step):
-    """组合断言方法（四栏改版核心）：复用既有单类型方法体作为「操作段」，包上
-    try/except 记入 failures（主断言失败不停），后接 ④断言栏的断言段（逐条全量执行），
-    末尾 failures 非空则抛 AssertionError 汇总明细。sleep/custom 无页面方法，忽略组合。"""
-    t = step.get('type', '')
-    el = step.get('element') or ''
-    base = page_method_code({k: v for k, v in step.items() if k != 'asserts'})
-    if not base:
-        return None
-    m = re.match(r'\s*def (\w+)\((.*?)\):\n\s*"""(.*?)"""\n([\s\S]*)$', base)
-    if not m:
-        return None
-    name, args_str, doc, body = m.group(1), m.group(2), m.group(3), m.group(4).rstrip('\n')
-    desc = (step.get('comment') or '').strip() or step_desc(step)
-    lines = ['failures = []', 'try:']
-    lines += ['    ' + ln if ln.strip() else ln for ln in body.split('\n')]
-    lines += ["except Exception as _e:",
-              "    self.appOperator.get_screenshot(%s)" % _q('操作失败_' + TYPE_NAMES_CN.get(t, t)),
-              "    failures.append('主操作: %s' % str(_e)[:120])"
-              ]
-    lines += _assert_body_lines(step, el)
-    lines += ['if failures:',
-              "    raise AssertionError('%d 项断言未通过：\\n%s' % (len(failures), '\\n'.join(failures)))"]
-    body_new = '\n'.join(lines)
-    args = [a.strip() for a in args_str.split(',') if a.strip() and a.strip() != 'self']
-    return _method_block(name, doc, args, body_new)
-
-
-TYPE_NAMES_CN = {
-    'click': '点击', 'input': '输入', 'long_press': '长按', 'tap': '坐标点击',
-    'screenshot': '截图', 'sleep': '固定等待', 'wait_element': '轮询等待出现',
-    'if_click': '出现才点击', 'custom': '自定义代码', 'assert_only': '仅断言',
-    'assert_visible': '断言存在', 'assert_text': '断言文本',
-    'assert_toast': '断言Toast', 'assert_gone': '断言消失',
-}
-
-
 def case_step_line(step):
     """步骤 → 用例里的一行调用；sleep/custom 返回特殊行（非 page.xxx 调用）"""
     t = step.get('type', '')
@@ -374,8 +247,6 @@ def case_step_line(step):
             return 'page.click_%s_if_visible(%d)' % (el, int(p))
         except (TypeError, ValueError):
             return 'page.click_%s_if_visible()' % el
-    if t == 'assert_only':
-        return 'page.assert_%s()' % el
     if t == 'hide_keyboard':
         return 'page.dismiss_keyboard()'
     if t == 'deal_first_launch_dialogs':
@@ -867,7 +738,7 @@ def append_code_to_method(case_file, method_name, step, gen_page_method=False, i
             pcontent = _ensure_elements_import(pcontent, elements_file,
                                                _elements_class_of(elements_file))
         # 探针类步骤（wait_element/assert_gone/if_click）还要补 CreateElement 等三件 import
-        if step.get('type') in PROBE_STEP_TYPES or _asserts_of(step):
+        if step.get('type') in PROBE_STEP_TYPES:
             pcontent = _ensure_probe_imports(pcontent)
         pcontent = _upsert_class_method(pcontent, page_class, [method_code])
         _write(ppath, pcontent)

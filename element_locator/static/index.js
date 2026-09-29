@@ -50,105 +50,8 @@ const SPECIAL_OPS = {
   deal_first_launch_dialogs: { v: 'deal_first_launch_dialogs', n: '首次启动弹窗处理', el: false, param: false },
 };
 const stepTypeInfo = (v) => SPECIAL_OPS[v] || STEP_TYPES.find(t => t.v === v) || STEP_TYPES[0];
-
-/* ④断言栏：组合断言类型（操作与断言解耦）——5 种，勾选即启用，全量执行 */
-var ASSERT_KINDS = [
-  { v: 'exists', n: '断言存在', d: '元素可见', p: { wait: 3 } },
-  { v: 'text', n: '断言文本', d: '控件文案 =', p: { text: '' } },
-  { v: 'toast', n: '断言Toast', d: '页面级 · 不需元素', p: { toast: '' } },
-  { v: 'gone', n: '断言消失', d: '弹窗已关闭', p: { wait: 2 } },
-  { v: 'visual', n: '视觉断言', d: '基线相似度比对', p: { threshold: 0.95, captured: false }, isNew: true },
-];
-var ASSERT_ONLY = 'assert_only';   // ③操作新增类型：不执行动作，只跑④栏组合
-
-function assertState() { return state.modalAsserts || (state.modalAsserts = []); }
-function findAssert(v) { return assertState().find(x => x.v === v); }
-
-function renderAssertCol() {
-  var box = $('asList');
-  if (!box) return;
-  box.innerHTML = ASSERT_KINDS.map(function (d) {
-    var r = findAssert(d.v), on = !!r;
-    var html = '<div class="as-item' + (on ? ' on' : '') + '" data-as="' + d.v + '">' +
-      '<input type="checkbox" ' + (on ? 'checked' : '') + '>' +
-      '<span class="ai-n">' + d.n + '</span>' +
-      (d.isNew ? '<span class="visual-tag">新 · 视觉断言</span>' : '') +
-      '<span class="ai-d">' + d.d + '</span></div>';
-    if (on) {
-      var p = '';
-      if (d.v === 'exists') p = '<label>等待秒数<input type="number" value="' + esc(r.wait == null ? 3 : r.wait) + '" data-af="wait"></label>';
-      if (d.v === 'text') p = '<label>期望文本<input value="' + esc(r.text == null ? '' : r.text) + '" data-af="text" placeholder="如：写新歌"></label>';
-      if (d.v === 'toast') p = '<label class="wide">Toast 文本<input value="' + esc(r.toast == null ? '' : r.toast) + '" data-af="toast" placeholder="如：已加入歌单"></label>';
-      if (d.v === 'gone') p = '<label>等待秒数<input type="number" value="' + esc(r.wait == null ? 2 : r.wait) + '" data-af="wait"></label>';
-      if (d.v === 'visual') {
-        var th = (r.threshold == null ? 0.95 : +r.threshold);
-        p = '<label>相似度阈值<div class="thresh"><input type="range" min="0.8" max="1" step="0.01" value="' + th + '" data-af="threshold">' +
-            '<span class="val" id="asTv">' + th.toFixed(2) + '</span></div></label>' +
-            '<label style="align-self:end"><button class="btn" id="asCapBtn" style="font-size:11px;padding:4px 10px">' + (r.captured ? '更新基线' : '采集基线') + '</button></label>' +
-            '<div class="wide as-hint">基线随元素存 elements/baselines/&lt;元素文件&gt;/&lt;元素名&gt;.png（进 git）；尺寸与基线不一致时判「分辨率不匹配」，不硬比</div>' +
-            '<div class="wide tri">' +
-            '<div class="tri-slot"><div class="tt">基线</div><div class="tri-img">' + (r.thumbnail ? '<img src="' + r.thumbnail + '">' : '<div class="glyph">🖼️</div>') + '</div><div class="simline">' + (r.captured ? '已采集' : '未采集') + '</div></div>' +
-            '<div class="tri-slot"><div class="tt">实际</div><div class="tri-img"><div class="glyph">📱</div></div><div class="simline">执行时截取</div></div>' +
-            '<div class="tri-slot"><div class="tt">diff</div><div class="tri-img"><div class="glyph">🔍</div></div><div class="simline">失败时随报告输出</div></div>' +
-            '</div>';
-      }
-      html += '<div class="as-param" data-pv="' + d.v + '">' + p + '</div>';
-    }
-    return html;
-  }).join('');
-  box.querySelectorAll('.as-item').forEach(function (it) {
-    it.addEventListener('click', function (e) {
-      if (e.target.tagName === 'INPUT' && e.target.type === 'checkbox') e.stopPropagation();
-      var v = it.dataset.as, r = findAssert(v);
-      if (r) state.modalAsserts = assertState().filter(function (x) { return x.v !== v; });
-      else {
-        r = Object.assign({ v: v }, ASSERT_KINDS.find(function (k) { return k.v === v; }).p);
-        state.modalAsserts.push(r);
-      }
-      renderAssertCol(); syncAssertSide();
-    });
-  });
-  box.querySelectorAll('[data-af]').forEach(function (inp) {
-    inp.addEventListener('input', function () {
-      var r = findAssert(inp.closest('.as-param').dataset.pv);
-      r[inp.dataset.af] = inp.type === 'range' ? +inp.value : inp.value;
-      if (inp.type === 'range') document.getElementById('asTv').textContent = (+inp.value).toFixed(2);
-      if (opCommentAuto) $('el-op-comment').value = autoStepComment(currentOpType(), opElementLabel(), $('el-op-param').value);
-    });
-  });
-  var cap = box.querySelector('#asCapBtn');
-  if (cap) cap.addEventListener('click', function () { captureBaseline().catch(e => toast(e.message, false)); });
-}
-
-async function captureBaseline() {
-  var r = findAssert('visual');
-  if (!r) return;
-  var cap = document.getElementById('asCapBtn');
-  if (!state.selNode && !state.coordPoint) throw new Error('请先在截图/元素树选中元素');
-  if (cap) { cap.disabled = true; cap.textContent = '采集中…'; }
-  try {
-    var resp = await fetch('api/element/baseline', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ locator_type: $('el-type').value, locator_value: $('el-value').value.trim(),
-                              element_file: $('el-file').value, element_name: $('el-name').value.trim() }) });
-    var d = await resp.json();
-    if (!d.ok) throw new Error(d.msg || '采集失败');
-    r.captured = true; r.thumbnail = d.thumbnail; r.path = d.path;
-    toast('基线已采集：' + d.path, true);
-    renderAssertCol();
-  } finally {
-    if (cap) { cap.disabled = false; }
-  }
-}
-
-/* 断言副作用：特殊操作时断言卡置灰（无断言语义） */
-function syncAssertSide() {
-  var card = document.querySelector('#col-assert .as-card');
-  if (card) card.classList.toggle('locked', !!$('el-op-special').value);
-  renderAssertCol();
-}
 /* 当前生效的操作类型：特殊操作优先，否则用常规操作类型下拉 */
-function currentOpType() { return $('el-op-special').value || $('el-op-type').value || ''; }
-function isAssertOnly() { return currentOpType() === ASSERT_ONLY; }
+function currentOpType() { return $('el-op-special').value || $('el-op-type').value; }
 
 function genStepDesc(s) {
   const t = stepTypeInfo(s.type);
@@ -169,7 +72,6 @@ function genStepDesc(s) {
     case 'sleep': return '等待' + p + '秒';
     case 'hide_keyboard': return '收起键盘';
     case 'deal_first_launch_dialogs': return '首次启动弹窗处理（无弹窗自动跳过）';
-    case 'assert_only': return '断言' + s.element;
     case 'custom': return (p || '自定义代码').split('\n')[0];
     default: return '未定义步骤';
   }
@@ -1172,8 +1074,7 @@ async function openModal() {
   $('el-op-type').value = 'click';
   $('el-op-type').disabled = false;
   $('el-op-special').value = '';   // 特殊操作每次打开复位为「无」
-  state.modalAsserts = [];         // ④断言栏：组合断言每次打开复位
-  renderAssertCol();
+  $('el-op-param').value = '';
   paramAuto = true;  // 打开弹窗重置为「自动预填」状态
   // ⌖ 坐标模式：默认「坐标点击」并回填最后选中的点
   if (state.coordMode && state.coordPoint) {
@@ -1330,14 +1231,13 @@ function onPurposeChange() {
   }
   const popup = p === 'popup';
   $('col-popup').style.display = popup ? '' : 'none';
-  ['col-element', 'col-case', 'col-op', 'col-assert'].forEach(id => {
+  ['col-element', 'col-case', 'col-op'].forEach(id => {
     $(id).style.display = popup ? 'none' : '';
   });
-  // 仅元素 = 只走①栏：②③④熄灭禁点；①元素栏必须保持可交互（dim 带 pointer-events:none，不能加到①上）
+  // 仅元素 = 只走①栏：②③熄灭禁点；①元素栏必须保持可交互（dim 带 pointer-events:none，不能加到①上）
   $('col-element').classList.remove('dim');
   $('col-case').classList.toggle('dim', !popup && p === 'only');
   $('col-op').classList.toggle('dim', !popup && p === 'only');
-  $('col-assert').classList.toggle('dim', !popup && p === 'only');
   if (popup) { ppPrefill(); loadPopupRules(); return; }
   if (p !== 'only') { onOpTypeChange(); onCaseFileChange(); }
   else { renderStepsList([]); updateOpNote(); }
@@ -1442,20 +1342,9 @@ async function savePopupRule(continueMode) {
   }
 }
 /* 操作下拉分组渲染（见名知意：基本操作 / 断言 / 长流程·等待与分支） */
-/* 四栏改版：③操作只留动作类（4 种断言移至④栏），新增「仅断言」 */
-const OP_HIDDEN = ['assert_visible', 'assert_text', 'assert_toast', 'assert_gone'];
-function visibleOpTypes() {
-  return STEP_TYPES.filter(t => OP_HIDDEN.indexOf(t.v) < 0)
-    .concat([{ v: ASSERT_ONLY, n: '仅断言', el: true, param: false, group: '基本操作' }]);
-}
-function opTypeInfo(v) {
-  return v === ASSERT_ONLY
-    ? { v: ASSERT_ONLY, n: '仅断言', el: true, param: false, ph: '', group: '基本操作', defv: '' }
-    : stepTypeInfo(v);
-}
 function opTypeOptions() {
   const groups = [];
-  visibleOpTypes().forEach(t => {
+  STEP_TYPES.forEach(t => {
     if (!t.group) return;
     let g = groups.find(x => x.name === t.group);
     if (!g) { g = { name: t.group, items: [] }; groups.push(g); }
@@ -1504,7 +1393,7 @@ function opElementLabel() {
 function followStepDesc() {
   /* 步骤描述实时拼接：操作类型 + 元素中文名（+ 参数）随输入即时刷新；手输过描述(opCommentAuto=false)则不覆盖 */
   if (opCommentAuto) {
-    $('el-op-comment').value = autoStepComment(currentOpType(), opElementLabel(), $('el-op-param').value) + assertsDescSuffix();
+    $('el-op-comment').value = autoStepComment(currentOpType(), opElementLabel(), $('el-op-param').value);
   }
 }
 
@@ -1528,20 +1417,13 @@ function autoStepComment(type, elementLabel, param) {
     case 'custom': return '执行自定义代码';
     case 'hide_keyboard': return '收起键盘（键盘在才收，否则不动）';
     case 'deal_first_launch_dialogs': return '首次启动弹窗处理（无弹窗自动跳过）';
-    case 'assert_only': return t ? '断言「' + t + '」' : '';
     default: return '';
   }
 }
 
-/* ④断言栏：描述后缀（· 含N断言） */
-function assertsDescSuffix() {
-  const n = assertState().length;
-  return n ? ('· 含' + n + '断言') : '';
-}
-
 function onOpTypeChange() {
   const special = $('el-op-special').value;
-  const t = opTypeInfo(currentOpType());
+  const t = stepTypeInfo(currentOpType());
   const paramWrap = $('el-op-param-wrap');
   paramWrap.style.display = t.param ? '' : 'none';
   $('el-op-param').placeholder = t.ph || '参数';
@@ -1565,14 +1447,12 @@ function onOpTypeChange() {
     $('col-element').classList.remove('soft');
     $('col-element').classList.remove('dim');
   }
-  syncAssertSide();   // ④断言栏：特殊操作时置灰；描述跟随重算
   updateOpNote();
 }
 
 /* 特殊操作下拉：选中 → 常规操作类型禁用、用途强制②（必须写用例）、元素栏禁用；
    取消（选「无」）→ 全部恢复。deal_first_launch_dialogs 的插入位置锁定由 onCaseFileChange 处理 */
 function onSpecialOpChange() {
-  syncAssertSide();
   const isSpecial = !!$('el-op-special').value;
   // 操作类型的禁用改由 applyOpMutual 视觉互斥承担（物理 disabled 会造成两侧都无法切回的死锁）
   if (isSpecial && purposeValue() !== 'all') {
@@ -1602,7 +1482,6 @@ function previewLine(step) {
       const n = parseInt(p, 10);
       return 'page.click_' + el + '_if_visible(' + (isNaN(n) ? '' : n) + ')';
     }
-    case 'assert_only': return 'page.assert_' + el + '()';
     case 'hide_keyboard': return 'page.dismiss_keyboard()';
     case 'deal_first_launch_dialogs': return 'page.deal_first_launch_dialogs()';
     case 'screenshot': return "page.wait_and_shot('" + escQ(p) + "')";
@@ -1788,11 +1667,7 @@ function pkgPageClassName() { const f = pkgPageFileName(); return f ? capFirst(f
 function pkgCaseFileName() { const b = pkgBase(); return b ? 'test_' + b + '.py' : ''; }
 function pkgStepComment() { return $('el-op-comment').value.trim() || genStepDesc(currentStepObj()); }
 function currentStepObj() {
-  const obj = { type: currentOpType(), element: $('el-name').value.trim() || '<元素名>', param: $('el-op-param').value.trim() };
-  if (!$('el-op-special').value && assertState().length) {
-    obj.asserts = assertState().map(a => Object.assign({}, a));
-  }
-  return obj;
+  return { type: currentOpType(), element: $('el-name').value.trim() || '<元素名>', param: $('el-op-param').value.trim() };
 }
 /* 与后端 page_method_code 同规则的页面方法块（用例包生成用） */
 function pkgMethodBlock(step) {
@@ -1845,39 +1720,6 @@ function pkgMethodBlock(step) {
   else if (t === 'screenshot') { sig = 'wait_and_shot(self, tag)'; body = 'import time\ntime.sleep(1)\nself.appOperator.get_screenshot(tag)'; }
   else if (t === 'tap') { sig = 'tap_xy(self, x, y)'; body = 'self.appOperator.tap(x, y)'; }
   if (t === 'click') body = 'self.appOperator.click(self._elements.' + el + ')';
-  // 四栏改版：④断言栏组合 → 操作段包 try/except 记 failures，断言段逐条全量执行，末尾汇总抛错
-  if (assertState().length && !(step.type === 'sleep' || step.type === 'custom')) {
-    const elFileStem = (function () {
-      try { if (typeof isNewCase === 'function' && isNewCase()) return pkgElementFileName().replace(/\.py$/i, ''); } catch (e) {}
-      return (($('el-file').value || '').replace(/\.py$/i, '')) || 'baselines';
-    })();
-    const afail = (no, kind) => '    ' + 'failures.append(\'' + no + '·' + kind + ': %s\' % str(_e)[:120])';
-    let assertLines = [];
-    assertState().forEach((a, i) => {
-      const no = '断言' + (i + 1);
-      if (a.v === 'exists') {
-        assertLines.push(probeBodyLines(el, String(a.wait == null ? 3 : a.wait)).replace(/PRESENCE_OF_ELEMENT_LOCATED/, 'VISIBILITY_OF'));
-        assertLines.push("self.appOperator.assert_exists_or_record(failures, '" + no + "·存在', probe)");
-      } else if (a.v === 'text') {
-        assertLines.push(probeBodyLines(el, '3').replace(/PRESENCE_OF_ELEMENT_LOCATED/, 'VISIBILITY_OF'));
-        assertLines.push("self.appOperator.assert_text_or_record(failures, '" + no + "·文本', probe, expected='" + escQ(a.text || '') + "')");
-      } else if (a.v === 'toast') {
-        assertLines.push("self.appOperator.assert_toast_or_record(failures, '" + no + "·Toast', '" + escQ(a.toast || '') + "', wait_seconds=5)");
-      } else if (a.v === 'gone') {
-        assertLines.push(probeBodyLines(el, String(a.wait == null ? 2 : a.wait)));
-        assertLines.push("self.appOperator.assert_gone_or_record(failures, '" + no + "·消失', probe, wait_seconds=" + (a.wait == null ? 2 : a.wait) + ")");
-      } else if (a.v === 'visual') {
-        const th = (a.threshold == null ? 0.95 : +a.threshold).toFixed(2);
-        assertLines.push(probeBodyLines(el, '3').replace(/PRESENCE_OF_ELEMENT_LOCATED/, 'VISIBILITY_OF'));
-        assertLines.push("self.appOperator.assert_visual_or_record(failures, '" + no + "·视觉', probe,");
-        assertLines.push("                                        baseline='page_objects/app_ui/android/demoProject/elements/baselines/" + elFileStem + '/' + el + ".png', threshold=" + th + ")");
-      }
-    });
-    body = 'failures = []\ntry:\n' + body.split('\n').map(l => '    ' + l).join('\n')
-      + "\nexcept Exception as _e:\n    self.appOperator.get_screenshot('操作失败')\n    failures.append('主操作: %s' % str(_e)[:120])\n"
-      + assertLines.join('\n')
-      + "\nif failures:\n    raise AssertionError('%d 项断言未通过：\\n%s' % (len(failures), '\\n'.join(failures)))";
-  }
   return '    def ' + sig + ':\n        """' + doc + '"""\n        ' + body.replace(/\n/g, '\n        ');
 }
 function pkgFiles() {
@@ -2055,10 +1897,6 @@ async function onSaveElement(continueMode) {
     comment: $('el-op-comment').value.trim(),        // 操作备注 → 页面方法 docstring
     case_comment: $('el-op-comment').value.trim(),   // 步骤描述 → 追加行上方注释（与弹窗所见一致）
   };
-  const comboObj = currentStepObj();               // ④断言栏：组合断言随保存下发（特殊操作时不带）
-  if (!special && comboObj.asserts && comboObj.asserts.length) {
-    step.asserts = comboObj.asserts;
-  }
   const res = $('el-result');
   res.className = 'el-result'; res.textContent = purpose === 'all'
     ? '元素已保存，正在追加用例代码 + 生成页面操作…'
@@ -2281,7 +2119,7 @@ async function saveCollect() {
 /* ================= 弹窗改版（v6.98）：图标卡快捷选择 / 锚点卡 / 三件套状态条 =================
    纯样式配套 JS：不新增字段、不改保存逻辑。el-op-type 原生 select 保留（全量操作类型），
    图标卡只是常用 6 类的快捷入口，两者写同一字段并互相同步高亮。 */
-const OP_GRID_TYPES = visibleOpTypes().map(t => t.v);   // 四栏改版：动作类+仅断言铺满图标卡（4种断言移至④栏）
+const OP_GRID_TYPES = STEP_TYPES.map(t => t.v);   // 全部操作类型铺满图标卡，区域内滚动
 /* 简约 iOS 线性图标（24×24 网格 · stroke 1.8 · currentColor，跟随选中态反白） */
 const svgIcon = (inner) =>
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
@@ -2312,7 +2150,7 @@ function buildOpGrid() {
   if (!grid || grid.dataset.built) return;
   grid.dataset.built = '1';
   OP_GRID_TYPES.forEach(v => {
-    const t = opTypeInfo(v);   // 四栏改版：仅断言卡标签不再回落成点击
+    const t = stepTypeInfo(v);
     const card = document.createElement('div');
     card.className = 'op-card';
     card.dataset.op = v;

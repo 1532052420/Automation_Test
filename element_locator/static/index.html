@@ -122,7 +122,7 @@ try {
 <!-- 添加测试用例 弹窗（横向三栏：元素 → 用例 → 操作） -->
 <div id="modal-mask" class="modal-mask" style="display:none">
   <div class="modal modal-flow">
-    <div class="modal-title">➕ 添加测试用例 <span class="hint">按「元素 → 用例 → 操作 → 断言」流程走：选下方用途决定走到哪一步；点字段旁「?」看说明</span></div>
+    <div class="modal-title">➕ 添加测试用例 <span class="hint">按「元素 → 用例 → 操作」流程走：选下方用途决定走到哪一步；点字段旁「?」看说明</span></div>
     <div class="modal-body">
       <div class="flow-step seg-row">
         <span class="seg-title">保存到哪一步</span>
@@ -227,19 +227,6 @@ try {
             <input id="el-page-file" type="text" readonly placeholder="选择目标用例后自动带出">
           </label>
           <div id="op-note" class="op-note"></div>
-        </section>
-
-        <!-- ④ 断言栏：多选组合断言（含视觉断言），与③操作解耦 -->
-        <section class="flow-col" id="col-assert">
-          <div class="col-head" data-n="4">④ 断言<span class="hint new">新增 · 可多选组合</span></div>
-          <div class="fcol-pad">
-            <div class="as-card">
-              <div class="as-head"><b>断言组合</b><span class="as-head-hint">勾选即启用 · 全量执行</span></div>
-              <div class="as-sub">对本元素追加的附加校验，逐条执行、失败各自截图，最后汇总报错。</div>
-              <div class="as-list" id="asList"></div>
-              <div class="semibar"><b>执行语义：</b>操作先执行 → 断言按勾选顺序逐条跑，<b>任何一条失败都不中断</b>；失败条目当场截图（视觉断言附 基线/实际/diff 三联图）；全部跑完后若存在失败，抛一条 AssertionError 汇总明细。全部不勾 = 纯操作步骤（与现状一致）。</div>
-            </div>
-          </div>
         </section>
 
         <!-- 弹窗规则栏：用途③（登记随机弹窗）专用，与三件套流程互斥显示 -->
