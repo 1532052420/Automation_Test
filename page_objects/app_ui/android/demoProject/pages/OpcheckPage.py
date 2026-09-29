@@ -250,7 +250,7 @@ class OpcheckPage:
                                      wait_type=Wait_By.VISIBILITY_OF,
                                      wait_seconds=3)
         self.appOperator.assert_visual_or_record(failures, '断言2·视觉', probe,
-                                                baseline='page_objects/app_ui/android/demoProject/elements/baselines/opcheckElements/content.png', threshold=0.9)
+                                                baseline='page_objects/app_ui/android/demoProject/elements/baselines/opcheckElements/content.png', threshold=0.95)
         if failures:
             raise AssertionError('%d 项断言未通过：\n%s' % (len(failures), '\n'.join(failures)))
 

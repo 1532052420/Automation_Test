@@ -118,13 +118,13 @@ class TestOpcheck:
     def test_15_assert_text_ok(self):
         """断言成功"""
         page = self.page
-        page.assert_tab_text('编辑后内容')
+        page.assert_tab_text('5')
 
     @allure.title('断言文本-错误数据：文本不匹配')
     def test_16_assert_text_fail(self):
         """断言失败（预期失败）"""
         page = self.page
-        page.assert_tab_text('编辑后内容')
+        page.assert_tab_text('5')
 
     # ---------- 断言Toast ----------
     @allure.title('断言Toast-错误数据：断言不存在的Toast')

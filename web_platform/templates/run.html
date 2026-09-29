@@ -125,9 +125,6 @@
             <button class="ghost mini" id="btnElRefresh" style="margin-left:8px">重置</button></h3>
           <!-- 一级：元素文件列表 -->
           <div id="elFilesView">
-            <div class="treebar">
-              <button class="ghost mini" id="btnElRefresh">重置</button>
-            </div>
             <div class="tblwrap">
               <table>
                 <thead><tr><th>元素文件名</th><th>操作</th></tr></thead>
@@ -269,20 +266,20 @@
       <section class="panel" id="panel-asserts" hidden>
         <div class="card">
           <div class="cardhead">
-            <h3>断言管理 <span class="muted">扫描用例中的断言步骤（含组合断言/视觉断言），仅支持修改断言内容</span></h3>
-            <div class="treebar" style="margin-left:auto">
-              <select id="asMgrCase" style="max-width:280px"><option value="">全部用例</option></select>
-              <select id="asMgrKind" style="max-width:180px">
-                <option value="">全部断言方式</option>
-                <option value="exists">断言元素是否可见</option>
-                <option value="text">断言文本是否正确</option>
-                <option value="toast">断言Toast是否出现</option>
-                <option value="gone">断言元素是否消失</option>
-                <option value="visual">断言外观是否一致（视觉）</option>
-                <option value="color">断言颜色是否正确</option>
-              </select>
-              <button class="ghost mini" id="btnAsMgrRefresh">刷新</button>
-            </div>
+            <h3>断言管理 <span class="muted">扫描用例中的断言步骤（含组合断言/视觉断言），仅支持修改断言内容</span>
+              <button class="ghost mini" id="btnAsMgrRefresh" style="margin-left:8px">刷新</button></h3>
+          </div>
+          <div class="treebar">
+            <select id="asMgrCase" style="max-width:280px"><option value="">全部用例</option></select>
+            <select id="asMgrKind" style="max-width:180px">
+              <option value="">全部断言方式</option>
+              <option value="exists">断言元素是否可见</option>
+              <option value="text">断言文本是否正确</option>
+              <option value="toast">断言Toast是否出现</option>
+              <option value="gone">断言元素是否消失</option>
+              <option value="visual">断言外观是否一致（视觉）</option>
+              <option value="color">断言颜色是否正确</option>
+            </select>
           </div>
           <div class="tblwrap">
             <table>

@@ -1651,13 +1651,13 @@ if (btnAppium) loadAppiumStatus();
 /* ================= 断言管理（④断言栏内容的平台侧维护） =================
    列表 = 用例中的断言步骤（传统直调 + 组合断言展开）；仅支持编辑断言内容。
    数据源 /api/appui/assertions（assertion_manager 扫描用例与页面方法）。 */
-let _asMgrAll = [], _asMgrKind = '';
+let _asMgrAll = [];
 
 async function loadAssertions() {
   try {
-    const qs = $('#asMgrKind') && $('#asMgrKind').value ? '?kind=' + $('#asMgrKind').value : '';
-    const d = await api('/api/appui/assertions' + qs);
+    const d = await api('/api/appui/assertions');
     _asMgrAll = d.assertions || [];
+    // 断言方式/用例筛选在 renderAssertions 本地完成（传统条目 kind 为 assert_* 全名，需归一化）
     const cases = d.cases || [];
     const sel = $('#asMgrCase');
     if (sel && sel.options.length <= 1) {
@@ -1670,11 +1670,8 @@ async function loadAssertions() {
 function renderAssertions() {
   const cf = (document.getElementById('asMgrCase') || {}).value || '';
   const rawKind = (document.getElementById('asMgrKind') || {}).value || '';
-  const KN = { assert_visible: 'exists', assert_text: 'text', assert_toast: 'toast', assert_gone: 'gone' };
-  const rows = _asMgrAll.filter(a => {
-    const ak = KN[a.kind] || a.kind;
-    return (!cf || a.case_file === cf) && (!rawKind || ak === rawKind);
-  });
+  const rows = _asMgrAll.filter(a =>
+    (!cf || a.case_file === cf) && (!rawKind || a.kind === rawKind));
   const tb = $('#asMgrTbody');
   tb.innerHTML = rows.map((a, i) => {
     let content;
@@ -1698,7 +1695,7 @@ function renderAssertions() {
     </tr>`;
   }).join('') || '<tr><td colspan="6" class="empty">当前筛选下没有断言</td></tr>';
   tb.querySelectorAll('[data-edit]').forEach(b =>
-    b.addEventListener('click', () => openAssertEdit(_asMgrAll[+b.dataset.edit])));
+    b.addEventListener('click', () => openAssertEdit(rows[+b.dataset.edit])));
 }
 
 function assertContentLabel(kind) {
@@ -1731,54 +1728,12 @@ function openAssertEdit(a) {
   mask.classList.add('show');
 }
 
-function openAssertEdit(a) {
-  openForm('编辑断言内容 · ' + (a.kind_name || a.kind),
-    fmField('用例', 'acCase', a.case_file) +
-    fmField('方法 · 步骤', 'acMethod', `${a.method} · 第${a.step_no}步`) +
-    fmField('元素', 'acEl', a.element || '—') +
-    assertEditFields(a.kind, a) +
-    `<div class="hint mt">仅支持修改断言内容；断言方式（类型）修改后续版本放开</div>`,
-    async () => {
-      const val = $('#acVal').value.trim();
-      if (!val && a.kind !== 'text') return toast('内容不能为空', false);
-      const r = await api('/api/appui/assertions/update', {
-        method: 'POST', body: { target: a, content: val } });
-      closeForm(); toast('断言内容已保存', true);
-      _asMgrKind = $('#asMgrKind') ? $('#asMgrKind').value : '';
-      loadAssertions();
-    });
-}
-
-/* 断言管理面板 · 事件绑定（DOMContentLoaded 后一次性绑定） */
+/* 断言管理面板 · 事件绑定（DOMContentLoaded 后一次性绑定，勿重复绑定） */
 document.addEventListener('DOMContentLoaded', function () {
   var asCase = document.getElementById('asMgrCase');
   var asKind = document.getElementById('asMgrKind');
   var asRefresh = document.getElementById('btnAsMgrRefresh');
-  var asPager = document.getElementById('asMgrPager');
-  if (asCase) asCase.addEventListener('change', function () { _asMgrPage = 1; loadAssertions(); });
-  if (asKind) asKind.addEventListener('change', function () { _asMgrPage = 1; renderAssertions(); });
-  if (asRefresh) asRefresh.addEventListener('click', function () { _asMgrPage = 1; loadAssertions(); });
-  if (asPager) asPager.addEventListener('click', function (e) {
-    var pg = e.target.closest('[data-aspage]');
-    if (pg) { _asMgrPage = +pg.dataset.aspage; renderAssertions(); }
-  });
+  if (asCase) asCase.addEventListener('change', loadAssertions);
+  if (asKind) asKind.addEventListener('change', renderAssertions);
+  if (asRefresh) asRefresh.addEventListener('click', loadAssertions);
 });
-
-/* 断言管理 · 交互绑定（等待 DOM 就绪后自动执行，最多重试 20 次） */
-(function bindAsMgrEvents(retry) {
-  retry = retry || 0;
-  var el = document.getElementById('asMgrKind');
-  if (!el && retry < 20) { setTimeout(function () { bindAsMgrEvents(retry + 1); }, 300); return; }
-  if (!el) return;
-  var kindSel = document.getElementById('asMgrKind');
-  var caseSel = document.getElementById('asMgrCase');
-  var refreshBtn = document.getElementById('btnAsMgrRefresh');
-  var pager = document.getElementById('asMgrPager');
-  if (kindSel) kindSel.addEventListener('change', function () { _asMgrPage = 1; renderAssertions(); });
-  if (caseSel) caseSel.addEventListener('change', function () { _asMgrPage = 1; loadAssertions(); });
-  if (refreshBtn) refreshBtn.addEventListener('click', function () { _asMgrPage = 1; loadAssertions(); });
-  if (pager) pager.addEventListener('click', function (e) {
-    var a = e.target.closest('[data-aspage]');
-    if (a) { _asMgrPage = +a.dataset.aspage; renderAssertions(); }
-  });
-})(0);

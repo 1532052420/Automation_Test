@@ -117,7 +117,7 @@ def _scan_case(content, case_file, only_method=None):
         steps = parse_case_steps(content, method)
         for idx, st in enumerate(steps, 1):
             if (st.get('type') or '').startswith('assert'):
-                kind = st['type']
+                kind = _norm_kind(st['type'])
                 call_line_no = None
                 for li, ln in enumerate(content.split('\n'), 1):
                     if ln.strip() == st.get('call', '').strip() and li > 1:
@@ -192,8 +192,7 @@ def list_assertions(case_file=None):
     for e in entries:
         # 仅内容可编辑：text(期望文本)/toast(文本)/gone(等待秒数·组合)/visual(阈值)/color(色值容差)；
         # exists 无内容参数（出现即可）→ 不可编辑
-        e['editable'] = e['kind'] in ('text', 'toast', 'visual', 'gone', 'color',
-                                      'assert_text', 'assert_toast') and (
+        e['editable'] = e['kind'] in ('text', 'toast', 'visual', 'gone', 'color') and (
             e['scope'] == 'page' or bool(str(e.get('content', ''))))
     return cases, entries
 
@@ -222,8 +221,15 @@ def _rewrite_window(lines, kind, content):
                 lines[i] = sub(ln, r"(_text\(')[^']*(')", lambda m: m.group(1) + _esc_sq(content) + m.group(2))
         elif kind == 'toast':
             if 'assert_toast' in ln and "'" in ln:
-                lines[i] = sub(ln, r"'((?:[^']|\\')*)'(\s*,\s*wait_seconds)", "x", "") or \
-                           sub(ln, r"(assert_toast\(')[^']*(')", lambda m: m.group(1) + _esc_sq(content) + m.group(2))
+                # 组合形态：'文本', wait_seconds=…；传统形态：assert_toast('文本')
+                nl = re.sub(r"'((?:[^']|\\')*)'(\s*,\s*wait_seconds)",
+                            lambda m: "'" + _esc_sq(content) + "'" + m.group(2), ln)
+                if nl == ln:
+                    nl = re.sub(r"(assert_toast\(')((?:[^']|\\')*)(')",
+                                lambda m: m.group(1) + _esc_sq(content) + m.group(3), ln)
+                if nl != ln:
+                    changed = True
+                lines[i] = nl
         elif kind in ('exists', 'gone'):
             if 'wait_seconds=' in ln and ('or_record' in ln or 'CreateElement.create(' in ln):
                 lines[i] = sub(ln, r'wait_seconds=\d+', 'wait_seconds=' + str(int(content or 2)))
