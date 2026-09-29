@@ -1687,7 +1687,7 @@ function renderAssertions() {
     if (!a.editable && a.kind !== 'exists') content = '<span class="muted">' + content + '</span>';
     return `<tr>
       <td class="muted" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.case_file)}</td>
-      <td><span class="as-badge">${a.step_no}</span> ${esc(a.method)}</td>
+      <td><span class="as-badge" title="这是在第${a.step_no}步">${a.step_no}</span> ${esc(a.method)}</td>
       <td>${esc(a.kind_name)}</td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.element || '—')}</td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${content}</td>

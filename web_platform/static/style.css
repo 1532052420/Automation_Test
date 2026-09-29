@@ -666,6 +666,16 @@ html.night .nav-card p { color: #a1a1a6; }
 .clitem ul { margin: 0; padding-left: 18px; }
 .clitem li { color: var(--muted); font-size: 12.5px; line-height: 1.75; }
 
+/* 断言管理 · 方法列步骤徽章（悬停原生 title 提示「这是在第N步」） */
+.as-badge {
+  display: inline-block; min-width: 18px; text-align: center;
+  font-size: 10.5px; font-weight: 600; color: var(--brand);
+  background: var(--brand-tint); border: 1px solid var(--brand-ring);
+  border-radius: 999px; padding: 1px 6px;
+  cursor: help; transition: background .15s ease, border-color .15s ease;
+}
+.as-badge:hover { background: var(--brand-ring); border-color: var(--brand); }
+
 /* ================= 夜间模式（html.night）：Apple 深色 ================= */
 html.night {
   color-scheme: dark;
