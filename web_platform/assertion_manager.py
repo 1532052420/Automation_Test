@@ -87,16 +87,20 @@ def _combo_asserts_in_body(body):
             continue
         kind_word, desc = m.group(1), m.group(2)
         kind = _kind_from_label(desc) or _kind_from_label(kind_word) or kind_word
+        # 组合断言常折行：baseline/threshold/expected 等参数多在调用首行的续行上
+        full = ln + ' ' + (lines[i + 1] if i + 1 < len(lines) else '')
         entry = {'label': desc, 'kind': kind, 'line_off': i, 'line': ln.rstrip(), 'wait': probe_wait}
         if kind == 'text':
-            me = re.search(r"expected='([^']*)'", ln)
+            me = re.search(r"expected='([^']*)'", full)
             entry['content'] = me.group(1) if me else ''
         elif kind == 'toast':
-            mt = re.search(r",\s*'([^']*)',\s*wait_seconds", ln)
+            mt = re.search(r",\s*'([^']*)',\s*wait_seconds", full)
             entry['content'] = mt.group(1) if mt else ''
         elif kind == 'visual':
-            mv = re.search(r'threshold=([\d.]+)', ln)
+            mv = re.search(r'threshold=([\d.]+)', full)
             entry['content'] = mv.group(1) if mv else '0.95'
+            mb = re.search(r"baseline='([^']*)'", full)
+            entry['baseline'] = mb.group(1) if mb else ''
         elif kind == 'gone':
             entry['content'] = str(probe_wait if probe_wait is not None else 2)
         elif kind == 'exists':
@@ -165,6 +169,7 @@ def _scan_case(content, case_file, only_method=None):
                     'kind': ca['kind'], 'kind_name': ASSERT_KIND_NAMES.get(ca['kind'], ca['kind']),
                     'element': fn.replace('click_', '').replace('check_', ''),
                     'content': ca.get('content', ''),
+                    'baseline': ca.get('baseline', ''),
                     'page_file': hits[0], 'page_method': fn,
                     'line_no': span_start_line + ca['line_off'],
                     'line': ca['line'],

@@ -236,6 +236,20 @@ def api_appui_assertions_update():
     return jsonify({'ok': ok, 'msg': msg})
 
 
+@bp.route('/api/appui/assertions/baseline-image')
+def api_appui_assertion_baseline_image():
+    """视觉断言基线图服务：path 严格限制在 page_objects 的 baselines 目录内，防路径穿越"""
+    import os
+    rel = (request.args.get('path') or '').strip()
+    root = os.path.realpath('page_objects')
+    p = os.path.realpath(rel) if rel else ''
+    norm = p.replace(os.sep, '/')
+    if not rel or not p.startswith(root + os.sep) or '/baselines/' not in norm \
+            or not p.endswith('.png') or not os.path.isfile(p):
+        return jsonify({'ok': False, 'msg': '基线图不存在（首次真机运行后自动生成）'}), 404
+    return send_file(p)
+
+
 # ---------------------------------------------------------------- AppUI 元素管理（元素库可视化维护）
 @bp.route('/api/appui/elements')
 def api_appui_elements():

@@ -676,6 +676,13 @@ html.night .nav-card p { color: #a1a1a6; }
 }
 .as-badge:hover { background: var(--brand-ring); border-color: var(--brand); }
 
+/* 断言管理 · 视觉断言基线缩略图（基线未生成时 onerror 移除，仅显示阈值文字） */
+.as-thumb {
+  height: 28px; width: auto; border-radius: 6px;
+  border: 1px solid var(--line-soft); vertical-align: middle;
+  margin-right: 6px; background: var(--panel2); object-fit: cover;
+}
+
 /* ================= 夜间模式（html.night）：Apple 深色 ================= */
 html.night {
   color-scheme: dark;

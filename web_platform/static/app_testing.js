@@ -1680,7 +1680,11 @@ function renderAssertions() {
       case 'toast':   content = esc(a.content || '—'); break;
       case 'exists':  content = (a.content || '3') + 's'; break;
       case 'gone':    content = (a.content || '2') + 's'; break;
-      case 'visual':  content = '相似度 ≥ ' + (a.content || '0.95'); break;
+      case 'visual':
+        content = (a.baseline
+          ? `<img class="as-thumb" src="/api/appui/assertions/baseline-image?path=${encodeURIComponent(a.baseline)}" alt="基线图" onerror="this.remove()">`
+          : '') + '相似度 ≥ ' + (a.content || '0.95');
+        break;
       case 'color':   content = esc(a.content || '—'); break;
       default:        content = esc(a.content || '—');
     }
