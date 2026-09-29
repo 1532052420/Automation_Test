@@ -332,8 +332,12 @@ def api_element_baseline():
     data = request.get_json(silent=True) or {}
     element_file = (data.get('element_file') or '').strip()
     element_name = (data.get('element_name') or '').strip()
-    if not _re.match(r'^[A-Za-z_][A-Za-z0-9_]*\.py$', element_file) or not _re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', element_name):
-        return jsonify({'ok': False, 'msg': '元素文件/元素名不合法（防路径穿越）'})
+    # 与元素库同名规则：允许中文（is_valid_element_name / add_elements_batch 同款正则）；
+    # 无点无斜杠，路径穿越天然被拦
+    if not _re.match(r'^[A-Za-z_\u4e00-\u9fff][\w\u4e00-\u9fff]*\.py$', element_file):
+        return jsonify({'ok': False, 'msg': '元素文件名不合法（%s）' % (element_file or '空')})
+    if not element_library.is_valid_element_name(element_name):
+        return jsonify({'ok': False, 'msg': '元素名不合法（%s）' % (element_name or '空')})
     serial = device.get_device(_request_serial())
     if not serial:
         return jsonify({'ok': False, 'msg': '未检测到在线设备——基线采集需要元素真实在屏'})
@@ -374,7 +378,16 @@ def api_element_baseline():
         _walk(n)
         if hit is not None:
             break
-    bounds = (hit or {}).get('bounds_num')
+    # xml_to_tree 原始节点的坐标在 _bounds（元组）/ bounds（字符串），无 bounds_num
+    bounds = None
+    if hit:
+        b = hit.get('_bounds')
+        if isinstance(b, (list, tuple)) and len(b) == 4:
+            bounds = [int(x) for x in b]
+        else:
+            m2 = _re.findall(r'-?\d+', hit.get('bounds') or '')
+            if len(m2) == 4:
+                bounds = [int(x) for x in m2]
     if not bounds or len(bounds) != 4:
         return jsonify({'ok': False, 'msg': '元素不在当前屏幕上（未在元素树命中该定位）——请先让元素出现在屏幕再采集基线'})
 
