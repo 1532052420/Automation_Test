@@ -53,15 +53,35 @@ const stepTypeInfo = (v) => SPECIAL_OPS[v] || STEP_TYPES.find(t => t.v === v) ||
 
 /* ④断言栏：组合断言类型（操作与断言解耦）——5 种，勾选即启用，全量执行 */
 var ASSERT_KINDS = [
-  { v: 'exists', n: '断言存在', d: '元素可见', p: { wait: 3 } },
-  { v: 'text', n: '断言文本', d: '控件文案 =', p: { text: '' } },
-  { v: 'toast', n: '断言Toast', d: '页面级 · 不需元素', p: { toast: '' } },
-  { v: 'gone', n: '断言消失', d: '弹窗已关闭', p: { wait: 2 } },
-  { v: 'visual', n: '视觉断言', d: '基线相似度比对', p: { threshold: 0.95, captured: false }, isNew: true },
+  { v: 'exists', n: '断言元素是否可见', d: '元素可见', p: { wait: 3 } },
+  { v: 'text', n: '断言文本是否正确', d: '文案相等', p: { text: '' } },
+  { v: 'toast', n: '断言Toast是否出现', d: '页面级', p: { toast: '' } },
+  { v: 'gone', n: '断言元素是否消失', d: '弹窗已关闭', p: { wait: 2 } },
+  { v: 'visual', n: '断言外观是否一致', d: '基线比对', p: { threshold: 0.95, captured: false }, isNew: true },
 ];
 var ASSERT_ONLY = 'assert_only';   // ③操作新增类型：不执行动作，只跑④栏组合
 
 function assertState() { return state.modalAsserts || (state.modalAsserts = []); }
+
+/* 断言开关：开启=显示断言卡组；关闭=隐藏并清空勾选（toast 提示） */
+function bindAssertToggle() {
+  var tg = $('asToggle');
+  if (!tg) return;
+  tg.addEventListener('change', function () {
+    var on = tg.checked;
+    $('asArea').style.display = on ? '' : 'none';
+    if (!on) { state.modalAsserts = []; renderAssertCol(); }
+    if (opCommentAuto) $('el-op-comment').value = autoStepComment(currentOpType(), opElementLabel(), $('el-op-param').value) + assertsDescSuffix();
+    showToast(on ? '断言开启' : '断言关闭');
+  });
+}
+function resetAssertToggle() {
+  var tg = $('asToggle');
+  if (tg) tg.checked = false;
+  $('asArea').style.display = 'none';
+  state.modalAsserts = [];
+  renderAssertCol();
+}
 function findAssert(v) { return assertState().find(x => x.v === v); }
 
 function renderAssertCol() {
@@ -82,17 +102,17 @@ function renderAssertCol() {
       if (d.v === 'gone') p = '<label>等待秒数<input type="number" value="' + esc(r.wait == null ? 2 : r.wait) + '" data-af="wait"></label>';
       if (d.v === 'visual') {
         var th = (r.threshold == null ? 0.95 : +r.threshold);
-        p = '<label>相似度阈值<div class="thresh"><input type="range" min="0.8" max="1" step="0.01" value="' + th + '" data-af="threshold">' +
+        p = '<label>相似度阈值（低于阈值判失败）<div class="thresh"><input type="range" min="0.8" max="1" step="0.01" value="' + th + '" data-af="threshold">' +
             '<span class="val" id="asTv">' + th.toFixed(2) + '</span></div></label>' +
-            '<label style="align-self:end"><button class="btn" id="asCapBtn" style="font-size:11px;padding:4px 10px">' + (r.captured ? '更新基线' : '采集基线') + '</button></label>' +
-            '<div class="wide as-hint">基线随元素存 elements/baselines/&lt;元素文件&gt;/&lt;元素名&gt;.png（进 git）；尺寸与基线不一致时判「分辨率不匹配」，不硬比</div>' +
+            '<div><button class="btn" id="asCapBtn" style="font-size:11.5px;padding:5px 14px;width:100%">' + (r.captured ? '更新基线' : '采集基线（元素需在当前屏幕）') + '</button></div>' +
+            '<div class="as-hint">基线存 elements/baselines/（随包进 git）；尺寸不一致判「分辨率不匹配」，不硬比</div>' +
             '<div class="wide tri">' +
             '<div class="tri-slot"><div class="tt">基线</div><div class="tri-img">' + (r.thumbnail ? '<img src="' + r.thumbnail + '">' : '<div class="glyph">🖼️</div>') + '</div><div class="simline">' + (r.captured ? '已采集' : '未采集') + '</div></div>' +
             '<div class="tri-slot"><div class="tt">实际</div><div class="tri-img"><div class="glyph">📱</div></div><div class="simline">执行时截取</div></div>' +
             '<div class="tri-slot"><div class="tt">diff</div><div class="tri-img"><div class="glyph">🔍</div></div><div class="simline">失败时随报告输出</div></div>' +
             '</div>';
       }
-      html += '<div class="as-param" data-pv="' + d.v + '">' + p + '</div>';
+      html += '<div class="as-param' + (d.v === 'visual' ? ' as-param--visual' : '') + '" data-pv="' + d.v + '">' + p + '</div>';
     }
     return html;
   }).join('');
@@ -117,7 +137,7 @@ function renderAssertCol() {
     });
   });
   var cap = box.querySelector('#asCapBtn');
-  if (cap) cap.addEventListener('click', function () { captureBaseline().catch(e => toast(e.message, false)); });
+  if (cap) cap.addEventListener('click', function () { captureBaseline().catch(e => showToast(e.message)); });
 }
 
 async function captureBaseline() {
@@ -133,7 +153,7 @@ async function captureBaseline() {
     var d = await resp.json();
     if (!d.ok) throw new Error(d.msg || '采集失败');
     r.captured = true; r.thumbnail = d.thumbnail; r.path = d.path;
-    toast('基线已采集：' + d.path, true);
+    showToast('基线已采集：' + d.path);
     renderAssertCol();
   } finally {
     if (cap) { cap.disabled = false; }
@@ -142,10 +162,13 @@ async function captureBaseline() {
 
 /* 断言副作用：特殊操作时断言卡置灰（无断言语义） */
 function syncAssertSide() {
-  var grid = document.getElementById('asGrid');
-  if (grid) grid.classList.toggle('locked', !!$('el-op-special').value);
-  var lbl = document.getElementById('asLabel');
-  if (lbl) lbl.classList.toggle('locked', !!$('el-op-special').value);
+  var sp = !!$('el-op-special').value;
+  ['asArea', 'asLabel'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.toggle('locked', sp);
+  });
+  var row = document.querySelector('.as-switch-row');
+  if (row) row.classList.toggle('locked', sp);
   renderAssertCol();
   if (opCommentAuto) $('el-op-comment').value = autoStepComment(currentOpType(), opElementLabel(), $('el-op-param').value) + assertsDescSuffix();
 }
@@ -294,6 +317,7 @@ async function init() {
   const bts = $('btn-tree-search');
   if (bts) bts.addEventListener('click', locateSearchTree);
   $('btn-add').addEventListener('click', openModal);
+  bindAssertToggle();
   $('btn-modal-cancel').addEventListener('click', () => {
     $('modal-mask').style.display = 'none';
   });
@@ -1175,8 +1199,7 @@ async function openModal() {
   $('el-op-type').value = 'click';
   $('el-op-type').disabled = false;
   $('el-op-special').value = '';   // 特殊操作每次打开复位为「无」
-  state.modalAsserts = [];         // ③断言区：组合断言每次打开复位
-  renderAssertCol();
+  resetAssertToggle();              // 断言开关复位：关 + 清空勾选
   paramAuto = true;  // 打开弹窗重置为「自动预填」状态
   // ⌖ 坐标模式：默认「坐标点击」并回填最后选中的点
   if (state.coordMode && state.coordPoint) {

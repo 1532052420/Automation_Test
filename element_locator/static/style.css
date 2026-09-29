@@ -282,8 +282,9 @@ html.night .field-flash { animation-name: fieldFlashNight; }
 .flow-col { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 0 0 10px; transition: opacity .15s, border-color .15s; overflow: hidden; }
 .flow-col .col-head { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 13px; color: #111827;
   padding: 11px 14px 9px; border-bottom: 1px solid #eef0f3; margin-bottom: 10px; }
-.flow-col .col-head::before { content: attr(data-n); width: 20px; height: 20px; border-radius: 50%; background: var(--sky);
-  color: #fff; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+/* 序号圆圈已删除（v6.18）：标题文字固定垂直居中，不随 dim/内容高度漂移 */
+.flow-col .col-head { min-height: 38px; }
+.flow-col .col-head::before { content: none; }
 .flow-col .col-head .hint { font-weight: 400; font-size: 11.5px; color: #9ca3af; margin-left: auto; text-align: right; }
 .flow-col.dim { opacity: .45; pointer-events: none; }
 /* 元素栏「此操作不依赖元素」弱化：只降透明度不禁交互（元素本身仍需填写入库） */
@@ -910,3 +911,37 @@ html.night .as-item .ai-n { color: #e5e7eb; }
 html.night .as-param { background: #232428; border-color: #3a3c42; }
 html.night .as-param input, html.night .as-param select { background: #17181b; border-color: #3a3c42; color: #e5e7eb; }
 html.night .tri-slot { background: #141519; border-color: #3a3c42; }
+
+/* ================= 断言开关（v6.18）：iOS 式 toggle + 底部固定写入页面文件 ================= */
+#col-op { display: flex; flex-direction: column; }  /* margin-top:auto 才能把写入页面文件压到底部 */
+.as-switch-row { display: flex; align-items: center; gap: 9px; margin: 2px 0 9px; }
+.as-switch { position: relative; width: 40px; height: 22px; flex: 0 0 40px; cursor: pointer; }
+.as-switch input { opacity: 0; width: 0; height: 0; }
+.as-switch .slider {
+  position: absolute; inset: 0; border-radius: 22px; background: #dcdfe6;
+  transition: background .18s ease;
+}
+.as-switch .slider::before {
+  content: ''; position: absolute; width: 18px; height: 18px; left: 2px; top: 2px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25);
+  transition: transform .18s ease;
+}
+.as-switch input:checked + .slider { background: #34c759; }
+.as-switch input:checked + .slider::before { transform: translateX(18px); }
+.as-switch-name { font-size: 13px; font-weight: 600; color: #303133; }
+.as-switch-hint { font-size: 10.5px; color: #9ca3af; margin-left: auto; text-align: right; }
+html.night .as-switch-name { color: #e5e7eb; }
+html.night .as-switch-hint { color: #9ca3af; }
+html.night .as-switch .slider { background: #3a3c42; }
+/* 写入页面文件：固定在③栏底部（列等高拉伸时贴底） */
+#page-file-label { margin-top: auto; }
+/* 视觉断言参数区：单列堆叠防挤压错乱 */
+.as-param--visual { display: flex; flex-direction: column; gap: 8px; }
+.as-param--visual .thresh { width: 100%; }
+.as-param--visual .tri { width: 100%; }
+.as-param--visual .as-hint { width: 100%; }
+/* 断言卡名称较长时的排版兜底 */
+.as-item .ai-n { white-space: nowrap; }
+.as-item .ai-d { flex: 0 0 auto; }
+.as-switch-row.locked { opacity: .5; pointer-events: none; }
+#asArea.locked, #asLabel.locked { opacity: .5; pointer-events: none; }
