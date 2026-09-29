@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>原型 · 添加测试用例 · 辅助断言与视觉断言</title>
+<style>
+/* ============ 原型画布（对齐元素定位器视觉：日间默认 + html.night 夜间覆盖） ============ */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { color-scheme: light; }
+body {
+  font: 14px/1.55 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: #303133; background: #e2e3e8; min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center; padding: 16px 12px 34px;
+}
+html.night { color-scheme: dark; }
+html.night body { background: #0c0c0e; color: #e5e7eb; }
+html.night .modal { background: #1b1c1f; color: #e5e7eb; }
+html.night .modal-title, html.night .modal-foot { border-color: #303236; }
+html.night .flow-col { background: #202126; border-color: #303236; }
+html.night .col-head { color: #f3f4f6; border-bottom-color: #303236; }
+html.night .col-head .hint { color: #9ca3af; }
+html.night .anchor-card { background: #0e2f4d; border-color: #1d4a75; }
+html.night .anchor-card .ac-loc { color: #7cc0ff; }
+html.night input, html.night select, html.night textarea {
+  background: #17181b; border-color: #3a3c42; color: #e5e7eb;
+}
+html.night input::placeholder { color: #6b7280; }
+html.night .seg { background: #17181b; }
+html.night .seg .seg-item { color: #9ca3af; }
+html.night .seg .seg-item.on { background: #202126; color: #409eff; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+html.night .op-card { border-color: #3a3c42; background: #232428; }
+html.night .op-card .ot { color: #d1d5db; }
+html.night .op-card.on { background: #0e2f4d; }
+html.night .op-card.on .ot { color: #7cc0ff; }
+html.night .steps-list, html.night .aux-card, html.night .aux-row, html.night .semibar,
+html.night .codebox, html.night .guide, html.night .tri-slot, html.night .canvasbar,
+html.night .demo-panel { background: #17181b; border-color: #303236; color: #e5e7eb; }
+html.night .codebox .cm { color: #7f8ea3; }
+html.night .sl-row, html.night .sl-marker { color: #9ca3af; }
+html.night .tri-bar { background: #0e2f4d; color: #7cc0ff; }
+html.night .aux-hint { color: #9ca3af; }
+html.night .btn { background: #232428; border-color: #3a3c42; color: #e5e7eb; }
+html.night .btn:hover { border-color: #409eff; color: #7cc0ff; }
+html.night .btn.pri { background: #409eff; color: #fff; }
+html.night .thumb-slot { background: #101114; }
+
+/* 画布顶栏（原型专属） */
+.canvasbar {
+  width: 100%; max-width: 1400px; display: flex; align-items: center; gap: 12px;
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+  padding: 9px 16px; margin-bottom: 12px;
+}
+.canvasbar b { font-size: 13.5px; }
+.canvasbar .muted { font-size: 12px; color: #9ca3af; }
+.canvasbar button {
+  margin-left: auto; border: 1px solid #dcdfe6; background: #fff; color: #303133;
+  border-radius: 8px; padding: 5px 14px; font-size: 12px; cursor: pointer;
+}
+.canvasbar button:hover { border-color: #409eff; color: #409eff; }
+
+/* ============ 弹窗（复刻真实 modal-flow：宽弹窗 + 三栏） ============ */
+.modal {
+  width: 100%; max-width: 1400px; background: #fff; border-radius: 10px;
+  box-shadow: 0 18px 60px rgba(0,0,0,.22); overflow: hidden;
+}
+.modal-title { padding: 11px 18px; font-weight: 600; font-size: 14.5px; border-bottom: 1px solid #eee; }
+.modal-title .hint { font-weight: 400; font-size: 12px; color: #9ca3af; margin-left: 8px; }
+.modal-body { padding: 12px 16px; }
+
+/* 用途分段（保存到哪一步） */
+.seg { background: #f3f4f6; border-radius: 10px; padding: 5px; display: flex; margin-bottom: 12px; }
+.seg-item {
+  flex: 1; text-align: center; font-size: 13.5px; color: #6b7280; padding: 8px 0;
+  border-radius: 8px; cursor: default;
+}
+.seg-item.on { background: #fff; color: #409eff; font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+.seg-item.on .badge {
+  display: inline-block; margin-left: 4px; font-size: 10px; font-weight: 700; color: #fff;
+  background: #f59e0b; border-radius: 8px; padding: 0 6px; vertical-align: 1px;
+}
+
+/* 三栏 */
+.flow-cols { display: grid; grid-template-columns: 1fr 1fr 1.05fr; gap: 14px; align-items: start; }
+.flow-col { background: #fff; border: 1px solid #eef0f3; border-radius: 10px; padding: 0 0 12px; }
+.col-head {
+  display: flex; align-items: center; gap: 8px; padding: 10px 14px 9px;
+  border-bottom: 1px solid #f0f1f4; margin-bottom: 11px; font-weight: 600; font-size: 13.5px;
+}
+.col-head .num {
+  width: 18px; height: 18px; border-radius: 50%; background: #409eff; color: #fff;
+  font-size: 11px; display: inline-flex; align-items: center; justify-content: center;
+}
+.col-head .hint { margin-left: auto; font-size: 11px; color: #9ca3af; font-weight: 400; }
+.fcol-pad { padding: 0 14px; }
+.field { margin-bottom: 10px; }
+.field > label { display: block; font-size: 12.5px; color: #374151; margin-bottom: 4px; }
+.field > label .q {
+  display: inline-flex; width: 13px; height: 13px; border-radius: 50%; border: 1px solid #c0c4cc;
+  color: #c0c4cc; font-size: 9px; align-items: center; justify-content: center; margin-left: 3px;
+}
+.field input, .field select {
+  width: 100%; padding: 7px 10px; border: 1px solid #dcdfe6; border-radius: 6px;
+  font-size: 13px; outline: none; background: #fff; color: inherit;
+}
+.field input:focus, .field select:focus { border-color: #409eff; }
+.duo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* ① 锚点卡 */
+.anchor-card { background: #ecf5ff; border: 1px solid #b3d8ff; border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; }
+.anchor-card .ac-head { font-size: 11.5px; color: #6b7280; }
+.anchor-card .ac-main { font-size: 13.5px; font-weight: 600; margin: 2px 0; }
+.anchor-card .ac-loc { font-size: 11.5px; color: #409eff; font-family: Menlo, Consolas, monospace; }
+
+/* ② 步骤列表 */
+.steps-list { background: #f9fafb; border: 1px dashed #e5e7eb; border-radius: 8px; padding: 8px 10px; font-size: 12.5px; }
+.steps-list .sl-title { color: #6b7280; margin-bottom: 6px; }
+.steps-list .sl-row { display: flex; gap: 6px; padding: 2px 0; color: #374151; }
+.steps-list .sl-idx { color: #9ca3af; min-width: 14px; }
+.steps-list .sl-marker { color: #409eff; border: 1px dashed #b3d8ff; border-radius: 6px; text-align: center; padding: 3px; margin: 5px 0; font-size: 12px; background: #ecf5ff; }
+.steps-list .sl-row.new { color: #303133; }
+.bind-note { font-size: 11.5px; color: #409eff; background: #ecf5ff; border-radius: 6px; padding: 6px 9px; margin-top: 9px; }
+
+/* ③ 操作类型卡组 */
+.op-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-bottom: 10px; }
+.op-card {
+  border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 7px 4px 6px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 4px; transition: all .12s;
+  background: #fff;
+}
+.op-card:hover { border-color: #9cc3ef; }
+.op-card.on { border-color: #409eff; background: #ecf5ff; box-shadow: 0 0 0 3px rgba(64,158,255,.14); }
+.op-card .oi { width: 27px; height: 27px; border-radius: 50%; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+.op-card.on .oi { background: #409eff; }
+.op-card .ot { font-size: 11px; font-weight: 600; color: #374151; white-space: nowrap; }
+.op-card.on .ot { color: #1f5faa; }
+
+/* == 新增：辅助断言卡（仅主断言为断言类时显示） == */
+.aux-card {
+  border: 1.5px solid #b3d8ff; border-radius: 10px; background: #f5faff;
+  padding: 10px 12px; margin-bottom: 10px;
+}
+.aux-head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.aux-head b { font-size: 12.5px; }
+.aux-head .tag {
+  font-size: 10px; font-weight: 700; border-radius: 4px; padding: 0 6px;
+  background: #f0f9eb; color: #529b2e; border: 1px solid #c2e7b0;
+}
+.aux-head .hint { margin-left: auto; font-size: 10.5px; }
+.aux-sub { font-size: 11px; color: #6b7280; margin-bottom: 8px; }
+.aux-rows { display: flex; flex-direction: column; gap: 7px; }
+.aux-row { border: 1px solid #d7e6f7; border-radius: 8px; background: #fff; padding: 8px 10px; }
+.aux-row .rhead { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
+.aux-row .ridx {
+  width: 16px; height: 16px; border-radius: 50%; background: #409eff; color: #fff;
+  font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+}
+.aux-row .rtype { font-size: 12px; font-weight: 600; }
+.aux-row .rdel { margin-left: auto; border: none; background: none; color: #c0c4cc; cursor: pointer; font-size: 13px; }
+.aux-row .rdel:hover { color: #f56c6c; }
+.aux-row .rbody { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+.aux-row .rbody label { font-size: 11.5px; color: #374151; display: block; }
+.aux-row .rbody input, .aux-row .rbody select {
+  width: 100%; margin-top: 3px; padding: 5px 8px; border: 1px solid #dcdfe6;
+  border-radius: 6px; font-size: 12px; background: #fff; color: inherit; outline: none;
+}
+.aux-row .rbody input:focus, .aux-row .rbody select:focus { border-color: #409eff; }
+.aux-row .wide { grid-column: 1 / -1; }
+/* 视觉基线三联图 */
+.tri { display: flex; gap: 7px; margin-top: 7px; }
+.tri-slot { flex: 1; border: 1px dashed #d7e6f7; border-radius: 7px; background: #f9fafb; padding: 5px; text-align: center; }
+.tri-slot .tt { font-size: 10px; font-weight: 600; color: #6b7280; margin-bottom: 4px; }
+.tri-img { height: 44px; border-radius: 5px; position: relative; background: linear-gradient(135deg, #dbe7f6, #e8eef7); overflow: hidden; }
+.tri-img .glyph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; opacity: .85; }
+.tri-img.diff { background: repeating-linear-gradient(45deg, #fdf2f2 0 7px, #fbe4e4 7px 14px); }
+.tri-badge { position: absolute; top: 3px; right: 3px; font-size: 9px; font-weight: 700; border-radius: 4px; padding: 0 4px; background: #d1fae5; color: #065f46; }
+.tri-badge.bad { background: #fee2e2; color: #991b1b; }
+.simline { font-size: 10px; color: #6b7280; margin-top: 4px; }
+.simline b.bad { color: #c0392b; }
+.thresh { display: flex; align-items: center; gap: 7px; }
+.thresh input[type=range] { flex: 1; accent-color: #409eff; margin-top: 0; }
+.thresh .val { font-size: 12px; font-weight: 700; color: #409eff; }
+.colorline { display: flex; align-items: center; gap: 7px; }
+.colorchip { width: 22px; height: 22px; border-radius: 5px; border: 1px solid rgba(0,0,0,.12); background: #2e6be6; flex: 0 0 22px; }
+.aux-add { display: flex; gap: 8px; align-items: center; margin-top: 9px; }
+.aux-add select { padding: 5px 8px; border: 1px solid #dcdfe6; border-radius: 7px; font-size: 12px; background: #fff; color: inherit; }
+.aux-hint { font-size: 10.5px; color: #9ca3af; }
+
+/* 按钮 */
+.btn {
+  border: 1px solid #dcdfe6; background: #fff; color: #303133; border-radius: 8px;
+  padding: 6px 13px; font-size: 12px; cursor: pointer;
+}
+.btn:hover { border-color: #409eff; color: #409eff; }
+.btn.pri { background: #409eff; border-color: #409eff; color: #fff; }
+.btn.pri:hover { background: #337ecc; color: #fff; }
+
+/* 执行语义条 */
+.semibar {
+  border: 1px solid #d7e6f7; border-radius: 8px; background: #f5faff;
+  padding: 7px 10px; font-size: 11px; color: #374151; margin-top: 8px; line-height: 1.6;
+}
+.semibar b { color: #303133; }
+
+/* 三件套条 + 底部 */
+.tri-bar {
+  margin-top: 12px; background: #f0f9eb; border: 1px solid #c2e7b0; color: #529b2e;
+  border-radius: 8px; padding: 8px 12px; font-size: 12.5px;
+}
+.modal-foot { padding: 10px 18px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; gap: 10px; }
+
+/* ============ 弹窗下方演示区（非弹窗内容） ============ */
+.demo-panel {
+  width: 100%; max-width: 1400px; margin-top: 12px; background: #fff;
+  border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px 16px 16px;
+}
+.demo-panel .dp-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.demo-panel .dp-head b { font-size: 13px; }
+.demo-panel .dp-head .hint { font-size: 11px; color: #9ca3af; }
+.codebox {
+  background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 11px 13px; font: 11px/1.7 "SF Mono", Menlo, Consolas, monospace; color: #374151;
+  white-space: pre; overflow-x: auto;
+}
+.codebox .cm { color: #9aa5b1; }
+.guide { margin-top: 12px; font-size: 12px; color: #374151; }
+.guide b { display: block; font-size: 12.5px; margin-bottom: 5px; }
+.guide table { width: 100%; border-collapse: collapse; }
+.guide td { padding: 3px 8px 3px 0; vertical-align: top; }
+.guide td:first-child { width: 44%; }
+</style>
+</head>
+<body>
+
+<div class="canvasbar">
+  <b>原型 · 添加测试用例（辅助断言 + 视觉断言）</b>
+  <span class="muted">功能加在 ③操作栏：主断言=现有操作类型（不变）；主断言为断言类时，出现「辅助断言」卡 —— 可点击体验</span>
+  <button id="themeBtn">夜间模式</button>
+</div>
+
+<div class="modal">
+  <div class="modal-title">➕ 添加测试用例<span class="hint">按「元素 → 用例 → 操作」流程走：选下方用途决定走到哪一步；点字段旁「?」看说明</span></div>
+  <div class="modal-body">
+
+    <div class="seg">
+      <div class="seg-item">仅元素</div>
+      <div class="seg-item on">元素 + 用例 + 操作<span class="badge">推荐</span></div>
+      <div class="seg-item">登记随机弹窗</div>
+    </div>
+
+    <div class="flow-cols">
+      <!-- ① 元素（与线上一致） -->
+      <section class="flow-col">
+        <div class="col-head"><span class="num">1</span>① 元素<span class="hint">入库必需</span></div>
+        <div class="fcol-pad">
+          <div class="anchor-card">
+            <div class="ac-head">已选元素 · 元素定位 <span style="color:#9ca3af">来源：元素树点选 / 坐标选中</span></div>
+            <div class="ac-main">webview</div>
+            <div class="ac-loc">ID · com.recordlife.kuaige:id/webview</div>
+          </div>
+          <div class="duo">
+            <div class="field"><label>元素名称<span class="q">?</span></label><input value="webview"></div>
+            <div class="field"><label>元素中文名<span class="q">?</span></label><input placeholder="如：悬浮球（可不填）"></div>
+          </div>
+          <div class="duo">
+            <div class="field"><label>定位方式<span class="q">?</span></label><select><option>ID</option></select></div>
+            <div class="field"><label>定位值<span class="q">?</span></label><input value="com.recordlife.kuaige:id/webview"></div>
+          </div>
+          <div class="duo">
+            <div class="field"><label>元素等待方式<span class="q">?</span></label><select><option>元素可见再操作（推荐）</option></select></div>
+            <div class="field"><label>等待时间(秒)<span class="q">?</span></label><input type="number" value="6"></div>
+          </div>
+          <div class="field"><label>写入元素文件<span class="q">?</span></label><select><option>opcheckElements.py</option></select></div>
+        </div>
+      </section>
+
+      <!-- ② 用例（与线上一致） -->
+      <section class="flow-col">
+        <div class="col-head"><span class="num">2</span>② 用例<span class="hint">这步操作追加到哪条用例</span></div>
+        <div class="fcol-pad">
+          <div class="field"><label>目标用例文件<span class="q">?</span></label><select><option>操作类型真机验证（test_opcheck.py）</option></select></div>
+          <div class="field"><label>页面操作<span class="q">?</span></label><select id="methodSel"><option>test_01_click_ok</option></select></div>
+          <div class="field"><label>插入位置<span class="q">?</span></label><select><option>末尾（成为第 1 步）</option></select></div>
+          <div class="steps-list">
+            <div class="sl-title">当前方法还没有步骤，这一步将是第 1 步：</div>
+            <div class="sl-marker">＋ 新步骤将插入到这里</div>
+            <div class="sl-row new"><span class="sl-idx">1</span><span>➕ 本步：<span id="stepDesc">点击「webview」</span></span></div>
+          </div>
+          <div class="bind-note">🔗 三件套去向：页面 OpcheckPage.py ← 元素文件 opcheckElements.py</div>
+        </div>
+      </section>
+
+      <!-- ③ 操作（原功能全部保留 + 辅助断言卡） -->
+      <section class="flow-col">
+        <div class="col-head"><span class="num">3</span>③ 操作<span class="hint">对这个元素做什么</span></div>
+        <div class="fcol-pad">
+          <div class="field"><label>操作类型<span class="q">?</span></label>
+            <div class="op-grid" id="opGrid"></div>
+          </div>
+          <div class="field"><label>全部操作类型（含断言/等待/分支等全部类型）</label>
+            <select id="opTypeSel"></select></div>
+          <div class="field"><label>特殊操作<span class="q">?</span></label>
+            <select><option>无（使用上方操作类型）</option><option>收起键盘（键盘在才收，否则不动）</option><option>首次启动弹窗处理（无弹窗自动跳过）</option></select></div>
+
+          <!-- ★ 新增：辅助断言卡（主断言为断言类时显示） -->
+          <div class="aux-card" id="auxCard" style="display:none">
+            <div class="aux-head"><b>辅助断言</b><span class="tag">新增 · P1</span>
+              <span class="hint">主断言失败也继续执行</span></div>
+            <div class="aux-sub">对本元素追加的附加校验，逐条执行、失败各自截图，最后汇总报错。</div>
+            <div class="aux-rows" id="auxRows"></div>
+            <div class="aux-add">
+              <select id="auxTypeSel">
+                <option value="text">文本 =（控件文案）</option>
+                <option value="visible">存在</option>
+                <option value="gone">消失（弹窗已关闭）</option>
+                <option value="visual" selected>视觉基线对比（logo/icon/切图）</option>
+                <option value="color">颜色断言（状态色）</option>
+              </select>
+              <button class="btn" id="addAux">＋ 添加辅助断言</button>
+              <span class="aux-hint">Toast 为页面级断言，仍走主断言</span>
+            </div>
+            <div class="semibar"><b>执行语义（全量执行）：</b>主断言 → 辅助断言按序逐条执行，<b>任何一条失败都不中断</b>；失败条目当场截图（视觉断言附 基线/实际/diff 三联图）；全部跑完后若存在失败，抛一条 AssertionError 汇总全部明细。</div>
+          </div>
+          <div class="aux-hint" id="auxOffHint" style="display:none;margin:-4px 0 10px">💡 主断言选「断言存在 / 断言文本 / 断言消失」时，可在此配置辅助断言（一个元素一次验证多项）</div>
+
+          <div class="field" id="paramWrap" style="display:none"><label>操作参数<span class="q">?</span></label>
+            <input id="opParam" placeholder="输入内容 / 期望文本 / toast文本 / 坐标(x,y) / 秒数"></div>
+          <div class="field"><label>步骤描述<span class="q">?</span></label><input id="stepDescInput" value="点击「webview」"></div>
+          <div class="field"><label>写入页面文件<span class="q">?</span></label><input readonly value="OpcheckPage.py"></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="tri-bar">🛡 三件套一次完成：元素 → opcheckElements.py · 用例行 → test_opcheck.py · 页面方法 → OpcheckPage.py</div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn">取消</button>
+    <button class="btn">💾 保存并继续</button>
+    <button class="btn pri">💾 保存</button>
+  </div>
+</div>
+
+<!-- 弹窗下方：原型演示区（非弹窗内容） -->
+<div class="demo-panel">
+  <div class="dp-head"><b>生成代码预览</b><span class="hint">原型演示区 · 保存时写入页面文件的一个方法（所见即所得）</span></div>
+  <div class="codebox" id="codebox"></div>
+  <div class="guide">
+    <b>断什么 · 用什么</b>
+    <table>
+      <tr><td>按钮上的文字内容</td><td>→ 主/辅助断言「文本 =」（读控件 text 属性，无需截图）</td></tr>
+      <tr><td><b>logo / icon / 切图型文案</b>（读不到内容）</td><td>→ 辅助断言「视觉基线对比」：与基线比相似度，失败挂 基线/实际/diff 三联图</td></tr>
+      <tr><td>颜色状态（角标红点/禁用置灰/主题色）</td><td>→ 辅助断言「颜色断言」：主色 RGB ± 容差</td></tr>
+      <tr><td>以上全都要</td><td>→ 主断言 + 多条辅助断言一次配齐，一次执行全量出结果</td></tr>
+    </table>
+  </div>
+</div>
+
+<script>
+'use strict';
+var $ = function (s) { return document.querySelector(s); };
+var esc = function (s) { return String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+
+/* 与线上一致的 13 种操作类型（图标为原型示意） */
+var OP_TYPES = [
+  { v: 'click', n: '点击', g: '👆' }, { v: 'input', n: '输入', g: '⌨️' },
+  { v: 'long_press', n: '长按', g: '✊' }, { v: 'tap', n: '坐标点击', g: '🎯' },
+  { v: 'screenshot', n: '截图', g: '📷' }, { v: 'sleep', n: '固定等待', g: '⏱️' },
+  { v: 'assert_visible', n: '断言存在', g: '👁️' }, { v: 'assert_text', n: '断言文本', g: '📝' },
+  { v: 'assert_toast', n: '断言Toast', g: '💬' }, { v: 'assert_gone', n: '断言消失', g: '🚫' },
+  { v: 'wait_element', n: '轮询等待出现', g: '🔄' }, { v: 'if_click', n: '出现才点击', g: '🔀' },
+  { v: 'custom', n: '自定义代码', g: '</>' },
+];
+var ASSERT_TYPES = ['assert_visible', 'assert_text', 'assert_gone'];
+var TYPE_NAME = { click: '点击', input: '输入', long_press: '长按', tap: '坐标点击', screenshot: '截图',
+  sleep: '固定等待', assert_visible: '断言存在', assert_text: '断言文本', assert_toast: '断言Toast',
+  assert_gone: '断言消失', wait_element: '轮询等待出现', if_click: '出现才点击', custom: '自定义代码' };
+var AUX_NAME = { text: '文本 =', visible: '存在', gone: '消失', visual: '视觉基线对比', color: '颜色断言' };
+
+var state = { op: 'click', auxSeq: 0, aux: [] };
+
+/* 操作类型卡组 + 下拉 */
+$('#opGrid').innerHTML = OP_TYPES.map(function (t) {
+  return '<div class="op-card" data-op="' + t.v + '"><span class="oi">' + t.g + '</span><span class="ot">' + t.n + '</span></div>';
+}).join('');
+$('#opTypeSel').innerHTML = OP_TYPES.map(function (t) { return '<option value="' + t.v + '">' + t.n + '</option>'; }).join('');
+
+function syncOp() {
+  document.querySelectorAll('.op-card').forEach(function (c) { c.classList.toggle('on', c.dataset.op === state.op); });
+  $('#opTypeSel').value = state.op;
+  var isAssert = ASSERT_TYPES.indexOf(state.op) >= 0;
+  $('#auxCard').style.display = isAssert ? '' : 'none';
+  $('#auxOffHint').style.display = isAssert ? 'none' : '';
+  $('#paramWrap').style.display = (state.op === 'assert_text' || state.op === 'assert_toast') ? '' : 'none';
+  if (state.op === 'assert_text') $('#opParam').value = '写新歌';
+  if (state.op === 'click') $('#stepDescInput').value = '点击「webview」';
+  else $('#stepDescInput').value = TYPE_NAME[state.op] + '「webview」' + (state.op === 'assert_text' ? '，文本 =「写新歌」' : '');
+  $('#stepDesc').textContent = $('#stepDescInput').value;
+  renderAux(); renderCode();
+}
+$('#opGrid').addEventListener('click', function (e) {
+  var c = e.target.closest('.op-card');
+  if (!c) return;
+  state.op = c.dataset.op; syncOp();
+});
+$('#opTypeSel').addEventListener('change', function () { state.op = this.value; syncOp(); });
+
+/* 辅助断言行 */
+function auxRowHtml(r, i) {
+  var h = '<div class="aux-row" data-id="' + r.id + '"><div class="rhead">' +
+    '<span class="ridx">' + (i + 1) + '</span><span class="rtype">' + AUX_NAME[r.type] + '</span>' +
+    '<button class="rdel" data-del="' + r.id + '">✕</button></div><div class="rbody">';
+  if (r.type === 'text') {
+    h += '<label>期望文本<input value="' + esc(r.expected || '') + '" data-f="expected" placeholder="如：写新歌"></label>' +
+         '<label>元素等待方式<select><option>元素可见再操作（推荐）</option></select></label>';
+  } else if (r.type === 'visible' || r.type === 'gone') {
+    h += '<label>等待时间(秒)<input type="number" value="' + esc(r.wait == null ? 2 : r.wait) + '" data-f="wait"></label>' +
+         '<label class="wide" style="color:#9ca3af">' + (r.type === 'visible' ? '元素出现即通过，失败截图留痕' : '等待时间内仍可见则失败（验证弹窗已关闭）') + '</label>';
+  } else if (r.type === 'visual') {
+    h += '<label>相似度阈值<div class="thresh"><input type="range" min="0.8" max="1" step="0.01" value="' + (r.threshold || 0.95) + '" data-f="threshold">' +
+         '<span class="val" id="tv-' + r.id + '">' + (r.threshold || 0.95).toFixed(2) + '</span></div></label>' +
+         '<label style="color:#9ca3af">尺寸与基线不一致时判「分辨率不匹配」，不硬比</label>' +
+         '<div class="wide"><button class="btn' + (r.captured ? '' : ' pri') + '" data-cap="' + r.id + '" style="font-size:11px;padding:4px 10px">' +
+         (r.captured ? '更新基线' : '采集基线') + '</button>' +
+         '<div class="tri">' +
+         '<div class="tri-slot"><div class="tt">基线</div><div class="tri-img"><div class="glyph">🖼️</div></div><div class="simline">' + (r.captured ? 'webview.png' : '未采集') + '</div></div>' +
+         '<div class="tri-slot"><div class="tt">实际</div><div class="tri-img"><div class="glyph">📱</div></div><div class="simline">执行时截取</div></div>' +
+         '<div class="tri-slot"><div class="tt">diff</div><div class="tri-img' + (r.captured && r.demoFail ? ' diff' : '') + '"><div class="glyph">🔍</div>' +
+         (r.captured ? '<span class="tri-badge' + (r.demoFail ? ' bad' : '') + '">' + (r.demoFail ? 'FAIL' : 'PASS') + '</span>' : '') + '</div>' +
+         '<div class="simline">' + (r.captured ? '相似度 <b class="' + (r.demoFail ? 'bad' : '') + '">' + (r.demoFail ? '0.71' : '0.99') + '</b> ≥ ' + (r.threshold || 0.95).toFixed(2) : '采集后预览') + '</div></div>' +
+         '<span class="aux-hint" style="margin-left:8px">失败时三联图随 AssertionError 一起挂入 allure 报告</span></div>';
+  } else if (r.type === 'color') {
+    h += '<label>期望主色 RGB<div class="colorline"><span class="colorchip"></span>' +
+         '<input value="' + esc(r.rgb || '') + '" data-f="rgb" placeholder="R,G,B 如 46,107,230"></div></label>' +
+         '<label>容差（每通道 ±）<input type="number" value="' + esc(r.tolerance == null ? 20 : r.tolerance) + '" data-f="tolerance"></label>' +
+         '<label class="wide" style="color:#9ca3af">用途：角标红点、禁用置灰、主题色变更 —— 只关心颜色语义的轻量断言</label>';
+  }
+  return h + '</div></div>';
+}
+function renderAux() {
+  var box = $('#auxRows');
+  box.innerHTML = state.aux.map(auxRowHtml).join('');
+  box.querySelectorAll('[data-del]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      state.aux = state.aux.filter(function (r) { return r.id !== +b.dataset.del; });
+      renderAux(); renderCode();
+    });
+  });
+  box.querySelectorAll('[data-cap]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var r = state.aux.find(function (x) { return x.id === +b.dataset.cap; });
+      r.captured = !r.captured; renderAux(); renderCode();
+    });
+  });
+  box.querySelectorAll('[data-f]').forEach(function (inp) {
+    inp.addEventListener('input', function () {
+      var r = state.aux.find(function (x) { return x.id === +inp.closest('.aux-row').dataset.id; });
+      r[inp.dataset.f] = inp.value; renderCode();
+    });
+  });
+}
+$('#addAux').addEventListener('click', function () {
+  var t = $('#auxTypeSel').value;
+  var r = { id: ++state.auxSeq, type: t };
+  if (t === 'text') r.expected = '';
+  if (t === 'visual') { r.threshold = 0.95; r.captured = false; }
+  if (t === 'color') { r.rgb = ''; r.tolerance = 20; }
+  if (t === 'visible' || t === 'gone') r.wait = 2;
+  state.aux.push(r); renderAux(); renderCode();
+});
+
+/* 生成代码预览 */
+function renderCode() {
+  var L = [];
+  L.push('<span class="cm"># 页面方法：一个元素的多段断言（全量执行，失败汇总）</span>');
+  L.push('def assert_webview(self, wait_seconds=3):');
+  L.push('    """断言「webview」：主断言 + ' + state.aux.length + ' 条辅助断言，失败不中断、逐条截图"""');
+  L.push('    failures = []');
+  L.push('    <span class="cm"># [主断言] ' + TYPE_NAME[state.op] + '</span>');
+  if (state.op === 'assert_visible') {
+    L.push('    try:');
+    L.push('        el = self.appOperator.getElement(self._elements.webview, wait_seconds=wait_seconds)');
+    L.push("        self.appOperator.get_screenshot('断言成功_存在')");
+    L.push('    except Exception as e:');
+    L.push("        self.appOperator.get_screenshot('断言失败_存在')   # 失败截图，不中断");
+    L.push("        failures.append('主断言·存在: %s' % e)");
+  } else {
+    L.push('    <span class="cm"># （主断言为「' + TYPE_NAME[state.op] + '」，非断言类时无辅助断言区，与线上一致）</span>');
+  }
+  state.aux.forEach(function (r, i) {
+    var no = i + 1;
+    if (r.type === 'text') {
+      L.push('    <span class="cm"># [辅助' + no + '] 文本 =</span>');
+      L.push("    ok = self.appOperator.getText(el) == '" + esc(r.expected || '') + "'");
+      L.push("    self.appOperator.assert_shot_or_record(failures, '辅助" + no + "·文本', ok, expect='" + esc(r.expected || '') + "')");
+    } else if (r.type === 'visible') {
+      L.push('    <span class="cm"># [辅助' + no + '] 存在</span>');
+      L.push("    self.appOperator.assert_element_or_record(failures, '辅助" + no + "·存在', el)");
+    } else if (r.type === 'gone') {
+      L.push('    <span class="cm"># [辅助' + no + '] 消失</span>');
+      L.push("    self.appOperator.assert_gone_or_record(failures, '辅助" + no + "·消失', el, wait=" + esc(r.wait == null ? 2 : r.wait) + ')');
+    } else if (r.type === 'visual') {
+      L.push('    <span class="cm"># [辅助' + no + '] 视觉基线对比（阈值 ' + (+r.threshold || 0.95).toFixed(2) + '）</span>');
+      L.push("    self.appOperator.assert_visual_or_record(");
+      L.push("        failures, '辅助" + no + "·视觉基线', el,");
+      L.push("        baseline='elements/baselines/opcheck/webview.png', threshold=" + (+r.threshold || 0.95).toFixed(2) + ')');
+    } else if (r.type === 'color') {
+      L.push('    <span class="cm"># [辅助' + no + '] 颜色断言</span>');
+      L.push("    self.appOperator.assert_color_or_record(");
+      L.push("        failures, '辅助" + no + "·颜色', el, expect_rgb=(" + esc(r.rgb || '0,0,0') + '), tolerance=' + esc(r.tolerance == null ? 20 : r.tolerance) + ')');
+    }
+  });
+  L.push('    if failures:   <span class="cm"># 全部跑完才抛错，明细含每条失败</span>');
+  L.push("        raise AssertionError('%d 项断言未通过：\\n%s' % (len(failures), '\\n'.join(failures)))");
+  $('#codebox').innerHTML = L.join('\n');
+}
+
+$('#themeBtn').addEventListener('click', function () {
+  var n = document.documentElement.classList.toggle('night');
+  this.textContent = n ? '日间模式' : '夜间模式';
+});
+
+/* 默认状态：主断言=断言存在（展示新能力），带 1 条文本辅助演示 */
+state.op = 'assert_visible';
+state.aux = [{ id: ++state.auxSeq, type: 'text', expected: '' }];
+syncOp();
+</script>
+</body>
+</html>
