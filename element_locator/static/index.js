@@ -104,7 +104,7 @@ function renderAssertCol() {
         var th = (r.threshold == null ? 0.95 : +r.threshold);
         p = '<label>相似度阈值（低于阈值判失败）<div class="thresh"><input type="range" min="0.8" max="1" step="0.01" value="' + th + '" data-af="threshold">' +
             '<span class="val" id="asTv">' + th.toFixed(2) + '</span></div></label>' +
-            '<div><button class="btn" id="asCapBtn" style="font-size:11.5px;padding:5px 14px;width:100%">' + (r.captured ? '更新基线' : '采集基线（元素需在当前屏幕）') + '</button></div>' +
+            '<div><button class="btn" id="asCapBtn" style="font-size:11.5px;padding:5px 14px;width:100%;' + (r.captured ? 'background:#e8f7ee;color:#0a7d43;border-color:#b7e2c6' : '') + '">' + (r.captured ? '✓ 基线已采集：' + (r.assetName || '区域') + '（点此重选）' : '采集基线（选元素或框选区域）') + '</button></div>' +
             '<div class="as-hint">基线存 elements/baselines/（随包进 git）；尺寸不一致判「分辨率不匹配」，不硬比</div>' +
             '<div class="wide tri">' +
             '<div class="tri-slot"><div class="tt">基线</div><div class="tri-img">' + (r.thumbnail ? '<img src="' + r.thumbnail + '">' : '<div class="glyph">🖼️</div>') + '</div><div class="simline">' + (r.captured ? '已采集' : '未采集') + '</div></div>' +
@@ -113,7 +113,9 @@ function renderAssertCol() {
             '</div>';
       }
       if (d.v === 'visual_asset') {
-        p = '<label>选择视觉资产<input list="vaAssetOpts" value="' + esc(r.asset || '') + '" data-af="asset" placeholder="点右侧刷新选择">·<button class="ghost mini" id="vaAssetRefresh" style="padding:2px 8px">刷新</button></label>' +
+        var hasA = !!(r.asset || '').trim();
+        p = '<label>选择视觉资产' + (hasA ? '<span style="color:#0a7d43;font-weight:600"> ✓ 已采集</span>' : '') +
+            '<input list="vaAssetOpts" value="' + esc(r.asset || '') + '" data-af="asset" placeholder="点右侧刷新选择"' + (hasA ? ' style="border-color:#b7e2c6;background:#f2fbf5"' : '') + '>·<button class="ghost mini" id="vaAssetRefresh" style="padding:2px 8px">刷新</button></label>' +
             '<datalist id="vaAssetOpts"></datalist>' +
             '<div class="as-hint">资产在定位器「视觉断言」模式保存（elements/visual_asserts/），运行时按其配置执行</div>';
       }
@@ -142,7 +144,7 @@ function renderAssertCol() {
     });
   });
   var cap = box.querySelector('#asCapBtn');
-  if (cap) cap.addEventListener('click', function () { captureBaseline().catch(e => showToast(e.message)); });
+  if (cap) cap.addEventListener('click', function () { startBaselinePick(); });
   var vaIn = box.querySelector('[data-af=asset]');
   if (vaIn) {
     fetch('api/visual_asset/list').then(x => x.json()).then(d => {
@@ -160,29 +162,138 @@ function renderAssertCol() {
   });
 }
 
-async function captureBaseline() {
-  var r = findAssert('visual');
-  if (!r) return;
-  var cap = document.getElementById('asCapBtn');
-  if (!state.selNode && !state.coordPoint) { showToast('请先在截图/元素树选中元素'); return; }
-  var origText = cap ? cap.textContent : '';
-  if (cap) { cap.disabled = true; cap.textContent = '采集中…'; }
-  try {
-    var resp = await fetch('api/element/baseline', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ locator_type: $('el-type').value, locator_value: $('el-value').value.trim(),
-                              element_file: $('el-file').value, element_name: $('el-name').value.trim() }) });
-    var d = await resp.json();
-    if (!d.ok) throw new Error(d.msg || '采集失败');
-    r.captured = true; r.thumbnail = d.thumbnail; r.path = d.path;
-    showToast('基线已采集：' + d.path);
-    renderAssertCol();   // 重建卡组：按钮变「更新基线」，三图区出现基线缩略图
-  } catch (e) {
-    // 失败原因可见 + 按钮回到采集前状态（可立即重新采集）
-    showToast('采集失败：' + (e && e.message ? e.message : e));
-    if (cap) { cap.disabled = false; cap.textContent = origText; }
-  }
+/* ========== 基线区域选择流程：隐藏用例弹窗 → 点元素/拖拽框选 → 确认弹窗 → 存视觉资产 → 弹回 ========== */
+var vba = { active: false, drag: null };
+
+function startBaselinePick() {
+  const img = $('shot');
+  if (img.style.display === 'none' || !img.naturalWidth) { showToast('请先点「刷新」加载设备截图'); return; }
+  // 弹窗隐藏而非销毁：输入框/断言勾选/元素选择全部原样保留
+  $('modal-mask').style.display = 'none';
+  vba.active = true; vba.drag = null;
+  showToast('📷 基线选择：点击元素（元素范围）或直接拖拽框选（区域范围）；Esc 取消');
 }
 
+function vbaCancel(restore) {
+  vba.active = false;
+  if (vba.drag) { vba.drag.el && vba.drag.el.remove(); vba.drag = null; }
+  document.querySelectorAll('.va-rect').forEach(el => el.remove());
+  document.body.classList.remove('va-dragging');
+  $('modal-mask').style.display = 'flex';
+  if (restore !== false) showToast('已返回添加用例');
+}
+
+function vbaPickFromClick(e) {
+  const r = hitFromEvent(e);
+  if (!r || !r.hit) { showToast('未命中元素——可在元素上直接拖拽框选区域'); return; }
+  const n = r.hit;
+  const b = n._bounds || n.bounds_num;
+  if (!b || b.length !== 4) { showToast('该元素无坐标，请拖拽框选区域'); return; }
+  const rid = (n['resource-id'] || '').trim();
+  vbaOpenConfirm({
+    scope: rid ? 'element' : 'region',           // 无 resource-id 的元素退化为固定区域
+    box: [b[0], b[1], b[2] - b[0], b[3] - b[1]],
+    locator_type: 'ID', locator_value: rid,
+    biz_default: (n.text || '').trim().slice(0, 8),
+  });
+}
+
+/* 截图拖拽：区域范围框选（vba 激活时优先于 va/普通点击） */
+function vbaBindDrag() {
+  const wrap = $('shot-wrap');
+  if (!wrap || wrap.dataset.vbaBound) return;
+  wrap.dataset.vbaBound = '1';
+  wrap.addEventListener('mousedown', (e) => {
+    if (!vba.active || e.button !== 0) return;
+    const pt = shotPointFromEvent(e);
+    if (!pt) return;
+    e.preventDefault(); e.stopPropagation();
+    vba.drag = { x0: pt[0], y0: pt[1], el: document.createElement('div') };
+    vba.drag.el.className = 'va-rect';
+    vba.drag.el.style.opacity = '.65';
+    wrap.appendChild(vba.drag.el);
+    document.body.classList.add('va-dragging');
+  }, true);
+  wrap.addEventListener('mousemove', (e) => {
+    if (!vba.drag) return;
+    const pt = shotPointFromEvent(e);
+    if (!pt) return;
+    const x = Math.min(vba.drag.x0, pt[0]), y = Math.min(vba.drag.y0, pt[1]);
+    const w = Math.abs(pt[0] - vba.drag.x0), h = Math.abs(pt[1] - vba.drag.y0);
+    const k = $('shot').clientWidth / state.width;
+    const img = $('shot');
+    vba.drag.el.style.cssText = `left:${img.offsetLeft + x * k}px;top:${img.offsetTop + y * k}px;width:${w * k}px;height:${h * k}px`;
+    vba.drag.box = [x, y, w, h];
+  }, true);
+  wrap.addEventListener('mouseup', (e) => {
+    if (!vba.drag) return;
+    const b = vba.drag.box;
+    vba.drag.el.remove();
+    const d = vba.drag; vba.drag = null;
+    document.body.classList.remove('va-dragging');
+    if (!b || b[2] < 8 || b[3] < 8) { showToast('框选太小——请框出要断言的区域'); return; }
+    vbaOpenConfirm({ scope: 'region', box: b, locator_type: '', locator_value: '', biz_default: '' });
+  }, true);
+}
+
+/* 区域确认弹窗：数值微调 + 裁剪预览 + 资产命名 */
+function vbaOpenConfirm(pick) {
+  // 从当前截图裁剪预览（canvas，纯前端）
+  const img = $('shot');
+  const c = document.createElement('canvas');
+  c.width = pick.box[2]; c.height = pick.box[3];
+  c.getContext('2d').drawImage(img, pick.box[0], pick.box[1], pick.box[2], pick.box[3], 0, 0, pick.box[2], pick.box[3]);
+  const preview = c.toDataURL('image/png');
+  const scopeTxt = pick.scope === 'element' ? '元素范围（跟随元素定位，位移自适应）' : '区域范围（固定坐标）';
+  const mask = document.getElementById('vbaConfirmMask');
+  document.getElementById('vbaScope').textContent = scopeTxt;
+  document.getElementById('vbaXY').textContent = 'X ' + pick.box[0] + ' · Y ' + pick.box[1];
+  document.getElementById('vbaWH').textContent = '宽 ' + pick.box[2] + ' · 高 ' + pick.box[3];
+  document.getElementById('vbaPrev').src = preview;
+  const nameIn = document.getElementById('vbaName');
+  nameIn.value = pick.biz_default ? (pick.biz_default + '_视觉') : ('视觉区域_' + timeShort());
+  nameIn.dataset.pick = JSON.stringify(pick);
+  mask.classList.add('show');
+  nameIn.focus(); nameIn.select();
+}
+function timeShort() { const d = new Date(); return (d.getMonth()+1) + '' + d.getDate() + '_' + d.getHours() + '' + ('0'+d.getMinutes()).slice(-2); }
+
+function vbaBindConfirm() {
+  const mask = document.getElementById('vbaConfirmMask');
+  const close = () => { mask.classList.remove('show'); vbaCancel(true); };
+  document.getElementById('vbaCancel').addEventListener('click', close);
+  document.getElementById('vbaRepick').addEventListener('click', () => {
+    mask.classList.remove('show');
+    showToast('重新框选：点击元素或拖拽（Esc 取消）');
+  });
+  document.getElementById('vbaOk').addEventListener('click', async () => {
+    const name = document.getElementById('vbaName').value.trim();
+    if (!name) { showToast('请输入资产名称'); document.getElementById('vbaName').focus(); return; }
+    const pick = JSON.parse(document.getElementById('vbaName').dataset.pick);
+    const r = findAssert('visual');
+    const body = {
+      name, scope: pick.scope,
+      locator_type: pick.locator_type, locator_value: pick.locator_value,
+      region: pick.scope === 'region' ? pick.box : null,
+      threshold: r ? (r.threshold || 0.95) : 0.95,
+      match_mode: 'strict', ignore_regions: [], biz_type: 'region',
+    };
+    const res = await fetch('api/visual_asset/save', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(x => x.json()).catch(() => null);
+    if (!res || !res.ok) { showToast((res && res.msg) || '保存失败'); return; }
+    // 弹回用例弹窗：visual 断言转成视觉资产引用 + 成功标记
+    mask.classList.remove('show');
+    vba.active = false;
+    $('modal-mask').style.display = 'flex';
+    state.modalAsserts = assertState()
+      .filter(a => a.v !== 'visual' && a.v !== 'visual_asset');
+    state.modalAsserts.push({ v: 'visual_asset', asset: name });
+    renderAssertCol(); syncAssertSide();
+    showToast('✓ 基线已采集并保存为视觉资产「' + name + '」', true);
+  });
+}
+
+/* 断言副作用：特殊操作时断言卡置灰（无断言语义） */
 /* 断言副作用：特殊操作时断言卡置灰（无断言语义） */
 function syncAssertSide() {
   var sp = !!$('el-op-special').value;
@@ -363,6 +474,8 @@ async function init() {
   $('btn-coord-mode').addEventListener('click', toggleCoordMode);
   $('btn-visual-mode').addEventListener('click', vaToggleMode);
   vaBindShotDrag();
+  vbaBindDrag(); vbaBindConfirm();
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && vba.active) vbaCancel(true); });
   $('btn-locate-check').addEventListener('click', runLocateCheck);
   $('btn-undo-step').addEventListener('click', undoLastStep);
   // 临时用例未导出时，离开页面前提醒（防误关丢失已录步骤）
@@ -681,6 +794,8 @@ function hitFromEvent(e) {
   return { hit: cands[0].node, cands: cands.map(c => c.node) };
 }
 function onShotClick(e) {
+  // 📷 基线区域选择模式：单击元素 = 以该元素为断言范围
+  if (vba.active) { vbaPickFromClick(e); return; }
   // ⌖ 坐标模式：选的就是这个点，不再命中容器节点（用于无障碍盲区，如自绘弹层选项）
   if (state.coordMode) {
     const pt = shotPointFromEvent(e);
