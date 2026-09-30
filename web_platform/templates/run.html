@@ -381,7 +381,7 @@
           <div class="tblwrap">
             <table>
               <thead><tr>
-                <th>视觉资产</th><th>名称</th><th>断言范围</th><th>视觉对象类型</th>
+                <th>名称</th><th>视觉资产</th><th>断言范围</th><th>视觉对象类型</th>
                 <th>比较模式</th><th>相似度阈值</th><th>忽略区域</th><th>创建时间</th><th style="width:130px">操作</th>
               </tr></thead>
               <tbody id="visTbody"><tr><td colspan="9" class="empty">加载中…</td></tr></tbody>
@@ -389,11 +389,47 @@
           </div>
           <div class="treebar mt" style="justify-content:flex-end">
             <span class="muted" id="visPagerInfo"></span>
-            <select id="visPageSize" style="width:auto"><option>10</option><option selected>20</option><option>50</option></select>
+            <select id="visPageSize" style="width:auto"><option selected>10</option><option>20</option><option>50</option></select>
             <span class="muted">条/页</span>
             <button class="ghost mini" id="btnVisPrev">‹</button>
             <span class="muted" id="visPageNow"></span>
             <button class="ghost mini" id="btnVisNext">›</button>
+          </div>
+        </div>
+        <!-- 视觉断言编辑弹窗（可编辑：类型/模式/阈值；置灰：名称/范围/忽略区域/基线） -->
+        <div class="mask" id="visEditMask">
+          <div class="modal" style="display:block;width:480px">
+            <div class="modal-title">✎ 编辑视觉断言</div>
+            <div class="modal-body">
+              <label style="display:block;margin-bottom:10px;font-size:13px;color:#374151">名称（不可修改）
+                <input id="vedName" readonly style="width:100%;margin-top:4px;padding:7px 10px;border:1px solid #dcdfe6;border-radius:6px;font-size:13px;background:var(--panel2,#f7f8fa);color:var(--muted,#6e6e73)"></label>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <label style="display:block;font-size:13px;color:#374151">断言范围（不可修改）
+                  <input id="vedScope" readonly style="width:100%;margin-top:4px;padding:7px 10px;border:1px solid #dcdfe6;border-radius:6px;font-size:13px;background:var(--panel2,#f7f8fa);color:var(--muted,#6e6e73)"></label>
+                <label style="display:block;font-size:13px;color:#374151">视觉对象类型 <span style="color:#d33">*</span>
+                  <select id="vedBiz" style="width:100%;margin-top:4px;padding:7px 10px;border:1px solid #dcdfe6;border-radius:6px;font-size:13px">
+                    <option value="region">普通区域</option><option value="icon">Icon</option>
+                    <option value="logo">Logo</option><option value="image">图片</option>
+                    <option value="card">卡片</option><option value="banner">Banner</option>
+                    <option value="toast">Toast</option><option value="popup">弹窗</option>
+                    <option value="custom">自定义</option>
+                  </select></label>
+                <label style="display:block;font-size:13px;color:#374151">比较模式 <span style="color:#d33">*</span>
+                  <select id="vedMatch" style="width:100%;margin-top:4px;padding:7px 10px;border:1px solid #dcdfe6;border-radius:6px;font-size:13px">
+                    <option value="strict">Strict（像素级）</option>
+                    <option value="layout">Layout（布局）</option>
+                  </select></label>
+                <label style="display:block;font-size:13px;color:#374151">相似度阈值（%） <span style="color:#d33">*</span>
+                  <input id="vedTh" type="number" min="50" max="100" style="width:100%;margin-top:4px;padding:7px 10px;border:1px solid #dcdfe6;border-radius:6px;font-size:13px"></label>
+                <label style="display:block;font-size:13px;color:#374151;grid-column:1/-1">忽略区域（不可修改——坐标系相对基线区域，调整请到定位器重新采集）
+                  <input id="vedIgnore" readonly style="width:100%;margin-top:4px;padding:7px 10px;border:1px solid #dcdfe6;border-radius:6px;font-size:13px;background:var(--panel2,#f7f8fa);color:var(--muted,#6e6e73)"></label>
+              </div>
+              <div style="margin-top:10px" id="vedThumb"></div>
+            </div>
+            <div class="mops">
+              <button class="ghost" id="vedCancel">取消</button>
+              <button id="vedSave">保存</button>
+            </div>
           </div>
         </div>
         <!-- 基线大图查看器 -->
