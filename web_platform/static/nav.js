@@ -15,7 +15,6 @@ window.PlatformNav = (function () {
     '/run': 'APP自动化',
     '/locator': '元素定位器',
     '/perf': '性能压测',
-    '/visual': '视觉测试',
     '/report': '测试报告'
   };
 

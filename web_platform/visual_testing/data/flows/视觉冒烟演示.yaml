@@ -1,6 +1,0 @@
-# 演示流程：启动快歌 → 首页截图（takeScreenshot 的图进看板做基线比对）
-appId: com.recordlife.kuaige
----
-- launchApp
-- assertVisible: "推荐"
-- takeScreenshot: 首页

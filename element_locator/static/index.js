@@ -57,8 +57,7 @@ var ASSERT_KINDS = [
   { v: 'text', n: '断言文本是否正确', d: '文案相等', p: { text: '' } },
   { v: 'toast', n: '断言Toast是否出现', d: '页面级', p: { toast: '' } },
   { v: 'gone', n: '断言元素是否消失', d: '弹窗已关闭', p: { wait: 2 } },
-  { v: 'visual', n: '视觉断言', d: '基线比对', p: { threshold: 0.95, captured: false }, isNew: true },
-  { v: 'visual_asset', n: '视觉资产', d: '引用已保存的视觉断言', p: { asset: '' } },
+  { v: 'visual_asset', n: '视觉断言', d: '基线比对', p: { asset: '', thresholdPct: 98, thumb: '' } },
 ];
 
 function assertState() { return state.modalAsserts || (state.modalAsserts = []); }
@@ -89,37 +88,28 @@ function renderAssertCol() {
   if (!box) return;
   box.innerHTML = ASSERT_KINDS.map(function (d) {
     var r = findAssert(d.v), on = !!r;
-    var html = '<div class="as-item' + (on ? ' on' : '') + '" data-as="' + d.v + '">' +
+    var lockVA = d.v === 'visual_asset' && !va.on;
+    var html = '<div class="as-item' + (on ? ' on' : '') + (lockVA ? ' locked' : '') + '" data-as="' + d.v + '">' +
       '<input type="checkbox" ' + (on ? 'checked' : '') + '>' +
       '<span class="ai-n">' + d.n + '</span>' +
       (d.isNew ? '<span class="visual-tag">视觉断言</span>' : '') +
       '<span class="ai-d">' + d.d + '</span></div>';
     if (on) {
       var p = '';
+      if (d.v === 'visual_asset') {
+        var th = r.thresholdPct == null ? 98 : r.thresholdPct;
+        p = '<label>相似度阈值（%，低于判失败）<input type="number" min="50" max="100" value="' + th + '" data-af="thresholdPct"></label>'
+          + '<div><button class="btn" id="vaCapBtn" style="font-size:11.5px;padding:5px 14px;width:100%">'
+          + (r.asset ? '✓ 已采集：' + esc(r.asset) + '（点此重采）' : '采集基线（需开启视觉断言模式）') + '</button></div>'
+          + (r.asset
+              ? (r.thumb ? '<div class="wide tri" style="margin-top:6px"><div class="tri-slot"><div class="tt">基线</div><div class="tri-img"><img src="' + r.thumb + '"></div><div class="simline">已采集</div></div></div>' : '')
+              : '<div class="as-hint">采集后显示基线缩略图；用例执行按基线区域实时比对</div>');
+      }
       if (d.v === 'exists') p = '<label>等待秒数<input type="number" value="' + esc(r.wait == null ? 3 : r.wait) + '" data-af="wait"></label>';
       if (d.v === 'text') p = '<label>期望文本<input value="' + esc(r.text == null ? '' : r.text) + '" data-af="text" placeholder="如：写新歌"></label>';
       if (d.v === 'toast') p = '<label class="wide">Toast 文本<input value="' + esc(r.toast == null ? '' : r.toast) + '" data-af="toast" placeholder="如：已加入歌单"></label>';
       if (d.v === 'gone') p = '<label>等待秒数<input type="number" value="' + esc(r.wait == null ? 2 : r.wait) + '" data-af="wait"></label>';
-      if (d.v === 'visual') {
-        var th = (r.threshold == null ? 0.95 : +r.threshold);
-        p = '<label>相似度阈值（低于阈值判失败）<div class="thresh"><input type="range" min="0.8" max="1" step="0.01" value="' + th + '" data-af="threshold">' +
-            '<span class="val" id="asTv">' + th.toFixed(2) + '</span></div></label>' +
-            '<div><button class="btn" id="asCapBtn" style="font-size:11.5px;padding:5px 14px;width:100%;' + (r.captured ? 'background:#e8f7ee;color:#0a7d43;border-color:#b7e2c6' : '') + '">' + (r.captured ? '✓ 基线已采集：' + (r.assetName || '区域') + '（点此重选）' : '采集基线（选元素或框选区域）') + '</button></div>' +
-            '<div class="as-hint">基线存 elements/baselines/（随包进 git）；尺寸不一致判「分辨率不匹配」，不硬比</div>' +
-            '<div class="wide tri">' +
-            '<div class="tri-slot"><div class="tt">基线</div><div class="tri-img">' + (r.thumbnail ? '<img src="' + r.thumbnail + '">' : '<div class="glyph">🖼️</div>') + '</div><div class="simline">' + (r.captured ? '已采集' : '未采集') + '</div></div>' +
-            '<div class="tri-slot"><div class="tt">实际</div><div class="tri-img"><div class="glyph">📱</div></div><div class="simline">执行时截取</div></div>' +
-            '<div class="tri-slot"><div class="tt">diff</div><div class="tri-img"><div class="glyph">🔍</div></div><div class="simline">失败时随报告输出</div></div>' +
-            '</div>';
-      }
-      if (d.v === 'visual_asset') {
-        var hasA = !!(r.asset || '').trim();
-        p = '<label>选择视觉资产' + (hasA ? '<span style="color:#0a7d43;font-weight:600"> ✓ 已采集</span>' : '') +
-            '<input list="vaAssetOpts" value="' + esc(r.asset || '') + '" data-af="asset" placeholder="点右侧刷新选择"' + (hasA ? ' style="border-color:#b7e2c6;background:#f2fbf5"' : '') + '>·<button class="ghost mini" id="vaAssetRefresh" style="padding:2px 8px">刷新</button></label>' +
-            '<datalist id="vaAssetOpts"></datalist>' +
-            '<div class="as-hint">资产在定位器「视觉断言」模式保存（elements/visual_asserts/），运行时按其配置执行</div>';
-      }
-      html += '<div class="as-param' + (d.v === 'visual' ? ' as-param--visual' : '') + '" data-pv="' + d.v + '">' + p + '</div>';
+      html += '<div class="as-param" data-pv="' + d.v + '">' + p + '</div>';
     }
     return html;
   }).join('');
@@ -127,6 +117,7 @@ function renderAssertCol() {
     it.addEventListener('click', function (e) {
       if (e.target.tagName === 'INPUT' && e.target.type === 'checkbox') e.stopPropagation();
       var v = it.dataset.as, r = findAssert(v);
+      if (v === 'visual_asset' && !va.on && !r) { showToast('请先开启左侧「视觉断言」模式'); return; }
       if (r) state.modalAsserts = assertState().filter(function (x) { return x.v !== v; });
       else {
         r = Object.assign({ v: v }, ASSERT_KINDS.find(function (k) { return k.v === v; }).p);
@@ -143,269 +134,23 @@ function renderAssertCol() {
       if (opCommentAuto) $('el-op-comment').value = autoStepComment(currentOpType(), opElementLabel(), $('el-op-param').value) + assertsDescSuffix();
     });
   });
-  var cap = box.querySelector('#asCapBtn');
-  if (cap) cap.addEventListener('click', function () { startBaselinePick(); });
-  var vaIn = box.querySelector('[data-af=asset]');
-  if (vaIn) {
+  var capBtn = box.querySelector('#vaCapBtn');
+  if (capBtn) capBtn.addEventListener('click', function (e) { e.stopPropagation(); vaCapStart(); });
+  var vaRow = findAssert('visual_asset');
+  if (vaRow && vaRow.asset && !vaRow.thumb) {
     fetch('api/visual_asset/list').then(x => x.json()).then(d => {
-      var dl = document.getElementById('vaAssetOpts');
-      if (dl && d && d.ok) dl.innerHTML = (d.assets || []).map(a => `<option value="${esc(a.name)}">`).join('');
+      if (d && d.ok) {
+        var hit = (d.assets || []).find(a => a.name === vaRow.asset);
+        if (hit && hit.thumb && findAssert('visual_asset')) {
+          findAssert('visual_asset').thumb = hit.thumb;
+          var live = document.querySelector('#asGrid [data-af=thresholdPct]');
+          if (live && document.getElementById('asGrid')) {
+            var slot = document.querySelector('#asGrid .tri-slot');
+            if (slot) slot.querySelector('.tri-img').innerHTML = '<img src="' + hit.thumb + '">';
+          }
+        }
+      }
     }).catch(() => {});
-  }
-  var vaRf = box.querySelector('#vaAssetRefresh');
-  if (vaRf) vaRf.addEventListener('click', function (e) {
-    e.stopPropagation();
-    fetch('api/visual_asset/list').then(x => x.json()).then(d => {
-      var dl = document.getElementById('vaAssetOpts');
-      if (dl && d && d.ok) { dl.innerHTML = (d.assets || []).map(a => `<option value="${esc(a.name)}">`).join(''); showToast('已刷新资产列表（' + (d.assets || []).length + ' 个）'); }
-    }).catch(() => {});
-  });
-}
-
-/* ========== 基线区域选择流程：隐藏用例弹窗 → 点元素/拖拽框选 → 确认弹窗 → 存视觉资产 → 弹回 ========== */
-var vba = { active: false, drag: null };
-
-function startBaselinePick() {
-  const img = $('shot');
-  if (img.style.display === 'none' || !img.naturalWidth) { showToast('请先点「刷新」加载设备截图'); return; }
-  // 弹窗隐藏而非销毁：输入框/断言勾选/元素选择全部原样保留
-  $('modal-mask').style.display = 'none';
-  vba.active = true; vba.drag = null;
-  showToast('📷 基线选择：点击元素（元素范围）或直接拖拽框选（区域范围）；Esc 取消');
-}
-
-function vbaCancel(restore) {
-  vba.active = false;
-  if (vba.drag) { vba.drag.el && vba.drag.el.remove(); vba.drag = null; }
-  document.querySelectorAll('.va-rect').forEach(el => el.remove());
-  document.body.classList.remove('va-dragging');
-  $('modal-mask').style.display = 'flex';
-  if (restore !== false) showToast('已返回添加用例');
-}
-
-function vbaPickFromClick(e) {
-  const r = hitFromEvent(e);
-  if (!r || !r.hit) { showToast('未命中元素——可在元素上直接拖拽框选区域'); return; }
-  const n = r.hit;
-  const b = n._bounds || n.bounds_num;
-  if (!b || b.length !== 4) { showToast('该元素无坐标，请拖拽框选区域'); return; }
-  const rid = (n['resource-id'] || '').trim();
-  vbaOpenConfirm({
-    scope: rid ? 'element' : 'region',           // 无 resource-id 的元素退化为固定区域
-    box: [b[0], b[1], b[2] - b[0], b[3] - b[1]],
-    locator_type: 'ID', locator_value: rid,
-    biz_default: (n.text || '').trim().slice(0, 8),
-  });
-}
-
-/* 截图拖拽：区域范围框选（vba 激活时优先于 va/普通点击） */
-function vbaBindDrag() {
-  const wrap = $('shot-wrap');
-  if (!wrap || wrap.dataset.vbaBound) return;
-  wrap.dataset.vbaBound = '1';
-  wrap.addEventListener('mousedown', (e) => {
-    if (!vba.active || e.button !== 0) return;
-    const pt = shotPointFromEvent(e);
-    if (!pt) return;
-    e.preventDefault(); e.stopPropagation();
-    vba.drag = { x0: pt[0], y0: pt[1], el: document.createElement('div') };
-    vba.drag.el.className = 'va-rect';
-    vba.drag.el.style.opacity = '.65';
-    wrap.appendChild(vba.drag.el);
-    document.body.classList.add('va-dragging');
-  }, true);
-  wrap.addEventListener('mousemove', (e) => {
-    if (!vba.drag) return;
-    const pt = shotPointFromEvent(e);
-    if (!pt) return;
-    const x = Math.min(vba.drag.x0, pt[0]), y = Math.min(vba.drag.y0, pt[1]);
-    const w = Math.abs(pt[0] - vba.drag.x0), h = Math.abs(pt[1] - vba.drag.y0);
-    const k = $('shot').clientWidth / state.width;
-    const img = $('shot');
-    vba.drag.el.style.cssText = `left:${img.offsetLeft + x * k}px;top:${img.offsetTop + y * k}px;width:${w * k}px;height:${h * k}px`;
-    vba.drag.box = [x, y, w, h];
-  }, true);
-  wrap.addEventListener('mouseup', (e) => {
-    if (!vba.drag) return;
-    const b = vba.drag.box;
-    vba.drag.el.remove();
-    const d = vba.drag; vba.drag = null;
-    document.body.classList.remove('va-dragging');
-    if (!b || b[2] < 8 || b[3] < 8) { showToast('框选太小——请框出要断言的区域'); return; }
-    vbaOpenConfirm({ scope: 'region', box: b, locator_type: '', locator_value: '', biz_default: '' });
-  }, true);
-}
-
-/* 区域确认弹窗：数值微调 + 裁剪预览 + 资产命名 */
-function vbaOpenConfirm(pick) {
-  // 从当前截图裁剪预览（canvas，纯前端）
-  const img = $('shot');
-  const c = document.createElement('canvas');
-  c.width = pick.box[2]; c.height = pick.box[3];
-  c.getContext('2d').drawImage(img, pick.box[0], pick.box[1], pick.box[2], pick.box[3], 0, 0, pick.box[2], pick.box[3]);
-  const preview = c.toDataURL('image/png');
-  const scopeTxt = pick.scope === 'element' ? '元素范围（跟随元素定位，位移自适应）' : '区域范围（固定坐标）';
-  const mask = document.getElementById('vbaConfirmMask');
-  document.getElementById('vbaScope').textContent = scopeTxt;
-  document.getElementById('vbaXY').textContent = 'X ' + pick.box[0] + ' · Y ' + pick.box[1];
-  document.getElementById('vbaWH').textContent = '宽 ' + pick.box[2] + ' · 高 ' + pick.box[3];
-  document.getElementById('vbaPrev').src = preview;
-  const nameIn = document.getElementById('vbaName');
-  nameIn.value = pick.biz_default ? (pick.biz_default + '_视觉') : ('视觉区域_' + timeShort());
-  nameIn.dataset.pick = JSON.stringify(pick);
-  mask.classList.add('show');
-  nameIn.focus(); nameIn.select();
-}
-function timeShort() { const d = new Date(); return (d.getMonth()+1) + '' + d.getDate() + '_' + d.getHours() + '' + ('0'+d.getMinutes()).slice(-2); }
-
-function vbaBindConfirm() {
-  const mask = document.getElementById('vbaConfirmMask');
-  const close = () => { mask.classList.remove('show'); vbaCancel(true); };
-  document.getElementById('vbaCancel').addEventListener('click', close);
-  document.getElementById('vbaRepick').addEventListener('click', () => {
-    mask.classList.remove('show');
-    showToast('重新框选：点击元素或拖拽（Esc 取消）');
-  });
-  document.getElementById('vbaOk').addEventListener('click', async () => {
-    const name = document.getElementById('vbaName').value.trim();
-    if (!name) { showToast('请输入资产名称'); document.getElementById('vbaName').focus(); return; }
-    const pick = JSON.parse(document.getElementById('vbaName').dataset.pick);
-    const r = findAssert('visual');
-    const body = {
-      name, scope: pick.scope,
-      locator_type: pick.locator_type, locator_value: pick.locator_value,
-      region: pick.scope === 'region' ? pick.box : null,
-      threshold: r ? (r.threshold || 0.95) : 0.95,
-      match_mode: 'strict', ignore_regions: [], biz_type: 'region',
-    };
-    const res = await fetch('api/visual_asset/save', { method: 'POST',
-      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(x => x.json()).catch(() => null);
-    if (!res || !res.ok) { showToast((res && res.msg) || '保存失败'); return; }
-    // 弹回用例弹窗：visual 断言转成视觉资产引用 + 成功标记
-    mask.classList.remove('show');
-    vba.active = false;
-    $('modal-mask').style.display = 'flex';
-    state.modalAsserts = assertState()
-      .filter(a => a.v !== 'visual' && a.v !== 'visual_asset');
-    state.modalAsserts.push({ v: 'visual_asset', asset: name });
-    renderAssertCol(); syncAssertSide();
-    showToast('✓ 基线已采集并保存为视觉资产「' + name + '」', true);
-  });
-}
-
-/* 断言副作用：特殊操作时断言卡置灰（无断言语义） */
-/* 断言副作用：特殊操作时断言卡置灰（无断言语义） */
-function syncAssertSide() {
-  var sp = !!$('el-op-special').value;
-  ['asArea', 'asLabel'].forEach(function (id) {
-    var el = document.getElementById(id);
-    if (el) el.classList.toggle('locked', sp);
-  });
-  var row = document.querySelector('.as-switch-row');
-  if (row) row.classList.toggle('locked', sp);
-  renderAssertCol();
-  followStepDesc();
-}
-/* 当前生效的操作类型：特殊操作优先，否则用常规操作类型下拉 */
-function currentOpType() { return $('el-op-special').value || $('el-op-type').value || ''; }
-
-function genStepDesc(s) {
-  const t = stepTypeInfo(s.type);
-  if (s.desc && s.desc.trim()) return s.desc.trim();
-  const p = s.param || '';
-  switch (s.type) {
-    case 'click': return '点击' + s.element;
-    case 'input': return '在' + s.element + '输入「' + p + '」';
-    case 'long_press': return '长按' + s.element;
-    case 'assert_visible': return '断言' + s.element + '出现';
-    case 'assert_text': return '断言' + s.element + '文本为「' + p + '」';
-    case 'assert_toast': return '断言toast「' + p + '」';
-    case 'wait_element': return '等待【' + s.element + '】出现（最长' + (p || 60) + '秒）';
-    case 'assert_gone': return '断言【' + s.element + '】已消失';
-    case 'if_click': return '若【' + s.element + '】出现则点击（最长等' + (p || 3) + '秒）';
-    case 'screenshot': return '截图：' + p;
-    case 'tap': return '点击坐标(' + p + ')';
-    case 'sleep': return '等待' + p + '秒';
-    case 'hide_keyboard': return '收起键盘';
-    case 'deal_first_launch_dialogs': return '首次启动弹窗处理（无弹窗自动跳过）';
-    case 'custom': return (p || '自定义代码').split('\n')[0];
-    default: return '未定义步骤';
-  }
-}
-
-/* ---------- 工具 ---------- */
-function esc(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-function copyText(text, btn) {
-  const done = () => {
-    if (!btn) return;
-    btn.textContent = '已复制 ✓'; btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = '复制'; btn.classList.remove('copied'); }, 1500);
-  };
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
-  } else { fallbackCopy(text, done); }
-}
-function fallbackCopy(text, done) {
-  const ta = document.createElement('textarea');
-  ta.value = text; document.body.appendChild(ta); ta.select();
-  try { document.execCommand('copy'); } catch (e) {}
-  document.body.removeChild(ta); done();
-}
-
-/* ---------- 初始化 ---------- */
-/* 内嵌模式（平台 iframe）：自带侧栏已被 CSS 隐藏，把侧栏里的功能件搬进顶部工具条，
-   避免「平台侧栏 + 定位器侧栏」双栏；独立访问 8001 时保持原布局不动 */
-function setupEmbedBar() {
-  if (!document.documentElement.classList.contains('embedded')) return;
-  const bar = $('embed-bar');
-  const rf = $('btn-refresh');
-  if (rf) bar.appendChild(rf);
-  // 新窗口打开：脱离平台内嵌、独立标签页使用定位器（原平台页头的入口挪到这里，紧跟刷新避免换行）
-  const nb = document.createElement('a');
-  nb.className = 'btn small';
-  nb.textContent = '↗ 新窗口';
-  nb.href = location.href;
-  nb.target = '_blank';
-  nb.rel = 'noopener';
-  bar.appendChild(nb);
-  // 右侧设备组：📱 前缀标识 + 切换下拉 + 状态，成组靠右不换行（D2 修复）
-  const group = document.createElement('span');
-  group.className = 'dev-group';
-  const devTag = document.createElement('span');
-  devTag.className = 'bar-label';
-  devTag.textContent = '📱 设备';
-  group.appendChild(devTag);
-  const devSel = $('device-sel');
-  // 不再限宽：设备下拉要完整显示 serial（截断后同型号多台无法区分）
-  if (devSel) group.appendChild(devSel);
-  const dv = $('dev-info');
-  if (dv) { dv.style.marginLeft = '0'; group.appendChild(dv); }
-  bar.appendChild(group);
-}
-
-/* 顶部全局菜单栏：结构与样式来自平台共用的 nav.js / nav.css（导航项单一数据源，
-   与平台各页完全一致，加页面只改 nav.js 一处）。内嵌在平台 iframe 时由 nav.css 隐藏。 */
-function renderTopNav() {
-  const el = document.getElementById('gnav');
-  if (el && window.PlatformNav) window.PlatformNav.render(el, '/locator');
-  // 设备切换下拉迁到顶栏右上角（独立使用时；内嵌模式仍由 setupEmbedBar 走 embed-bar）。
-  // dev-info 状态文本不再入顶栏——下拉已含同份信息（型号·系统·serial），重复展示去掉
-  if (el && !document.documentElement.classList.contains('embedded')) {
-    const group = document.createElement('span');
-    group.className = 'dev-group gnav-dev';
-    const tag = document.createElement('span');
-    tag.className = 'bar-label';
-    tag.textContent = '📱 设备';
-    group.appendChild(tag);
-    const sel = $('device-sel');
-    if (sel) group.appendChild(sel);
-    el.appendChild(group);
-    const foot = document.querySelector('.side-foot');
-    if (foot) foot.style.display = 'none';   // 节点已迁走/不再展示，侧栏底部空壳隐藏
   }
 }
 
@@ -474,8 +219,6 @@ async function init() {
   $('btn-coord-mode').addEventListener('click', toggleCoordMode);
   $('btn-visual-mode').addEventListener('click', vaToggleMode);
   vaBindShotDrag();
-  vbaBindDrag(); vbaBindConfirm();
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && vba.active) vbaCancel(true); });
   $('btn-locate-check').addEventListener('click', runLocateCheck);
   $('btn-undo-step').addEventListener('click', undoLastStep);
   // 临时用例未导出时，离开页面前提醒（防误关丢失已录步骤）
@@ -794,8 +537,7 @@ function hitFromEvent(e) {
   return { hit: cands[0].node, cands: cands.map(c => c.node) };
 }
 function onShotClick(e) {
-  // 📷 基线区域选择模式：单击元素 = 以该元素为断言范围
-  if (vba.active) { vbaPickFromClick(e); return; }
+  if (vaCap.active) { vaCapPickFromClick(e); return; }
   // ⌖ 坐标模式：选的就是这个点，不再命中容器节点（用于无障碍盲区，如自绘弹层选项）
   if (state.coordMode) {
     const pt = shotPointFromEvent(e);
@@ -1159,14 +901,8 @@ function applyShotSize() {
   if (state.selNode) highlightShot(state.selNode);
 }
 function renderDetail(node) {
-  // 视觉断言采集模式：元素详情让位配置面板，只同步蓝框与提示
-  if (va && va.on) {
-    const rid = (node && node['resource-id']) || '';
-    $('detail').style.display = 'none';
-    vaDrawRects();
-    showToast(rid ? '已选元素 ' + rid.split('/').pop() + '（蓝框=视觉区域）' : '该元素无 resource-id，建议用「自定义区域」框选');
-    return;
-  }
+  // 采集流程激活时右侧是「视觉断言采集」表单，详情让位
+  if (typeof vaCap !== 'undefined' && vaCap.active) { $('detail').style.display = 'none'; return; }
   $('detail').style.display = 'block';
   // 候选元素：截图同一点可能命中多层（容器/文字/按钮），点选更精确的
   const candBox = $('hit-cands');
@@ -1972,9 +1708,7 @@ function pkgStepComment() { return $('el-op-comment').value.trim() || genStepDes
 function currentStepObj() {
   const obj = { type: currentOpType(), element: $('el-name').value.trim() || '<元素名>', param: $('el-op-param').value.trim() };
   if (!$('el-op-special').value && assertState().length) {
-    obj.asserts = assertState()
-      .filter(a => a.v !== 'visual_asset' || (a.asset || '').trim())   // 未选资产的视觉资产不入用例
-      .map(a => Object.assign({}, a));
+    obj.asserts = assertState().map(a => Object.assign({}, a));
   }
   return obj;
 }
@@ -2050,11 +1784,6 @@ function pkgMethodBlock(step) {
       } else if (a.v === 'gone') {
         assertLines.push(probeBodyLines(el, String(a.wait == null ? 2 : a.wait)));
         assertLines.push("self.appOperator.assert_gone_or_record(failures, '" + no + "·消失', probe, wait_seconds=" + (a.wait == null ? 2 : a.wait) + ")");
-      } else if (a.v === 'visual') {
-        const th = (a.threshold == null ? 0.95 : +a.threshold).toFixed(2);
-        assertLines.push(probeBodyLines(el, '3').replace(/PRESENCE_OF_ELEMENT_LOCATED/, 'VISIBILITY_OF'));
-        assertLines.push("self.appOperator.assert_visual_or_record(failures, '" + no + "·视觉', probe,");
-        assertLines.push("                                        baseline='page_objects/app_ui/android/demoProject/elements/baselines/" + elFileStem + '/' + el + ".png', threshold=" + th + ")");
       }
     });
     body = 'failures = []\ntry:\n' + body.split('\n').map(l => '    ' + l).join('\n')
@@ -2608,6 +2337,11 @@ function vaDrawRects() {
   });
 }
 function vaTargetBox() {   // 视觉区域设备坐标：element=选中元素 bounds；region=框选；screen=null(全屏)
+  if (typeof vaCap !== 'undefined' && vaCap.active) {   // 采集态：读 vaCap 上下文
+    if (vaCap.scope === 'region') return va.region;
+    if (vaCap.scope === 'element') return vaCap.box;
+    return null;
+  }
   if (va.scope === 'region') return va.region;
   if (va.scope === 'element') {
     const b = state.selNode && (state.selNode._bounds || state.selNode.bounds_num);
@@ -2636,6 +2370,51 @@ function vaCollect() {   // 面板 → API 参数
   if (va.scope === 'region' && va.region) c.region = va.region;
   return c;
 }
+/* 断言副作用：特殊操作时断言卡置灰（无断言语义） */
+function syncAssertSide() {
+  var sp = !!$('el-op-special').value;
+  ['asArea', 'asLabel'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.toggle('locked', sp);
+  });
+  var row = document.querySelector('.as-switch-row');
+  if (row) row.classList.toggle('locked', sp);
+  renderAssertCol();
+  followStepDesc();
+}
+
+function currentOpType() { return $('el-op-special').value || $('el-op-type').value || ''; }
+
+function genStepDesc(s) {
+  const t = stepTypeInfo(s.type);
+  if (s.desc && s.desc.trim()) return s.desc.trim();
+  const p = s.param || '';
+  switch (s.type) {
+    case 'click': return '点击' + s.element;
+    case 'input': return '在' + s.element + '输入「' + p + '」';
+    case 'long_press': return '长按' + s.element;
+    case 'assert_visible': return '断言' + s.element + '出现';
+    case 'assert_text': return '断言' + s.element + '文本为「' + p + '」';
+    case 'assert_toast': return '断言toast「' + p + '」';
+    case 'wait_element': return '等待【' + s.element + '】出现（最长' + (p || 60) + '秒）';
+    case 'assert_gone': return '断言【' + s.element + '】已消失';
+    case 'if_click': return '若【' + s.element + '】出现则点击（最长等' + (p || 3) + '秒）';
+    case 'screenshot': return '截图：' + p;
+    case 'tap': return '点击坐标(' + p + ')';
+    case 'sleep': return '等待' + p + '秒';
+    case 'hide_keyboard': return '收起键盘';
+    case 'deal_first_launch_dialogs': return '首次启动弹窗处理（无弹窗自动跳过）';
+    case 'custom': return (p || '自定义代码').split('\n')[0];
+    default: return '未定义步骤';
+  }
+}
+
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function vaRenderAssets(list) {
   const box = $('va-assets');
   if (!box) return;
@@ -2762,21 +2541,226 @@ function vaRenderChips() {
 }
 function vaToggleMode() {
   va.on = !va.on;
-  document.body.classList.toggle('va-mode', va.on);
   const btn = $('btn-visual-mode');
   if (btn) btn.querySelector('.bt-tx').textContent = va.on ? '视觉断言：开' : '视觉断言：关';
   if (va.on) {
-    if (state.coordMode) $('btn-coord-mode').click();   // 与坐标模式互斥
-    $('detail').style.display = 'none';
-    va.scope = 'element'; va.region = null; va.ignores = []; va.ignoreArmed = false;
-    vaRenderPanel(); vaDrawRects();
-    showToast('视觉断言采集：点击截图选元素 / 切「区域」拖拽框选');
+    showToast('视觉断言已开启：添加用例弹窗可勾选「视觉断言」并采集基线');
   } else {
-    $('visualPanel').style.display = 'none';
-    vaClearRects();
-    if (state.selNode) $('detail').style.display = '';
+    showToast('视觉断言已关闭：弹窗中的视觉断言不可勾选');
+  }
+  renderAssertCol();   // 刷新卡锁定态（弹窗开着时立即生效）
+  syncAssertSide();
+}
+
+function renderTopNav() {
+  const el = document.getElementById('gnav');
+  if (el && window.PlatformNav) window.PlatformNav.render(el, '/locator');
+  // 设备切换下拉迁到顶栏右上角（独立使用时；内嵌模式仍由 setupEmbedBar 走 embed-bar）。
+  // dev-info 状态文本不再入顶栏——下拉已含同份信息（型号·系统·serial），重复展示去掉
+  if (el && !document.documentElement.classList.contains('embedded')) {
+    const group = document.createElement('span');
+    group.className = 'dev-group gnav-dev';
+    const tag = document.createElement('span');
+    tag.className = 'bar-label';
+    tag.textContent = '📱 设备';
+    group.appendChild(tag);
+    const sel = $('device-sel');
+    if (sel) group.appendChild(sel);
+    el.appendChild(group);
+    const foot = document.querySelector('.side-foot');
+    if (foot) foot.style.display = 'none';   // 节点已迁走/不再展示，侧栏底部空壳隐藏
   }
 }
+
+function setupEmbedBar() {
+  if (!document.documentElement.classList.contains('embedded')) return;
+  const bar = $('embed-bar');
+  const rf = $('btn-refresh');
+  if (rf) bar.appendChild(rf);
+  // 新窗口打开：脱离平台内嵌、独立标签页使用定位器（原平台页头的入口挪到这里，紧跟刷新避免换行）
+  const nb = document.createElement('a');
+  nb.className = 'btn small';
+  nb.textContent = '↗ 新窗口';
+  nb.href = location.href;
+  nb.target = '_blank';
+  nb.rel = 'noopener';
+  bar.appendChild(nb);
+  // 右侧设备组：📱 前缀标识 + 切换下拉 + 状态，成组靠右不换行（D2 修复）
+  const group = document.createElement('span');
+  group.className = 'dev-group';
+  const devTag = document.createElement('span');
+  devTag.className = 'bar-label';
+  devTag.textContent = '📱 设备';
+  group.appendChild(devTag);
+  const devSel = $('device-sel');
+  // 不再限宽：设备下拉要完整显示 serial（截断后同型号多台无法区分）
+  if (devSel) group.appendChild(devSel);
+  const dv = $('dev-info');
+  if (dv) { dv.style.marginLeft = '0'; group.appendChild(dv); }
+  bar.appendChild(group);
+}
+
+function copyText(text, btn) {
+  const done = () => {
+    if (!btn) return;
+    btn.textContent = '已复制 ✓'; btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '复制'; btn.classList.remove('copied'); }, 1500);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else { fallbackCopy(text, done); }
+}
+
+function fallbackCopy(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text; document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); } catch (e) {}
+  document.body.removeChild(ta); done();
+}
+
+/* ================= 视觉断言采集流程（新交互）：弹窗快照 → 右侧采集表单 → 保存后回显 ================= */
+var vaCap = { active: false, ctx: null, scope: 'element', box: null, locator: null };
+
+function snapModalCtx() {
+  return {
+    purpose: (document.querySelector('input[name=el-purpose]:checked') || {}).value || 'only',
+    name: $('el-name').value, cn: $('el-cn-name').value,
+    type: $('el-type').value, value: $('el-value').value, wait: $('el-wait-sec').value,
+    file: $('el-file').value, fileNew: ($('el-file-new') || {}).value || '',
+    caseFile: $('el-case-file').value, caseNew: ($('el-case-new') || {}).value || '',
+    method: $('el-case-method').value, insert: $('el-insert-pos').value,
+    opType: $('el-op-type').value, special: $('el-op-special').value,
+    param: $('el-op-param').value, comment: $('el-op-comment').value,
+    asserts: assertState().map(a => Object.assign({}, a)),
+    coordMode: state.coordMode, coordPoint: state.coordPoint && state.coordPoint.slice(),
+    selNode: state.selNode, selUid: state.selUid,
+  };
+}
+
+async function restoreModalCtx(ctx, extraAssert) {
+  state.coordMode = ctx.coordMode; state.coordPoint = ctx.coordPoint;
+  state.selNode = ctx.selNode; state.selUid = ctx.selUid;
+  openModal();
+  await new Promise(r => setTimeout(r, 150));
+  const pr = document.querySelector('input[name=el-purpose][value="' + ctx.purpose + '"]');
+  if (pr && !pr.checked) { pr.checked = true; pr.dispatchEvent(new Event('change', { bubbles: true })); }
+  await new Promise(r => setTimeout(r, 150));
+  $('el-name').value = ctx.name; $('el-cn-name').value = ctx.cn;
+  $('el-type').value = ctx.type; $('el-value').value = ctx.value; $('el-wait-sec').value = ctx.wait;
+  const setSel = (id, v) => { const el = $(id); if (el && v !== undefined && v !== null && v !== '') { el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); } };
+  setSel('el-file', ctx.file);
+  setSel('el-case-file', ctx.caseFile);
+  setSel('el-case-method', ctx.method); setSel('el-insert-pos', ctx.insert);
+  setSel('el-op-type', ctx.opType); setSel('el-op-special', ctx.special);
+  if (ctx.file === '__new__' && $('el-file-new')) $('el-file-new').value = ctx.fileNew;
+  if (ctx.caseFile === '__new__' && $('el-case-new')) $('el-case-new').value = ctx.caseNew;
+  $('el-op-param').value = ctx.param; $('el-op-comment').value = ctx.comment;
+  opCommentAuto = false;
+  state.modalAsserts = ctx.asserts.filter(a => a.v !== 'visual_asset').map(a => Object.assign({}, a));
+  if (extraAssert) state.modalAsserts.push(Object.assign({}, extraAssert));
+  const tg = $('asToggle');
+  tg.checked = state.modalAsserts.length > 0;
+  tg.dispatchEvent(new Event('change', { bubbles: true }));
+  renderAssertCol(); syncAssertSide();
+}
+
+function vaCapStart() {
+  if (!$('modal-mask') || getComputedStyle($('modal-mask')).display === 'none') return;
+  vaCap.ctx = snapModalCtx();
+  vaCap.active = true; vaCap.scope = 'element'; vaCap.box = null; vaCap.locator = null;
+  va.ignores = []; va.region = null; va.ignoreArmed = false;
+  $('modal-mask').style.display = 'none';
+  vaRenderCapturePanel();
+  showToast('请采集：点击截图中的元素，或直接拖拽框选区域');
+}
+
+function vaRenderCapturePanel() {
+  const p = $('visualPanel');
+  if (!p) return;
+  p.style.display = 'block';
+  $('detail').style.display = 'none';
+  p.innerHTML = `
+    <div class="detail-head">视觉断言采集 <span class="hint">左侧截图点元素 / 拖拽框选</span></div>
+    <label>资产名称 <b style="color:#d33">*</b>
+      <input id="vac-name" placeholder="如：登录成功卡片"></label>
+    <label>断言范围
+      <span id="vac-scope-txt" class="hint" style="display:block;margin-top:4px">尚未选定——点击截图元素或拖拽框选</span></label>
+    <label>相似度阈值（%，默认 98）
+      <input id="vac-th" type="number" min="50" max="100" value="98"></label>
+    <label>忽略区域 <span class="hint">（动态数字/时间，比对时涂白跳过）</span>
+      <button class="btn small" id="vac-add-ignore" style="width:100%;margin-top:4px">＋ 添加忽略区域（回截图拖拽）</button>
+      <span class="va-chips" id="va-chips" style="display:block;margin-top:4px"></span></label>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn small" id="vac-cancel" style="flex:1">取消</button>
+      <button class="btn small primary" id="vac-save" style="flex:1">保存视觉断言</button>
+    </div>`;
+  $('vac-name').value = vaCap.ctx && vaCap.ctx.name && !/^coord_/.test(vaCap.ctx.name) ? vaCap.ctx.name : '';
+  $('vac-add-ignore').addEventListener('click', () => {
+    if (!vaTargetBox()) { showToast('请先选定视觉区域'); return; }
+    va.ignoreArmed = true;
+    showToast('在左侧截图的视觉区域内拖拽一块忽略区域');
+  });
+  $('vac-cancel').addEventListener('click', () => vaCapCancel());
+  $('vac-save').addEventListener('click', () => vaCapSave());
+  vaRenderChips();
+}
+
+async function vaCapCancel() {
+  vaCap.active = false;
+  $('visualPanel').style.display = 'none';
+  vaClearRects();
+  if (vaCap.ctx) { await restoreModalCtx(vaCap.ctx, null); showToast('已取消采集，弹窗已恢复'); }
+}
+
+async function vaCapSave() {
+  const name = $('vac-name').value.trim();
+  if (!name) { showToast('请输入资产名称'); $('vac-name').focus(); return; }
+  const box = vaCap.scope === 'region' ? va.region : vaTargetBox();
+  if (vaCap.scope !== 'screen' && !box) { showToast('请先在左侧截图选定视觉区域'); return; }
+  const body = {
+    name, scope: vaCap.scope,
+    locator_type: (vaCap.locator && vaCap.locator.type) || 'ID',
+    locator_value: (vaCap.locator && vaCap.locator.value) || '',
+    region: vaCap.scope === 'region' ? va.region : null,
+    threshold: Math.min(1, Math.max(0.5, (parseFloat($('vac-th').value) || 98) / 100)),
+    match_mode: 'strict', ignore_regions: va.ignores, biz_type: 'region',
+  };
+  const r = await fetch('api/visual_asset/save', { method: 'POST',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .then(x => x.json()).catch(() => null);
+  if (!r || !r.ok) { showToast((r && r.msg) || '保存失败（服务异常）'); return; }
+  vaCap.active = false;
+  $('visualPanel').style.display = 'none';
+  vaClearRects();
+  const th = parseFloat($('vac-th').value) || 98;
+  const newAssert = { v: 'visual_asset', asset: name, thresholdPct: th, thumb: (r.asset && r.asset.thumb) || '' };
+  await restoreModalCtx(vaCap.ctx, newAssert);
+  showToast('基线已采集，弹窗已恢复', true);
+}
+
+function vaCapPickFromClick(e) {
+  const r = hitFromEvent(e);
+  if (!r || !r.hit) { showToast('未命中元素——可直接拖拽框选区域'); return; }
+  const n = r.hit;
+  const b = n._bounds || n.bounds_num;
+  if (!b || b.length !== 4) { showToast('该元素无坐标，请拖拽框选区域'); return; }
+  const rid = (n['resource-id'] || '').trim();
+  vaCap.box = [b[0], b[1], b[2] - b[0], b[3] - b[1]];
+  vaCap.locator = rid ? { type: 'ID', value: rid } : null;
+  vaCap.scope = rid ? 'element' : 'region';
+  va.ignores = []; va.region = rid ? null : vaCap.box;
+  vaDrawRects(); vaCapSyncScopeTxt();
+  showToast(rid ? '已选元素 ' + rid.split('/').pop() : '已框定区域（元素无 id，按固定区域保存）');
+}
+
+function vaCapSyncScopeTxt() {
+  const el = $('vac-scope-txt');
+  if (!el) return;
+  if (vaCap.scope === 'element' && vaCap.box) el.textContent = '元素范围（跟随定位，位移自适应）';
+  else if (vaCap.scope === 'region' && va.region) el.textContent = '区域范围（固定坐标）· ' + va.region.join(', ');
+  else el.textContent = '尚未选定——点击截图元素或拖拽框选';
+}
+
 /* 截图拖拽框选：region 范围主框 + 忽略区域追加框 */
 function vaBindShotDrag() {
   const wrap = $('shot-wrap');
@@ -2784,8 +2768,8 @@ function vaBindShotDrag() {
   wrap.dataset.vaBound = '1';
   let drag = null;
   wrap.addEventListener('mousedown', (e) => {
-    if (!va.on || e.button !== 0) return;
-    if (!(va.scope === 'region' || va.ignoreArmed)) return;
+    if (e.button !== 0) return;
+    if (!vaCap.active && (!va.on || !(va.scope === 'region' || va.ignoreArmed))) return;
     const pt = vaDevicePoint(e);
     if (!pt) return;
     e.preventDefault();
@@ -2812,6 +2796,13 @@ function vaBindShotDrag() {
     const b = drag.box;
     drag = null;
     if (!b || b[2] < 8 || b[3] < 8) { if (va.ignoreArmed) showToast('框选太小，已忽略'); return; }
+    if (vaCap.active && !va.ignoreArmed) {
+      vaCap.scope = 'region'; vaCap.locator = null;
+      va.region = b; va.ignores = [];
+      vaDrawRects(); vaCapSyncScopeTxt();
+      showToast('已框选区域 ' + b[2] + '×' + b[3]);
+      return;
+    }
     if (va.ignoreArmed) {           // 忽略区域：裁到视觉区域内并转相对坐标
       const o = vaTargetOrigin(), box = vaTargetBox();
       let ix = Math.max(b[0], o[0]), iy = Math.max(b[1], o[1]);
@@ -2821,11 +2812,11 @@ function vaBindShotDrag() {
       va.ignores.push([ix - o[0], iy - o[1], ix2 - ix, iy2 - iy]);
       va.ignoreArmed = false;
       $('va-ignore-hint') && ($('va-ignore-hint').textContent = '点击后回到左侧截图，在视觉区域内拖拽一块');
-      vaRenderChips();
+      vaRenderChips(); vaCapSyncScopeTxt();
     } else {
       va.region = b;
     }
-    vaDrawRects();
+    vaDrawRects(); vaCapSyncScopeTxt();
   };
   wrap.addEventListener('mouseup', finish);
   wrap.addEventListener('mouseleave', finish);

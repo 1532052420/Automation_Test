@@ -155,12 +155,11 @@ def _assert_body_lines(step, el):
                          "                                        baseline=%s, threshold=%.2f%s)"
                          % (no, _q(_visual_baseline_path(step, el)), th, extra))
         elif t == 'visual_asset':
-            # 视觉资产断言：运行时按资产配置（三范围/忽略/模式/阈值）执行；未选资产则跳过
+            # 视觉断言（资产引用）：运行时按资产配置执行（范围/忽略/阈值在资产内）
             asset = str(a.get('asset') or '').strip()
-            if not asset:
-                continue
-            lines.append("self.appOperator.assert_visual_asset_or_record("
-                         "failures, '%s·视觉资产', '%s')" % (no, asset.replace("'", "\'")))
+            if asset:
+                lines.append("self.appOperator.assert_visual_asset_or_record("
+                             "failures, '%s·视觉', '%s')" % (no, asset.replace("'", "\'")))
     return lines
 
 
