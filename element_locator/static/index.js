@@ -340,6 +340,8 @@ async function init() {
   initDialog();
   $('btn-tree-diff').addEventListener('click', toggleTreeDiff);
   $('btn-coord-mode').addEventListener('click', toggleCoordMode);
+  $('btn-visual-mode').addEventListener('click', vaToggleMode);
+  vaBindShotDrag();
   $('btn-locate-check').addEventListener('click', runLocateCheck);
   $('btn-undo-step').addEventListener('click', undoLastStep);
   // 临时用例未导出时，离开页面前提醒（防误关丢失已录步骤）
@@ -657,7 +659,287 @@ function hitFromEvent(e) {
   if (!cands.length) return null;
   return { hit: cands[0].node, cands: cands.map(c => c.node) };
 }
+/* ================= 视觉断言采集模式（三范围 + 忽略区域 + Layout + 业务类型） ================= */
+/* 状态机：va.on 模式开关；scope=element/region/screen；region 框选设备坐标；
+   ignores 相对视觉区域左上角存（执行侧裁剪出区域图后直接可用，元素位移时随区域整体平移）。 */
+var va = { on: false, scope: 'element', region: null, ignores: [], ignoreArmed: false,
+           preview: null, els: {} };
+
+function vaShotRect() { return $('shot').getBoundingClientRect(); }
+function vaDevicePoint(e) {
+  const img = $('shot'), r = img.getBoundingClientRect();
+  if (r.width <= 0) return null;
+  const natW = img.naturalWidth || state.width, natH = img.naturalHeight || state.height;
+  return [Math.round((e.clientX - r.left) / r.width * natW),
+          Math.round(Math.min((e.clientY - r.top) / r.height * natH, state.height))];
+}
+function vaScreenBox(box) {   // 设备坐标 [x,y,w,h] → 截图上 div 的 left/top/w/h
+  const img = $('shot');
+  const k = img.clientWidth / state.width;
+  return { l: img.offsetLeft + box[0] * k, t: img.offsetTop + box[1] * k,
+           w: box[2] * k, h: box[3] * k };
+}
+function vaClearRects() {
+  document.querySelectorAll('.va-rect, .va-ignore').forEach(el => el.remove());
+}
+function vaDrawRects() {
+  vaClearRects();
+  const host = $('shot-wrap');
+  if (!host) return;
+  const box = vaTargetBox();   // 当前视觉区域（设备坐标）
+  if (box) {
+    const d = document.createElement('div');
+    d.className = 'va-rect';
+    const s = vaScreenBox(box);
+    d.style.cssText = `left:${s.l}px;top:${s.t}px;width:${s.w}px;height:${s.h}px`;
+    d.innerHTML = '<span class="va-tag">视觉区域</span>';
+    host.appendChild(d);
+  }
+  const o = vaTargetOrigin();
+  va.ignores.forEach((ig, i) => {
+    const d = document.createElement('div');
+    d.className = 'va-ignore';
+    const s = vaScreenBox([o[0] + ig[0], o[1] + ig[1], ig[2], ig[3]]);
+    d.style.cssText = `left:${s.l}px;top:${s.t}px;width:${s.w}px;height:${s.h}px`;
+    d.innerHTML = '<span class="va-tag">忽略' + (i + 1) + '</span>';
+    host.appendChild(d);
+  });
+}
+function vaTargetBox() {   // 视觉区域设备坐标：element=选中元素 bounds；region=框选；screen=null(全屏)
+  if (va.scope === 'region') return va.region;
+  if (va.scope === 'element') {
+    const b = state.selNode && (state.selNode._bounds || state.selNode.bounds_num);
+    if (b && b.length === 4) return [b[0], b[1], b[2] - b[0], b[3] - b[1]];
+  }
+  return null;
+}
+function vaTargetOrigin() {
+  if (va.scope === 'region' && va.region) return [va.region[0], va.region[1]];
+  const b = vaTargetBox();
+  return b ? [b[0], b[1]] : [0, 0];
+}
+function vaCollect() {   // 面板 → API 参数
+  const c = {
+    scope: va.scope,
+    biz_type: $('va-biz').value,
+    match_mode: document.querySelector('input[name=va-match]:checked').value,
+    threshold: Math.min(1, Math.max(0.5, (parseFloat($('va-th').value) || 98) / 100)),
+    ignore_regions: va.ignores,
+  };
+  if (va.scope === 'element') {
+    const rid = (state.selNode && state.selNode['resource-id']) || '';
+    c.locator_type = 'ID';
+    c.locator_value = rid;
+  }
+  if (va.scope === 'region' && va.region) c.region = va.region;
+  return c;
+}
+function vaRenderAssets(list) {
+  const box = $('va-assets');
+  if (!box) return;
+  box.innerHTML = (list || []).map(a =>
+    '<div class="va-asset" style="display:flex;gap:10px;align-items:center;padding:8px;border-bottom:1px solid #f0f1f4">' +
+    (a.thumb ? `<img src="${a.thumb}" style="height:56px">` : '') +
+    `<div style="flex:1;min-width:0"><b>${esc(a.name)}</b><div class="muted" style="font-size:11.5px">` +
+    `${a.biz_type_name || ''} · ${{element:'元素',region:'区域',screen:'整屏'}[a.scope] || a.scope} · ` +
+    `${a.match_mode === 'layout' ? 'Layout' : 'Strict'} ≥${Math.round((a.threshold || 0.98) * 100)}%` +
+    `${a.ignore_count ? ' · 忽略' + a.ignore_count + '区' : ''}</div></div>` +
+    `<button class="ghost mini" data-vadel="${esc(a.name)}">删除</button></div>`).join('')
+    || '<div class="muted" style="padding:10px 0">暂无视觉资产——配置上方表单并保存</div>';
+  box.querySelectorAll('[data-vadel]').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('删除视觉资产「' + b.dataset.vadel + '」？')) return;
+    const r = await fetch('api/visual_asset/' + encodeURIComponent(b.dataset.vadel), { method: 'DELETE' }).then(x => x.json());
+    showToast(r.msg || (r.ok ? '已删除' : '删除失败'));
+    vaLoadAssets();
+  }));
+}
+async function vaLoadAssets() {
+  const r = await fetch('api/visual_asset/list').then(x => x.json()).catch(() => null);
+  if (r && r.ok) vaRenderAssets(r.assets);
+}
+function vaRenderPanel() {
+  const p = $('visualPanel');
+  if (!p) return;
+  p.style.display = 'block';
+  p.innerHTML = `
+    <div class="detail-head">视觉断言采集 <span class="hint">选元素 / 框选区域 / 整屏</span></div>
+    <div class="field"><label>名称 <b style="color:#d33">*</b></label>
+      <input id="va-name" placeholder="如：登录成功用户卡片"></div>
+    <div class="field"><label>断言范围</label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <label class="chk"><input type="radio" name="va-scope" value="element" ${va.scope==='element'?'checked':''}>元素</label>
+        <label class="chk"><input type="radio" name="va-scope" value="region" ${va.scope==='region'?'checked':''}>自定义区域</label>
+        <label class="chk"><input type="radio" name="va-scope" value="screen" ${va.scope==='screen'?'checked':''}>整屏</label>
+      </div>
+      <div class="hint" id="va-scope-hint"></div></div>
+    <div class="field"><label>视觉对象类型 <span class="hint">（仅用于资产分类管理）</span></label>
+      <select id="va-biz">${['region|普通区域','icon|Icon','logo|Logo','image|图片','card|卡片','banner|Banner','toast|Toast','popup|弹窗','custom|自定义'].map(o=>{const [v,n]=o.split('|');return `<option value="${v}">${n}</option>`}).join('')}</select>
+      <div class="hint" id="va-biz-hint"></div></div>
+    <div class="field"><label>比较模式</label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <label class="chk"><input type="radio" name="va-match" value="strict" checked>Strict（像素）</label>
+        <label class="chk"><input type="radio" name="va-match" value="layout">Layout（布局）</label>
+      </div>
+      <div class="hint">Strict 逐像素比对；Layout 缩成粗粒度结构图比对——文字/数字变化不敏感，位置与尺寸变化敏感</div></div>
+    <div class="field"><label>相似度阈值（%·默认 98）</label>
+      <input id="va-th" type="number" min="50" max="100" step="1" value="98"></div>
+    <div class="field"><label>忽略区域 <span class="hint">（时间/数字等动态内容，比对时涂白跳过）</span></label>
+      <button class="ghost mini" id="va-add-ignore">＋ 添加忽略区域</button>
+      <div class="hint" id="va-ignore-hint">点击后回到左侧截图，在视觉区域内拖拽一块</div>
+      <div class="va-chips" id="va-chips"></div></div>
+    <div class="field"><label>基线预览</label>
+      <div id="va-preview" class="muted" style="font-size:12px">点「预览」实时截图按范围裁剪确认</div></div>
+    <div class="detail-foot" style="justify-content:flex-start">
+      <button class="btn small" id="va-preview-btn">预览</button>
+      <button class="btn small primary" id="va-save-btn">保存视觉断言</button>
+    </div>
+    <div class="loc-title" style="margin-top:14px">已保存的视觉资产</div>
+    <div class="va-assets" id="va-assets" style="max-height:260px;overflow:auto"></div>`;
+  document.querySelectorAll('input[name=va-scope]').forEach(r =>
+    r.addEventListener('change', () => { va.scope = r.value; va.ignores = []; va.region = null; vaDrawRects(); vaSyncHints(); }));
+  $('va-biz').addEventListener('change', vaSyncHints);
+  $('va-add-ignore').addEventListener('click', () => {
+    if (!vaTargetBox()) { showToast('请先选定视觉区域（选元素或框选区域）'); return; }
+    va.ignoreArmed = true;
+    $('va-ignore-hint').textContent = '🟡 已进入忽略框选：在左侧截图的视觉区域内拖拽一块（点面板任意处取消）';
+    showToast('在左侧截图上拖拽出忽略区域');
+  });
+  $('va-preview-btn').addEventListener('click', async () => {
+    const err = vaValidate(false);
+    if (err) { showToast(err); return; }
+    $('va-preview').textContent = '截图中…';
+    const r = await fetch('api/visual_asset/preview', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(vaCollect()) })
+      .then(x => x.json()).catch(() => null);
+    if (!r || !r.ok) { $('va-preview').textContent = '❌ ' + ((r && r.msg) || '预览失败'); return; }
+    $('va-preview').innerHTML = `<img src="${r.thumb}" style="max-height:200px;border-radius:8px;border:1px solid #eee">` +
+      `<div class="muted" style="font-size:11.5px;margin-top:4px">${r.size[0]}×${r.size[1]} px</div>`;
+  });
+  $('va-save-btn').addEventListener('click', async () => {
+    const err = vaValidate(true);
+    if (err) { showToast(err); return; }
+    const body = Object.assign({ name: $('va-name').value.trim() }, vaCollect());
+    const r = await fetch('api/visual_asset/save', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(x => x.json()).catch(() => null);
+    showToast((r && r.msg) || (r && r.ok ? '视觉断言已保存' : '保存失败'), r && r.ok);
+    if (r && r.ok) { $('va-name').value = ''; vaLoadAssets(); }
+  });
+  vaSyncHints(); vaRenderChips(); vaLoadAssets();
+}
+function vaValidate(needName) {
+  if (needName && !$('va-name').value.trim()) return '名称必填';
+  if (va.scope === 'element') {
+    const rid = (state.selNode && state.selNode['resource-id']) || '';
+    if (!state.selNode) return '元素范围：请先在左侧截图点击选择元素';
+    if (!rid) return '该元素无 resource-id——建议改用「自定义区域」框选';
+  }
+  if (va.scope === 'region' && !va.region) return '自定义区域：请在左侧截图上拖拽框选';
+  return null;
+}
+function vaSyncHints() {
+  const hints = {
+    element: '点击左侧截图中的元素（蓝框=当前视觉区域）',
+    region: '在左侧截图上按住拖拽框选（可重复框选，后者覆盖前者）',
+    screen: '无需选择——保存时截取整屏；忽略区域可叠加多个',
+  };
+  if ($('va-scope-hint')) $('va-scope-hint').textContent = hints[va.scope] || '';
+  const biz = $('va-biz') && $('va-biz').value;
+  if ($('va-biz-hint')) $('va-biz-hint').textContent = biz === 'toast'
+    ? 'Toast 类型：先让 Toast 出现在屏幕上，再框选它的区域保存' : '';
+}
+function vaRenderChips() {
+  const box = $('va-chips');
+  if (!box) return;
+  box.innerHTML = va.ignores.map((ig, i) =>
+    `<span class="va-chip">忽略${i + 1} (${ig[0]},${ig[1]},${ig[2]}×${ig[3]}) <b data-vaig="${i}">✕</b></span>`).join('');
+  box.querySelectorAll('[data-vaig]').forEach(b => b.addEventListener('click', () => {
+    va.ignores.splice(+b.dataset.vaig, 1); vaRenderChips(); vaDrawRects();
+  }));
+}
+function vaToggleMode() {
+  va.on = !va.on;
+  document.body.classList.toggle('va-mode', va.on);
+  const btn = $('btn-visual-mode');
+  if (btn) btn.querySelector('.bt-tx').textContent = va.on ? '视觉断言：开' : '视觉断言：关';
+  if (va.on) {
+    if (state.coordMode) $('btn-coord-mode').click();   // 与坐标模式互斥
+    $('detail').style.display = 'none';
+    va.scope = 'element'; va.region = null; va.ignores = []; va.ignoreArmed = false;
+    vaRenderPanel(); vaDrawRects();
+    showToast('视觉断言采集：点击截图选元素 / 切「区域」拖拽框选');
+  } else {
+    $('visualPanel').style.display = 'none';
+    vaClearRects();
+    if (state.selNode) $('detail').style.display = '';
+  }
+}
+/* 截图拖拽框选：region 范围主框 + 忽略区域追加框 */
+function vaBindShotDrag() {
+  const wrap = $('shot-wrap');
+  if (!wrap || wrap.dataset.vaBound) return;
+  wrap.dataset.vaBound = '1';
+  let drag = null;
+  wrap.addEventListener('mousedown', (e) => {
+    if (!va.on || e.button !== 0) return;
+    if (!(va.scope === 'region' || va.ignoreArmed || (e.target.id === 'shot'))) return;
+    const pt = vaDevicePoint(e);
+    if (!pt) return;
+    e.preventDefault();
+    drag = { x0: pt[0], y0: pt[1], el: document.createElement('div') };
+    drag.el.className = va.ignoreArmed ? 'va-ignore' : 'va-rect';
+    drag.el.style.opacity = '.6';
+    wrap.appendChild(drag.el);
+    document.body.classList.add('va-dragging');
+  });
+  // move/up 挂 document：拖拽中鼠标冲出截图区也能持续跟踪（快速拖拽必踩 wrap 丢事件）
+  const onMove = (e) => {
+    if (!drag) return;
+    const pt = vaDevicePoint(e);
+    if (!pt) return;
+    const x = Math.min(drag.x0, pt[0]), y = Math.min(drag.y0, pt[1]);
+    const w = Math.abs(pt[0] - drag.x0), h = Math.abs(pt[1] - drag.y0);
+    const s = vaScreenBox([x, y, w, h]);
+    drag.el.style.cssText = `left:${s.l}px;top:${s.t}px;width:${s.w}px;height:${s.h}px`;
+    drag.box = [x, y, w, h];
+  };
+  const finish = () => {
+    if (!drag) return;
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', finish);
+    document.body.classList.remove('va-dragging');
+    drag.el.remove();
+    const b = drag.box;
+    drag = null;
+    if (!b || b[2] < 8 || b[3] < 8) { if (va.ignoreArmed) showToast('框选太小，已忽略'); return; }
+    if (va.ignoreArmed) {           // 忽略区域：裁到视觉区域内并转相对坐标
+      const o = vaTargetOrigin(), box = vaTargetBox();
+      let ix = Math.max(b[0], o[0]), iy = Math.max(b[1], o[1]);
+      let ix2 = Math.min(b[0] + b[2], o[0] + (box ? box[2] : state.width));
+      let iy2 = Math.min(b[1] + b[3], o[1] + (box ? box[3] : state.height));
+      if (ix2 - ix < 4 || iy2 - iy < 4) { showToast('忽略区域须在视觉区域内部'); return; }
+      va.ignores.push([ix - o[0], iy - o[1], ix2 - ix, iy2 - iy]);
+      va.ignoreArmed = false;
+      $('va-ignore-hint') && ($('va-ignore-hint').textContent = '点击后回到左侧截图，在视觉区域内拖拽一块');
+      vaRenderChips();
+    } else {
+      va.region = b;
+    }
+    vaDrawRects(); vaCapSyncScopeTxt && vaCapSyncScopeTxt();
+  };
+  wrap.addEventListener('mousemove', onMove);
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', finish);
+}
+
+
 function onShotClick(e) {
+  // 视觉断言采集模式：点选元素确定断言范围
+  if (va.on) {
+    const rr = hitFromEvent(e);
+    if (rr && rr.hit) selectNode(rr.hit.uid);
+    return;
+  }
   // ⌖ 坐标模式：选的就是这个点，不再命中容器节点（用于无障碍盲区，如自绘弹层选项）
   if (state.coordMode) {
     const pt = shotPointFromEvent(e);
@@ -1021,6 +1303,11 @@ function applyShotSize() {
   if (state.selNode) highlightShot(state.selNode);
 }
 function renderDetail(node) {
+  if (va.on) {
+    $('detail').style.display = 'none';
+    vaDrawRects();
+    return;
+  }
   $('detail').style.display = 'block';
   // 候选元素：截图同一点可能命中多层（容器/文字/按钮），点选更精确的
   const candBox = $('hit-cands');
