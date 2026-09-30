@@ -734,29 +734,6 @@ function vaCollect() {   // 面板 → API 参数
   if (va.scope === 'region' && va.region) c.region = va.region;
   return c;
 }
-function vaRenderAssets(list) {
-  const box = $('va-assets');
-  if (!box) return;
-  box.innerHTML = (list || []).map(a =>
-    '<div class="va-asset" style="display:flex;gap:10px;align-items:center;padding:8px;border-bottom:1px solid #f0f1f4">' +
-    (a.thumb ? `<img src="${a.thumb}" style="height:56px">` : '') +
-    `<div style="flex:1;min-width:0"><b>${esc(a.name)}</b><div class="muted" style="font-size:11.5px">` +
-    `${a.biz_type_name || ''} · ${{element:'元素',region:'区域',screen:'整屏'}[a.scope] || a.scope} · ` +
-    `${a.match_mode === 'layout' ? 'Layout' : 'Strict'} ≥${Math.round((a.threshold || 0.98) * 100)}%` +
-    `${a.ignore_count ? ' · 忽略' + a.ignore_count + '区' : ''}</div></div>` +
-    `<button class="ghost mini" data-vadel="${esc(a.name)}">删除</button></div>`).join('')
-    || '<div class="muted" style="padding:10px 0">暂无视觉资产——配置上方表单并保存</div>';
-  box.querySelectorAll('[data-vadel]').forEach(b => b.addEventListener('click', async () => {
-    if (!confirm('删除视觉资产「' + b.dataset.vadel + '」？')) return;
-    const r = await fetch('api/visual_asset/' + encodeURIComponent(b.dataset.vadel), { method: 'DELETE' }).then(x => x.json());
-    showToast(r.msg || (r.ok ? '已删除' : '删除失败'));
-    vaLoadAssets();
-  }));
-}
-async function vaLoadAssets() {
-  const r = await fetch('api/visual_asset/list').then(x => x.json()).catch(() => null);
-  if (r && r.ok) vaRenderAssets(r.assets);
-}
 function vaRenderPanel() {
   const p = $('visualPanel');
   if (!p) return;
@@ -793,8 +770,7 @@ function vaRenderPanel() {
       <button class="btn small" id="va-preview-btn">预览</button>
       <button class="btn small primary" id="va-save-btn">保存视觉断言</button>
     </div>
-    <div class="loc-title" style="margin-top:14px">已保存的视觉资产</div>
-    <div class="va-assets" id="va-assets" style="max-height:260px;overflow:auto"></div>`;
+`;
   document.querySelectorAll('input[name=va-scope]').forEach(r =>
     r.addEventListener('change', () => { va.scope = r.value; va.ignores = []; va.region = null; vaDrawRects(); vaSyncHints(); }));
   $('va-biz').addEventListener('change', vaSyncHints);
@@ -823,9 +799,9 @@ function vaRenderPanel() {
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       .then(x => x.json()).catch(() => null);
     showToast((r && r.msg) || (r && r.ok ? '视觉断言已保存' : '保存失败'), r && r.ok);
-    if (r && r.ok) { $('va-name').value = ''; vaLoadAssets(); }
+    if (r && r.ok) { $('va-name').value = ''; }
   });
-  vaSyncHints(); vaRenderChips(); vaLoadAssets();
+  vaSyncHints(); vaRenderChips();
 }
 function vaValidate(needName) {
   if (needName && !$('va-name').value.trim()) return '名称必填';
