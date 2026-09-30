@@ -1878,11 +1878,12 @@ function bindVdbgOnce(name) {
   thIn.onchange = () => saveCfg({ threshold: (parseFloat(thIn.value) || 98) / 100 });
 
   const box = document.getElementById('vdbgUpBox');
-  if (box.dataset.vacapBound) return;
-  box.dataset.vacapBound = '1';
   const input = document.getElementById('vdbgFile');
   const upImg = document.getElementById('vdbgUpImg');
   const upX = document.getElementById('vdbgUpX');
+  const mask = document.getElementById('visDebugMask');
+  // 取消按钮：关闭调试弹窗（属性赋值覆盖式，每次调用重绑，绝不遗漏）
+  document.getElementById('vdbgClose').onclick = () => mask.classList.remove('show');
   const showPicked = (dataUrl) => {
     upImg.src = dataUrl; upImg.style.display = '';
     upX.style.display = '';
