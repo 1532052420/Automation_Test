@@ -30,7 +30,7 @@ STEP_TYPES = [
 
 # ④断言栏 · 组合断言类型（操作与断言解耦：一步 = 操作 + 断言组合）
 # exists/text/gone/visual 绑定本元素；toast 页面级
-ASSERT_KINDS = ('exists', 'text', 'toast', 'gone', 'visual')
+ASSERT_KINDS = ('exists', 'text', 'toast', 'gone', 'visual', 'visual_asset')
 
 # 页面里固定实现的工具方法：已存在则不重复生成
 TOOL_METHODS = {'wait_and_shot', 'tap_xy', 'assert_toast', 'dismiss_keyboard',
@@ -137,10 +137,23 @@ def _assert_body_lines(step, el):
                 th = float(a.get('threshold'))
             except (TypeError, ValueError):
                 th = 0.95
+            # 视觉断言增强（三范围方案）：忽略区域/比较模式随断言配置透传
+            extra = ''
+            if a.get('ignore_regions'):
+                extra += ", ignore_regions=%r" % (a.get('ignore_regions'),)
+            if a.get('match_mode'):
+                extra += ", match_mode='%s'" % a['match_mode']
             lines.append(_probe_line(el, 3))
             lines.append("self.appOperator.assert_visual_or_record(failures, '%s·视觉', probe,\n"
-                         "                                        baseline=%s, threshold=%.2f)"
-                         % (no, _q(_visual_baseline_path(step, el)), th))
+                         "                                        baseline=%s, threshold=%.2f%s)"
+                         % (no, _q(_visual_baseline_path(step, el)), th, extra))
+        elif t == 'visual_asset':
+            # 视觉资产断言：运行时按资产配置（三范围/忽略/模式/阈值）执行；未选资产则跳过
+            asset = str(a.get('asset') or '').strip()
+            if not asset:
+                continue
+            lines.append("self.appOperator.assert_visual_asset_or_record("
+                         "failures, '%s·视觉资产', '%s')" % (no, asset.replace("'", "\'")))
     return lines
 
 

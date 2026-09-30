@@ -58,6 +58,7 @@ var ASSERT_KINDS = [
   { v: 'toast', n: '断言Toast是否出现', d: '页面级', p: { toast: '' } },
   { v: 'gone', n: '断言元素是否消失', d: '弹窗已关闭', p: { wait: 2 } },
   { v: 'visual', n: '视觉断言', d: '基线比对', p: { threshold: 0.95, captured: false }, isNew: true },
+  { v: 'visual_asset', n: '视觉资产', d: '引用已保存的视觉断言', p: { asset: '' } },
 ];
 
 function assertState() { return state.modalAsserts || (state.modalAsserts = []); }
@@ -111,6 +112,11 @@ function renderAssertCol() {
             '<div class="tri-slot"><div class="tt">diff</div><div class="tri-img"><div class="glyph">🔍</div></div><div class="simline">失败时随报告输出</div></div>' +
             '</div>';
       }
+      if (d.v === 'visual_asset') {
+        p = '<label>选择视觉资产<input list="vaAssetOpts" value="' + esc(r.asset || '') + '" data-af="asset" placeholder="点右侧刷新选择">·<button class="ghost mini" id="vaAssetRefresh" style="padding:2px 8px">刷新</button></label>' +
+            '<datalist id="vaAssetOpts"></datalist>' +
+            '<div class="as-hint">资产在定位器「视觉断言」模式保存（elements/visual_asserts/），运行时按其配置执行</div>';
+      }
       html += '<div class="as-param' + (d.v === 'visual' ? ' as-param--visual' : '') + '" data-pv="' + d.v + '">' + p + '</div>';
     }
     return html;
@@ -132,11 +138,26 @@ function renderAssertCol() {
       var r = findAssert(inp.closest('.as-param').dataset.pv);
       r[inp.dataset.af] = inp.type === 'range' ? +inp.value : inp.value;
       if (inp.type === 'range') document.getElementById('asTv').textContent = (+inp.value).toFixed(2);
-      if (opCommentAuto) $('el-op-comment').value = autoStepComment(currentOpType(), opElementLabel(), $('el-op-param').value);
+      if (opCommentAuto) $('el-op-comment').value = autoStepComment(currentOpType(), opElementLabel(), $('el-op-param').value) + assertsDescSuffix();
     });
   });
   var cap = box.querySelector('#asCapBtn');
   if (cap) cap.addEventListener('click', function () { captureBaseline().catch(e => showToast(e.message)); });
+  var vaIn = box.querySelector('[data-af=asset]');
+  if (vaIn) {
+    fetch('api/visual_asset/list').then(x => x.json()).then(d => {
+      var dl = document.getElementById('vaAssetOpts');
+      if (dl && d && d.ok) dl.innerHTML = (d.assets || []).map(a => `<option value="${esc(a.name)}">`).join('');
+    }).catch(() => {});
+  }
+  var vaRf = box.querySelector('#vaAssetRefresh');
+  if (vaRf) vaRf.addEventListener('click', function (e) {
+    e.stopPropagation();
+    fetch('api/visual_asset/list').then(x => x.json()).then(d => {
+      var dl = document.getElementById('vaAssetOpts');
+      if (dl && d && d.ok) { dl.innerHTML = (d.assets || []).map(a => `<option value="${esc(a.name)}">`).join(''); showToast('已刷新资产列表（' + (d.assets || []).length + ' 个）'); }
+    }).catch(() => {});
+  });
 }
 
 async function captureBaseline() {
@@ -1836,7 +1857,9 @@ function pkgStepComment() { return $('el-op-comment').value.trim() || genStepDes
 function currentStepObj() {
   const obj = { type: currentOpType(), element: $('el-name').value.trim() || '<元素名>', param: $('el-op-param').value.trim() };
   if (!$('el-op-special').value && assertState().length) {
-    obj.asserts = assertState().map(a => Object.assign({}, a));
+    obj.asserts = assertState()
+      .filter(a => a.v !== 'visual_asset' || (a.asset || '').trim())   // 未选资产的视觉资产不入用例
+      .map(a => Object.assign({}, a));
   }
   return obj;
 }
@@ -2520,40 +2543,41 @@ function vaRenderPanel() {
   const p = $('visualPanel');
   if (!p) return;
   p.style.display = 'block';
+  // 字段样式与「添加测试用例」弹窗同款：label 包 input（.modal-body 同族规则由 .va-panel 复用）
   p.innerHTML = `
     <div class="detail-head">视觉断言采集 <span class="hint">选元素 / 框选区域 / 整屏</span></div>
-    <div class="field"><label>名称 <b style="color:#d33">*</b></label>
-      <input id="va-name" placeholder="如：登录成功用户卡片"></div>
-    <div class="field"><label>断言范围</label>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <label class="chk"><input type="radio" name="va-scope" value="element" ${va.scope==='element'?'checked':''}>元素</label>
-        <label class="chk"><input type="radio" name="va-scope" value="region" ${va.scope==='region'?'checked':''}>自定义区域</label>
-        <label class="chk"><input type="radio" name="va-scope" value="screen" ${va.scope==='screen'?'checked':''}>整屏</label>
-      </div>
-      <div class="hint" id="va-scope-hint"></div></div>
-    <div class="field"><label>视觉对象类型 <span class="hint">（仅用于资产分类管理）</span></label>
+    <label>名称 <b style="color:#d33">*</b>
+      <input id="va-name" type="text" placeholder="如：登录成功用户卡片"></label>
+    <label>断言范围
+      <span style="display:flex;gap:12px;margin-top:4px">
+        <label class="chk" style="margin:0"><input type="radio" name="va-scope" value="element" ${va.scope==='element'?'checked':''}>元素</label>
+        <label class="chk" style="margin:0"><input type="radio" name="va-scope" value="region" ${va.scope==='region'?'checked':''}>自定义区域</label>
+        <label class="chk" style="margin:0"><input type="radio" name="va-scope" value="screen" ${va.scope==='screen'?'checked':''}>整屏</label>
+      </span>
+      <span class="hint" id="va-scope-hint" style="display:block;margin-top:3px"></span></label>
+    <label>视觉对象类型 <span class="hint">（仅用于资产分类）</span>
       <select id="va-biz">${['region|普通区域','icon|Icon','logo|Logo','image|图片','card|卡片','banner|Banner','toast|Toast','popup|弹窗','custom|自定义'].map(o=>{const [v,n]=o.split('|');return `<option value="${v}">${n}</option>`}).join('')}</select>
-      <div class="hint" id="va-biz-hint"></div></div>
-    <div class="field"><label>比较模式</label>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <label class="chk"><input type="radio" name="va-match" value="strict" checked>Strict（像素）</label>
-        <label class="chk"><input type="radio" name="va-match" value="layout">Layout（布局）</label>
-      </div>
-      <div class="hint">Strict 逐像素比对；Layout 缩成粗粒度结构图比对——文字/数字变化不敏感，位置与尺寸变化敏感</div></div>
-    <div class="field"><label>相似度阈值（%·默认 98）</label>
-      <input id="va-th" type="number" min="50" max="100" step="1" value="98"></div>
-    <div class="field"><label>忽略区域 <span class="hint">（时间/数字等动态内容，比对时涂白跳过）</span></label>
-      <button class="ghost mini" id="va-add-ignore">＋ 添加忽略区域</button>
-      <div class="hint" id="va-ignore-hint">点击后回到左侧截图，在视觉区域内拖拽一块</div>
-      <div class="va-chips" id="va-chips"></div></div>
-    <div class="field"><label>基线预览</label>
-      <div id="va-preview" class="muted" style="font-size:12px">点「预览」实时截图按范围裁剪确认</div></div>
-    <div class="detail-foot" style="justify-content:flex-start">
-      <button class="btn small" id="va-preview-btn">预览</button>
-      <button class="btn small primary" id="va-save-btn">保存视觉断言</button>
+      <span class="hint" id="va-biz-hint" style="display:block;margin-top:3px"></span></label>
+    <label>比较模式
+      <span style="display:flex;gap:12px;margin-top:4px">
+        <label class="chk" style="margin:0"><input type="radio" name="va-match" value="strict" checked>Strict（像素级）</label>
+        <label class="chk" style="margin:0"><input type="radio" name="va-match" value="layout">Layout（布局）</label>
+      </span>
+      <span class="hint" style="display:block;margin-top:3px">Strict 逐像素；Layout 文字/数字变化不敏感、位置尺寸变化敏感</span></label>
+    <label>相似度阈值（%，默认 98）
+      <input id="va-th" type="number" min="50" max="100" step="1" value="98"></label>
+    <label>忽略区域 <span class="hint">（时间/数字等动态内容，比对时涂白跳过）</span>
+      <button class="btn small" id="va-add-ignore" style="width:100%">＋ 添加忽略区域（回截图拖拽）</button>
+      <span class="hint" id="va-ignore-hint" style="display:block;margin-top:3px"></span>
+      <span class="va-chips" id="va-chips" style="display:block;margin-top:4px"></span></label>
+    <label>基线预览
+      <span id="va-preview" class="muted" style="font-size:12px">点「预览」实时截图按范围裁剪确认</span></label>
+    <div style="display:flex;gap:8px;margin:2px 0 6px">
+      <button class="btn small" id="va-preview-btn" style="flex:1">预览</button>
+      <button class="btn small primary" id="va-save-btn" style="flex:1">保存视觉断言</button>
     </div>
-    <div class="loc-title" style="margin-top:14px">已保存的视觉资产</div>
-    <div class="va-assets" id="va-assets" style="max-height:260px;overflow:auto"></div>`;
+    <div class="loc-title" style="margin-top:12px">已保存的视觉资产 <span class="hint">elements/visual_asserts/</span></div>
+    <div class="va-assets" id="va-assets" style="max-height:240px;overflow:auto"></div>`;
   document.querySelectorAll('input[name=va-scope]').forEach(r =>
     r.addEventListener('change', () => { va.scope = r.value; va.ignores = []; va.region = null; vaDrawRects(); vaSyncHints(); }));
   $('va-biz').addEventListener('change', vaSyncHints);
