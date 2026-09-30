@@ -9,6 +9,24 @@
    依赖 app.js 公共件：$ / api / postJson / del / esc / toast / confirmModal / statusBadge / showRunPanel。 */
 'use strict';
 
+/* 平台提示件：本文件历史沿用定位器 showToast 命名，而 app.js 公共件叫 toast 且晚于本文件加载——
+   因此内置独立实现（红=失败 绿=成功 灰=中性），不再依赖加载顺序 */
+let _atToastTm;
+function showToast(msg, ok) {
+  let t = document.getElementById('atToast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'atToast';
+    t.style.cssText = 'position:fixed;left:50%;bottom:36px;transform:translateX(-50%);padding:10px 22px;border-radius:10px;font-size:13.5px;font-weight:600;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;transition:opacity .2s;pointer-events:none';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.background = ok === false ? '#EF4444' : (ok === true ? '#059669' : '#334155');
+  t.style.opacity = '1';
+  clearTimeout(_atToastTm);
+  _atToastTm = setTimeout(() => { t.style.opacity = '0'; }, 2600);
+}
+
 const AT_PREFIX = '/app-testing';
 let _orchSteps = [];       // 当前编排的步骤 [{type, element, param, desc}]
 let _orchSelStep = -1;     // 画布中选中的步骤下标（-1 = 未选，右栏显示用例信息）
@@ -1868,6 +1886,8 @@ function simLevel(p) {
   return 'bad';
 }
 
+const VDBG_BIZ_CN = { region: '普通区域', icon: 'Icon', logo: 'Logo', image: '图片', card: '卡片', banner: 'Banner', toast: 'Toast', popup: '弹窗', custom: '自定义' };
+
 function openVisualAssetDebug(name) {
   const mask = document.getElementById('visDebugMask');
   mask.dataset.asset = name;
@@ -1877,25 +1897,45 @@ function openVisualAssetDebug(name) {
     const a = (d.assets || []).find(x => x.name === name);
     if (!a) return;
     const SCOPE_CN = { element: '元素', region: '自定义区域', screen: '整屏' };
-    document.getElementById('vdbgScope').textContent = SCOPE_CN[a.scope] || a.scope;
+    const scopeCn = SCOPE_CN[a.scope] || a.scope;
+    document.getElementById('vdbgScope').textContent = scopeCn;
+    document.getElementById('vdbgScopeCn').textContent = scopeCn;
+    document.getElementById('vdbgBizCn').textContent = VDBG_BIZ_CN[a.biz_type] || a.biz_type || '—';
     document.getElementById('vdbgBizTxt').value = a.biz_type || 'region';
     document.getElementById('vdbgMatchTxt').value = a.match_mode || 'strict';
-    document.getElementById('vdbgThTxt').textContent = Math.round((a.threshold || 0.98) * 100);
-    document.getElementById('vdbgSim').textContent = '0.00%';
-    document.getElementById('vdbgSim').dataset.level = 'bad';
+    const thPct = Math.round((a.threshold || 0.98) * 100);
+    document.getElementById('vdbgTh').value = thPct;
+    document.getElementById('vdbgThTxt').textContent = thPct;
+    document.getElementById('vdbgIgnTxt').textContent = (a.ignore_regions || []).length + ' 块';
   }).catch(() => {});
+  // 重置：隐藏 Diff 高光带、清判定词与相似度、恢复上传落区
+  document.getElementById('vdbgDiffWrap').style.display = 'none';
+  document.getElementById('vdbgDiffImg').removeAttribute('src');
+  const simEl = document.getElementById('vdbgSim');
+  simEl.textContent = '—'; simEl.dataset.level = 'bad';
+  document.getElementById('vdbgJudge').textContent = '低于';
+  delete mask.dataset.lastSim;
   const box = document.getElementById('vdbgUpBox');
   const upImg = document.getElementById('vdbgUpImg');
   const upX = document.getElementById('vdbgUpX');
   upImg.style.display = 'none'; upImg.removeAttribute('src');
   upX.style.display = 'none';
-  box.querySelector('div').style.display = '';
+  box.style.display = 'flex';
+  document.getElementById('vdbgFile').value = '';
   mask.classList.add('show');
   bindVdbgOnce(name);
 }
 
-/* 类型/模式/阈值下拉与输入只绑一次 */
+/* 类型/模式/阈值下拉与输入每次打开重绑（属性赋值覆盖式，绝不遗漏） */
 function bindVdbgOnce(name) {
+  const mask = document.getElementById('visDebugMask');
+  const judgeEl = () => document.getElementById('vdbgJudge');
+  const refreshJudge = () => {
+    const last = mask.dataset.lastSim;
+    if (last === undefined) return;
+    const th = parseFloat(document.getElementById('vdbgTh').value) || 98;
+    judgeEl().textContent = (parseFloat(last) >= th) ? '达到' : '低于';
+  };
   const saveCfg = async (patch) => {
     const r = await fetch('/api/appui/visual_assets/' + encodeURIComponent(name) + '/config', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
@@ -1905,31 +1945,43 @@ function bindVdbgOnce(name) {
   const biz = document.getElementById('vdbgBizTxt');
   const match = document.getElementById('vdbgMatchTxt');
   const thIn = document.getElementById('vdbgTh');
-  biz.onchange = () => saveCfg({ biz_type: biz.value });
+  biz.onchange = () => {
+    document.getElementById('vdbgBizCn').textContent = VDBG_BIZ_CN[biz.value] || biz.value;
+    saveCfg({ biz_type: biz.value });
+  };
   match.onchange = () => saveCfg({ match_mode: match.value });
-  thIn.onchange = () => saveCfg({ threshold: (parseFloat(thIn.value) || 98) / 100 });
+  thIn.onchange = () => {
+    const pct = Math.min(100, Math.max(1, parseFloat(thIn.value) || 98));
+    thIn.value = pct;
+    document.getElementById('vdbgThTxt').textContent = pct;
+    refreshJudge();
+    saveCfg({ threshold: pct / 100 });
+  };
 
   const box = document.getElementById('vdbgUpBox');
   const input = document.getElementById('vdbgFile');
   const upImg = document.getElementById('vdbgUpImg');
   const upX = document.getElementById('vdbgUpX');
-  const mask = document.getElementById('visDebugMask');
-  // 取消按钮：关闭调试弹窗（属性赋值覆盖式，每次调用重绑，绝不遗漏）
-  document.getElementById('vdbgClose').onclick = () => mask.classList.remove('show');
+  // 关闭：✕ 与「取消」双绑定（属性赋值覆盖式，每次打开重绑）
+  const closeFn = () => mask.classList.remove('show');
+  document.getElementById('vdbgCloseX').onclick = closeFn;
+  document.getElementById('vdbgCancel').onclick = closeFn;
   const showPicked = (dataUrl) => {
     upImg.src = dataUrl; upImg.style.display = '';
     upX.style.display = '';
-    box.querySelector('div').style.display = 'none';
+    box.style.display = 'none';
   };
   const clearPicked = () => {
     input.value = ''; upImg.style.display = 'none'; upImg.removeAttribute('src');
     upX.style.display = 'none';
-    box.querySelector('div').style.display = '';
+    box.style.display = 'flex';
     const simEl = document.getElementById('vdbgSim');
-    if (simEl) { simEl.textContent = '—'; simEl.style.color = ''; }
-    const simTxt = document.getElementById('vdbgSimTxt');
-    if (simTxt) simTxt.textContent = '—';
+    simEl.textContent = '—'; simEl.dataset.level = 'bad';
+    document.getElementById('vdbgJudge').textContent = '低于';
+    document.getElementById('vdbgDiffWrap').style.display = 'none';
+    delete mask.dataset.lastSim;
   };
+  box.onclick = () => input.click();
   input.onchange = function () {
     const f = this.files[0];
     if (!f) return;
@@ -1937,23 +1989,26 @@ function bindVdbgOnce(name) {
     rd.onload = () => showPicked(rd.result);
     rd.readAsDataURL(f);
   };
-  upX.onclick = () => clearPicked();
-  ['dragover', 'dragenter'].forEach(ev => box.addEventListener(ev, e => { e.preventDefault(); box.style.borderColor = '#0071e3'; }));
-  box.addEventListener('dragleave', () => { box.style.borderColor = ''; });
-  box.addEventListener('drop', e => {
-    e.preventDefault(); box.style.borderColor = '';
-    const f = e.dataTransfer.files[0];
-    if (!f || !/image\/(png|jpeg)/.test(f.type)) { showToast('仅支持 PNG / JPG 图片'); return; }
-    const rd = new FileReader();
-    rd.onload = () => showPicked(rd.result);
-    rd.readAsDataURL(f);
-    try {
-      const dt = new DataTransfer();
-      dt.items.add(f);
-      input.files = dt.files;
-    } catch (err) {}
-  });
-  // 调试按钮：上传图 vs 基线，相似度按值分色
+  upX.onclick = (e) => { e.stopPropagation(); clearPicked(); };
+  if (!box.dataset.dragBound) {   // 拖拽为累加型监听，只在首次绑定时注册
+    box.dataset.dragBound = '1';
+    ['dragover', 'dragenter'].forEach(ev => box.addEventListener(ev, e => { e.preventDefault(); box.style.borderColor = '#0071e3'; }));
+    box.addEventListener('dragleave', () => { box.style.borderColor = ''; });
+    box.addEventListener('drop', e => {
+      e.preventDefault(); box.style.borderColor = '';
+      const f = e.dataTransfer.files[0];
+      if (!f || !/image\/(png|jpeg)/.test(f.type)) { showToast('仅支持 PNG / JPG 图片'); return; }
+      const rd = new FileReader();
+      rd.onload = () => showPicked(rd.result);
+      rd.readAsDataURL(f);
+      try {
+        const dt = new DataTransfer();
+        dt.items.add(f);
+        input.files = dt.files;
+      } catch (err) {}
+    });
+  }
+  // 调试按钮：上传图 vs 基线，相似度分色 + 差异高光三联图 + 阈值判定词
   document.getElementById('vdbgRun').onclick = async () => {
     if (!input.files[0]) { showToast('请先上传实际图片'); return; }
     const simEl = document.getElementById('vdbgSim');
@@ -1966,12 +2021,27 @@ function bindVdbgOnce(name) {
       { method: 'POST', body: fd }).then(x => x.json()).catch(() => null);
     btn.disabled = false; btn.textContent = '调试';
     if (!r || !r.ok) { simEl.textContent = '—'; showToast((r && r.msg) || '比对失败', false); return; }
-    const sim = r.data.similarity || 0;
+    const d = r.data || {};
+    const diffWrap = document.getElementById('vdbgDiffWrap');
+    if (d.err) showToast(d.err, false);   // 引擎提示（如分辨率不匹配）必须透出
+    const sim = (d.similarity == null) ? null : d.similarity;
+    if (sim === null) {
+      simEl.textContent = '—';
+      diffWrap.style.display = 'none';
+      return;
+    }
     simEl.textContent = (sim * 100).toFixed(2) + '%';
-    simEl.style.color = '';            // 清打开时写入的内联色，交给 CSS 分色
     simEl.dataset.level = simLevel(sim);
-    const simTxt = document.getElementById('vdbgSimTxt');
-    if (simTxt) simTxt.textContent = (sim * 100).toFixed(2) + '%';
+    const th = Math.round((d.threshold || 0.98) * 100);
+    document.getElementById('vdbgThTxt').textContent = th;
+    document.getElementById('vdbgJudge').textContent = d.passed ? '达到' : '低于';
+    mask.dataset.lastSim = String(sim * 100);
+    if (d.triple) {
+      document.getElementById('vdbgDiffImg').src = d.triple;
+      diffWrap.style.display = '';
+    } else {
+      diffWrap.style.display = 'none';
+    }
   };
 }
 
