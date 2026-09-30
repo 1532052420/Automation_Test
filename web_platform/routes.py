@@ -273,6 +273,20 @@ def api_visual_assets_delete(name):
     return jsonify({'ok': ok, 'msg': msg})
 
 
+@bp.route('/api/appui/visual_assets/<name>/config', methods=['GET'])
+def api_visual_assets_config(name):
+    """单资产配置读取（编辑弹窗回显用）"""
+    import sys
+    el_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'element_locator')
+    if el_dir not in sys.path:
+        sys.path.insert(0, el_dir)
+    from element_locator import visual_assets as va
+    cfg = va.get_config(name)
+    if cfg is None:
+        return jsonify({'ok': False, 'msg': '资产不存在'}), 404
+    return jsonify({'ok': True, 'config': cfg})
+
+
 @bp.route('/api/appui/visual_assets/<name>/config', methods=['POST'])
 def api_visual_assets_update(name):
     """编辑资产配置（视觉对象类型/比较模式/相似度阈值；名称/范围/基线不可改）"""

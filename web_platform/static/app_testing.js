@@ -1815,6 +1815,39 @@ function renderVisualAssets() {
     }));
   $('#visTbody').querySelectorAll('[data-visedit]').forEach(b =>
     b.addEventListener('click', () => openVisualAssetEdit(b.dataset.visedit)));
+
+/* 编辑视觉断言：可改 视觉对象类型/比较模式/相似度阈值；名称/范围/忽略区域/基线 置灰只读（改=重采集） */
+async function openVisualAssetEdit(name) {
+  const r = await fetch('/api/appui/visual_assets/' + encodeURIComponent(name) + '/config')
+    .then(x => x.json()).catch(() => null);
+  if (!r || !r.ok) { toast((r && r.msg) || '读取失败', false); return; }
+  const cfg = r.config || {};
+  const SCOPE_CN = { element: '元素', region: '自定义区域', screen: '整屏' };
+  document.getElementById('vedName').value = name;
+  document.getElementById('vedScope').value = SCOPE_CN[cfg.scope] || cfg.scope || '';
+  document.getElementById('vedBiz').value = cfg.biz_type || 'region';
+  document.getElementById('vedMatch').value = cfg.match_mode || 'strict';
+  document.getElementById('vedTh').value = Math.round((cfg.threshold || 0.98) * 100);
+  document.getElementById('vedIgnore').value = (cfg.ignore_regions || []).length
+    ? (cfg.ignore_regions.length + ' 块（坐标相对基线区域）') : '无';
+  document.getElementById('vedThumb').innerHTML =
+    `<img src="/api/appui/visual_assets/${encodeURIComponent(name)}/baseline.png" style="max-height:150px;border-radius:8px;border:1px solid var(--line-soft,#e5e7eb)">`;
+  const mask = document.getElementById('visEditMask');
+  mask.classList.add('show');
+  document.getElementById('vedCancel').onclick = () => mask.classList.remove('show');
+  document.getElementById('vedSave').onclick = async () => {
+    const body = {
+      biz_type: document.getElementById('vedBiz').value,
+      match_mode: document.getElementById('vedMatch').value,
+      threshold: (parseFloat(document.getElementById('vedTh').value) || 98) / 100,
+    };
+    const rr = await fetch('/api/appui/visual_assets/' + encodeURIComponent(name) + '/config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }).then(x => x.json()).catch(() => null);
+    toast((rr && rr.msg) || (rr && rr.ok ? '配置已更新' : '保存失败'), rr && rr.ok);
+    if (rr && rr.ok) { mask.classList.remove('show'); loadVisualAssets(); }
+  };
+}
   $('#visTbody').querySelectorAll('[data-visdebug]').forEach(b =>
     b.addEventListener('click', () => openVisualAssetDebug(b.dataset.visdebug)));
   $('#visTbody').querySelectorAll('[data-visdel]').forEach(b =>
@@ -1827,12 +1860,12 @@ function renderVisualAssets() {
 }
 
 /* 调试视觉断言（方案5优化）：基线VS上传图；相似度按值分色；类型/模式改动即存 */
-function simColor(p) {
-  // 语义分段色（Material Design 语义色规范）：100% 深绿 / 80~100 绿 / 50~80 橙 / <50 红
-  if (p >= 0.9999) return '#059669';
-  if (p >= 0.8) return '#10B981';
-  if (p >= 0.5) return '#F59E0B';
-  return '#EF4444';
+function simLevel(p) {
+  // 语义分段（Material 语义色规范）：返回 data-level 交给 CSS 分色（日夜间自适应）
+  if (p >= 0.9999) return 'perfect';
+  if (p >= 0.8) return 'good';
+  if (p >= 0.5) return 'warn';
+  return 'bad';
 }
 
 function openVisualAssetDebug(name) {
@@ -1850,7 +1883,6 @@ function openVisualAssetDebug(name) {
     document.getElementById('vdbgTh').value = Math.round((a.threshold || 0.98) * 100);
     const simEl = document.getElementById('vdbgSim');
     simEl.textContent = '—';
-    simEl.style.color = 'var(--text,#1d1d1f)';
   }).catch(() => {});
   const box = document.getElementById('vdbgUpBox');
   const upImg = document.getElementById('vdbgUpImg');
@@ -1895,6 +1927,8 @@ function bindVdbgOnce(name) {
     box.querySelector('div').style.display = '';
     const simEl = document.getElementById('vdbgSim');
     if (simEl) { simEl.textContent = '—'; simEl.style.color = ''; }
+    const simTxt = document.getElementById('vdbgSimTxt');
+    if (simTxt) simTxt.textContent = '—';
   };
   input.onchange = function () {
     const f = this.files[0];
@@ -1934,7 +1968,10 @@ function bindVdbgOnce(name) {
     if (!r || !r.ok) { simEl.textContent = '—'; showToast((r && r.msg) || '比对失败', false); return; }
     const sim = r.data.similarity || 0;
     simEl.textContent = (sim * 100).toFixed(2) + '%';
-    simEl.style.color = simColor(sim);
+    simEl.style.color = '';            // 清打开时写入的内联色，交给 CSS 分色
+    simEl.dataset.level = simLevel(sim);
+    const simTxt = document.getElementById('vdbgSimTxt');
+    if (simTxt) simTxt.textContent = (sim * 100).toFixed(2) + '%';
   };
 }
 
