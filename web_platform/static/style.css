@@ -510,7 +510,7 @@ img.thumb:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); 
    深色通栏侧边栏（参考后台管理控制台布置）：整列撑满内容区高度，
    图标+文字菜单项，当前项蓝色高亮；右侧为对应面板，hash 深链。
    该页取消 1180px 限宽、去掉页头，面板撑满整屏（高度按视口动态撑满）。 */
-body[data-page="run"] main, body[data-page="api-test"] main { max-width: none; padding-bottom: 28px; }
+body[data-page="run"] main, body[data-page="api-test"] main, body[data-page="visual"] main { max-width: none; padding-bottom: 28px; }
 .runlayout {
   display: flex; gap: 24px; align-items: stretch;
   min-height: calc(100vh - var(--nav-h) - 70px);

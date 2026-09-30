@@ -60,6 +60,17 @@ async function vtLoadFlows() {
   }));
 }
 
+const VT_TPL = '# 一条流程 = 启动 App → 自动操作 → 在想留证的步骤后截图\n'
+  + '# ① 把 appId 换成被测 App 包名；② --- 后是具体步骤；③ takeScreenshot 后的截图自动进看板比对\n'
+  + 'appId: com.recordlife.kuaige\n'
+  + '---\n'
+  + '- launchApp\n'
+  + '- assertVisible: "推荐"\n'
+  + '- takeScreenshot: 首页\n'
+  + '- tapOn: "我的"\n'
+  + '- assertVisible: "登录"\n'
+  + '- takeScreenshot: 我的页\n';
+
 async function vtOpenFlow(name) {
   const mask = document.getElementById('vtFlowMask');
   let content = '';
@@ -68,16 +79,11 @@ async function vtOpenFlow(name) {
     if (!d || !d.ok) { vtToast((d && d.msg) || '读取失败', false); return; }
     content = d.content;
   }
-  document.getElementById('vtFlowTitle').textContent = name ? '✎ 编辑流程 · ' + name : '＋ 新建流程';
+  document.getElementById('vtFlowTitle').textContent = name ? '✎ 编辑流程 · ' + name : '新建视觉检查流程';
   document.getElementById('vtFlowName').value = name || '';
   document.getElementById('vtFlowName').disabled = !!name;
-  document.getElementById('vtFlowYaml').value = content ||
-    '# appId 换成被测应用包名；takeScreenshot 的截图会进入看板做基线比对\n'
-    + 'appId: com.recordlife.kuaige\n'
-    + '---\n'
-    + '- launchApp\n'
-    + '- assertVisible: "推荐"\n'
-    + '- takeScreenshot: 首页\n';
+  document.getElementById('vtFlowName').placeholder = '如：快歌首页视觉检查';
+  document.getElementById('vtFlowYaml').value = content;
   document.getElementById('vtFlowSave').onclick = async () => {
     const n = document.getElementById('vtFlowName').value.trim();
     const r = await vtPost('/visual/api/flows', { name: n, content: document.getElementById('vtFlowYaml').value });
@@ -179,6 +185,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const start = (location.hash || '').replace('#', '') === 'runs' ? 'runs' : 'flows';
   vtShowPanel(start);
   document.getElementById('btnVtNew').addEventListener('click', () => vtOpenFlow(''));
+  document.getElementById('vtFlowTpl').addEventListener('click', () => {
+    const y = document.getElementById('vtFlowYaml');
+    if (!y.value.trim()) y.value = VT_TPL;
+  });
   document.getElementById('btnVtFlowsRefresh').addEventListener('click', vtLoadFlows);
   document.getElementById('btnVtRunsRefresh').addEventListener('click', vtLoadRuns);
   document.getElementById('btnVtDetailBack').addEventListener('click', () => {
