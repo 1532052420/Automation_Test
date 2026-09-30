@@ -1843,7 +1843,6 @@ function openVisualAssetDebug(name) {
     el.textContent = pass ? '通过 PASS' : '未通过 FAIL';
     el.style.color = pass ? '#0A7D43' : '#D73211';
     document.getElementById('vdbgSim').textContent = (lastSim * 100).toFixed(2) + '%';
-    document.getElementById('vdbgJudgeVal').textContent = lastTh.toFixed(2);
   };
   const renderParams = (d) => {
     lastSim = d.similarity; lastTh = d.threshold; lastMode = d.match_mode;
@@ -1886,8 +1885,12 @@ function openVisualAssetDebug(name) {
     }
     const d = r.data;
     document.getElementById('vdbgMsg').textContent = '';
-    renderParams(d);
-    showTriple(d.triple);
+    try {
+      renderParams(d);
+      showTriple(d.triple);
+    } catch (e) {
+      document.getElementById('vdbgMsg').textContent = '渲染异常: ' + e.message + ' @ ' + (e.stack || '').split('\n').slice(1, 3).join(' <- ');
+    }
   };
   document.getElementById('vdbgDel').onclick = () => {
     document.getElementById('vdbgImgs').innerHTML = '';
