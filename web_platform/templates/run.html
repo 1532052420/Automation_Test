@@ -69,6 +69,7 @@
       <a href="#projects" data-panel="projects" data-icon="folder" class="on">项目管理</a>
       <a href="#elements" data-panel="elements" data-icon="target">元素管理</a>
       <a href="#asserts" data-panel="asserts" data-icon="check">断言管理</a>
+      <a href="#visuals" data-panel="visuals" data-icon="visual">视觉断言</a>
       <a href="#caselist" data-panel="caselist" data-icon="doc">用例管理</a>
       <a href="#cases" data-panel="cases" data-icon="list">执行用例</a>
       <a href="#orch" data-panel="orch" data-icon="flow">用例编排</a>
@@ -356,6 +357,50 @@
       </section>
 
       <!-- 用例管理（testhub TestCaseList 移植）：只管理 / 编辑用例实体，执行统一走「执行用例」 -->
+      <!-- 视觉断言（定位器采集的视觉资产统一管理；列表样式与项目管理同款含分页） -->
+      <section class="panel" id="panel-visuals" hidden>
+        <div class="card">
+          <div class="cardhead">
+            <h3>视觉断言 <span class="muted">元素定位器「视觉断言」模式采集的资产在此统一管理；用例断言方式选「视觉资产」引用</span></h3>
+          </div>
+          <div class="treebar">
+            <input type="search" id="visSearch" placeholder="搜索资产名称" style="max-width:220px">
+            <select id="visScope" style="max-width:170px">
+              <option value="">全部范围</option>
+              <option value="element">元素</option>
+              <option value="region">自定义区域</option>
+              <option value="screen">整屏</option>
+            </select>
+            <select id="visMatch" style="max-width:170px">
+              <option value="">全部比较模式</option>
+              <option value="strict">Strict（像素级）</option>
+              <option value="layout">Layout（布局）</option>
+            </select>
+            <button class="ghost mini" id="btnVisReset" title="清除筛选项并重新加载数据">重置</button>
+          </div>
+          <div class="tblwrap">
+            <table>
+              <thead><tr>
+                <th>基线缩略图</th><th>名称</th><th>断言范围</th><th>业务类型</th>
+                <th>比较模式</th><th>阈值</th><th>忽略区域</th><th>创建时间</th><th style="width:130px">操作</th>
+              </tr></thead>
+              <tbody id="visTbody"><tr><td colspan="9" class="empty">加载中…</td></tr></tbody>
+            </table>
+          </div>
+          <div class="treebar mt" style="justify-content:flex-end">
+            <span class="muted" id="visPagerInfo"></span>
+            <select id="visPageSize" style="width:auto"><option>10</option><option selected>20</option><option>50</option></select>
+            <span class="muted">条/页</span>
+            <button class="ghost mini" id="btnVisPrev">‹</button>
+            <span class="muted" id="visPageNow"></span>
+            <button class="ghost mini" id="btnVisNext">›</button>
+          </div>
+        </div>
+        <!-- 基线大图查看器 -->
+        <div class="mask" id="vaMgrViewer" style="cursor:zoom-out;align-items:center;justify-content:center">
+          <img id="vaMgrViewerImg" alt="基线大图" style="max-width:82vw;max-height:84vh;border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.4)">
+        </div>
+      </section>
       <section class="panel" id="panel-caselist" hidden>
         <div class="card">
           <h3>用例管理 <span class="muted">框架 cases/app_ui 全部测试用例 · 管理与编辑 · 移动到项目</span></h3>

@@ -250,6 +250,39 @@ def api_appui_assertion_baseline_image():
     return send_file(p)
 
 
+# ---------------------------------------------------------------- 视觉断言管理（定位器采集的视觉资产统一管理）
+@bp.route('/api/appui/visual_assets')
+def api_visual_assets():
+    """视觉资产列表：读取定位器视觉断言采集的数据（elements/visual_asserts/），含缩略图"""
+    import sys
+    if os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'element_locator') not in sys.path:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'element_locator'))
+    from element_locator import visual_assets as va
+    return jsonify({'ok': True, 'assets': va.list_assets()})
+
+
+@bp.route('/api/appui/visual_assets/<name>', methods=['DELETE'])
+def api_visual_assets_delete(name):
+    import sys
+    if os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'element_locator') not in sys.path:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'element_locator'))
+    from element_locator import visual_assets as va
+    ok, msg = va.delete(name)
+    return jsonify({'ok': ok, 'msg': msg})
+
+
+@bp.route('/api/appui/visual_assets/<name>/baseline.png')
+def api_visual_assets_baseline(name):
+    import sys
+    if os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'element_locator') not in sys.path:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'element_locator'))
+    from element_locator import visual_assets as va
+    p = va.baseline_path(name)
+    if not p:
+        return jsonify({'ok': False, 'msg': '基线图不存在'}), 404
+    return send_file(os.path.abspath(p))
+
+
 # ---------------------------------------------------------------- AppUI 元素管理（元素库可视化维护）
 @bp.route('/api/appui/elements')
 def api_appui_elements():
