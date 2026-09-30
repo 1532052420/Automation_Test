@@ -1874,6 +1874,8 @@ function bindVdbgOnce(name) {
   const match = document.getElementById('vdbgMatch');
   biz.onchange = () => saveCfg({ biz_type: biz.value });
   match.onchange = () => saveCfg({ match_mode: match.value });
+  const thIn = document.getElementById('vdbgTh');
+  thIn.onchange = () => saveCfg({ threshold: (parseFloat(thIn.value) || 98) / 100 });
 
   const box = document.getElementById('vdbgUpBox');
   if (box.dataset.vacapBound) return;
