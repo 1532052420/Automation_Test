@@ -76,22 +76,36 @@
   </div>
 </main>
 
-<!-- 流程编辑弹窗 -->
+<!-- 流程表单弹窗（表单化：必填/选填标注 + 逐字段校验，保存时生成 Maestro YAML） -->
 <div class="mask" id="vtFlowMask">
-  <div class="modal envmodal" style="width:min(720px,94vw)">
+  <div class="modal envmodal" style="width:min(760px,94vw)">
     <h4 id="vtFlowTitle">新建视觉检查流程</h4>
     <p class="muted" style="font-size:12.5px;margin-bottom:12px">
-      一条流程 = 一段手机自动操作脚本（Maestro 语法）：启动 App → 点按/断言 → 在想留证的步骤后加
-      <b>takeScreenshot: 截图名</b>，运行时该截图会自动进看板与基线比对。</p>
-    <div class="fields" style="grid-template-columns:1fr auto">
-      <div class="field"><label>流程名（不用带扩展名）</label><input type="text" id="vtFlowName" placeholder="如：快歌首页视觉检查" autocomplete="off"></div>
-      <div class="field" style="justify-content:flex-end"><label>&nbsp;</label>
-        <button class="ghost mini" id="vtFlowTpl" title="填入一条可直接修改使用的完整示例">插入示例模板</button></div>
+      表单会自动生成 Maestro 脚本：运行时启动 App → 按步骤自动操作 → 遇到截图步骤自动留证，
+      与基线逐张比对出差异。带 <b style="color:var(--bad-text)">*</b> 为必填，其余可不填。</p>
+    <div class="fields" style="grid-template-columns:1fr 1fr">
+      <div class="field"><label>流程名 <b style="color:var(--bad-text)">*</b></label>
+        <input type="text" id="vtFlowName" placeholder="如：快歌首页视觉检查" autocomplete="off"></div>
+      <div class="field"><label>被测 App 包名 <b style="color:var(--bad-text)">*</b>
+        <span class="muted">（adb shell pm list packages 可查）</span></label>
+        <input type="text" id="vtFlowApp" placeholder="如：com.recordlife.kuaige" autocomplete="off"></div>
+      <div class="field"><label>启动后等待秒数 <span class="muted">（选填；慢页面建议 2~5，留空不等待）</span></label>
+        <input type="number" id="vtFlowWait" min="0" max="60" placeholder="选填，如：3"></div>
+      <div class="field"><label>备注 <span class="muted">（选填；写进脚本首行注释，便于回看）</span></label>
+        <input type="text" id="vtFlowNote" placeholder="选填，如：回归首页主链路视觉"></div>
     </div>
-    <div class="field mt"><label>流程脚本（YAML） <span class="muted">常用：launchApp 启动 / tapOn 点按 / assertVisible 断言可见 / takeScreenshot 截图</span></label>
-      <textarea id="vtFlowYaml" rows="15" spellcheck="false"
-        style="font:12px/1.6 ui-monospace,Menlo,Consolas,monospace;white-space:pre;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;outline:none"></textarea></div>
-    <div class="mops mt"><button class="ghost" id="vtFlowCancel">取消</button><button id="vtFlowSave">保存</button></div>
+    <div class="field mt"><label>操作与截图步骤 <b style="color:var(--bad-text)">*</b>
+      <span class="muted">（每行一条命令，不用写行首「- 」；想留证的行写 takeScreenshot: 截图名，至少一条）</span></label>
+      <textarea id="vtFlowSteps" rows="9" spellcheck="false"
+        style="font:12px/1.6 ui-monospace,Menlo,Consolas,monospace;white-space:pre;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;outline:none"
+        placeholder="launchApp&#10;assertVisible: &quot;推荐&quot;&#10;takeScreenshot: 首页&#10;tapOn: &quot;我的&quot;&#10;takeScreenshot: 我的页"></textarea>
+      <div class="muted" style="font-size:11.5px;margin-top:4px">常用：launchApp 启动 · tapOn: "按钮" 点按 · inputText: "文字" 输入 ·
+        assertVisible: "文案" 断言可见 · takeScreenshot: 名称 截图检查点 · 数字 直接等待秒</div>
+    </div>
+    <div class="mops mt"><span class="muted" style="margin-right:auto;font-size:12px" id="vtFlowHint"></span>
+      <button class="ghost" id="vtFlowCancel">取消</button>
+      <button class="ghost" id="vtFlowTpl" title="用一条完整示例填满全部字段">填入示例</button>
+      <button id="vtFlowSave">保存</button></div>
   </div>
 </div>
 

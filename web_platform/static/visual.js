@@ -60,37 +60,97 @@ async function vtLoadFlows() {
   }));
 }
 
-const VT_TPL = '# 一条流程 = 启动 App → 自动操作 → 在想留证的步骤后截图\n'
-  + '# ① 把 appId 换成被测 App 包名；② --- 后是具体步骤；③ takeScreenshot 后的截图自动进看板比对\n'
-  + 'appId: com.recordlife.kuaige\n'
-  + '---\n'
-  + '- launchApp\n'
-  + '- assertVisible: "推荐"\n'
-  + '- takeScreenshot: 首页\n'
-  + '- tapOn: "我的"\n'
-  + '- assertVisible: "登录"\n'
-  + '- takeScreenshot: 我的页\n';
+const VT_TPL = {
+  name: '快歌首页视觉检查',
+  app: 'com.recordlife.kuaige',
+  wait: '3',
+  note: '回归首页主链路视觉',
+  steps: 'launchApp\nassertVisible: "推荐"\ntakeScreenshot: 首页\ntapOn: "我的"\ntakeScreenshot: 我的页',
+};
+
+/* 表单 ⇄ YAML：
+   生成 = 备注(注释行) + appId + --- + 每行步骤自动补「- 」前缀；
+   解析 = 逆向提取（旧手写脚本也能进表单继续编辑） */
+function vtBuildYaml(f) {
+  const lines = [];
+  if (f.note) lines.push('# 备注: ' + f.note);
+  lines.push('appId: ' + f.app);
+  lines.push('---');
+  if (f.wait) lines.push('- sleep: ' + f.wait);
+  f.steps.forEach(st => lines.push('- ' + st));
+  return lines.join('\n');
+}
+
+function vtParseYaml(content) {
+  const f = { name: '', app: '', wait: '', note: '', steps: [] };
+  let inSteps = false;
+  (content || '').split('\n').forEach(ln => {
+    const t = ln.trim();
+    if (!t) return;
+    const mNote = t.match(/^#\s*备注[:：]\s*(.+)$/);
+    if (mNote) { f.note = mNote[1].trim(); return; }
+    const mApp = t.match(/^appId:\s*(\S+)$/);
+    if (mApp) { f.app = mApp[1]; return; }
+    if (t === '---') { inSteps = true; return; }
+    if (inSteps) {
+      f.steps.push(t.replace(/^-\s+/, ''));
+      if (/^sleep:\s*\d+/.test(t) && !f.wait) f.wait = t.split(':')[1].trim();
+    }
+  });
+  return f;
+}
 
 async function vtOpenFlow(name) {
   const mask = document.getElementById('vtFlowMask');
-  let content = '';
+  let f = { name: '', app: '', wait: '', note: '', steps: [] };
   if (name) {
     const d = await vtApi('/visual/api/flows/' + encodeURIComponent(name));
     if (!d || !d.ok) { vtToast((d && d.msg) || '读取失败', false); return; }
-    content = d.content;
+    f = vtParseYaml(d.content);
+    f.name = name;
   }
-  document.getElementById('vtFlowTitle').textContent = name ? '✎ 编辑流程 · ' + name : '新建视觉检查流程';
-  document.getElementById('vtFlowName').value = name || '';
+  document.getElementById('vtFlowTitle').textContent = name ? '✎ 编辑视觉检查流程 · ' + name : '新建视觉检查流程';
+  document.getElementById('vtFlowName').value = f.name;
   document.getElementById('vtFlowName').disabled = !!name;
-  document.getElementById('vtFlowName').placeholder = '如：快歌首页视觉检查';
-  document.getElementById('vtFlowYaml').value = content;
+  document.getElementById('vtFlowApp').value = f.app;
+  document.getElementById('vtFlowWait').value = f.wait;
+  document.getElementById('vtFlowNote').value = f.note;
+  document.getElementById('vtFlowSteps').value = f.steps.join('\n');
+  document.getElementById('vtFlowHint').textContent = '';
   document.getElementById('vtFlowSave').onclick = async () => {
-    const n = document.getElementById('vtFlowName').value.trim();
-    const r = await vtPost('/visual/api/flows', { name: n, content: document.getElementById('vtFlowYaml').value });
+    const hint = document.getElementById('vtFlowHint');
+    const req = (ok, msg, focusId) => {
+      if (ok) return true;
+      hint.textContent = '❌ ' + msg;
+      vtToast(msg, false);
+      if (focusId) document.getElementById(focusId).focus();
+      return false;
+    };
+    const name = document.getElementById('vtFlowName').value.trim();
+    const app = document.getElementById('vtFlowApp').value.trim();
+    const wait = document.getElementById('vtFlowWait').value.trim();
+    const note = document.getElementById('vtFlowNote').value.trim();
+    const steps = document.getElementById('vtFlowSteps').value.split('\n')
+      .map(l => l.trim().replace(/^-\s+/, '')).filter(Boolean);
+    if (!req(name, '流程名为必填项', 'vtFlowName')) return;
+    if (!req(app, '被测 App 包名为必填项（如 com.recordlife.kuaige）', 'vtFlowApp')) return;
+    if (!req(steps.length, '操作与截图步骤为必填项（至少一行，如 launchApp）', 'vtFlowSteps')) return;
+    const shot = steps.filter(l => /^takeScreenshot[:：]/.test(l));
+    if (!req(shot.length, '至少需要一条 takeScreenshot 截图检查点，否则看板无图可比', 'vtFlowSteps')) return;
+    const r = await vtPost('/visual/api/flows', { name, content: vtBuildYaml({ name, app, wait, note, steps }) });
     vtToast(r.msg || (r.ok ? '已保存' : '保存失败'), r.ok);
     if (r.ok) { mask.classList.remove('show'); vtLoadFlows(); }
   };
   document.getElementById('vtFlowCancel').onclick = () => mask.classList.remove('show');
+  document.getElementById('vtFlowTpl').onclick = () => {
+    document.getElementById('vtFlowName').value = VT_TPL.name;
+    document.getElementById('vtFlowName').disabled = true;
+    document.getElementById('vtFlowName').dataset.tplNew = '1';
+    document.getElementById('vtFlowApp').value = VT_TPL.app;
+    document.getElementById('vtFlowWait').value = VT_TPL.wait;
+    document.getElementById('vtFlowNote').value = VT_TPL.note;
+    document.getElementById('vtFlowSteps').value = VT_TPL.steps;
+  };
   mask.classList.add('show');
 }
 
@@ -185,10 +245,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const start = (location.hash || '').replace('#', '') === 'runs' ? 'runs' : 'flows';
   vtShowPanel(start);
   document.getElementById('btnVtNew').addEventListener('click', () => vtOpenFlow(''));
-  document.getElementById('vtFlowTpl').addEventListener('click', () => {
-    const y = document.getElementById('vtFlowYaml');
-    if (!y.value.trim()) y.value = VT_TPL;
-  });
   document.getElementById('btnVtFlowsRefresh').addEventListener('click', vtLoadFlows);
   document.getElementById('btnVtRunsRefresh').addEventListener('click', vtLoadRuns);
   document.getElementById('btnVtDetailBack').addEventListener('click', () => {
