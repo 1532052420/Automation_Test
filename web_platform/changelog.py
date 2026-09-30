@@ -17,6 +17,16 @@ APP_VERSION = '6.14.69'
 # 每条变更一句话 10~20 字，只说改了什么（详细背景见项目 memory 与设计文档）
 CHANGELOG = [
     {
+        'version': '6.14.70',
+        'time': '2026-09-30 21:36:48',
+        'title': '安装官方两个skill：webapp-testing与frontend-design（anthropics/skills 179k★）',
+        'changes': [
+            '新增 webapp-testing skill（Web端Playwright功能测试，含with_server.py服务生命周期脚本）',
+            '更新 frontend-design skill至官方最新版（覆盖旧版）',
+            '登记 AGENTS.md 强制规范表 #7/#8',
+        ],
+    },
+    {
         'version': '6.14.69',
         'time': '2026-09-30 21:22:47',
         'title': '新增 self-test-gate 自测门禁 skill（四道门禁+自检清单）',

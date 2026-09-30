@@ -2,7 +2,7 @@
 
 本项目的所有任务在执行前，必须先声明：**「我已按照 agents.md 执行了 xxx skill」**，并 genuinely 按对应 skill 的规范执行，而不是只走声明形式。
 
-## 四条强制规范（全项目默认启用）+ 一条按需规范
+## 六条强制规范（全项目默认启用）+ 一条按需规范
 
 以下四条规范为**项目默认生效**，无需每次手动指定、无需用户显式调用 skill；只要任务落在对应触发范围内，即自动适用。
 
@@ -14,6 +14,8 @@
 | 4 | `version-changelog` | **任何对项目产物（代码/UI/配置/文档）产生修改的任务** | `.workbuddy/skills/version-changelog/` |
 | 5 | `frontend-design` | 新增页面 / 可点击 HTML 原型的视觉方向（**按需启用，非默认强制**） | `.workbuddy/skills/frontend-design/` |
 | 6 | `version-github-release` | **版本号迭代收尾**（version-changelog 递增之后）：双数→推送 GitHub，单数→不上传 | `.workbuddy/skills/version-github-release/` |
+| 7 | `webapp-testing` | Web 端功能测试（Playwright：前端功能验证/UI行为调试/截图/服务生命周期），来源 anthropics/skills 官方仓库（179k★） | `.workbuddy/skills/webapp-testing/` |
+| 8 | `frontend-design`（官方版） | Web 端 UI/视觉设计方向（美学/排版/布局，anthropics 官方最新版，覆盖旧版） | `.workbuddy/skills/frontend-design/` |
 
 > 同一份 skill 亦同步存放于 `.zcode/skills/`（ZCode/Qoder 运行时读取路径）。两处内容需保持一致，权威副本为 `.workbuddy/skills/`。
 

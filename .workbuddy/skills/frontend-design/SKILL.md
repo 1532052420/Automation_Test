@@ -69,15 +69,3 @@ Use active voice as default. A CTA says exactly what happens when it is used: "S
 Treat failure and emptiness as moments for direction, not mood. Explain what went wrong and how to fix it, in the interface's voice rather than a person's. Errors don't apologize, and they are never vague about what happened. An empty screen is an invitation to act.
 
 Keep the tone conversational: plain verbs, sentence case, no filler, with tone matched to the brand and the audience. Let each written element do exactly one job.
-
----
-
-## 本项目适配（AutomationTest）
-
-上游正文保持原样，本节是本地约束，冲突时以本节为准。
-
-- **适用范围**：为 App、网页（含 `web_platform` 平台、`element_locator` 元素定位器）做**新增页面或可点击 HTML 原型**时的视觉方向指导。
-- **不覆盖既有主题契约**：平台与定位器已统一「日间默认 + `html.night` 夜间覆盖」，颜色必须走 `style.css` 的 CSS 变量，不得为了视觉冲击另起一套硬编码色板。改**既有页面**时视觉语言服从现状，本 skill 的设计自由度只用在新增页面上。
-- **不得引入外部资源**：运行环境内网，禁止 CDN 字体 / 外链图片 / 在线 JS，字体只用系统字体栈或仓库内已有资源。
-- **图标仍走 `icon-generator`**：需要图标时按 `.workbuddy/skills/icon-generator/SKILL.md` 出 24×24 SVG 源文件再导出多档 PNG，不在 HTML 里手写零散 SVG。
-- **交付形态**：验证想法 → 单文件 HTML 原型（浏览器直接打开、可点击）；落地平台 → 套既有骨架（模板 `<body data-page="xxx">` + `app.js` 的 `renderSidebar()` 加导航 + 末尾页面分发加 `initXxx()`）。
