@@ -432,29 +432,45 @@
             </div>
           </div>
         </div>
-        <!-- 视觉断言调试弹窗（上传实际图→按资产配置比对；零落盘） -->
+        <!-- 视觉断言调试弹窗（方案5：基线VS上传图双栏；上传图零落盘） -->
         <div class="mask" id="visDebugMask">
-          <div class="modal" style="display:block;width:760px">
-            <div class="modal-title">🧪 调试视觉断言 <span class="muted" id="vdbgName" style="font-weight:400"></span></div>
-            <div class="modal-body">
-              <div style="display:flex;gap:14px">
-                <div style="flex:0 0 240px">
-                  <label style="display:block;font-size:13px;color:#374151">上传实际图片（与基线同范围同尺寸）
-                    <input id="vdbgFile" type="file" accept="image/png,image/jpeg" style="width:100%;margin-top:4px;font-size:12px"></label>
-                  <button class="btn ghost small" id="vdbgDel" style="width:100%;margin-top:6px">删除图片</button>
-                  <div class="hint" style="font-size:11.5px;color:#9ca3af;margin-top:6px">上传图仅用于本次比对，不做保存</div>
-                </div>
-                <div style="flex:1">
-                  <table style="font-size:12.5px;color:#374151;border-collapse:collapse">
-                    <tbody id="vdbgParams"></tbody>
-                  </table>
+          <div class="modal" style="display:block;width:940px;padding:20px 26px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+              <span style="font-size:19px;font-weight:700">🧪 调试视觉断言 · <span id="vdbgName"></span></span>
+              <span class="muted" style="font-size:12.5px">上传实际图仅本次比对使用，不做保存</span>
+            </div>
+            <div style="display:flex;align-items:stretch;gap:14px">
+              <div style="flex:1;text-align:center">
+                <div class="muted" style="font-size:12px;margin-bottom:6px">基线（已采集）</div>
+                <div style="height:260px;border-radius:10px;border:1px solid var(--line-soft,#e5e7eb);background:#f6f7fb;display:flex;align-items:center;justify-content:center;overflow:hidden">
+                  <img id="vdbgBase" style="max-width:100%;max-height:100%;object-fit:contain">
                 </div>
               </div>
-              <div id="vdbgImgs" style="display:flex;gap:10px;margin-top:10px"></div>
-              <div id="vdbgMsg" class="muted" style="margin-top:8px;font-size:12.5px;min-height:18px"></div>
+              <div style="display:flex;align-items:center">
+                <div style="width:44px;height:44px;border-radius:50%;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800">VS</div>
+              </div>
+              <div style="flex:1;text-align:center">
+                <div class="muted" style="font-size:12px;margin-bottom:6px">上传实际图片（PNG/JPG · 与基线同范围同尺寸）</div>
+                <div id="vdbgUpBox" style="position:relative;height:260px;border:2px dashed #b9c6d8;border-radius:10px;background:#f7f9fc;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer">
+                  <div style="font-size:13.5px;font-weight:600;color:#333">点击或拖拽上传</div>
+                  <div class="muted" style="font-size:11px">PNG / JPG</div>
+                  <input id="vdbgFile" type="file" accept="image/png,image/jpeg" style="position:absolute;inset:0;opacity:0;cursor:pointer">
+                  <img id="vdbgUpImg" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:8px;display:none">
+                  <div id="vdbgUpX" style="position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:#fff;border:1.5px solid #e3e8ef;color:#666;font-size:15px;line-height:26px;text-align:center;font-weight:700;display:none;cursor:pointer">✕</div>
+                </div>
+              </div>
             </div>
-            <div class="modal-foot">
-              <button class="btn ghost small" id="vdbgClose">关闭</button>
+            <div style="display:flex;gap:14px;margin:16px 2px 4px;flex-wrap:wrap">
+              <div style="background:#f6f7fb;border-radius:9px;padding:8px 16px"><div class="muted" style="font-size:11.5px">断言范围</div><div style="font-weight:700;font-size:13.5px" id="vdbgScope"></div></div>
+              <div style="background:#f6f7fb;border-radius:9px;padding:8px 16px"><div class="muted" style="font-size:11.5px">视觉对象类型</div><div style="font-weight:700;font-size:13.5px" id="vdbgBiz"></div></div>
+              <div style="background:#f6f7fb;border-radius:9px;padding:8px 16px"><div class="muted" style="font-size:11.5px">比较模式</div><div style="font-weight:700;font-size:13.5px" id="vdbgMatch"></div></div>
+              <div style="background:#f6f7fb;border-radius:9px;padding:8px 16px"><div class="muted" style="font-size:11.5px">相似度</div><div style="font-weight:800;font-size:15px" id="vdbgSim">—</div></div>
+              <div style="background:#f6f7fb;border-radius:9px;padding:8px 16px"><div class="muted" style="font-size:11.5px">相似度阈值（%）</div><input id="vdbgTh" type="number" min="50" max="100" value="98" style="width:70px;border:1px solid var(--line-soft,#e5e7eb);border-radius:6px;padding:3px 8px;font-size:13px;font-weight:700"></div>
+              <div style="background:#f6f7fb;border-radius:9px;padding:8px 16px"><div class="muted" style="font-size:11.5px">忽略区域</div><div style="font-weight:700;font-size:13.5px" id="vdbgIgn">0 块</div></div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:14px">
+              <button class="ghost" id="vdbgClose" style="padding:8px 22px;border-radius:8px;border:1px solid var(--line-soft,#e5e7eb);background:#fff;font-size:13.5px;cursor:pointer">取消</button>
+              <button id="vdbgRun" style="padding:8px 22px;border-radius:8px;border:none;background:#0071e3;color:#fff;font-size:13.5px;font-weight:600;cursor:pointer">调试</button>
             </div>
           </div>
         </div>
