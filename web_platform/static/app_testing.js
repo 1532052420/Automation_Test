@@ -1651,13 +1651,15 @@ if (btnAppium) loadAppiumStatus();
 /* ================= 断言管理（④断言栏内容的平台侧维护） =================
    列表 = 用例中的断言步骤（传统直调 + 组合断言展开）；仅支持编辑断言内容。
    数据源 /api/appui/assertions（assertion_manager 扫描用例与页面方法）。 */
-let _asMgrAll = [];
+let _asMgrAll = [], _asMgrPage = 1;
+const AS_MGR_PAGE_SIZE = 15;   // 断言管理分页：每页 15 条（renderPager 单页时仅显示「共 N 条」）
 
 async function loadAssertions() {
   try {
     const d = await api('/api/appui/assertions');
     _asMgrAll = d.assertions || [];
-    // 断言方式/用例筛选在 renderAssertions 本地完成（传统条目 kind 为 assert_* 全名，需归一化）
+    _asMgrPage = 1;   // 数据重载/用例切换 → 回到第 1 页
+    // 断言方式/用例筛选在 renderAssertions 本地完成（kind 已在扫描源头归一化为短名）
     const cases = d.cases || [];
     const sel = $('#asMgrCase');
     if (sel && sel.options.length <= 1) {
@@ -1672,8 +1674,13 @@ function renderAssertions() {
   const rawKind = (document.getElementById('asMgrKind') || {}).value || '';
   const rows = _asMgrAll.filter(a =>
     (!cf || a.case_file === cf) && (!rawKind || a.kind === rawKind));
+  // 分页：每页 15 条；页码越界（筛选后变少）自动回退
+  const pages = Math.max(1, Math.ceil(rows.length / AS_MGR_PAGE_SIZE));
+  if (_asMgrPage > pages) _asMgrPage = pages;
+  const start = (_asMgrPage - 1) * AS_MGR_PAGE_SIZE;
+  const pageRows = rows.slice(start, start + AS_MGR_PAGE_SIZE);
   const tb = $('#asMgrTbody');
-  tb.innerHTML = rows.map((a, i) => {
+  tb.innerHTML = pageRows.map((a, i) => {
     let content;
     switch (a.kind) {
       case 'text':    content = esc(a.content || '—'); break;
@@ -1695,11 +1702,13 @@ function renderAssertions() {
       <td>${esc(a.kind_name)}</td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.element || '—')}</td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${content}</td>
-      <td>${a.editable ? `<button class="ghost mini" data-edit="${i}">编辑</button>` : '<span class="muted">—</span>'}</td>
+      <td>${a.editable ? `<button class="ghost mini" data-edit="${start + i}">编辑</button>` : '<span class="muted">—</span>'}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="6" class="empty">当前筛选下没有断言</td></tr>';
   tb.querySelectorAll('[data-edit]').forEach(b =>
     b.addEventListener('click', () => openAssertEdit(rows[+b.dataset.edit])));
+  // 复用平台共享分页条（app.js renderPager）：单页仅显示「共 N 条」，多页出上一页/页码/下一页
+  renderPager('#asMgrPager', _asMgrPage, pages, p => { _asMgrPage = p; renderAssertions(); }, rows.length);
 }
 
 function assertContentLabel(kind) {
@@ -1738,6 +1747,6 @@ document.addEventListener('DOMContentLoaded', function () {
   var asKind = document.getElementById('asMgrKind');
   var asRefresh = document.getElementById('btnAsMgrRefresh');
   if (asCase) asCase.addEventListener('change', loadAssertions);
-  if (asKind) asKind.addEventListener('change', renderAssertions);
+  if (asKind) asKind.addEventListener('change', function () { _asMgrPage = 1; renderAssertions(); });
   if (asRefresh) asRefresh.addEventListener('click', loadAssertions);
 });
