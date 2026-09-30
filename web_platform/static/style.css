@@ -674,22 +674,38 @@ html.night .nav-card p { color: #a1a1a6; }
 .clitem ul { margin: 0; padding-left: 18px; }
 .clitem li { color: var(--muted); font-size: 12.5px; line-height: 1.75; }
 
-/* 断言管理 · 方法列步骤徽章（悬停原生 title 提示「这是在第N步」） */
+/* 断言管理 · 方法列步骤徽章（悬停深色气泡提示「这是在第N步」） */
 .as-badge {
   display: inline-block; min-width: 18px; text-align: center;
   font-size: 10.5px; font-weight: 600; color: var(--brand);
   background: var(--brand-tint); border: 1px solid var(--brand-ring);
-  border-radius: 999px; padding: 1px 6px;
-  cursor: help; transition: background .15s ease, border-color .15s ease;
+  border-radius: 999px; padding: 1px 6px; position: relative;
+  transition: background .15s ease, border-color .15s ease;
 }
 .as-badge:hover { background: var(--brand-ring); border-color: var(--brand); }
+/* 悬停提示气泡：左对齐徽章（列首徽章居中会左溢出被表格裁切），纯 CSS 展示 */
+.as-badge[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute; left: 0; bottom: calc(100% + 7px); transform: translateY(3px);
+  background: var(--ink); color: var(--panel);
+  font-size: 11.5px; font-weight: 400; line-height: 1.4;
+  padding: 4px 9px; border-radius: 7px; white-space: nowrap;
+  opacity: 0; pointer-events: none;
+  transition: opacity .15s ease, transform .15s ease; z-index: 30;
+  box-shadow: 0 4px 14px rgba(0,0,0,.18);
+}
+.as-badge[data-tip]:hover::after {
+  opacity: 1; transform: translateY(0);
+}
 
 /* 断言管理 · 视觉断言基线缩略图（基线未生成时 onerror 移除，仅显示阈值文字） */
 .as-thumb {
   height: 28px; width: auto; border-radius: 6px;
   border: 1px solid var(--line-soft); vertical-align: middle;
   margin-right: 6px; background: var(--panel2); object-fit: cover;
+  cursor: zoom-in; transition: border-color .15s ease, box-shadow .15s ease;
 }
+.as-thumb:hover { border-color: var(--brand); box-shadow: 0 2px 10px rgba(0,0,0,.12); }
 
 /* ================= 夜间模式（html.night）：Apple 深色 ================= */
 html.night {

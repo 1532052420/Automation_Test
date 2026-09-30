@@ -104,7 +104,8 @@ def _combo_asserts_in_body(body):
         elif kind == 'gone':
             entry['content'] = str(probe_wait if probe_wait is not None else 2)
         elif kind == 'exists':
-            entry['content'] = ''
+            # 组合断言的存在断言：等待秒数 = 探针 create 行的 wait_seconds（可编辑）
+            entry['content'] = str(probe_wait) if probe_wait is not None else ''
         out.append(entry)
         probe_wait = None
     return out
@@ -195,10 +196,10 @@ def list_assertions(case_file=None):
             continue
         entries.extend(_scan_case(_read(path), cf))
     for e in entries:
-        # 仅内容可编辑：text(期望文本)/toast(文本)/gone(等待秒数·组合)/visual(阈值)/color(色值容差)；
-        # exists 无内容参数（出现即可）→ 不可编辑
-        e['editable'] = e['kind'] in ('text', 'toast', 'visual', 'gone', 'color') and (
-            e['scope'] == 'page' or bool(str(e.get('content', ''))))
+        # 可编辑内容：text(期望文本)/toast(文本)/gone·exists(等待秒数，仅组合断言带该参数)/
+        # visual(阈值)/color(色值容差)；传统 exists 直调行无参数（等待由元素库定义）→ 不可编辑
+        e['editable'] = e['kind'] in ('text', 'toast', 'visual', 'gone', 'color') or \
+            (e['kind'] == 'exists' and (e['scope'] == 'page' or bool(str(e.get('content', '')))))
     return cases, entries
 
 

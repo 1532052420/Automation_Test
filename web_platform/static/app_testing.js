@@ -1684,11 +1684,11 @@ function renderAssertions() {
     switch (a.kind) {
       case 'text':    content = esc(a.content || '—'); break;
       case 'toast':   content = esc(a.content || '—'); break;
-      case 'exists':  content = '元素 ' + (a.content || '3') + '秒 内可见'; break;
+      case 'exists':  content = a.content ? '元素 ' + a.content + '秒 内可见' : '元素出现即可'; break;
       case 'gone':    content = '元素 ' + (a.content || '2') + '秒 内消失'; break;
       case 'visual':
         content = (a.baseline
-          ? `<img class="as-thumb" src="/api/appui/assertions/baseline-image?path=${encodeURIComponent(a.baseline)}" alt="基线图" onerror="this.remove()">`
+          ? `<img class="as-thumb" data-full="/api/appui/assertions/baseline-image?path=${encodeURIComponent(a.baseline)}" src="/api/appui/assertions/baseline-image?path=${encodeURIComponent(a.baseline)}" alt="基线图" title="点击查看大图" onerror="this.remove()">`
           : '') + '相似度 ≥ ' + (a.content || '0.95');
         break;
       case 'color':   content = esc(a.content || '—'); break;
@@ -1696,16 +1696,17 @@ function renderAssertions() {
     }
     if (!a.editable && a.kind !== 'exists') content = '<span class="muted">' + content + '</span>';
     return `<tr>
-      <td class="muted" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.case_file)}</td>
-      <td><span class="as-badge" title="这是在第${a.step_no}步">${a.step_no}</span> ${esc(a.method)}</td>
+      <td><span class="as-badge" data-tip="这是在第${a.step_no}步">${a.step_no}</span> ${esc(a.method)}</td>
       <td>${esc(a.kind_name)}</td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.element || '—')}</td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${content}</td>
       <td>${a.editable ? `<button class="ghost mini" data-edit="${start + i}">编辑</button>` : '<span class="muted">—</span>'}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="6" class="empty">当前筛选下没有断言</td></tr>';
+  }).join('') || '<tr><td colspan="5" class="empty">当前筛选下没有断言</td></tr>';
   tb.querySelectorAll('[data-edit]').forEach(b =>
     b.addEventListener('click', () => openAssertEdit(rows[+b.dataset.edit])));
+  tb.querySelectorAll('.as-thumb').forEach(img =>
+    img.addEventListener('click', () => openAsImgViewer(img.dataset.full)));
   // 分页条（与项目管理完全同款）：共 N 条 · [下拉 条/页] · ‹ x/y ›
   $('#asMgrPagerInfo').textContent = '共 ' + rows.length + ' 条';
   $('#asMgrPageNow').textContent = _asMgrPage + ' / ' + pages;
@@ -1713,25 +1714,38 @@ function renderAssertions() {
   $('#btnAsMgrNext').disabled = _asMgrPage >= pages;
 }
 
+/* 各断言方式的内容标签 / 灰色推荐文案（placeholder，官方/经验推荐值）/ 空值校验提示 */
+function assertContentMeta(kind) {
+  return {
+    text:    { label: '期望文本',     ph: '请输入期望文本，如：写新歌',           err: '请输入期望文本' },
+    toast:   { label: 'Toast 文本',   ph: '请输入 Toast 文本，如：已加入歌单',    err: '请输入断言的 Toast 文本' },
+    visual:  { label: '相似度阈值',   ph: '推荐 0.80 ~ 0.95（SSIM 算法经验区间）', err: '请输入相似度阈值' },
+    gone:    { label: '等待秒数',     ph: '推荐 2 ~ 5 秒',                        err: '请输入等待秒数' },
+    exists:  { label: '等待秒数',     ph: '推荐 3 ~ 6 秒',                        err: '请输入等待秒数' },
+    color:   { label: '期望 RGB',     ph: 'R,G,B，如 255,255,255',               err: '请输入颜色 RGB 值' },
+  }[kind] || { label: '断言内容', ph: '', err: '请输入断言内容' };
+}
+
 function assertContentLabel(kind) {
-  return { text: '期望文本', toast: 'Toast 文本', visual: '相似度阈值（0.80~1.00）',
-           gone: '等待秒数', color: '期望 RGB（R,G,B）', exists: '—' }[kind] || '断言内容';
+  return assertContentMeta(kind).label;
 }
 
 function openAssertEdit(a) {
   const mask = document.getElementById('asEditMask');
   if (!mask) return;
+  const meta = assertContentMeta(a.kind);
   document.getElementById('asEditTitle').textContent = '✎ 编辑断言内容 · ' + (a.kind_name || a.kind);
   document.getElementById('asEdCase').value = a.case_file;
   document.getElementById('asEdMethod').value = a.method + ' · 第' + a.step_no + '步';
   document.getElementById('asEdKind').value = a.kind_name || a.kind;
   document.getElementById('asEdEl').value = a.element || '—';
-  document.getElementById('asEdContentLabel').textContent = assertContentLabel(a.kind);
+  document.getElementById('asEdContentLabel').textContent = meta.label;
   const val = document.getElementById('asEdVal');
   val.value = a.content || '';
+  val.placeholder = meta.ph;
   document.getElementById('asEditSave').onclick = async () => {
     const v = val.value.trim();
-    if (!v && a.kind !== 'exists') { toast('断言内容不能为空', false); return; }
+    if (!v) { toast(meta.err, false); val.focus(); return; }
     try {
       await api('/api/appui/assertions/update', { method: 'POST', body: { target: a, content: v } });
       mask.classList.remove('show');
@@ -1743,6 +1757,15 @@ function openAssertEdit(a) {
   mask.classList.add('show');
 }
 
+/* 基线缩略图点击查看大图（点击遮罩关闭） */
+function openAsImgViewer(src) {
+  const mask = document.getElementById('asImgViewer');
+  if (!mask) return;
+  document.getElementById('asImgViewerImg').src = src;
+  mask.classList.add('show');
+  mask.onclick = function () { mask.classList.remove('show'); };
+}
+
 /* 断言管理面板 · 事件绑定（DOMContentLoaded 后一次性绑定，勿重复绑定） */
 document.addEventListener('DOMContentLoaded', function () {
   var asCase = document.getElementById('asMgrCase');
@@ -1750,7 +1773,13 @@ document.addEventListener('DOMContentLoaded', function () {
   var asRefresh = document.getElementById('btnAsMgrRefresh');
   if (asCase) asCase.addEventListener('change', loadAssertions);
   if (asKind) asKind.addEventListener('change', function () { _asMgrPage = 1; renderAssertions(); });
-  if (asRefresh) asRefresh.addEventListener('click', loadAssertions);
+  // 重置：清除筛选项 + 重新加载页面数据（原「刷新」只重载不清筛选，看起来没效果）
+  if (asRefresh) asRefresh.addEventListener('click', function () {
+    if (asCase) asCase.value = '';
+    if (asKind) asKind.value = '';
+    _asMgrPage = 1;
+    loadAssertions();
+  });
   // 分页交互（与项目管理同款）：每页条数切换回第1页；越界页由 renderAssertions 自动回退
   var asSize = document.getElementById('asMgrPageSize');
   var asPrev = document.getElementById('btnAsMgrPrev');
