@@ -1878,11 +1878,11 @@ function openVisualAssetDebug(name) {
     if (!a) return;
     const SCOPE_CN = { element: '元素', region: '自定义区域', screen: '整屏' };
     document.getElementById('vdbgScope').textContent = SCOPE_CN[a.scope] || a.scope;
-    document.getElementById('vdbgBiz').value = a.biz_type || 'region';
-    document.getElementById('vdbgMatch').value = a.match_mode || 'strict';
-    document.getElementById('vdbgTh').value = Math.round((a.threshold || 0.98) * 100);
-    const simEl = document.getElementById('vdbgSim');
-    simEl.textContent = '—';
+    document.getElementById('vdbgBizTxt').value = a.biz_type || 'region';
+    document.getElementById('vdbgMatchTxt').value = a.match_mode || 'strict';
+    document.getElementById('vdbgThTxt').textContent = Math.round((a.threshold || 0.98) * 100);
+    document.getElementById('vdbgSim').textContent = '0.00%';
+    document.getElementById('vdbgSim').dataset.level = 'bad';
   }).catch(() => {});
   const box = document.getElementById('vdbgUpBox');
   const upImg = document.getElementById('vdbgUpImg');
@@ -1902,11 +1902,11 @@ function bindVdbgOnce(name) {
     }).then(x => x.json()).catch(() => null);
     showToast((r && r.msg) || (r && r.ok ? '已保存' : '保存失败'), r && r.ok);
   };
-  const biz = document.getElementById('vdbgBiz');
-  const match = document.getElementById('vdbgMatch');
+  const biz = document.getElementById('vdbgBizTxt');
+  const match = document.getElementById('vdbgMatchTxt');
+  const thIn = document.getElementById('vdbgTh');
   biz.onchange = () => saveCfg({ biz_type: biz.value });
   match.onchange = () => saveCfg({ match_mode: match.value });
-  const thIn = document.getElementById('vdbgTh');
   thIn.onchange = () => saveCfg({ threshold: (parseFloat(thIn.value) || 98) / 100 });
 
   const box = document.getElementById('vdbgUpBox');

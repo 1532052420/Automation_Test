@@ -1027,3 +1027,13 @@ html.night ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, .26
 #panel-requests .namebar input { flex: 1; min-width: 0; }
 #panel-requests .debugbar #reqMethod { width: 110px; flex: 0 0 auto; }
 #panel-requests .debugbar #reqEnvSel { width: 170px; }
+
+/* 调试弹窗相似度大字分色（Material 语义色；夜间提亮一档保证可读） */
+#vdbgSim[data-level="perfect"] { color:#059669; }
+#vdbgSim[data-level="good"]    { color:#10B981; }
+#vdbgSim[data-level="warn"]    { color:#F59E0B; }
+#vdbgSim[data-level="bad"]     { color:#EF4444; }
+html.night #vdbgSim[data-level="perfect"] { color:#34D399; }
+html.night #vdbgSim[data-level="good"]    { color:#6EE7B7; }
+html.night #vdbgSim[data-level="warn"]    { color:#FBBF24; }
+html.night #vdbgSim[data-level="bad"]     { color:#F87171; }
