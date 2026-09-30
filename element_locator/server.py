@@ -546,55 +546,6 @@ def api_save_file():
     return jsonify({'ok': True, 'msg': '%s 已保存' % msg, 'content': content})
 
 
-# ---------------------------------------------------------------- 视觉断言资产（三范围 + 忽略区域 + Layout + 业务类型）
-import visual_assets as va
-
-
-@app.route('/api/visual_asset/preview', methods=['POST'])
-def api_visual_preview():
-    """预览：按范围实时截图裁剪（不落盘），返回 dataURL 供确认"""
-    d = request.get_json(silent=True) or {}
-    img, box, err = va.capture(d.get('scope'), d.get('locator_type'),
-                               d.get('locator_value'), d.get('region'))
-    if err:
-        return jsonify({'ok': False, 'msg': err})
-    import io
-    import base64
-    buf = io.BytesIO()
-    img.save(buf, format='PNG')
-    return jsonify({'ok': True, 'box': box, 'size': list(img.size),
-                    'thumb': 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()})
-
-
-@app.route('/api/visual_asset/save', methods=['POST'])
-def api_visual_save():
-    """保存资产：采集基线 + config.yaml（重名覆盖，旧基线留 baseline.prev.png）"""
-    d = request.get_json(silent=True) or {}
-    ok, r = va.save(d.get('name'), d)
-    if not ok:
-        return jsonify({'ok': False, 'msg': r})
-    return jsonify({'ok': True, 'asset': r})
-
-
-@app.route('/api/visual_asset/list')
-def api_visual_list():
-    return jsonify({'ok': True, 'assets': va.list_assets()})
-
-
-@app.route('/api/visual_asset/<name>', methods=['DELETE'])
-def api_visual_delete(name):
-    ok, msg = va.delete(name)
-    return jsonify({'ok': ok, 'msg': msg})
-
-
-@app.route('/api/visual_asset/<name>/baseline.png')
-def api_visual_baseline(name):
-    p = va.baseline_path(name)
-    if not p:
-        return jsonify({'ok': False, 'msg': '基线图不存在'}), 404
-    return send_file(p)
-
-
 if __name__ == '__main__':
     serial = device.get_device()
     if serial:

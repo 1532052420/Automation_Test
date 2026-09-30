@@ -28,9 +28,7 @@ logger = logging.getLogger('appOperator')
 import base64
 import time
 import ujson
-import glob
 import os
-import shutil
 
 # 操作步骤编号：日志里给每个操作标「步骤N」并分行展示（动作/详情/结果各占一行），
 # 每条用例开始时由 conftest 调 reset_action_step_no() 归零
@@ -659,87 +657,10 @@ class AppOperator:
         except Exception as e:
             self._assert_step(failures, desc, False, e)
 
-    def assert_visual_asset_or_record(self, failures, desc, asset_name, wait_seconds=3):
-        """视觉资产断言（三范围统一执行器）：运行时读取
-        elements/visual_asserts/<asset_name>/config.yaml（baseline/threshold/ignore_regions/match_mode）。
-        scope=element：按资产 locator 实时探针取元素截图；region：整屏按 region 裁剪；screen：整屏。
-        基线缺失→自动建立；失败挂三联图。资产文件缺失→明确报错。"""
-        import yaml
-        base_dir = os.path.join('page_objects', 'app_ui', 'android', 'demoProject',
-                                'elements', 'visual_asserts', str(asset_name))
-        cfg_p = os.path.join(base_dir, 'config.yaml')
-        baseline = os.path.join(base_dir, 'baseline.png')
-        try:
-            with open(cfg_p, encoding='utf-8') as f:
-                cfg = yaml.safe_load(f) or {}
-        except Exception as e:
-            self._assert_step(failures, desc, False, '视觉资产配置读取失败(%s): %s' % (asset_name, e))
-            return
-        scope = cfg.get('scope', 'element')
-        threshold = float(cfg.get('threshold') or 0.98)
-        ignore_regions = cfg.get('ignore_regions') or []
-        match_mode = cfg.get('match_mode') or 'strict'
-        try:
-            from common.appium import visual_assertions as _va
-            actual_path = 'output/tmp/visual_asset_%s_%s.png' % (
-                str(asset_name)[:24], DateTimeTool.getNowTime('%Y%m%d%H%M%S%f'))
-            os.makedirs('output/tmp/', exist_ok=True)
-            if scope == 'element':
-                loc = cfg.get('locator') or {}
-                strategy = str(loc.get('strategy', 'id'))
-                value = loc.get('value', '')
-                lt = {'id': 'ID', 'xpath': 'XPATH', 'accessibility_id': 'ACCESSIBILITY_ID',
-                      'class_name': 'CLASS_NAME', '-android uiautomator': 'ANDROID_UIAUTOMATOR'}.get(
-                      strategy.lower(), 'ID')
-                el_info = CreateElement.create(lt, value,
-                                               wait_type=Wait_By.VISIBILITY_OF, wait_seconds=wait_seconds)
-                probe = self.getElement(el_info)
-                self.save_element_image(probe, 'visual_asset_%s' % abs(hash(desc)))
-                src = None
-                for cand in glob.glob('output/tmp/visual_asset_%s*.png' % abs(hash(desc))):
-                    src = cand
-                if not src:
-                    self._assert_step(failures, desc, False, '元素区域截图失败')
-                    return
-                shutil.move(src, actual_path)
-            else:
-                png = self.driver.get_screenshot_as_png()
-                with open(actual_path, 'wb') as f:
-                    f.write(png)
-                if scope == 'region':
-                    from PIL import Image
-                    region = cfg.get('region') or [0, 0, 0, 0]
-                    img = Image.open(actual_path)
-                    x, y, w, h = [int(v) for v in region]
-                    img.crop((x, y, min(x + w, img.size[0]), min(y + h, img.size[1]))).save(actual_path)
-            if not os.path.isfile(baseline):
-                ok2, err2 = _va.ensure_baseline(actual_path, baseline)
-                if ok2:
-                    with allure.step('视觉资产基线自动建立：「%s」' % desc):
-                        self.get_screenshot(('基线已建立_' + desc)[:40])
-                    failures_note = '基线已建立（首跑采集，本次视为通过）'
-                    step_no = _next_action_step_no()
-                    _log_action_result(step_no, '视觉资产「%s」' % desc, [], True, extra=failures_note)
-                    return
-            triple_path = os.path.abspath('output/tmp/visual_asset_triple_%s.png' % DateTimeTool.getNowTime('%Y%m%d%H%M%S%f'))
-            ok, actual, err, triple = _va.compare_images(baseline, actual_path, threshold, triple_path,
-                                                          ignore_regions=ignore_regions, match_mode=match_mode)
-            if triple and os.path.isfile(triple):
-                with open(triple, 'rb') as f:
-                    allure.attach(name=('视觉资产三联图_' + desc)[:40], body=f.read(),
-                                  attachment_type=allure.attachment_type.PNG)
-            self._assert_step(failures, desc, ok, err or ('相似度 %s' % (actual or {}).get('similarity')),
-                              actual=actual)
-        except Exception as e:
-            self._assert_step(failures, desc, False, e)
-
-    def assert_visual_or_record(self, failures, desc, element, baseline='', threshold=0.95, wait_seconds=3,
-                                ignore_regions=None, match_mode='strict'):
+    def assert_visual_or_record(self, failures, desc, element, baseline='', threshold=0.95, wait_seconds=3):
         """视觉断言（多断言版）：元素区域截图 vs 基线相似度；
         基线缺失→自动建立（通过并在报告注明）；尺寸不一致→不硬比；
-        失败挂 基线/实际/diff 三联图入 allure。
-        ignore_regions：[(x,y,w,h)] 相对元素区域坐标，比对时涂白跳过（动态数字/时间）；
-        match_mode：strict 像素SSIM | layout 粗粒度结构比对（内容小变化不敏感）。"""
+        失败挂 基线/实际/diff 三联图入 allure。"""
         try:
             from common.appium import visual_assertions as _va
             probe = self._assert_probe(element, wait_seconds)
@@ -758,8 +679,7 @@ class AppOperator:
                     return
             os.makedirs('output/tmp/', exist_ok=True)
             triple_path = os.path.abspath('output/tmp/visual_triple_%s.png' % DateTimeTool.getNowTime('%Y%m%d%H%M%S%f'))
-            ok, actual, err, triple = _va.compare_images(baseline, actual_path, threshold, triple_path,
-                                                          ignore_regions=ignore_regions, match_mode=match_mode)
+            ok, actual, err, triple = _va.compare_images(baseline, actual_path, threshold, triple_path)
             if triple and os.path.isfile(triple):
                 with open(triple, 'rb') as f:
                     allure.attach(name=('视觉三联图_' + desc)[:40], body=f.read(),

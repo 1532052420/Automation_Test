@@ -72,8 +72,6 @@ const ICONS = {
   scan: '<path d="M4 8.2V6a2 2 0 0 1 2-2h2.2M15.8 4H18a2 2 0 0 1 2 2v2.2M20 15.8V18a2 2 0 0 1-2 2h-2.2M8.2 20H6a2 2 0 0 1-2-2v-2.2"/>'
       + '<circle cx="12" cy="12" r="3.1"/>',
   bolt: '<path d="M13.2 2.8 5.8 13.2h4.9L10.8 21.2 18.2 10.8h-4.9Z"/>',
-  /* 首页/二级菜单：视觉测试（眼睛，与断言可见图标同族） */
-  visual: '<path d="M3.5 12s3.2-5.5 8.5-5.5S20.5 12 20.5 12s-3.2 5.5-8.5 5.5S3.5 12 3.5 12z"/><circle cx="12" cy="12" r="2.4"/>',
   /* AppUI 编排/套件用：流程（编排）/ 层叠（套件） */
   flow: '<circle cx="5.4" cy="6" r="2.3"/><circle cx="18.6" cy="18" r="2.3"/>'
       + '<path d="M7.7 6.9c6.2 1.5 5.5 7.4 8.8 9.6"/>',
@@ -621,10 +619,10 @@ async function initRun() {
 }
 
 /* ---------------- 左侧二级菜单：hash 深链 + 记住上次所在面板 ---------------- */
-const RUN_PANELS = ['projects', 'elements', 'asserts', 'visuals', 'cases', 'caselist', 'caseedit', 'orch', 'suites', 'report', 'admin', 'exec'];
+const RUN_PANELS = ['projects', 'elements', 'asserts', 'cases', 'caselist', 'caseedit', 'orch', 'suites', 'report', 'admin', 'exec'];
 /* 面板名 → 顶部面包屑第三级文案 */
 const RUN_PANEL_NAMES = {
-  projects: '项目管理', elements: '元素管理', asserts: '断言管理', visuals: '视觉断言', cases: '执行用例', caselist: '用例管理',
+  projects: '项目管理', elements: '元素管理', asserts: '断言管理', cases: '执行用例', caselist: '用例管理',
   caseedit: '步骤编辑', orch: '用例编排', suites: '测试套件', report: '测试报告', admin: '用例上传', exec: '设备配置',
 };
 function showRunPanel(name) {
@@ -637,7 +635,6 @@ function showRunPanel(name) {
     a.classList.toggle('on', a.dataset.panel === name));
   setCrumbSub(RUN_PANEL_NAMES[name]);
   if (name === 'asserts' && typeof loadAssertions === 'function') loadAssertions();
-  if (name === 'visuals' && typeof loadVisualAssets === 'function') loadVisualAssets();
 }
 function initRunPanels() {
   document.querySelectorAll('#subnav a').forEach(a => {

@@ -30,7 +30,7 @@ STEP_TYPES = [
 
 # ④断言栏 · 组合断言类型（操作与断言解耦：一步 = 操作 + 断言组合）
 # exists/text/gone/visual 绑定本元素；toast 页面级
-ASSERT_KINDS = ('exists', 'text', 'toast', 'gone', 'visual', 'visual_asset')
+ASSERT_KINDS = ('exists', 'text', 'toast', 'gone', 'visual')
 
 # 页面里固定实现的工具方法：已存在则不重复生成
 TOOL_METHODS = {'wait_and_shot', 'tap_xy', 'assert_toast', 'dismiss_keyboard',
@@ -79,18 +79,11 @@ def _q(s):
 
 
 def _asserts_of(step):
-    """步骤里的组合断言列表（四栏改版）：非法项剔除。
-    兼容两种键：后端历史数据为 type，前端 currentStepObj 下发为 v——
-    真实保存链路曾因只认 type 导致勾选的断言全部静默丢失（v6.14.52 修复）。"""
+    """步骤里的组合断言列表（四栏改版）：非法项剔除"""
     out = []
     for a in step.get('asserts') or []:
-        if not isinstance(a, dict):
-            continue
-        t = a.get('type') or a.get('v')
-        if t in ASSERT_KINDS:
-            b = dict(a)
-            b['type'] = t
-            out.append(b)
+        if isinstance(a, dict) and a.get('type') in ASSERT_KINDS:
+            out.append(a)
     return out
 
 
@@ -144,22 +137,10 @@ def _assert_body_lines(step, el):
                 th = float(a.get('threshold'))
             except (TypeError, ValueError):
                 th = 0.95
-            # 视觉断言增强（三范围方案）：忽略区域/比较模式随断言配置透传
-            extra = ''
-            if a.get('ignore_regions'):
-                extra += ", ignore_regions=%r" % (a.get('ignore_regions'),)
-            if a.get('match_mode'):
-                extra += ", match_mode='%s'" % a['match_mode']
             lines.append(_probe_line(el, 3))
             lines.append("self.appOperator.assert_visual_or_record(failures, '%s·视觉', probe,\n"
-                         "                                        baseline=%s, threshold=%.2f%s)"
-                         % (no, _q(_visual_baseline_path(step, el)), th, extra))
-        elif t == 'visual_asset':
-            # 视觉断言（资产引用）：运行时按资产配置执行（范围/忽略/阈值在资产内）
-            asset = str(a.get('asset') or '').strip()
-            if asset:
-                lines.append("self.appOperator.assert_visual_asset_or_record("
-                             "failures, '%s·视觉', '%s')" % (no, asset.replace("'", "\'")))
+                         "                                        baseline=%s, threshold=%.2f)"
+                         % (no, _q(_visual_baseline_path(step, el)), th))
     return lines
 
 
@@ -296,7 +277,7 @@ def page_method_code(step):
         return _method_block('wait_and_shot', desc, ['tag'],
                              "import time\ntime.sleep(1)\nself.appOperator.get_screenshot(tag)")
     if t == 'tap':
-        return _method_block('tap_xy' + _tool_method_unique_suffix(step), desc, ['x', 'y'],
+        return _method_block('tap_xy', desc, ['x', 'y'],
                              'self.appOperator.tap(x, y)')
     if t == 'deal_first_launch_dialogs':
         # 首次启动弹窗处理：隐私协议「同意并继续」→ 系统权限「允许」，出现才点、无弹窗自动跳过。
@@ -334,11 +315,6 @@ def _combo_method_code(step):
     if not m:
         return None
     name, args_str, doc, body = m.group(1), m.group(2), m.group(3), m.group(4).rstrip('\n')
-    # 组合断言方法必须专属化：默认工具方法名（tap_xy 等）被多步共享，若撞已存在方法
-    # 会被「不重复生成」跳过导致断言静默丢失——有断言时追加元素后缀
-    suffix = _tool_method_unique_suffix(step)
-    if suffix and name in TOOL_METHODS:
-        name = name + suffix
     desc = (step.get('comment') or '').strip() or step_desc(step)
     lines = ['failures = []', 'try:']
     lines += ['    ' + ln if ln.strip() else ln for ln in body.split('\n')]
@@ -361,22 +337,6 @@ TYPE_NAMES_CN = {
     'assert_visible': '断言存在', 'assert_text': '断言文本',
     'assert_toast': '断言Toast', 'assert_gone': '断言消失',
 }
-
-
-
-def _tool_method_unique_suffix(step):
-    """带组合断言的步骤若默认生成共享工具方法（tap_xy 等），追加元素后缀生成专属方法——
-    断言只作用于本步骤，不能写进被多步共享的工具方法体。"""
-    if _asserts_of(step):
-        el = _safe_el_name(step.get('element') or '')
-        if el:
-            return '_' + el
-    return ''
-
-
-def _safe_el_name(name):
-    n = re.sub(r'[^\w\u4e00-\u9fff]', '_', str(name or ''))
-    return n.strip('_')[:40]
 
 
 def case_step_line(step):
@@ -417,11 +377,9 @@ def case_step_line(step):
         return 'page.wait_and_shot(%s)' % _q(p)
     if t == 'tap':
         parts = [x.strip() for x in p.split(',') if x.strip()]
-        call = ('page.tap_xy(%s, %s)' % (parts[0], parts[1])) if len(parts) >= 2 else \
-               ('page.tap_xy(%s)' % (parts[0] if parts else '0'))
-        if 'tap_xy(' in call:
-            call = call.replace('page.tap_xy(', 'page.tap_xy%s(' % _tool_method_unique_suffix(step), 1)
-        return call
+        if len(parts) >= 2:
+            return 'page.tap_xy(%s, %s)' % (parts[0], parts[1])
+        return 'page.tap_xy(%s)' % (parts[0] if parts else '0')
     if t == 'sleep':
         try:
             return 'time.sleep(%s)' % float(p)

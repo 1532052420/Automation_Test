@@ -1,0 +1,13 @@
+name: 示例_登录成功卡片
+type: visual
+scope: region
+biz_type: card
+threshold: 0.98
+match_mode: strict
+ignore_regions: []
+created: '2026-09-30 12:40:00'
+region:
+- 60
+- 700
+- 960
+- 300

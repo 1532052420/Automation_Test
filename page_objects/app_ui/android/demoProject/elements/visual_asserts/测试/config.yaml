@@ -1,0 +1,8 @@
+name: 测试
+type: visual
+scope: screen
+biz_type: region
+threshold: 0.98
+match_mode: strict
+ignore_regions: []
+created: '2026-09-30 16:49:31'

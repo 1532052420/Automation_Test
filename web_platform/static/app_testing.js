@@ -1766,61 +1766,6 @@ function openAsImgViewer(src) {
   mask.onclick = function () { mask.classList.remove('show'); };
 }
 
-/* ================= 视觉断言管理（定位器采集的视觉资产；列表/筛选/分页与项目管理同款） ================= */
-let _visAll = [], _visPage = 1, _visPageSize = 20;
-
-async function loadVisualAssets() {
-  try {
-    const d = await api('/api/appui/visual_assets?_=' + Date.now());   // 防缓存：删除/采集后列表要即时刷新
-    _visAll = d.assets || [];
-    _visPage = 1;
-    renderVisualAssets();
-  } catch (e) { toast(e.message, false); }
-}
-
-function renderVisualAssets() {
-  const kw = ($('#visSearch') || {}).value || '';
-  const scope = ($('#visScope') || {}).value || '';
-  const match = ($('#visMatch') || {}).value || '';
-  const rows = _visAll.filter(a =>
-    (!kw || (a.name || '').toLowerCase().includes(kw.trim().toLowerCase())) &&
-    (!scope || a.scope === scope) && (!match || a.match_mode === match));
-  const pages = Math.max(1, Math.ceil(rows.length / _visPageSize));
-  if (_visPage > pages) _visPage = pages;
-  const start = (_visPage - 1) * _visPageSize;
-  const view = rows.slice(start, start + _visPageSize);
-  const SCOPE_CN = { element: '元素', region: '自定义区域', screen: '整屏' };
-  $('#visTbody').innerHTML = view.map(a => `<tr>
-    <td>${a.thumb ? `<img class="as-thumb" src="${a.thumb}" data-full="/api/appui/visual_assets/${encodeURIComponent(a.name)}/baseline.png" title="点击查看大图">` : '<span class="muted">—</span>'}</td>
-    <td><b>${esc(a.name)}</b></td>
-    <td>${SCOPE_CN[a.scope] || esc(a.scope)}</td>
-    <td>${esc(a.biz_type_name || a.biz_type || '—')}</td>
-    <td>${a.match_mode === 'layout' ? 'Layout（布局）' : 'Strict（像素级）'}</td>
-    <td>${Math.round((a.threshold || 0.98) * 100)}%</td>
-    <td>${a.ignore_count || 0}</td>
-    <td class="muted">${esc(a.created || '—')}</td>
-    <td class="ops">
-      <button class="ghost mini" data-visview="${esc(a.name)}">查看</button>
-      <button class="danger mini" data-visdel="${esc(a.name)}">删除</button>
-    </td></tr>`).join('') || '<tr><td colspan="9" class="empty">暂无视觉资产——到元素定位器「视觉断言」模式采集</td></tr>';
-  $('#visPagerInfo').textContent = '共 ' + rows.length + ' 条';
-  $('#visPageNow').textContent = _visPage + ' / ' + pages;
-  $('#btnVisPrev').disabled = _visPage <= 1;
-  $('#btnVisNext').disabled = _visPage >= pages;
-  $('#visTbody').querySelectorAll('.as-thumb').forEach(img =>
-    img.addEventListener('click', () => {
-      document.getElementById('vaMgrViewerImg').src = img.dataset.full;
-      document.getElementById('vaMgrViewer').classList.add('show');
-    }));
-  $('#visTbody').querySelectorAll('[data-visdel]').forEach(b =>
-    b.addEventListener('click', async () => {
-      if (!confirm('删除视觉资产「' + b.dataset.visdel + '」？基线图与配置将一并删除。')) return;
-      const r = await api('/api/appui/visual_assets/' + encodeURIComponent(b.dataset.visdel), { method: 'DELETE' });
-      toast((r && r.msg) || (r && r.ok ? '已删除' : '删除失败'), r && r.ok);
-      loadVisualAssets();
-    }));
-}
-
 /* 断言管理面板 · 事件绑定（DOMContentLoaded 后一次性绑定，勿重复绑定） */
 document.addEventListener('DOMContentLoaded', function () {
   var asCase = document.getElementById('asMgrCase');
@@ -1835,30 +1780,6 @@ document.addEventListener('DOMContentLoaded', function () {
     _asMgrPage = 1;
     loadAssertions();
   });
-
-  /* 视觉断言管理：筛选/分页/查看/删除（与项目管理同款交互） */
-  var visSearch = document.getElementById('visSearch');
-  var visScope = document.getElementById('visScope');
-  var visMatch = document.getElementById('visMatch');
-  var visSize = document.getElementById('visPageSize');
-  var visPrev = document.getElementById('btnVisPrev');
-  var visNext = document.getElementById('btnVisNext');
-  var visReset = document.getElementById('btnVisReset');
-  var visViewer = document.getElementById('vaMgrViewer');
-  if (visSearch) visSearch.addEventListener('input', function () { _visPage = 1; renderVisualAssets(); });
-  if (visScope) visScope.addEventListener('change', function () { _visPage = 1; renderVisualAssets(); });
-  if (visMatch) visMatch.addEventListener('change', function () { _visPage = 1; renderVisualAssets(); });
-  if (visSize) visSize.addEventListener('change', function () { _visPageSize = +visSize.value || 20; _visPage = 1; renderVisualAssets(); });
-  if (visPrev) visPrev.addEventListener('click', function () { if (_visPage > 1) { _visPage--; renderVisualAssets(); } });
-  if (visNext) visNext.addEventListener('click', function () { _visPage++; renderVisualAssets(); });
-  if (visReset) visReset.addEventListener('click', function () {
-    if (visSearch) visSearch.value = '';
-    if (visScope) visScope.value = '';
-    if (visMatch) visMatch.value = '';
-    _visPage = 1;
-    loadVisualAssets();
-  });
-  if (visViewer) visViewer.addEventListener('click', function () { visViewer.classList.remove('show'); });
   // 分页交互（与项目管理同款）：每页条数切换回第1页；越界页由 renderAssertions 自动回退
   var asSize = document.getElementById('asMgrPageSize');
   var asPrev = document.getElementById('btnAsMgrPrev');

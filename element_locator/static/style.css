@@ -963,37 +963,3 @@ html.night .seg-strip .seg-title { color: #e5e7eb; }
   background: #34c759; color: #fff; font-size: 10px; font-weight: 700;
   align-items: center; justify-content: center; margin-right: 4px; flex: 0 0 18px;
 }
-
-/* ===== 视觉断言采集模式：范围框选与忽略区域 ===== */
-.va-rect { position: absolute; border: 2px solid #2997ff; background: rgba(41,151,255,.10);
-           pointer-events: none; z-index: 6; }
-.va-rect .va-tag { position: absolute; top: -20px; left: -2px; font-size: 11px; color: #fff;
-                   background: #2997ff; border-radius: 4px; padding: 1px 7px; white-space: nowrap; }
-.va-ignore { position: absolute; border: 2px dashed #f59e0b; background: rgba(245,158,11,.12);
-             pointer-events: none; z-index: 6; }
-.va-ignore .va-tag { position: absolute; top: -18px; left: -2px; font-size: 10.5px; color: #92400e;
-                     background: #fde68a; border-radius: 4px; padding: 0 6px; white-space: nowrap; }
-html.night .va-rect { border-color: #4aa9ff; background: rgba(74,169,255,.14); }
-html.night .va-ignore { border-color: #fbbf24; background: rgba(251,191,36,.14); }
-body.va-dragging { cursor: crosshair; }
-body.va-mode .detail.va-panel .field label { font-size: 12.5px; color: var(--muted, #6e6e73); font-weight: 500; }
-.va-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.va-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px;
-           border: 1px dashed #f59e0b; color: #92400e; background: #fffbeb;
-           border-radius: 6px; padding: 2px 8px; }
-.va-chip b { cursor: pointer; color: #b45309; font-weight: 700; }
-html.night .va-chip { background: rgba(251,191,36,.08); color: #fcd34d; border-color: rgba(251,191,36,.4); }
-.va-assets img { border: 1px solid rgba(0,0,0,.08); border-radius: 6px; }
-
-/* 视觉断言面板：字段样式与「添加测试用例」弹窗（.modal-body）一致 */
-.va-panel { padding: 4px 14px 12px; }
-.va-panel label { display: block; margin-bottom: 10px; font-size: 13px; color: #374151; }
-.va-panel label > input, .va-panel label > select, .va-panel label > span {
-  display: block; width: 100%; margin-top: 4px;
-}
-.va-panel input, .va-panel select {
-  padding: 7px 10px; border: 1px solid #dcdfe6; border-radius: 6px; font-size: 13px; outline: none; background: #fff;
-}
-.va-panel input:focus, .va-panel select:focus { border-color: #409eff; }
-.va-panel .chk input { width: auto; margin: 0 4px 0 0; display: inline-block; }
-.va-panel .chk { display: inline-flex; align-items: center; margin: 0; }

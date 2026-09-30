@@ -1,0 +1,11 @@
+name: 无票
+type: visual
+scope: element
+biz_type: toast
+threshold: 0.98
+match_mode: strict
+ignore_regions: []
+created: '2026-09-30 13:11:58'
+locator:
+  strategy: id
+  value: cn.damai:id/tv_tag
