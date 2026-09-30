@@ -1826,7 +1826,15 @@ function renderVisualAssets() {
     }));
 }
 
-/* 调试视觉断言（方案5）：基线VS上传图双栏；上传图零落盘；相似度即最终结果 */
+/* 调试视觉断言（方案5优化）：基线VS上传图；相似度按值分色；类型/模式改动即存 */
+function simColor(p) {
+  // 语义分段色（Material Design 语义色规范）：100% 深绿 / 80~100 绿 / 50~80 橙 / <50 红
+  if (p >= 0.9999) return '#059669';
+  if (p >= 0.8) return '#10B981';
+  if (p >= 0.5) return '#F59E0B';
+  return '#EF4444';
+}
+
 function openVisualAssetDebug(name) {
   const mask = document.getElementById('visDebugMask');
   mask.dataset.asset = name;
@@ -1837,28 +1845,39 @@ function openVisualAssetDebug(name) {
     if (!a) return;
     const SCOPE_CN = { element: '元素', region: '自定义区域', screen: '整屏' };
     document.getElementById('vdbgScope').textContent = SCOPE_CN[a.scope] || a.scope;
-    document.getElementById('vdbgBiz').textContent = a.biz_type_name || a.biz_type || '—';
-    document.getElementById('vdbgMatch').textContent = a.match_mode === 'layout' ? 'Layout（布局）' : 'Strict（像素级）';
+    document.getElementById('vdbgBiz').value = a.biz_type || 'region';
+    document.getElementById('vdbgMatch').value = a.match_mode || 'strict';
     document.getElementById('vdbgTh').value = Math.round((a.threshold || 0.98) * 100);
-    document.getElementById('vdbgIgn').textContent = (a.ignore_count || 0) + ' 块';
+    const simEl = document.getElementById('vdbgSim');
+    simEl.textContent = '—';
+    simEl.style.color = 'var(--text,#1d1d1f)';
   }).catch(() => {});
-  // 上传区复位
   const box = document.getElementById('vdbgUpBox');
   const upImg = document.getElementById('vdbgUpImg');
   const upX = document.getElementById('vdbgUpX');
   upImg.style.display = 'none'; upImg.removeAttribute('src');
   upX.style.display = 'none';
   box.querySelector('div').style.display = '';
-  document.getElementById('vdbgSim').textContent = '—';
   mask.classList.add('show');
   bindVdbgOnce(name);
 }
 
-/* 上传/拖拽与调试按钮只绑一次（防重复监听叠加）；上传图零落盘 */
+/* 类型/模式/阈值下拉与输入只绑一次 */
 function bindVdbgOnce(name) {
+  const saveCfg = async (patch) => {
+    const r = await fetch('/api/appui/visual_assets/' + encodeURIComponent(name) + '/config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+    }).then(x => x.json()).catch(() => null);
+    showToast((r && r.msg) || (r && r.ok ? '已保存' : '保存失败'), r && r.ok);
+  };
+  const biz = document.getElementById('vdbgBiz');
+  const match = document.getElementById('vdbgMatch');
+  biz.onchange = () => saveCfg({ biz_type: biz.value });
+  match.onchange = () => saveCfg({ match_mode: match.value });
+
   const box = document.getElementById('vdbgUpBox');
-  if (box.dataset.bound === name) return;
-  box.dataset.bound = name;
+  if (box.dataset.vacapBound) return;
+  box.dataset.vacapBound = '1';
   const input = document.getElementById('vdbgFile');
   const upImg = document.getElementById('vdbgUpImg');
   const upX = document.getElementById('vdbgUpX');
@@ -1871,7 +1890,8 @@ function bindVdbgOnce(name) {
     input.value = ''; upImg.style.display = 'none'; upImg.removeAttribute('src');
     upX.style.display = 'none';
     box.querySelector('div').style.display = '';
-    document.getElementById('vdbgSim').textContent = '—';
+    const simEl = document.getElementById('vdbgSim');
+    if (simEl) { simEl.textContent = '—'; simEl.style.color = ''; }
   };
   input.onchange = function () {
     const f = this.files[0];
@@ -1896,6 +1916,7 @@ function bindVdbgOnce(name) {
       input.files = dt.files;
     } catch (err) {}
   });
+  // 调试按钮：上传图 vs 基线，相似度按值分色
   document.getElementById('vdbgRun').onclick = async () => {
     if (!input.files[0]) { showToast('请先上传实际图片'); return; }
     const simEl = document.getElementById('vdbgSim');
@@ -1908,6 +1929,9 @@ function bindVdbgOnce(name) {
       { method: 'POST', body: fd }).then(x => x.json()).catch(() => null);
     btn.disabled = false; btn.textContent = '调试';
     if (!r || !r.ok) { simEl.textContent = '—'; showToast((r && r.msg) || '比对失败', false); return; }
-    simEl.textContent = ((r.data.similarity || 0) * 100).toFixed(2) + '%';
+    const sim = r.data.similarity || 0;
+    simEl.textContent = (sim * 100).toFixed(2) + '%';
+    simEl.style.color = simColor(sim);
   };
 }
+
