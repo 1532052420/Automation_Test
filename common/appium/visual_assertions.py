@@ -38,18 +38,27 @@ def _similarity(a, b):
         return 1.0 - float(np.count_nonzero(diff)) / diff.size
 
 
-def _diff_triple(baseline_path, actual_path, out_path):
-    """基线/实际/diff 三联图（diff=红色高亮差异区域叠加在灰度实际图上）"""
+def _diff_triple(baseline_path, actual_path, out_path, ignore_regions=None):
+    """基线/实际/diff 三联图（diff=红色高亮差异区域叠加在灰度实际图上；忽略区域涂白标注）"""
     import cv2
     import numpy as np
     b = cv2.imread(baseline_path)
     a = cv2.imread(actual_path)
     ga = cv2.cvtColor(b, cv2.COLOR_BGR2GRAY)
     gb = cv2.cvtColor(a, cv2.COLOR_BGR2GRAY)
+    if ignore_regions:
+        ga = _apply_ignores(ga, ignore_regions)
+        gb = _apply_ignores(gb, ignore_regions)
     diff = cv2.absdiff(ga, gb)
     _, mask = cv2.threshold(diff, 24, 255, cv2.THRESH_BINARY)
     mark = a.copy()
     mark[mask > 0] = (0, 0, 255)
+    # 忽略区域在 diff 图上涂白（可视化为「已排除」）
+    for (x, y, rw, rh) in (ignore_regions or []):
+        x1, y1 = max(0, int(x)), max(0, int(y))
+        x2, y2 = min(mark.shape[1], int(x) + int(rw)), min(mark.shape[0], int(y) + int(rh))
+        if x2 > x1 and y2 > y1:
+            mark[y1:y2, x1:x2] = (255, 255, 255)
     h = max(b.shape[0], a.shape[0], mark.shape[0])
 
     def _pad(img):
@@ -60,8 +69,35 @@ def _diff_triple(baseline_path, actual_path, out_path):
     return out_path
 
 
-def compare_images(baseline_path, actual_path, threshold=0.95, diff_out=None):
-    """公共检测方法：基线 vs 实际。
+def _apply_ignores(gray, ignore_regions):
+    """忽略区域涂白（比对/diff 均不参与）。ignore_regions: [(x,y,w,h)]（相对本图坐标）"""
+    import cv2
+    h, w = gray.shape[:2]
+    for (x, y, rw, rh) in (ignore_regions or []):
+        x1, y1 = max(0, int(x)), max(0, int(y))
+        x2, y2 = min(w, int(x) + int(rw)), min(h, int(y) + int(rh))
+        if x2 > x1 and y2 > y1:
+            gray[y1:y2, x1:x2] = 255
+    return gray
+
+
+def _layout_sim(a, b):
+    """Layout 模式：缩放到粗粒度结构图（高 64px）再 SSIM——
+    文字/图标内容的小变化被下采样抹平，位置与尺寸变化仍然显著（方案 §11 Layout 语义）"""
+    import cv2
+    def coarse(g):
+        h, w = g.shape[:2]
+        nh = 64
+        nw = max(1, round(w * nh / h))
+        return cv2.resize(g, (nw, nh), interpolation=cv2.INTER_AREA)
+    return _similarity(coarse(a), coarse(b))
+
+
+def compare_images(baseline_path, actual_path, threshold=0.95, diff_out=None,
+                   ignore_regions=None, match_mode='strict'):
+    """公共检测方法：基线 vs 实际（视觉断言三范围统一入口，两图须同口径裁剪）。
+    ignore_regions: [(x,y,w,h)] 相对图内坐标，涂白后不参与比对（diff 图同样标注忽略）。
+    match_mode: strict=像素级 SSIM；layout=粗粒度结构比对（内容小变化不敏感）。
     返回 (passed, actual: dict, error: str|None, triple_path: str|None)。"""
     try:
         if not baseline_path or not os.path.isfile(baseline_path):
@@ -75,16 +111,23 @@ def compare_images(baseline_path, actual_path, threshold=0.95, diff_out=None):
                             'actual_size': '%dx%d' % (b.shape[1], b.shape[0])},
                     '分辨率不匹配（基线 %dx%d vs 实际 %dx%d）——请在同设备上重新采集基线'
                     % (a.shape[1], a.shape[0], b.shape[1], b.shape[0]), None)
-        sim = _similarity(a, b)
+        if ignore_regions:
+            a = _apply_ignores(a, ignore_regions)
+            b = _apply_ignores(b, ignore_regions)
+        sim = _layout_sim(a, b) if match_mode == 'layout' else _similarity(a, b)
         triple = None
         if diff_out:
             try:
-                triple = _diff_triple(baseline_path, actual_path, diff_out)
+                triple = _diff_triple(baseline_path, actual_path, diff_out, ignore_regions)
             except Exception:
                 triple = None
-        actual = {'similarity': round(sim, 4), 'threshold': threshold}
+        ah, aw = a.shape[:2]
+        bh, bw = b.shape[:2]
+        actual = {'similarity': round(sim, 4), 'threshold': threshold, 'match_mode': match_mode,
+                  'ignored': len(ignore_regions or []),
+                  'baseline_size': '%dx%d' % (aw, ah), 'actual_size': '%dx%d' % (bw, bh)}
         return (sim >= threshold), actual, (None if sim >= threshold else
-                                            '相似度 %.4f 低于阈值 %.2f' % (sim, threshold)), triple
+                                            '相似度 %.4f 低于阈值 %.2f（模式 %s）' % (sim, threshold, match_mode)), triple
     except Exception as e:
         return False, None, '视觉比对异常: %s' % e, None
 

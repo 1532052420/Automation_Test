@@ -432,7 +432,426 @@
             </div>
           </div>
         </div>
+        <!-- 视觉断言调试弹窗（上传实际图→按资产配置比对；零落盘） -->
+        <div class="mask" id="visDebugMask">
+          <div class="modal" style="display:block;width:760px">
+            <div class="modal-title">🧪 调试视觉断言 <span class="muted" id="vdbgName" style="font-weight:400"></span></div>
+            <div class="modal-body">
+              <div style="display:flex;gap:14px">
+                <div style="flex:0 0 240px">
+                  <label style="display:block;font-size:13px;color:#374151">上传实际图片（与基线同范围同尺寸）
+                    <input id="vdbgFile" type="file" accept="image/png,image/jpeg" style="width:100%;margin-top:4px;font-size:12px"></label>
+                  <button class="btn ghost small" id="vdbgDel" style="width:100%;margin-top:6px">删除图片</button>
+                  <div class="hint" style="font-size:11.5px;color:#9ca3af;margin-top:6px">上传图仅用于本次比对，不做保存</div>
+                </div>
+                <div style="flex:1">
+                  <table style="font-size:12.5px;color:#374151;border-collapse:collapse">
+                    <tbody id="vdbgParams"></tbody>
+                  </table>
+                </div>
+              </div>
+              <div id="vdbgImgs" style="display:flex;gap:10px;margin-top:10px"></div>
+              <div id="vdbgMsg" class="muted" style="margin-top:8px;font-size:12.5px;min-height:18px"></div>
+            </div>
+            <div class="modal-foot">
+              <button class="btn ghost small" id="vdbgClose">关闭</button>
+            </div>
+          </div>
+        </div>
         <!-- 基线大图查看器 -->
+        <div class="mask" id="vaMgrViewer" style="cursor:zoom-out;align-items:center;justify-content:center">
+          <img id="vaMgrViewerImg" alt="基线大图" style="max-width:82vw;max-height:84vh;border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.4)">
+        </div>
+      </section>
+      <section class="panel" id="panel-caselist" hidden>
+        <div class="card">
+          <h3>用例管理 <span class="muted">框架 cases/app_ui 全部测试用例 · 管理与编辑 · 移动到项目</span></h3>
+          <div class="treebar">
+            <select id="clProj" style="max-width:170px" title="按项目筛选"><option value="">全部项目</option></select>
+            <input type="search" id="clSearch" placeholder="搜索用例名称 / 描述 / 创建人">
+            <button class="ghost mini" id="btnClRefresh">重置</button>
+            <button id="btnClNew" style="margin-left:auto">＋ 新建用例</button>
+          </div>
+          <div class="tblwrap">
+            <table>
+              <thead><tr>
+                <th>用例</th><th>项目</th><th>步骤</th><th>创建人</th><th>创建时间</th><th>操作</th>
+              </tr></thead>
+              <tbody id="clTbody"></tbody>
+            </table>
+          </div>
+          <div id="clEmpty" class="empty" style="display:none">框架里还没有 AppUI 测试用例 —— 用上方「＋ 新建用例」从设备截图录制，或到元素定位器保存用例包</div>
+          <div class="list-pager" id="clPager"></div>
+        </div>
+      </section>
+
+      <!-- 步骤编辑（三级页）：用例管理「编辑步骤」进入；布局对照 design/case-step-editor-prototype.html
+           左 步骤时间轴（轨道 + 分组色节点）· 右 步骤编辑器；数据 = 方法体注释 + 调用行反解 -->
+      <section class="panel" id="panel-caseedit" hidden>
+        <div class="card ce-head" id="ceHead">
+          <a href="#caselist" class="ce-back" id="ceBack">‹ 返回用例管理</a>
+          <div class="ce-title-wrap">
+            <div class="ce-title" id="ceTitle">—</div>
+            <div class="ce-meta" id="ceMeta"></div>
+          </div>
+          <div class="ce-actions">
+            <span class="ce-dirty" id="ceDirty" style="display:none">● 未保存（刷新页面恢复初始数据）</span>
+            <button class="mini" id="ceSave">保存</button>
+          </div>
+        </div>
+        <div class="ce-cols">
+          <div class="card">
+            <div class="card-h"><h3 style="font-size:14.5px;font-weight:700">步骤</h3><span class="muted" id="ceCnt" style="font-size:12.5px"></span></div>
+            <div class="step-tools">
+              <div class="ce-search">🔍<input id="ceQ" placeholder="筛选步骤：描述 / 元素 / 参数"></div>
+            </div>
+            <div class="ce-steps" id="ceSteps"></div>
+            <div class="ce-legend" style="padding:0 16px 14px">
+              <span><i style="background:var(--brand)"></i>基本操作</span>
+              <span><i style="background:#6e46c8"></i>断言</span>
+              <span><i style="background:#b26a00"></i>等待与分支</span>
+              <span><i style="background:#86868b"></i>其他</span>
+            </div>
+          </div>
+          <div class="card ce-editor">
+            <div class="card-h"><h3 style="font-size:14.5px;font-weight:700">步骤编辑</h3><span class="muted" id="ceIdx" style="font-size:12.5px"></span></div>
+            <div class="ce-none" id="ceNone">从左侧选择一步开始编辑</div>
+            <div class="ed-body" id="ceBody" style="display:none">
+              <div class="field"><label>动作类型</label><select id="ceType"></select></div>
+              <div class="field" id="ceElWrap"><label>目标元素</label>
+                <div class="ce-combo">
+                  <input type="text" id="ceEl" placeholder="点击选择元素，支持输入过滤" autocomplete="off">
+                  <div class="ce-combo-list" id="ceElList"></div>
+                </div>
+                <div class="ce-el-preview" id="ceElPreview"></div>
+              </div>
+              <div class="field" id="ceParamWrap"><label id="ceParamLab">参数</label><input type="text" id="ceParam"></div>
+              <div class="ce-row2">
+                <div class="field"><label>等待条件</label>
+                  <select id="ceWait"><option>出现即可</option><option>可见后操作</option><option>可点击后操作</option><option>不等待</option></select>
+                </div>
+                <div class="field"><label>最长等待（秒）</label><input type="text" id="ceSec" value="10"></div>
+              </div>
+              <div class="field"><label>备注（可选）</label><textarea id="ceDesc" rows="2" placeholder="给看报告的人一句话说明"></textarea></div>
+              <div class="ed-foot ce-foot">
+                <button class="ghost mini" id="ceDup">复制步骤</button>
+                <div style="flex:1"></div>
+                <button class="danger-ghost mini" id="ceDel">删除步骤</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 用例编排（testhub SceneBuilder 移植：顶栏用例信息条 + 三栏 操作面板/画布/参数配置）
+           用例 = 元素 + 页面操作的有序组合；保存时编译成框架三件套接入执行链路 -->
+      <section class="panel" id="panel-orch" hidden>
+        <div class="card">
+          <h3>用例编排 <span class="muted">左栏点选操作 → 选元素、填参数 → 保存后自动生成执行文件</span></h3>
+          <div class="orchtoolbar">
+            <select id="orchSel"><option value="">＋ 新建用例</option></select>
+            <input type="text" id="orchName" placeholder="用例名称，如：快歌登录">
+            <input type="text" id="orchDesc" placeholder="描述（可选）">
+            <input type="text" id="orchBy" placeholder="创建人" style="max-width:100px">
+            <select id="orchProj" style="max-width:150px" title="用例归属的项目（可先到「项目管理」新建）"><option value="">— 未分组 —</option></select>
+            <select id="orchElemFile" style="max-width:200px" title="元素来自元素定位器采集的元素库"><option value="">— 元素文件 —</option></select>
+            <button class="ghost mini" id="btnOrchRun" disabled>执行此用例</button>
+            <button id="btnOrchSave">保存用例</button>
+          </div>
+          <div class="orchlayout">
+            <div class="orchcol">
+              <div class="orchcol-title">操作面板 <span class="muted">页面操作 · 点击或拖入画布</span></div>
+              <div class="orchtree orchpalette" id="orchTree">加载中…</div>
+            </div>
+            <div class="orchcol orchcol-mid">
+              <div class="orchcol-title">编排画布 <span class="muted">按此顺序执行，可拖拽</span></div>
+              <div class="orchsteps" id="orchSteps"></div>
+            </div>
+            <div class="orchcol">
+              <div class="orchcol-title" id="orchCfgTitle">用例信息</div>
+              <div class="orchform" id="orchCfg"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 测试套件（testhub SuiteList 移植：顶部执行配置卡 + 套件表格 + 双栏编辑/历史弹窗） -->
+      <section class="panel" id="panel-suites" hidden>
+        <div class="card">
+          <h3>设备配置 <span class="muted">套件与用例执行共用，与「设备配置」页同一数据源</span></h3>
+          <div class="fields" style="grid-template-columns:1.2fr 1fr 1fr">
+            <div class="field"><label>设备配置（conf）</label><select id="suiteConf"></select></div>
+            <div class="field"><label>设备编号 udid（留空用 conf 默认）</label><input type="text" id="suiteUdid" placeholder="自动"></div>
+            <div class="field"><label>发起人（用于追溯）</label><input type="text" id="suiteOwner" placeholder="你的名字"></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>测试套件 <span class="muted">有序用例集合，按顺序批量执行并统计结果</span></h3>
+          <div class="treebar">
+            <select id="suiteProj" style="max-width:170px" title="按项目筛选"><option value="">全部项目</option></select>
+            <button class="ghost mini" id="btnSuiteRefresh">刷新</button>
+            <button id="btnSuiteNew" style="margin-left:auto">新建套件</button>
+          </div>
+          <div class="tblwrap">
+            <table>
+              <thead><tr>
+                <th>套件</th><th>用例</th><th>执行状态</th><th>最近结果</th>
+                <th>通过 / 失败</th><th>最后执行</th><th>操作</th>
+              </tr></thead>
+              <tbody id="suiteTbody"></tbody>
+            </table>
+          </div>
+          <div id="suiteEmpty" class="empty" style="display:none">还没有测试套件 —— 点「新建套件」把用例编排成批</div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</main>
+<div id="toast"></div>
+<div class="mask" id="mask">
+  <div class="modal">
+    <h4 id="mTitle"></h4>
+    <p id="mMsg"></p>
+    <div class="mops"><button class="ghost" id="mCancel">取消</button><button id="mOk">确定</button></div>
+  </div>
+</div>
+<!-- 元素 编辑/复制 弹窗 -->
+<div class="mask" id="elMask">
+  <div class="modal envmodal">
+    <h4 id="elModalTitle">编辑元素</h4>
+    <div class="fields" style="grid-template-columns:1fr 1fr">
+      <div class="field"><label>元素名称（中文/字母/数字/下划线）</label><input type="text" id="elMName" autocomplete="off"></div>
+      <div class="field"><label>元素中文名（元素管理/报告显示名，可不填）</label><input type="text" id="elMCnName" autocomplete="off"></div>
+      <div class="field"><label>定位方式</label><select id="elMType"></select></div>
+      <div class="field wide"><label>定位值</label><input type="text" id="elMValue" autocomplete="off"></div>
+      <div class="field"><label>等待方式</label><select id="elMWait"></select></div>
+      <div class="field"><label>等待时间(秒)</label><input type="number" id="elMWaitSec" min="1" max="600" step="1" value="6"></div>
+      <div class="field wide"><label>标签 / 备注（写进行尾注释，报告与回看更友好，可不填）</label><input type="text" id="elMDesc" autocomplete="off"></div>
+      <div class="field wide" id="elMFileWrap"><label>写入元素文件（复制目标）</label><select id="elMFile"></select></div>
+    </div>
+    <div class="mops mt">
+      <button class="ghost" id="elMCancel">取消</button>
+      <button id="elMSave">保存</button>
+    </div>
+  </div>
+</div>
+<!-- 套件 编辑/新建 弹窗：左可选用例 + 右已选用例（拖拽排序，testhub SuiteList 双栏交互） -->
+<div class="mask" id="suiteMask">
+  <div class="modal suitemodal">
+    <h4 id="suiteModalTitle">新建套件</h4>
+    <div class="fields" style="grid-template-columns:2fr 3fr 2fr">
+      <div class="field"><label>套件名称</label><input type="text" id="suMName" placeholder="如：回归冒烟"></div>
+      <div class="field"><label>描述</label><input type="text" id="suMDesc" placeholder="套件用途（可选）"></div>
+      <div class="field"><label>所属项目 <span class="muted">选定后可选用例只列同项目与未分组</span></label>
+        <select id="suMProj"><option value="">— 未分组 —</option></select></div>
+    </div>
+    <div class="suitelayout">
+      <div class="orchcol">
+        <div class="orchcol-title">可选用例 <span class="muted">点击加入</span></div>
+        <input type="search" id="suMSearch" placeholder="搜索用例">
+        <div class="orchtree" id="suMAvail"></div>
+      </div>
+      <div class="orchcol">
+        <div class="orchcol-title">已选用例 <span class="muted">按此顺序执行，可拖拽排序</span></div>
+        <div class="orchsteps" id="suMSelected"></div>
+      </div>
+    </div>
+    <div class="mops mt">
+      <button class="ghost" id="suMCancel">取消</button>
+      <button id="suMSave">保存</button>
+    </div>
+  </div>
+</div>
+<!-- 套件执行历史弹窗（testhub SuiteList 历史弹窗：run 明细 + 查看详情） -->
+<div class="mask" id="histMask">
+  <div class="modal suitemodal">
+    <h4 id="histTitle">执行历史</h4>
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>Run</th><th>开始时间</th><th>状态</th><th>通过</th><th>失败</th><th>操作</th></tr></thead>
+        <tbody id="histTbody"></tbody>
+      </table>
+    </div>
+    <div class="mops mt"><button id="histClose">关闭</button></div>
+  </div>
+</div>
+<!-- 项目 新建/编辑 弹窗（状态/负责人/描述） -->
+<div class="mask" id="projMask">
+  <div class="modal envmodal">
+    <h4 id="projModalTitle">新建项目</h4>
+    <div class="fields" style="grid-template-columns:1fr 1fr">
+      <div class="field"><label>项目名称（如：快歌）</label><input type="text" id="pjMName" placeholder="项目名称"></div>
+      <div class="field"><label>负责人</label><input type="text" id="pjMOwner" placeholder="你的名字"></div>
+      <div class="field"><label>状态</label>
+        <select id="pjMStatus"><option>未开始</option><option selected>进行中</option><option>已完成</option></select></div>
+      <div class="field wide"><label>描述</label><input type="text" id="pjMDesc" placeholder="项目说明（可选）"></div>
+    </div>
+    <div class="mops mt">
+      <button class="ghost" id="pjMCancel">取消</button>
+      <button id="pjMSave">保存</button>
+    </div>
+  </div>
+</div>
+<!-- 项目 详情 弹窗（基本信息 + 项目下用例/套件清单） -->
+<div class="mask" id="projDetailMask">
+  <div class="modal suitemodal">
+    <h4 id="pjdTitle">项目详情</h4>
+    <div class="cfg-meta" id="pjdMeta"></div>
+    <div class="suitelayout">
+      <div class="orchcol">
+        <div class="orchcol-title">用例 <span class="muted" id="pjdCaseCount"></span></div>
+        <div class="orchtree" id="pjdCases"></div>
+      </div>
+      <div class="orchcol">
+        <div class="orchcol-title">套件 <span class="muted" id="pjdSuiteCount"></span></div>
+        <div class="orchtree" id="pjdSuites"></div>
+      </div>
+    </div>
+    <div class="mops mt"><button id="pjdClose">关闭</button></div>
+  </div>
+</div>
+<!-- 移动用例到项目 弹窗（已登记 = 只改归属；未登记 = 顺带登记到平台，框架文件不动） -->
+<div class="mask" id="caseMoveMask">
+  <div class="modal envmodal">
+    <h4 id="mvTitle">移动用例到项目</h4>
+    <p class="muted" id="mvWho" style="font-size:12px; margin:4px 0 10px; word-break:break-all"></p>
+    <div class="fields" style="grid-template-columns:1fr 1fr">
+      <div class="field wide"><label>移动到项目</label><select id="mvProj"></select></div>
+      <div class="field" id="mvNameWrap" style="display:none"><label>登记用例名称</label><input type="text" id="mvName" placeholder="默认取方法名，可改"></div>
+      <div class="field" id="mvByWrap" style="display:none"><label>创建人</label><input type="text" id="mvBy" placeholder="你的名字（可选）"></div>
+    </div>
+    <p class="muted" style="font-size:11px" id="mvHint">未登记的框架用例会在移动时自动登记（只登记信息，不动框架文件）</p>
+    <div class="mops mt">
+      <button class="ghost" id="mvCancel">取消</button>
+      <button id="mvSave">确定</button>
+    </div>
+  </div>
+</div>
+<!-- 新建用例 弹窗（测试用例模块 · 三栏：左 设备截图可缩放 · 中 元素坐标定位 · 右 元素+用例+页面操作；底部右下角固定 取消/保存） -->
+<div class="mask" id="caseNewMask">
+  <div class="modal cnew-modal">
+    <div class="cnew-head">
+      <h4>新建用例 <span class="muted">从设备截图拾取元素 → 元素坐标定位 → 元素 + 用例 + 页面操作</span></h4>
+      <div class="cnew-tools">
+        <span class="muted" id="cnDeviceInfo">未获取截图</span>
+        <button class="ghost mini" id="btnCnZoomOut" title="缩小">－</button>
+        <button class="ghost mini" id="btnCnZoomIn" title="放大">＋</button>
+        <button class="ghost mini" id="btnCnZoomReset" title="恢复默认大小">适应</button>
+        <button class="mini" id="btnCnShot">从设备截图</button>
+      </div>
+    </div>
+    <!-- ④ 项目登记条（弹窗顶部）：填了用例名称才登记到用例列表与项目管理，留空只写框架代码 -->
+    <div style="flex:0 0 auto; display:flex; gap:14px; align-items:flex-end; padding:8px 0; border-bottom:1px dashed var(--line-soft)">
+      <div style="flex:0 0 auto; font-size:13px; font-weight:700; padding-bottom:8px">④ 项目 <span class="muted" style="font-weight:400">登记到测试用例列表与项目管理 · 名称留空则不登记</span></div>
+      <div class="fields" style="flex:1; grid-template-columns:1.1fr .9fr .8fr 1.4fr; gap:10px">
+        <div class="field"><label>用例名称</label><input type="text" id="cnRegName" placeholder="如：快歌登录"></div>
+        <div class="field"><label>项目</label><select id="cnRegProj"></select></div>
+        <div class="field"><label>创建人</label><input type="text" id="cnRegBy" placeholder="你的名字"></div>
+        <div class="field"><label>描述</label><input type="text" id="cnRegDesc" placeholder="用例说明（可选）"></div>
+      </div>
+    </div>
+    <div class="cnew-body">
+      <!-- 左：设备截图（滚轮/按钮缩放，点击拾取元素） -->
+      <div class="cnleft" id="cnImgWrap">
+        <div class="cn-empty" id="cnEmptyHint">请先从设备截图<br>点右上「从设备截图」获取当前画面</div>
+        <img id="cnImg" style="display:none" alt="设备截图">
+        <div id="cnSelBox" class="cn-selbox" style="display:none"></div>
+      </div>
+      <!-- 中：元素坐标定位 -->
+      <div class="cnmid">
+        <div class="cn-col-title">元素坐标定位</div>
+        <div id="cnEmptyMid" class="cn-empty" style="position:static;flex:none">点击左侧截图中的元素<br>此处显示命中坐标与定位</div>
+        <div id="cnPickInfo" style="display:none">
+          <div class="field"><label>命中坐标 (x, y)</label><input type="text" id="cnCoord" readonly></div>
+          <div class="field"><label>元素边界 [l, t, r, b]</label><input type="text" id="cnBounds" readonly></div>
+          <div class="field"><label>定位方式（候选）</label><select id="cnLocator"></select></div>
+          <div class="field"><label>定位值</label><textarea id="cnLocVal" rows="3" readonly></textarea></div>
+          <button class="ghost mini" id="btnCnApply" style="width:100%">回显到右侧表单 →</button>
+        </div>
+      </div>
+      <!-- 右：元素 + 用例 + 页面操作（照搬定位器添加用例弹窗，横改竖；④ 项目登记在弹窗顶部） -->
+      <div class="cnright">
+        <div class="cn-col-title">① 元素 <span class="muted">入库必需</span></div>
+        <div class="fields" style="grid-template-columns:1fr 1fr">
+          <div class="field"><label>元素名称</label><input type="text" id="cnElName" placeholder="如：登录按钮"></div>
+          <div class="field"><label>定位方式</label><select id="cnElLocType"></select></div>
+          <div class="field wide"><label>定位值</label><input type="text" id="cnElLocVal" placeholder="点击截图元素后自动回显，可手改"></div>
+          <div class="field"><label>等待方式</label>
+            <select id="cnElWait">
+              <option value="VISIBILITY_OF">VISIBILITY_OF（可见）</option>
+              <option value="PRESENCE_OF_ELEMENT_LOCATED">PRESENCE_OF_ELEMENT_LOCATED（存在）</option>
+              <option value="ELEMENT_TO_BE_CLICKABLE">ELEMENT_TO_BE_CLICKABLE（可点击）</option>
+            </select></div>
+          <div class="field"><label>等待时间(秒)</label><input type="number" id="cnElWaitSec" min="1" max="600" value="6"></div>
+          <div class="field wide"><label>元素备注</label><input type="text" id="cnElComment" placeholder="如：登录页-登录按钮（可不填）"></div>
+          <div class="field wide"><label>写入元素文件</label><select id="cnElemFile"></select></div>
+          <div class="field wide" id="cnElemFileNewWrap" style="display:none">
+            <label>新元素文件名</label><input type="text" id="cnElemFileNew" placeholder="如: loginFlow（结尾自动补 Elements，.py 自动加）">
+          </div>
+        </div>
+        <div id="cnSecCase">
+          <div class="cn-col-title mt">② 用例 <span class="muted">这步操作追加到哪条用例</span></div>
+          <div class="field"><label>目标用例文件</label><select id="cnCaseFile"></select></div>
+          <div class="field" id="cnCaseNewWrap" style="display:none">
+            <label>新用例名</label>
+            <input type="text" id="cnCaseNew" placeholder="如: login_flow（前缀 test_ 固定，.py 自动加）">
+            <label style="margin-top:8px">用例中文名 <span class="muted">（可选，映射到「执行用例」列表显示）</span></label>
+            <input type="text" id="cnCaseCnName" placeholder="如: 快歌登录冒烟">
+            <span class="muted" style="font-size:11px">保存并继续 = 三件套（用例+页面+元素）直接入库，后续步骤默认继续写入该用例</span>
+          </div>
+          <div class="field"><label>目标测试方法</label><select id="cnCaseMethod"></select></div>
+          <div class="field"><label>用例备注</label><input type="text" id="cnCaseComment" placeholder="留空=自动生成（可不填）"></div>
+          <div class="field"><label>插入位置</label><select id="cnInsertPos"></select></div>
+          <div class="cn-col-title">当前用例步骤 <span class="muted" id="cnStepCount"></span></div>
+          <div id="cnSteps" class="cnsteps"></div>
+        </div>
+        <div id="cnSecOp">
+          <div class="cn-col-title mt">③ 操作 <span class="muted">对这个元素做什么</span></div>
+          <div class="fields" style="grid-template-columns:1fr 1fr">
+            <div class="field"><label>操作类型</label><select id="cnStepType"></select></div>
+            <div class="field"><label id="cnStepParamLabel">操作参数</label><input type="text" id="cnStepParam" placeholder="输入内容 / 期望文本 / 秒数" style="display:none"></div>
+            <div class="field wide"><label>步骤描述</label><input type="text" id="cnStepDesc" placeholder="留空自动生成"></div>
+            <div class="field wide"><label>写入页面文件</label><input type="text" id="cnPageFile" readonly placeholder="选择目标用例后自动带出"></div>
+          </div>
+        </div>
+        <p class="muted" style="font-size:12px">💾 保存并继续 = 元素入库 + 操作写入用例 + 页面方法自动生成（三件套一次完成）</p>
+      </div>
+    </div>
+    <div class="cnew-foot">
+      <button class="ghost" id="cnCancel">取消</button>
+      <button class="ghost" id="cnSave">保存并继续</button>
+      <button id="cnClose">保存</button>
+    </div>
+  </div>
+</div>
+<!-- 步骤描述弹窗：纵向步骤流（步骤卡片 + ↓ 连接），点击用例列表「步骤描述」打开 -->
+<div class="mask" id="stepFlowMask">
+  <div class="modal" style="width:min(420px,92vw)">
+    <h4 id="stepFlowTitle">操作步骤</h4>
+    <div id="stepFlowBody" class="sf-body"></div>
+    <div class="mops mt"><button class="ghost" id="stepFlowClose">关闭</button></div>
+  </div>
+</div>
+<!-- 用例文件中文名 弹窗（与元素中文名同款映射：写文件头「# 用例中文名：」，定位器同步显示） -->
+<div class="mask" id="caseCnMask">
+  <div class="modal" style="width:min(480px,92vw)">
+    <h4 id="caseCnTitle">用例中文名</h4>
+    <p class="muted" style="font-size:12.5px;margin:4px 0 8px" id="caseCnFile"></p>
+    <div class="fields" style="grid-template-columns:1fr">
+      <div class="field"><label>中文名（选择用例/元素定位器用例下拉的显示名，留空清除映射）</label>
+        <input type="text" id="caseCnInput" placeholder="如：快歌星值" autocomplete="off"></div>
+    </div>
+    <div class="mops mt"><button class="ghost" id="caseCnCancel">取消</button><button id="caseCnSave">保存</button></div>
+  </div>
+</div>
+<script src="/assets/{{ asset_v }}/nav.js"></script>
+<script src="/assets/{{ asset_v }}/admin.js"></script>
+<script src="/assets/{{ asset_v }}/app_testing.js"></script>
+<script src="/assets/{{ asset_v }}/app.js"></script>
+</body>
+</html>
+<!-- 基线大图查看器 -->
         <div class="mask" id="vaMgrViewer" style="cursor:zoom-out;align-items:center;justify-content:center">
           <img id="vaMgrViewerImg" alt="基线大图" style="max-width:82vw;max-height:84vh;border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.4)">
         </div>

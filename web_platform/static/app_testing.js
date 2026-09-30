@@ -1767,7 +1767,7 @@ function openAsImgViewer(src) {
 }
 
 /* ================= 视觉断言管理（定位器采集的视觉资产；筛选/分页/大图/删除，UI 与项目管理同款） ================= */
-let _visAll = [], _visPage = 1, _visPageSize = 20;
+let _visAll = [], _visPage = 1, _visPageSize = 10;
 
 async function loadVisualAssets() {
   try {
@@ -1791,8 +1791,8 @@ function renderVisualAssets() {
   const view = rows.slice(start, start + _visPageSize);
   const SCOPE_CN = { element: '元素', region: '自定义区域', screen: '整屏' };
   $('#visTbody').innerHTML = view.map(a => `<tr>
-    <td>${a.thumb ? `<img class="as-thumb" src="${a.thumb}" data-full="/api/appui/visual_assets/${encodeURIComponent(a.name)}/baseline.png" title="点击查看基线大图">` : '<span class="muted">—</span>'}</td>
     <td><b>${esc(a.name)}</b></td>
+    <td>${a.thumb ? `<img class="as-thumb" src="${a.thumb}" data-full="/api/appui/visual_assets/${encodeURIComponent(a.name)}/baseline.png" title="点击查看基线大图">` : '<span class="muted">—</span>'}</td>
     <td>${SCOPE_CN[a.scope] || esc(a.scope)}</td>
     <td>${esc(a.biz_type_name || a.biz_type || '—')}</td>
     <td>${a.match_mode === 'layout' ? 'Layout（布局）' : 'Strict（像素级）'}</td>
@@ -1800,7 +1800,8 @@ function renderVisualAssets() {
     <td>${a.ignore_count || 0}</td>
     <td class="muted">${esc(a.created || '—')}</td>
     <td class="ops">
-      <button class="ghost mini" data-visview="${esc(a.name)}">查看</button>
+      <button class="mini" data-visedit="${esc(a.name)}">编辑</button>
+      <button class="mini" data-visdebug="${esc(a.name)}">调试</button>
       <button class="danger mini" data-visdel="${esc(a.name)}">删除</button>
     </td></tr>`).join('') || '<tr><td colspan="9" class="empty">暂无视觉资产——到元素定位器「视觉断言」采集</td></tr>';
   $('#visPagerInfo').textContent = '共 ' + rows.length + ' 条';
@@ -1812,11 +1813,10 @@ function renderVisualAssets() {
       document.getElementById('vaMgrViewerImg').src = img.dataset.full;
       document.getElementById('vaMgrViewer').classList.add('show');
     }));
-  $('#visTbody').querySelectorAll('[data-visview]').forEach(b =>
-    b.addEventListener('click', () => {
-      document.getElementById('vaMgrViewerImg').src = '/api/appui/visual_assets/' + encodeURIComponent(b.dataset.visview) + '/baseline.png';
-      document.getElementById('vaMgrViewer').classList.add('show');
-    }));
+  $('#visTbody').querySelectorAll('[data-visedit]').forEach(b =>
+    b.addEventListener('click', () => openVisualAssetEdit(b.dataset.visedit)));
+  $('#visTbody').querySelectorAll('[data-visdebug]').forEach(b =>
+    b.addEventListener('click', () => openVisualAssetDebug(b.dataset.visdebug)));
   $('#visTbody').querySelectorAll('[data-visdel]').forEach(b =>
     b.addEventListener('click', async () => {
       if (!confirm('删除视觉资产「' + b.dataset.visdel + '」？基线图与配置将一并删除。')) return;
@@ -1824,6 +1824,111 @@ function renderVisualAssets() {
       toast((r && r.msg) || (r && r.ok ? '已删除' : '删除失败'), r && r.ok);
       loadVisualAssets();
     }));
+}
+
+/* 调试视觉断言：上传实际图按资产配置比对（零落盘），参数明细+阈值实时重判 */
+function openVisualAssetDebug(name) {
+  const mask = document.getElementById('visDebugMask');
+  document.getElementById('vdbgName').textContent = '· ' + name;
+  document.getElementById('vdbgFile').value = '';
+  document.getElementById('vdbgImgs').innerHTML = '';
+  document.getElementById('vdbgParams').innerHTML = '<tr><td>上传实际图后自动比对</td></tr>';
+  document.getElementById('vdbgMsg').textContent = '';
+  mask.classList.add('show');
+  let lastSim = null, lastTh = null, lastMode = 'strict';
+  const renderJudge = () => {
+    if (lastSim == null) return;
+    const pass = lastSim >= lastTh;
+    const el = document.getElementById('vdbgJudge');
+    el.textContent = pass ? '通过 PASS' : '未通过 FAIL';
+    el.style.color = pass ? '#0A7D43' : '#D73211';
+    document.getElementById('vdbgSim').textContent = (lastSim * 100).toFixed(2) + '%';
+    document.getElementById('vdbgJudgeVal').textContent = lastTh.toFixed(2);
+  };
+  const renderParams = (d) => {
+    lastSim = d.similarity; lastTh = d.threshold; lastMode = d.match_mode;
+    const rows = [
+      ['比较模式', d.match_mode === 'layout' ? 'Layout（布局）' : 'Strict（像素级）'],
+      ['相似度', `<b id="vdbgSim" style="font-size:15px">${(d.similarity * 100).toFixed(2)}%</b>`],
+      ['相似度阈值', `<input id="vdbgThIn" type="number" min="50" max="100" step="1" value="${(d.threshold * 100).toFixed(0)}" style="width:70px;padding:3px 6px;border:1px solid #dcdfe6;border-radius:5px;font-size:12.5px"> %`],
+      ['判定', `<b id="vdbgJudge" style="font-size:14px"></b>`],
+      ['忽略区域', d.ignored + ' 块（比对时涂白跳过）'],
+      ['基线尺寸', d.baseline_size || '—'],
+      ['上传图尺寸', d.actual_size || '—'],
+    ];
+    document.getElementById('vdbgParams').innerHTML =
+      rows.map(r => `<tr><td style="padding:3px 14px 3px 0;color:#6e6e73">${r[0]}</td><td style="padding:3px 0">${r[1]}</td></tr>`).join('');
+    renderJudge();
+    const thIn = document.getElementById('vdbgThIn');
+    thIn.addEventListener('input', () => {
+      const v = parseFloat(thIn.value);
+      if (isNaN(v)) return;
+      lastTh = v / 100;
+      renderJudge();
+    });
+  };
+  const showTriple = (b64) => {
+    document.getElementById('vdbgImgs').innerHTML =
+      `<img src="${b64}" style="width:100%;border:1px solid var(--line,#e5e7eb);border-radius:8px">`;
+  };
+  document.getElementById('vdbgFile').onchange = async function () {
+    const f = this.files[0];
+    if (!f) return;
+    document.getElementById('vdbgMsg').textContent = '比对中…';
+    const fd = new FormData();
+    fd.append('file', f);
+    const r = await fetch('/api/appui/visual_assets/' + encodeURIComponent(name) + '/debug',
+      { method: 'POST', body: fd }).then(x => x.json()).catch(() => null);
+    if (!r || !r.ok) {
+      document.getElementById('vdbgMsg').textContent = '❌ ' + ((r && r.msg) || '比对失败');
+      renderParams({ similarity: null, threshold: lastTh, match_mode: lastMode, ignored: 0 });
+      return;
+    }
+    const d = r.data;
+    document.getElementById('vdbgMsg').textContent = '';
+    renderParams(d);
+    showTriple(d.triple);
+  };
+  document.getElementById('vdbgDel').onclick = () => {
+    document.getElementById('vdbgImgs').innerHTML = '';
+    document.getElementById('vdbgFile').value = '';
+    document.getElementById('vdbgParams').innerHTML = '<tr><td>上传实际图后自动比对</td></tr>';
+    document.getElementById('vdbgMsg').textContent = '';
+    showToast('已清除调试图片（本次比对结果一并清除）');
+  };
+  document.getElementById('vdbgClose').onclick = () => mask.classList.remove('show');
+}
+
+/* 编辑视觉断言：可改 视觉对象类型/比较模式/相似度阈值；名称/范围/忽略区域 置灰只读 */
+async function openVisualAssetEdit(name) {
+  const d = await api('/api/appui/visual_assets');
+  const a = (d.assets || []).find(x => x.name === name);
+  if (!a) { toast('资产不存在', false); return; }
+  const cfgResp = await fetch('/api/appui/visual_assets/' + encodeURIComponent(name) + '/config').then(x => x.json()).catch(() => null);
+  const cfg = cfgResp || {};
+  const SCOPE_CN = { element: '元素', region: '自定义区域', screen: '整屏' };
+  document.getElementById('vedName').value = name;
+  document.getElementById('vedScope').value = SCOPE_CN[a.scope] || a.scope;
+  document.getElementById('vedBiz').value = a.biz_type || 'region';
+  document.getElementById('vedMatch').value = a.match_mode || 'strict';
+  document.getElementById('vedTh').value = Math.round((a.threshold || 0.98) * 100);
+  document.getElementById('vedIgnore').value = a.ignore_count ? (a.ignore_count + ' 块（坐标相对基线区域）') : '无';
+  document.getElementById('vedThumb').innerHTML =
+    `<img src="/api/appui/visual_assets/${encodeURIComponent(name)}/baseline.png" style="max-height:160px;border-radius:8px;border:1px solid var(--line,#e5e7eb)">`;
+  const mask = document.getElementById('visEditMask');
+  mask.classList.add('show');
+  document.getElementById('vedCancel').onclick = () => mask.classList.remove('show');
+  document.getElementById('vedSave').onclick = async () => {
+    const body = {
+      biz_type: document.getElementById('vedBiz').value,
+      match_mode: document.getElementById('vedMatch').value,
+      threshold: (parseInt(document.getElementById('vedTh').value, 10) || 98) / 100,
+    };
+    const r = await api('/api/appui/visual_assets/' + encodeURIComponent(name) + '/config',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    toast((r && r.msg) || (r && r.ok ? '配置已更新' : '保存失败'), r && r.ok);
+    if (r && r.ok) { mask.classList.remove('show'); loadVisualAssets(); }
+  };
 }
 
 /* 断言管理面板 · 事件绑定（DOMContentLoaded 后一次性绑定，勿重复绑定） */

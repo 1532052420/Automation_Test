@@ -273,6 +273,35 @@ def api_visual_assets_delete(name):
     return jsonify({'ok': ok, 'msg': msg})
 
 
+@bp.route('/api/appui/visual_assets/<name>/config', methods=['POST'])
+def api_visual_assets_update(name):
+    """编辑资产配置（视觉对象类型/比较模式/相似度阈值；名称/范围/基线不可改）"""
+    import sys
+    el_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'element_locator')
+    if el_dir not in sys.path:
+        sys.path.insert(0, el_dir)
+    from element_locator import visual_assets as va
+    d = request.get_json(silent=True) or {}
+    ok, msg = va.update_config(name, d)
+    return jsonify({'ok': ok, 'msg': msg})
+
+
+@bp.route('/api/appui/visual_assets/<name>/debug', methods=['POST'])
+def api_visual_assets_debug(name):
+    """调试比对：上传实际图（multipart file 字段 file），按资产配置 SSIM 比对，
+    零落盘；返回相似度/阈值/比较模式/忽略区域数与 diff 三联图（base64）"""
+    import sys
+    el_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'element_locator')
+    if el_dir not in sys.path:
+        sys.path.insert(0, el_dir)
+    from element_locator import visual_assets as va
+    f = request.files.get('file')
+    if not f:
+        return jsonify({'ok': False, 'msg': '缺少上传图片（file 字段）'}), 400
+    ok, r = va.debug_compare(name, f.read())
+    return jsonify({'ok': ok, **({'data': r} if ok else {'msg': r})})
+
+
 @bp.route('/api/appui/visual_assets/<name>/baseline.png')
 def api_visual_assets_baseline(name):
     import sys

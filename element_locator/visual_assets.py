@@ -238,6 +238,102 @@ def delete(name):
     return True, '已删除'
 
 
+def update_config(name, patch):
+    """编辑资产配置（仅开放与采集结果无关的元数据）：
+    可编辑 biz_type / threshold / match_mode；名称/范围/基线图不可改（改=重新采集）。
+    忽略区域本版只读展示（坐标系相对基线区域，调整请重新采集）。"""
+    import yaml
+    n = _safe_name(name)
+    d = _dir(n)
+    cfg_p = os.path.join(d, 'config.yaml')
+    if not _safe_name(n) or not os.path.isfile(cfg_p):
+        return False, '资产不存在'
+    with open(cfg_p, encoding='utf-8') as f:
+        cfg = yaml.safe_load(f) or {}
+    if 'biz_type' in patch and patch['biz_type'] in BIZ_TYPES:
+        cfg['biz_type'] = patch['biz_type']
+    if 'threshold' in patch:
+        try:
+            cfg['threshold'] = max(0.5, min(1.0, float(patch['threshold'])))
+        except (TypeError, ValueError):
+            return False, '阈值不合法'
+    if 'match_mode' in patch:
+        if patch['match_mode'] not in ('strict', 'layout'):
+            return False, '比较模式不合法'
+        cfg['match_mode'] = patch['match_mode']
+    with open(cfg_p, 'w', encoding='utf-8') as f:
+        yaml.safe_dump(cfg, f, allow_unicode=True, sort_keys=False)
+    return True, '配置已更新'
+
+
+def debug_paths(name):
+    """调试产物路径：actual（上传的实际图）/ diff（三联图）；不存在返回 None"""
+    n = _safe_name(name)
+    if not n:
+        return None, None
+    d = _dir(n)
+    a = os.path.join(d, 'debug_actual.png')
+    g = os.path.join(d, 'debug_diff.png')
+    return (a if os.path.isfile(a) else None), (g if os.path.isfile(g) else None)
+
+
+def debug_compare(name, actual_bytes):
+    """调试比对（零落盘）：上传的实际图 vs 基线，按资产配置执行 SSIM，
+    结果（含 diff 三联图）以 base64 返回，图片不保存。
+    返回 (ok, data|err)，data 含相似度/阈值/比较模式/忽略区域数等完整参数。"""
+    import base64
+    import tempfile
+    import yaml
+    n = _safe_name(name)
+    d = _dir(n)
+    cfg_p = os.path.join(d, 'config.yaml')
+    baseline = os.path.join(d, 'baseline.png')
+    if not n or not os.path.isfile(cfg_p):
+        return False, '资产不存在'
+    if not os.path.isfile(baseline):
+        return False, '基线图不存在（请先采集）'
+    try:
+        with open(cfg_p, encoding='utf-8') as f:
+            cfg = yaml.safe_load(f) or {}
+    except Exception as e:
+        return False, '配置读取失败: %s' % e
+    from common.appium import visual_assertions as _va
+    tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+    try:
+        tmp.write(actual_bytes)
+        tmp.close()
+        diff_tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+        diff_tmp.close()
+        ok, actual, err, triple = _va.compare_images(
+            baseline, tmp.name, float(cfg.get('threshold') or 0.98), diff_tmp.name,
+            ignore_regions=cfg.get('ignore_regions') or [],
+            match_mode=cfg.get('match_mode') or 'strict')
+        def _b64(p):
+            try:
+                with open(p, 'rb') as f:
+                    return 'data:image/png;base64,' + base64.b64encode(f.read()).decode()
+            except Exception:
+                return ''
+        return True, {
+            'passed': ok,
+            'similarity': (actual or {}).get('similarity'),
+            'threshold': float(cfg.get('threshold') or 0.98),
+            'match_mode': cfg.get('match_mode') or 'strict',
+            'ignored': len(cfg.get('ignore_regions') or []),
+            'baseline_size': (actual or {}).get('baseline_size'),
+            'actual_size': (actual or {}).get('actual_size'),
+            'err': err or '',
+            'triple': _b64(triple) if triple else '',
+        }
+    finally:
+        import os as _os
+        for f in (tmp.name, diff_tmp.name):
+            try:
+                _os.remove(f)
+            except OSError:
+                pass
+
+
 def baseline_path(name):
     p = os.path.join(_dir(name), 'baseline.png')
     return p if os.path.isfile(p) else None
