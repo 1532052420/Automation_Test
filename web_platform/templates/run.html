@@ -458,10 +458,11 @@
                   <img id="vdbgUpImg" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:8px;display:none">
                   <div id="vdbgUpX" style="position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:#fff;border:1.5px solid #e3e8ef;color:#666;font-size:15px;line-height:26px;text-align:center;font-weight:700;display:none;cursor:pointer">✕</div>
                 </div>
-                <!-- 相似度大字居中（按值分色） -->
-                <div style="margin-top:12px">
-                  <span id="vdbgSim" style="font-size:34px;font-weight:800;letter-spacing:.02em;color:var(--text,#1d1d1f)">—</span>
-                  <span class="muted" style="font-size:12px;margin-left:8px">相似度</span>
+                <!-- 相似度阈值（左）+ 相似度大字分色（右），成组居中 -->
+                <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:12px">
+                  <span class="muted" style="font-size:12px">相似度阈值</span>
+                  <input id="vdbgTh" type="number" min="50" max="100" value="98" style="width:74px;border:1px solid var(--line-soft,#e5e7eb);border-radius:6px;padding:4px 8px;font-size:14px;font-weight:700;text-align:center">%
+                  <span id="vdbgSim" style="font-size:34px;font-weight:800;letter-spacing:.02em">—</span>
                 </div>
               </div>
             </div>
@@ -481,8 +482,7 @@
                   <option value="strict">Strict（像素级）</option>
                   <option value="layout">Layout（布局）</option>
                 </select></div>
-              <div style="background:#f6f7fb;border-radius:9px;padding:6px 12px"><div class="muted" style="font-size:11.5px;margin-bottom:3px">相似度阈值（%）</div>
-                <input id="vdbgTh" type="number" min="50" max="100" value="98" style="border:none;background:transparent;font-size:13.5px;font-weight:700;outline:none;width:70px"></div>
+
             </div>
             <div class="muted" style="font-size:11.5px;margin-top:8px">比较模式 / 视觉对象类型改动即自动保存；相似度颜色：<span style="color:#059669;font-weight:700">100%</span> / <span style="color:#10B981;font-weight:700">80~100%</span> / <span style="color:#F59E0B;font-weight:700">50~80%</span> / <span style="color:#EF4444;font-weight:700">&lt;50%</span></div>
             <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:14px">
