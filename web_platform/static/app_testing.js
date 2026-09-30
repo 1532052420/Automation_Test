@@ -1710,7 +1710,7 @@ function assertContentLabel(kind) {
 function openAssertEdit(a) {
   const mask = document.getElementById('asEditMask');
   if (!mask) return;
-  document.getElementById('asEditTitle').textContent = '编辑断言内容 · ' + (a.kind_name || a.kind);
+  document.getElementById('asEditTitle').textContent = '✎ 编辑断言内容 · ' + (a.kind_name || a.kind);
   document.getElementById('asEdCase').value = a.case_file;
   document.getElementById('asEdMethod').value = a.method + ' · 第' + a.step_no + '步';
   document.getElementById('asEdKind').value = a.kind_name || a.kind;

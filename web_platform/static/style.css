@@ -212,6 +212,14 @@ input::placeholder, textarea::placeholder { color: var(--muted2); }
 select:focus, input:focus, textarea:focus {
   border-color: var(--brand); box-shadow: 0 0 0 4px var(--brand-tint);
 }
+/* 只读字段置灰：弹窗内不可修改的回显信息（断言编辑、规则库坐标等），夜间走变量自动适配 */
+input[readonly], textarea[readonly] {
+  color: var(--muted); background: var(--panel2);
+  border-color: var(--line-soft); cursor: not-allowed;
+}
+input[readonly]:focus, textarea[readonly]:focus {
+  border-color: var(--line-soft); box-shadow: none;
+}
 label.chk { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; }
 
 /* iOS 风复选框：自绘外观（圆角方框 + 品牌蓝填充 + 白勾） */
