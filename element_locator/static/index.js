@@ -260,7 +260,8 @@ function setupEmbedBar() {
 function renderTopNav() {
   const el = document.getElementById('gnav');
   if (el && window.PlatformNav) window.PlatformNav.render(el, '/locator');
-  // 设备组迁到顶栏右上角横排（独立使用时；内嵌模式仍由 setupEmbedBar 走 embed-bar）
+  // 设备切换下拉迁到顶栏右上角（独立使用时；内嵌模式仍由 setupEmbedBar 走 embed-bar）。
+  // dev-info 状态文本不再入顶栏——下拉已含同份信息（型号·系统·serial），重复展示去掉
   if (el && !document.documentElement.classList.contains('embedded')) {
     const group = document.createElement('span');
     group.className = 'dev-group gnav-dev';
@@ -270,11 +271,9 @@ function renderTopNav() {
     group.appendChild(tag);
     const sel = $('device-sel');
     if (sel) group.appendChild(sel);
-    const dv = $('dev-info');
-    if (dv) group.appendChild(dv);
     el.appendChild(group);
     const foot = document.querySelector('.side-foot');
-    if (foot) foot.style.display = 'none';   // 节点已迁走，侧栏底部空壳隐藏
+    if (foot) foot.style.display = 'none';   // 节点已迁走/不再展示，侧栏底部空壳隐藏
   }
 }
 
