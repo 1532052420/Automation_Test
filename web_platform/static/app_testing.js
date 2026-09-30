@@ -1651,8 +1651,7 @@ if (btnAppium) loadAppiumStatus();
 /* ================= 断言管理（④断言栏内容的平台侧维护） =================
    列表 = 用例中的断言步骤（传统直调 + 组合断言展开）；仅支持编辑断言内容。
    数据源 /api/appui/assertions（assertion_manager 扫描用例与页面方法）。 */
-let _asMgrAll = [], _asMgrPage = 1;
-const AS_MGR_PAGE_SIZE = 15;   // 断言管理分页：每页 15 条（renderPager 单页时仅显示「共 N 条」）
+let _asMgrAll = [], _asMgrPage = 1, _asMgrPageSize = 20;   // 分页与项目管理同款（10/20/50，默认20）
 
 async function loadAssertions() {
   try {
@@ -1674,11 +1673,11 @@ function renderAssertions() {
   const rawKind = (document.getElementById('asMgrKind') || {}).value || '';
   const rows = _asMgrAll.filter(a =>
     (!cf || a.case_file === cf) && (!rawKind || a.kind === rawKind));
-  // 分页：每页 15 条；页码越界（筛选后变少）自动回退
-  const pages = Math.max(1, Math.ceil(rows.length / AS_MGR_PAGE_SIZE));
+  // 分页：与项目管理同款（每页条数可切 10/20/50）；页码越界自动回退
+  const pages = Math.max(1, Math.ceil(rows.length / _asMgrPageSize));
   if (_asMgrPage > pages) _asMgrPage = pages;
-  const start = (_asMgrPage - 1) * AS_MGR_PAGE_SIZE;
-  const pageRows = rows.slice(start, start + AS_MGR_PAGE_SIZE);
+  const start = (_asMgrPage - 1) * _asMgrPageSize;
+  const pageRows = rows.slice(start, start + _asMgrPageSize);
   const tb = $('#asMgrTbody');
   tb.innerHTML = pageRows.map((a, i) => {
     let content;
@@ -1707,8 +1706,11 @@ function renderAssertions() {
   }).join('') || '<tr><td colspan="6" class="empty">当前筛选下没有断言</td></tr>';
   tb.querySelectorAll('[data-edit]').forEach(b =>
     b.addEventListener('click', () => openAssertEdit(rows[+b.dataset.edit])));
-  // 复用平台共享分页条（app.js renderPager）：单页仅显示「共 N 条」，多页出上一页/页码/下一页
-  renderPager('#asMgrPager', _asMgrPage, pages, p => { _asMgrPage = p; renderAssertions(); }, rows.length);
+  // 分页条（与项目管理完全同款）：共 N 条 · [下拉 条/页] · ‹ x/y ›
+  $('#asMgrPagerInfo').textContent = '共 ' + rows.length + ' 条';
+  $('#asMgrPageNow').textContent = _asMgrPage + ' / ' + pages;
+  $('#btnAsMgrPrev').disabled = _asMgrPage <= 1;
+  $('#btnAsMgrNext').disabled = _asMgrPage >= pages;
 }
 
 function assertContentLabel(kind) {
@@ -1749,4 +1751,11 @@ document.addEventListener('DOMContentLoaded', function () {
   if (asCase) asCase.addEventListener('change', loadAssertions);
   if (asKind) asKind.addEventListener('change', function () { _asMgrPage = 1; renderAssertions(); });
   if (asRefresh) asRefresh.addEventListener('click', loadAssertions);
+  // 分页交互（与项目管理同款）：每页条数切换回第1页；越界页由 renderAssertions 自动回退
+  var asSize = document.getElementById('asMgrPageSize');
+  var asPrev = document.getElementById('btnAsMgrPrev');
+  var asNext = document.getElementById('btnAsMgrNext');
+  if (asSize) asSize.addEventListener('change', function () { _asMgrPageSize = +asSize.value || 20; _asMgrPage = 1; renderAssertions(); });
+  if (asPrev) asPrev.addEventListener('click', function () { if (_asMgrPage > 1) { _asMgrPage--; renderAssertions(); } });
+  if (asNext) asNext.addEventListener('click', function () { _asMgrPage++; renderAssertions(); });
 });
