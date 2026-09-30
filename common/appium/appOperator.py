@@ -657,10 +657,13 @@ class AppOperator:
         except Exception as e:
             self._assert_step(failures, desc, False, e)
 
-    def assert_visual_or_record(self, failures, desc, element, baseline='', threshold=0.95, wait_seconds=3):
+    def assert_visual_or_record(self, failures, desc, element, baseline='', threshold=0.95, wait_seconds=3,
+                                ignore_regions=None, match_mode='strict'):
         """视觉断言（多断言版）：元素区域截图 vs 基线相似度；
         基线缺失→自动建立（通过并在报告注明）；尺寸不一致→不硬比；
-        失败挂 基线/实际/diff 三联图入 allure。"""
+        失败挂 基线/实际/diff 三联图入 allure。
+        ignore_regions：[(x,y,w,h)] 相对元素区域坐标，比对时涂白跳过（动态数字/时间）；
+        match_mode：strict 像素SSIM | layout 粗粒度结构比对（内容小变化不敏感）。"""
         try:
             from common.appium import visual_assertions as _va
             probe = self._assert_probe(element, wait_seconds)
@@ -679,7 +682,8 @@ class AppOperator:
                     return
             os.makedirs('output/tmp/', exist_ok=True)
             triple_path = os.path.abspath('output/tmp/visual_triple_%s.png' % DateTimeTool.getNowTime('%Y%m%d%H%M%S%f'))
-            ok, actual, err, triple = _va.compare_images(baseline, actual_path, threshold, triple_path)
+            ok, actual, err, triple = _va.compare_images(baseline, actual_path, threshold, triple_path,
+                                                          ignore_regions=ignore_regions, match_mode=match_mode)
             if triple and os.path.isfile(triple):
                 with open(triple, 'rb') as f:
                     allure.attach(name=('视觉三联图_' + desc)[:40], body=f.read(),

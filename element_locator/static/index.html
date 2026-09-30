@@ -24,7 +24,7 @@ try {
 } catch (e) { /* 隐私模式等场景忽略 */ }
 </script>
 <link rel="stylesheet" href="/static/nav.css">
-<link rel="stylesheet" href="static/style.css?v=76">
+<link rel="stylesheet" href="static/style.css?v=77">
 </head>
 <body>
 <header class="gnav" id="gnav"></header>
@@ -41,6 +41,10 @@ try {
   <button id="btn-tree-diff" class="btn ghost side-btn" title="每次刷新与上一次元素树对比：新增 / 消失（快速发现跳转与弹窗）">
     <svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="6.5" r="2.3"/><circle cx="17.5" cy="17.5" r="2.3"/><path d="M6.5 8.8v3.2a3 3 0 0 0 3 3h4.3"/><path d="M17.5 15.2V12a3 3 0 0 0-3-3h-4.3"/></svg>
     <span class="bt-tx">树对比：开</span>
+  </button>
+  <button id="btn-visual-mode" class="btn ghost side-btn" title="视觉断言采集：在截图上选元素/框选区域/整屏，保存为视觉资产（基线+忽略区域+比较模式），供用例做视觉断言">
+    <svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12s3.2-5.5 8.5-5.5S20.5 12 20.5 12s-3.2 5.5-8.5 5.5S3.5 12 3.5 12z"/><circle cx="12" cy="12" r="2.2"/></svg>
+    <span class="bt-tx">视觉断言：关</span>
   </button>
   <button id="btn-coord-mode" class="btn ghost side-btn" title="点截图选精确坐标（不再命中容器节点）。用于无障碍盲区：自绘弹层的选项等定位不到的元素；双击=真机点该点，添加到用例默认生成「坐标点击」">
     <svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5.5"/><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3"/></svg>
@@ -98,6 +102,7 @@ try {
   <!-- 右：选中元素（原「操作教学」栏位改造；定高不随字段增减变化） -->
   <section class="col right">
     <div class="col-title">选中元素 <span class="hint">点选截图或元素树节点后展示详情</span></div>
+    <div id="visualPanel" class="detail" style="display:none"></div>
     <div id="detail" class="detail" style="display:none">
       <div class="detail-head">选中元素 <span class="hint">双击截图可直达设备点击</span></div>
       <div id="tap-tip" class="tap-tip"></div>
@@ -332,6 +337,6 @@ try {
 </div>
 <script src="/static/nav.js"></script>
 <script src="/static/theme.js"></script>
-<script src="static/index.js?v=76"></script>
+<script src="static/index.js?v=77"></script>
 </body>
 </html>
