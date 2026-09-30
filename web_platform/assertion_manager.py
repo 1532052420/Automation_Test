@@ -22,7 +22,7 @@ IND = '    '
 # 断言方式 → 中文名 + 可编辑内容字段
 ASSERT_KIND_NAMES = {
     'exists': '断言元素是否可见', 'text': '断言文本是否正确', 'toast': '断言Toast是否出现',
-    'gone': '断言元素是否消失', 'visual': '断言外观是否一致', 'color': '断言颜色是否正确',
+    'gone': '断言元素是否消失', 'visual': '视觉断言', 'color': '断言颜色是否正确',
     'visible': '断言元素是否可见',
 }
 KIND_FROM_LABEL = [('视觉', 'visual'), ('Toast', 'toast'), ('颜色', 'color'),

@@ -57,7 +57,7 @@ var ASSERT_KINDS = [
   { v: 'text', n: '断言文本是否正确', d: '文案相等', p: { text: '' } },
   { v: 'toast', n: '断言Toast是否出现', d: '页面级', p: { toast: '' } },
   { v: 'gone', n: '断言元素是否消失', d: '弹窗已关闭', p: { wait: 2 } },
-  { v: 'visual', n: '断言外观是否一致', d: '基线比对', p: { threshold: 0.95, captured: false }, isNew: true },
+  { v: 'visual', n: '视觉断言', d: '基线比对', p: { threshold: 0.95, captured: false }, isNew: true },
 ];
 
 function assertState() { return state.modalAsserts || (state.modalAsserts = []); }
@@ -91,7 +91,7 @@ function renderAssertCol() {
     var html = '<div class="as-item' + (on ? ' on' : '') + '" data-as="' + d.v + '">' +
       '<input type="checkbox" ' + (on ? 'checked' : '') + '>' +
       '<span class="ai-n">' + d.n + '</span>' +
-      (d.isNew ? '<span class="visual-tag">新 · 视觉断言</span>' : '') +
+      (d.isNew ? '<span class="visual-tag">视觉断言</span>' : '') +
       '<span class="ai-d">' + d.d + '</span></div>';
     if (on) {
       var p = '';
@@ -143,7 +143,8 @@ async function captureBaseline() {
   var r = findAssert('visual');
   if (!r) return;
   var cap = document.getElementById('asCapBtn');
-  if (!state.selNode && !state.coordPoint) throw new Error('请先在截图/元素树选中元素');
+  if (!state.selNode && !state.coordPoint) { showToast('请先在截图/元素树选中元素'); return; }
+  var origText = cap ? cap.textContent : '';
   if (cap) { cap.disabled = true; cap.textContent = '采集中…'; }
   try {
     var resp = await fetch('api/element/baseline', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -153,9 +154,11 @@ async function captureBaseline() {
     if (!d.ok) throw new Error(d.msg || '采集失败');
     r.captured = true; r.thumbnail = d.thumbnail; r.path = d.path;
     showToast('基线已采集：' + d.path);
-    renderAssertCol();
-  } finally {
-    if (cap) { cap.disabled = false; }
+    renderAssertCol();   // 重建卡组：按钮变「更新基线」，三图区出现基线缩略图
+  } catch (e) {
+    // 失败原因可见 + 按钮回到采集前状态（可立即重新采集）
+    showToast('采集失败：' + (e && e.message ? e.message : e));
+    if (cap) { cap.disabled = false; cap.textContent = origText; }
   }
 }
 
