@@ -2159,9 +2159,14 @@ async function onSaveElement(continueMode) {
     // def : / Locator_Type. 让后端语法校验兜底，不如在这里明确提示）
     if (!special) {
       const missing = [];
+      // 坐标点击等类型本就不依赖元素定位（el:false），定位方式/值不应列为必填
+      const opDef = STEP_TYPES.find(k => k.v === currentOpType()) || {};
+      const needLoc = opDef.el !== false;
       if (!name) missing.push('元素名（左侧点选元素或手填）');
-      if (!$('el-type').value) missing.push('定位方式');
-      if (!$('el-value').value.trim()) missing.push('定位值');
+      if (needLoc) {
+        if (!$('el-type').value) missing.push('定位方式');
+        if (!$('el-value').value.trim()) missing.push('定位值');
+      }
       if (!$('el-op-type').value) missing.push('操作类型');
       if (missing.length) {
         showElResult('⚠️ 请补齐必填项：' + missing.join('、'), false);
