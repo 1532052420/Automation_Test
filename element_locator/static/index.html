@@ -204,18 +204,11 @@ try {
         <!-- 第三栏：操作 -->
         <section class="flow-col" id="col-op">
           <div class="col-head">操作 <span class="hint">动作单选 + 断言可多选</span></div>
-          <label>操作类型 <span class="help-icon" data-help="动作类单选；「仅断言」= 只跑下方勾选的断言、不执行动作">?</span>
+          <label>操作类型 <span class="help-icon" data-help="动作类单选；断言用下方开关开启后勾选">?</span>
             <div id="op-grid" class="op-grid"></div>
           </label>
-          <label>全部操作类型 <span class="hint" style="font-weight:400">（动作与仅断言；组合断言用下方开关开启后勾选）</span>
+          <label>全部操作类型 <span class="hint" style="font-weight:400">（动作类；组合断言用下方开关开启后勾选）</span>
             <select id="el-op-type"></select>
-          </label>
-          <label>特殊操作 <span class="help-icon" data-help="与元素无关的用例级动作；选中时断言不可用">?</span>
-            <select id="el-op-special">
-              <option value="">无（使用上方操作类型）</option>
-              <option value="hide_keyboard">收起键盘（键盘在才收，否则不动）</option>
-              <option value="deal_first_launch_dialogs">首次启动弹窗处理（无弹窗自动跳过）</option>
-            </select>
           </label>
           <label id="el-op-param-wrap">操作参数 <span class="help-icon" data-help="输入内容/期望文本/坐标/秒数">?</span>
             <input id="el-op-param" type="text" placeholder="输入内容 / 期望文本 / toast文本 / 坐标(x,y) / 秒数">
@@ -237,6 +230,13 @@ try {
             <div id="asGrid" class="as-grid"></div>
           </div>
           <div id="op-note" class="op-note"></div>
+          <label>特殊操作 <span class="help-icon" data-help="与元素无关的用例级动作；选中时断言不可用">?</span>
+            <select id="el-op-special">
+              <option value="">无（使用上方操作类型）</option>
+              <option value="hide_keyboard">收起键盘（键盘在才收，否则不动）</option>
+              <option value="deal_first_launch_dialogs">首次启动弹窗处理（无弹窗自动跳过）</option>
+            </select>
+          </label>
           <label id="page-file-label">写入页面文件 <span class="help-icon" data-help="由目标用例决定，自动带出">?</span>
             <input id="el-page-file" type="text" readonly placeholder="选择目标用例后自动带出">
           </label>

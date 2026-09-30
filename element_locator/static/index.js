@@ -59,7 +59,6 @@ var ASSERT_KINDS = [
   { v: 'gone', n: '断言元素是否消失', d: '弹窗已关闭', p: { wait: 2 } },
   { v: 'visual', n: '断言外观是否一致', d: '基线比对', p: { threshold: 0.95, captured: false }, isNew: true },
 ];
-var ASSERT_ONLY = 'assert_only';   // ③操作新增类型：不执行动作，只跑④栏组合
 
 function assertState() { return state.modalAsserts || (state.modalAsserts = []); }
 
@@ -174,7 +173,6 @@ function syncAssertSide() {
 }
 /* 当前生效的操作类型：特殊操作优先，否则用常规操作类型下拉 */
 function currentOpType() { return $('el-op-special').value || $('el-op-type').value || ''; }
-function isAssertOnly() { return currentOpType() === ASSERT_ONLY; }
 
 function genStepDesc(s) {
   const t = stepTypeInfo(s.type);
@@ -195,7 +193,6 @@ function genStepDesc(s) {
     case 'sleep': return '等待' + p + '秒';
     case 'hide_keyboard': return '收起键盘';
     case 'deal_first_launch_dialogs': return '首次启动弹窗处理（无弹窗自动跳过）';
-    case 'assert_only': return '断言' + s.element;
     case 'custom': return (p || '自定义代码').split('\n')[0];
     default: return '未定义步骤';
   }
@@ -1467,18 +1464,13 @@ async function savePopupRule(continueMode) {
     showToast('🎯 弹窗规则「' + name + '」已登记' + check + ' · 用例执行时被动生效');
   }
 }
-/* 操作下拉分组渲染（见名知意：基本操作 / 断言 / 长流程·等待与分支） */
-/* 四栏改版：③操作只留动作类（4 种断言移至④栏），新增「仅断言」 */
+/* 操作下拉分组渲染（见名知意：基本操作 / 长流程·等待与分支） */
+/* 四栏改版：③操作只留动作类（4 种传统断言移至④栏，组合断言走开关勾选） */
 const OP_HIDDEN = ['assert_visible', 'assert_text', 'assert_toast', 'assert_gone'];
 function visibleOpTypes() {
-  return STEP_TYPES.filter(t => OP_HIDDEN.indexOf(t.v) < 0)
-    .concat([{ v: ASSERT_ONLY, n: '仅断言(无动作)', el: true, param: false, group: '基本操作' }]);
+  return STEP_TYPES.filter(t => OP_HIDDEN.indexOf(t.v) < 0);
 }
-function opTypeInfo(v) {
-  return v === ASSERT_ONLY
-    ? { v: ASSERT_ONLY, n: '仅断言(无动作)', el: true, param: false, ph: '', group: '基本操作', defv: '' }
-    : stepTypeInfo(v);
-}
+function opTypeInfo(v) { return stepTypeInfo(v); }
 function opTypeOptions() {
   const groups = [];
   visibleOpTypes().forEach(t => {
@@ -1556,7 +1548,6 @@ function autoStepComment(type, elementLabel, param) {
     case 'custom': return '执行自定义代码';
     case 'hide_keyboard': return '收起键盘（键盘在才收，否则不动）';
     case 'deal_first_launch_dialogs': return '首次启动弹窗处理（无弹窗自动跳过）';
-    case 'assert_only': return t ? '断言「' + t + '」' : '';
     default: return '';
   }
 }
@@ -1630,7 +1621,6 @@ function previewLine(step) {
       const n = parseInt(p, 10);
       return 'page.click_' + el + '_if_visible(' + (isNaN(n) ? '' : n) + ')';
     }
-    case 'assert_only': return 'page.assert_' + el + '()';
     case 'hide_keyboard': return 'page.dismiss_keyboard()';
     case 'deal_first_launch_dialogs': return 'page.deal_first_launch_dialogs()';
     case 'screenshot': return "page.wait_and_shot('" + escQ(p) + "')";
@@ -2309,7 +2299,7 @@ async function saveCollect() {
 /* ================= 弹窗改版（v6.98）：图标卡快捷选择 / 锚点卡 / 三件套状态条 =================
    纯样式配套 JS：不新增字段、不改保存逻辑。el-op-type 原生 select 保留（全量操作类型），
    图标卡只是常用 6 类的快捷入口，两者写同一字段并互相同步高亮。 */
-const OP_GRID_TYPES = visibleOpTypes().map(t => t.v);   // 四栏改版：动作类+仅断言铺满图标卡（4种断言移至④栏）
+const OP_GRID_TYPES = visibleOpTypes().map(t => t.v);   // 动作类铺满图标卡（4种传统断言移至④栏）
 /* 简约 iOS 线性图标（24×24 网格 · stroke 1.8 · currentColor，跟随选中态反白） */
 const svgIcon = (inner) =>
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
@@ -2340,7 +2330,7 @@ function buildOpGrid() {
   if (!grid || grid.dataset.built) return;
   grid.dataset.built = '1';
   OP_GRID_TYPES.forEach(v => {
-    const t = opTypeInfo(v);   // 四栏改版：仅断言卡标签不再回落成点击
+    const t = opTypeInfo(v);
     const card = document.createElement('div');
     card.className = 'op-card';
     card.dataset.op = v;

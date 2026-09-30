@@ -25,7 +25,7 @@ STEP_TYPES = [
     'click', 'input', 'long_press', 'assert_visible', 'assert_text',
     'assert_toast', 'wait_element', 'assert_gone', 'if_click',
     'screenshot', 'tap', 'sleep', 'hide_keyboard', 'custom',
-    'deal_first_launch_dialogs', 'assert_only',
+    'deal_first_launch_dialogs',
 ]
 
 # ④断言栏 · 组合断言类型（操作与断言解耦：一步 = 操作 + 断言组合）
@@ -175,7 +175,6 @@ def step_desc(step):
         'sleep': '等待%s秒' % p,
         'hide_keyboard': '收起键盘',
         'custom': (p or '自定义代码').splitlines()[0],
-        'assert_only': '断言%s' % el,
         'deal_first_launch_dialogs': '首次启动弹窗处理（无弹窗自动跳过）',
     }.get(t, '未定义步骤') + _asserts_desc_suffix(step)
 
@@ -214,10 +213,6 @@ def page_method_code(step):
     t = step.get('type', '')
     el = step.get('element') or ''
     desc = (step.get('comment') or '').strip() or step_desc(step)
-    if t == 'assert_only':
-        # 仅断言（无组合项）：等价旧「断言存在」
-        return _method_block('assert_%s' % el, desc, [],
-                             'self.appOperator.getElement(self._elements.%s)\n%s' % (el, _shot_line(desc)))
     if t == 'click':
         return _method_block('click_%s' % el, desc, [],
                              'self.appOperator.click(self._elements.%s)' % el)
@@ -338,7 +333,7 @@ def _combo_method_code(step):
 TYPE_NAMES_CN = {
     'click': '点击', 'input': '输入', 'long_press': '长按', 'tap': '坐标点击',
     'screenshot': '截图', 'sleep': '固定等待', 'wait_element': '轮询等待出现',
-    'if_click': '出现才点击', 'custom': '自定义代码', 'assert_only': '仅断言',
+    'if_click': '出现才点击', 'custom': '自定义代码',
     'assert_visible': '断言存在', 'assert_text': '断言文本',
     'assert_toast': '断言Toast', 'assert_gone': '断言消失',
 }
@@ -374,8 +369,6 @@ def case_step_line(step):
             return 'page.click_%s_if_visible(%d)' % (el, int(p))
         except (TypeError, ValueError):
             return 'page.click_%s_if_visible()' % el
-    if t == 'assert_only':
-        return 'page.assert_%s()' % el
     if t == 'hide_keyboard':
         return 'page.dismiss_keyboard()'
     if t == 'deal_first_launch_dialogs':
