@@ -10,12 +10,21 @@
 两端不再各自硬编码版本号。
 """
 
-APP_VERSION = '6.14.42'
+APP_VERSION = '6.14.43'
 
 # 最新版本在最前；time 精确到秒（YYYY-MM-DD HH:MM:SS）
 # 版本号格式 x.xx.x 自 6.11.0 起强制执行；更早的历史条目保留原始记录，不回溯改写
 # 每条变更一句话 10~20 字，只说改了什么（详细背景见项目 memory 与设计文档）
 CHANGELOG = [
+    {
+        'version': '6.14.43',
+        'time': '2026-09-30 12:00:10',
+        'title': 'Percy+Maestro 视觉测试调研方案（仅调研未实施）',
+        'changes': [
+            '新增 调研文档：percy-maestro-app 原理拆解与本机环境实测',
+            '结论 独立模块 visual_testing 三期路线；一二期不依赖云端，三期需 BrowserStack 凭据',
+        ],
+    },
     {
         'version': '6.14.42',
         'time': '2026-09-30 10:38:40',
