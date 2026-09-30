@@ -1771,7 +1771,7 @@ let _visAll = [], _visPage = 1, _visPageSize = 20;
 
 async function loadVisualAssets() {
   try {
-    const d = await api('/api/appui/visual_assets');
+    const d = await api('/api/appui/visual_assets?_=' + Date.now());   // 防缓存：删除/采集后列表要即时刷新
     _visAll = d.assets || [];
     _visPage = 1;
     renderVisualAssets();
