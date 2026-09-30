@@ -66,6 +66,10 @@ app.register_blueprint(api_testing_bp)
 from web_platform.api_testing import scheduler as api_task_scheduler
 api_task_scheduler.start_scheduler()
 
+# 视觉测试（Percy/Maestro 调研落地 · 独立模块：Maestro 流程 + 本地运行 + SSIM 看板，零云端依赖）
+from web_platform.visual_testing.routes import bp as visual_testing_bp
+app.register_blueprint(visual_testing_bp)
+
 # AppUI 用例编排 / 测试用例 / 测试套件（testhub_platform app_automation 移植：复用 runner 链路）
 from web_platform.app_testing.routes import bp as app_testing_bp
 app.register_blueprint(app_testing_bp)

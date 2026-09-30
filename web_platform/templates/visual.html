@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>视觉测试 · 自动化测试平台</title>
+<script src="/assets/{{ asset_v }}/theme.js"></script>
+<link rel="stylesheet" href="/assets/{{ asset_v }}/nav.css">
+<link rel="stylesheet" href="/assets/{{ asset_v }}/style.css">
+</head>
+<body data-page="visual">
+<header class="gnav" id="sidebar"></header>
+<main>
+  <div class="runlayout">
+    <aside class="subnav" id="subnav">
+      <div class="subnav-label">视觉测试</div>
+      <a href="#flows" data-panel="flows" data-icon="doc" class="on">流程管理</a>
+      <a href="#runs" data-panel="runs" data-icon="film">运行历史</a>
+      <div class="subnav-foot muted" style="margin-top:auto;padding:10px 14px;font-size:11.5px;line-height:1.6">
+        Maestro 本地模式：流程在本机真机执行，截图与 SSIM 基线比对全部本地完成（Percy 云端未接入）
+      </div>
+    </aside>
+
+    <div class="content">
+      <!-- 流程管理 -->
+      <section class="panel" id="panel-flows">
+        <div class="card">
+          <div class="cardhead">
+            <h3>Maestro 流程 <span class="muted">YAML 流程列表；运行后按 takeScreenshot 截图做 SSIM 基线比对</span></h3>
+            <div class="treebar" style="margin-left:auto;margin-bottom:0">
+              <button id="btnVtNew" class="ghost mini">＋ 新建流程</button>
+              <button id="btnVtFlowsRefresh" class="ghost mini">重置</button>
+            </div>
+          </div>
+          <div class="tblwrap">
+            <table>
+              <thead><tr><th>流程名</th><th>文件</th><th>修改时间</th><th style="width:230px">操作</th></tr></thead>
+              <tbody id="vtFlowsTbody"><tr><td colspan="4" class="empty">加载中…</td></tr></tbody>
+            </table>
+          </div>
+          <div id="vtFlowsEmpty" class="empty" style="display:none">暂无流程——点「＋ 新建流程」写一条 Maestro YAML</div>
+        </div>
+      </section>
+
+      <!-- 运行历史 -->
+      <section class="panel" id="panel-runs" hidden>
+        <div class="card">
+          <div class="cardhead">
+            <h3>运行历史 <span class="muted">每次运行收集截图并与基线 SSIM 比对（相同/变化/新增三态）</span></h3>
+            <div class="treebar" style="margin-left:auto;margin-bottom:0">
+              <button id="btnVtRunsRefresh" class="ghost mini">重置</button>
+            </div>
+          </div>
+          <div class="tblwrap">
+            <table>
+              <thead><tr><th>运行 ID</th><th>流程</th><th>状态</th><th>截图数</th><th>开始时间</th><th style="width:180px">操作</th></tr></thead>
+              <tbody id="vtRunsTbody"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <!-- 运行详情：日志 + 截图比对看板 -->
+        <div class="card" id="vtDetail" style="display:none">
+          <div class="cardhead">
+            <h3 id="vtDetailTitle">运行详情</h3>
+            <div class="treebar" style="margin-left:auto;margin-bottom:0">
+              <button id="btnVtDetailBack" class="ghost mini">← 返回列表</button>
+            </div>
+          </div>
+          <pre id="vtLog" class="muted" style="max-height:180px;overflow:auto;background:var(--panel2);padding:10px 12px;border-radius:10px;font-size:12px;white-space:pre-wrap"></pre>
+          <div id="vtResults"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<!-- 流程编辑弹窗 -->
+<div class="mask" id="vtFlowMask">
+  <div class="modal envmodal">
+    <h4 id="vtFlowTitle">✎ 编辑流程</h4>
+    <div class="field mt"><label>流程名（文件名，无需扩展名）</label><input type="text" id="vtFlowName" autocomplete="off"></div>
+    <div class="field mt"><label>Maestro YAML</label>
+      <textarea id="vtFlowYaml" rows="16" spellcheck="false"
+        style="font:12px/1.6 ui-monospace,Menlo,Consolas,monospace;white-space:pre;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;outline:none"></textarea></div>
+    <div class="mops mt"><button class="ghost" id="vtFlowCancel">取消</button><button id="vtFlowSave">保存</button></div>
+  </div>
+</div>
+
+<script src="/assets/{{ asset_v }}/nav.js"></script>
+<script src="/assets/{{ asset_v }}/app.js"></script>
+<script src="/assets/{{ asset_v }}/visual.js"></script>
+</body>
+</html>
