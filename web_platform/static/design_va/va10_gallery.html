@@ -1,0 +1,51 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>视觉断言调试弹窗 · 10 套设计方案</title><style>
+* { margin:0; padding:0; box-sizing:border-box; font-family:"PingFang SC","Microsoft YaHei",sans-serif; }
+body { background:#0a0c10; color:#e8ecf2; padding:28px 36px; }
+h1 { font-size:22px; margin-bottom:4px; }
+.sub { color:#8a94a6; font-size:13px; margin-bottom:22px; }
+.grid { display:grid; grid-template-columns:repeat(2,1fr); gap:22px; }
+.cell h3 { font-size:14.5px; margin-bottom:8px; color:#aeb8c4; font-weight:600; }
+.cell h3 .no { color:#0071e3; margin-right:6px; font-weight:800; }
+.frame { border:1px solid #262b34; border-radius:12px; overflow:hidden; cursor:zoom-in; transition:border-color .15s; background:#0e1116; }
+.frame:hover { border-color:#0071e3; }
+.frame iframe { width:100%; height:430px; border:none; pointer-events:none; display:block; }
+.lb { position:fixed; inset:0; background:rgba(0,0,0,.82); display:none; align-items:center; justify-content:center; z-index:99; cursor:zoom-out; }
+.lb.show { display:flex; }
+.lb iframe { width:1280px; height:860px; border:none; border-radius:8px; background:#0e1116; }
+.lb .tip { position:fixed; top:20px; right:32px; color:#8a94a6; font-size:13px; }
+</style></head><body>
+<h1>🧪 视觉断言调试弹窗 · 10 套设计方案</h1>
+<div class="sub">点击任意方案放大查看 · 内容为演示数据（基线/实际/Diff），确认样式后按所选方案实现</div>
+<div class="grid" id="grid"></div>
+<div class="lb" id="lb"><span class="tip">点击任意处关闭</span><iframe id="lbf"></iframe></div>
+<script>
+const names = [
+  ['V1 经典双栏','基线|实际 左右大图+VS，相似度大字居中，参数胶囊一行'],
+  ['V2 上下堆叠','基线/实际横条上下排+右侧参数栏+相似度卡'],
+  ['V3 环形仪表','相似度环形进度居中，下方基线/实际对比条+参数胶囊'],
+  ['V4 分屏滑块','基线|实际叠加，中央分割线拖动对比，下方参数芯片'],
+  ['V5 玻璃拟态','毛玻璃卡片+渐变相似度大字+基线/实际双图'],
+  ['V6 极简线框','黑白线框数据表+三图横排（极客风）'],
+  ['V7 渐变强调','渐变描边卡片+相似度渐变大字+参数胶囊行'],
+  ['V8 仪表盘风','相似度环形+参数卡片网格（面板仪表盘感）'],
+  ['V9 检查器风','左大图+工具条+右侧信息卡片栈（检查器式）'],
+  ['V10 苹果浅色','iOS 浅色风：圆角白卡+大号相似度+参数胶囊（仅浅色）'],
+];
+const grid = document.getElementById('grid');
+names.forEach((n, i) => {
+  const v = 'v' + (i + 1);
+  const cell = document.createElement('div');
+  cell.className = 'cell';
+  cell.innerHTML = `<h3><span class="no">${String(i+1).padStart(2,'0')}</span>${n[0]}</h3>
+    <div class="frame" data-v="${v}"><iframe src="${v}.html"></iframe></div>`;
+  grid.appendChild(cell);
+});
+grid.addEventListener('click', e => {
+  const f = e.target.closest('.frame');
+  if (!f) return;
+  const lb = document.getElementById('lb');
+  document.getElementById('lbf').src = f.dataset.v + '.html';
+  lb.classList.add('show');
+});
+document.getElementById('lb').addEventListener('click', () => document.getElementById('lb').classList.remove('show'));
+</script></body></html>

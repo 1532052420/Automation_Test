@@ -1,0 +1,36 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><style>
+body { width:1280px; height:880px; background:rgba(10,10,10,.7); display:flex; align-items:center; justify-content:center;
+       font-family:"PingFang SC","Microsoft YaHei",sans-serif; }
+.modal { width:920px; background:#0c0c0c; border:1px solid #2a2a2a; border-radius:4px; padding:24px 28px; color:#d4d4d4; }
+.hd { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #2a2a2a; padding-bottom:12px; margin-bottom:16px; }
+.hd .t { font-size:15px; font-weight:700; letter-spacing:1px; }
+.hd .cl { font-size:12px; color:#777; cursor:pointer; }
+.tbl { width:100%; border-collapse:collapse; font-size:13px; }
+.tbl th { text-align:left; color:#888; font-weight:400; padding:6px 10px; border-bottom:1px solid #2a2a2a; }
+.tbl td { padding:8px 10px; border-bottom:1px solid #1c1c1c; }
+.tbl td.v { color:#fff; font-weight:600; }
+.fail { color:#f55; font-weight:700; }
+.imgrow { display:flex; gap:12px; margin-top:14px; }
+.imgc { flex:1; border:1px solid #2a2a2a; }
+.imgc img { width:100%; height:150px; object-fit:cover; display:block; filter:grayscale(.2); }
+.imgc .lb { padding:5px 10px; font-size:11px; color:#888; border-top:1px solid #2a2a2a; }
+.foot { display:flex; justify-content:flex-end; gap:10px; margin-top:18px; }
+.b { padding:7px 22px; font-size:12.5px; cursor:pointer; background:transparent; color:#d4d4d4; border:1px solid #444; }
+.b.pri { background:#d4d4d4; color:#0c0c0c; border-color:#d4d4d4; font-weight:700; }
+</style></head><body>
+<div class="modal">
+  <div class="hd"><span class="t">DEBUG · 视觉断言调试 / 拖拽健壮性验证</span><span class="cl">✕ ESC 关闭</span></div>
+  <table class="tbl">
+    <tr><th>断言范围</th><td class="v">自定义区域</td><th>视觉对象类型</th><td class="v">图片</td></tr>
+    <tr><th>比较模式</th><td class="v">Strict（像素级）</td><th>忽略区域</th><td class="v">0 块</td></tr>
+    <tr><th>相似度</th><td class="fail">0.00%</td><th>相似度阈值</th><td class="v">98 %</td></tr>
+    <tr><th>判定</th><td class="fail" colspan="3">✗ 未通过（相似度低于阈值）</td></tr>
+  </table>
+  <div class="imgrow">
+    <div class="imgc"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1NjAiIGhlaWdodD0iNTAwIj48cmVjdCB3aWR0aD0iNTYwIiBoZWlnaHQ9IjUwMCIgZmlsbD0iIzE2MTgxZCIvPjxyZWN0IHg9IjIwIiB5PSIyMCIgd2lkdGg9IjUyMCIgaGVpZ2h0PSI0NjAiIHJ4PSIxMiIgZmlsbD0iIzFlMjIyYSIvPjxjaXJjbGUgY3g9IjcwIiBjeT0iODAiIHI9IjI0IiBmaWxsPSIjMmMzMTNhIi8+PHJlY3QgeD0iMTEwIiB5PSI2MCIgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMiIgcng9IjYiIGZpbGw9IiMzYTQxNTAiLz48cmVjdCB4PSIxMTAiIHk9Ijk1IiB3aWR0aD0iMzIwIiBoZWlnaHQ9IjE0IiByeD0iNCIgZmlsbD0iIzJjMzEzYSIvPjxyZWN0IHg9IjExMCIgeT0iMTIwIiB3aWR0aD0iMjgwIiBoZWlnaHQ9IjE0IiByeD0iNCIgZmlsbD0iIzJjMzEzYSIvPjxyZWN0IHg9IjQwIiB5PSIxNzAiIHdpZHRoPSI0ODAiIGhlaWdodD0iMTMwIiByeD0iMTAiIGZpbGw9IiMyMzI4MzMiLz48dGV4dCB4PSIyODAiIHk9IjI0NSIgZm9udC1zaXplPSIzMCIgZmlsbD0iIzVhNjQ3OCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+5Z+657q/5oiq5Zu+5YaF5a65PC90ZXh0PjxyZWN0IHg9IjQwIiB5PSIzMzAiIHdpZHRoPSI0ODAiIGhlaWdodD0iMTEwIiByeD0iMTAiIGZpbGw9IiMyMzI4MzMiLz48dGV4dCB4PSIyODAiIHk9IjM5NSIgZm9udC1zaXplPSIyNiIgZmlsbD0iIzRhNTQ2OCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+5YiX6KGo5Yy65Z+fPC90ZXh0Pjwvc3ZnPg=="><div class="lb">基线 128×64</div></div>
+    <div class="imgc"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1NjAiIGhlaWdodD0iNTAwIj48cmVjdCB3aWR0aD0iNTYwIiBoZWlnaHQ9IjUwMCIgZmlsbD0iIzE2MTgxZCIvPjxyZWN0IHg9IjIwIiB5PSIyMCIgd2lkdGg9IjUyMCIgaGVpZ2h0PSI0NjAiIHJ4PSIxMiIgZmlsbD0iIzFlMjIyYSIvPjxjaXJjbGUgY3g9IjcwIiBjeT0iODAiIHI9IjI0IiBmaWxsPSIjMmMzMTNhIi8+PHJlY3QgeD0iMTEwIiB5PSI2MCIgd2lkdGg9IjE5MCIgaGVpZ2h0PSIyMiIgcng9IjYiIGZpbGw9IiMzYTQxNTAiLz48cmVjdCB4PSIxMTAiIHk9Ijk1IiB3aWR0aD0iMzEwIiBoZWlnaHQ9IjE0IiByeD0iNCIgZmlsbD0iIzJjMzEzYSIvPjxyZWN0IHg9IjExMCIgeT0iMTIwIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE0IiByeD0iNCIgZmlsbD0iIzJjMzEzYSIvPjxyZWN0IHg9IjQwIiB5PSIxNzAiIHdpZHRoPSI0ODAiIGhlaWdodD0iMTMwIiByeD0iMTAiIGZpbGw9IiMyMzI4MzMiLz48cmVjdCB4PSIzOTAiIHk9IjE4MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI5MCIgZmlsbD0iI0VGNDQ0NCIgb3BhY2l0eT0iMC4zNSIvPjx0ZXh0IHg9IjI4MCIgeT0iMjQ1IiBmb250LXNpemU9IjMwIiBmaWxsPSIjNWE2NDc4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj7lrp7pmYXmiKrlm77lhoXlrrk8L3RleHQ+PHJlY3QgeD0iNDAiIHk9IjMzMCIgd2lkdGg9IjQ4MCIgaGVpZ2h0PSIxMTAiIHJ4PSIxMCIgZmlsbD0iIzIzMjgzMyIvPjx0ZXh0IHg9IjI4MCIgeT0iMzk1IiBmb250LXNpemU9IjI2IiBmaWxsPSIjNGE1NDY4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj7liJfooajljLrln588L3RleHQ+PHJlY3QgeD0iMzgwIiB5PSIxODUiIHdpZHRoPSIxMzAiIGhlaWdodD0iMzAiIGZpbGw9IiNFRjQ0NDQiIG9wYWNpdHk9IjAuNiIvPjwvc3ZnPg=="><div class="lb">实际 128×64</div></div>
+    <div class="imgc"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1NjAiIGhlaWdodD0iNTAwIj48cmVjdCB3aWR0aD0iNTYwIiBoZWlnaHQ9IjUwMCIgZmlsbD0iIzEwMTIxNiIvPjxyZWN0IHg9IjIwIiB5PSIyMCIgd2lkdGg9IjUyMCIgaGVpZ2h0PSI0NjAiIHJ4PSIxMiIgZmlsbD0iIzE0MTcxYyIvPjxyZWN0IHg9IjM4MCIgeT0iMTgwIiB3aWR0aD0iMTMwIiBoZWlnaHQ9Ijk1IiBmaWxsPSIjRUY0NDQ0IiBvcGFjaXR5PSIwLjU1Ii8+PHJlY3QgeD0iMzgwIiB5PSIxODUiIHdpZHRoPSIxMzAiIGhlaWdodD0iMzAiIGZpbGw9IiNFRjQ0NDQiIG9wYWNpdHk9IjAuOCIvPjx0ZXh0IHg9IjI4MCIgeT0iMjUwIiBmb250LXNpemU9IjI4IiBmaWxsPSIjRUY0NDQ0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBvcGFjaXR5PSIwLjg1Ij7lt67lvILljLrln5/pq5jkuq48L3RleHQ+PC9zdmc+"><div class="lb">Diff 差异高亮</div></div>
+  </div>
+  <div class="foot"><button class="b">取消</button><button class="b pri">重新比对</button></div>
+</div>
+</body></html>

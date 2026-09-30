@@ -1,0 +1,38 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><style>
+body { width:1280px; height:920px; background:rgba(20,20,24,.5); display:flex; align-items:center; justify-content:center;
+       font-family:"PingFang SC","Microsoft YaHei",sans-serif; }
+.modal { width:980px; background:#f5f5f7; border-radius:20px; padding:26px 30px 22px; color:#1d1d1f;
+         box-shadow:0 30px 90px rgba(0,0,0,.45); }
+.hd { display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; }
+.hd .t { font-size:21px; font-weight:700; }
+.hd .cl { font-size:15px; color:#86868b; cursor:pointer; }
+.duo { display:flex; gap:16px; }
+.cbox { flex:1; text-align:center; }
+.cbox .tag { font-size:12.5px; color:#86868b; margin-bottom:8px; }
+.cbox .img { height:240px; border-radius:14px; overflow:hidden; background:#fff; box-shadow:0 2px 12px rgba(0,0,0,.06); display:flex; align-items:center; justify-content:center; }
+.cbox .img img { max-width:100%; max-height:100%; }
+.sim { display:flex; align-items:baseline; justify-content:center; gap:10px; margin:18px 0 8px; }
+.sim .n { font-size:44px; font-weight:800; color:#1d1d1f; }
+.sim .pct { font-size:20px; color:#86868b; }
+.sim .lb { font-size:13px; color:#86868b; }
+.pills { display:flex; gap:10px; justify-content:center; margin-top:10px; }
+.pill { background:#e8e8ed; border-radius:20px; padding:6px 18px; font-size:12.5px; color:#1d1d1f; }
+.foot { display:flex; justify-content:flex-end; gap:12px; margin-top:20px; }
+.b { padding:9px 30px; border-radius:12px; font-size:14px; font-weight:600; cursor:pointer; }
+.ghost { background:transparent; border:1px solid #d2d2d7; color:#1d1d1f; }
+.pri { background:#0071e3; color:#fff; border:none; }
+</style></head><body>
+<div class="modal">
+  <div class="hd"><span class="t">调试视觉断言 · 拖拽健壮性验证</span><span class="cl">完成</span></div>
+  <div class="duo">
+    <div class="cbox"><div class="tag">基线（已采集）</div><div class="img"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1NjAiIGhlaWdodD0iNTAwIj48cmVjdCB3aWR0aD0iNTYwIiBoZWlnaHQ9IjUwMCIgZmlsbD0iIzE2MTgxZCIvPjxyZWN0IHg9IjIwIiB5PSIyMCIgd2lkdGg9IjUyMCIgaGVpZ2h0PSI0NjAiIHJ4PSIxMiIgZmlsbD0iIzFlMjIyYSIvPjxjaXJjbGUgY3g9IjcwIiBjeT0iODAiIHI9IjI0IiBmaWxsPSIjMmMzMTNhIi8+PHJlY3QgeD0iMTEwIiB5PSI2MCIgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMiIgcng9IjYiIGZpbGw9IiMzYTQxNTAiLz48cmVjdCB4PSIxMTAiIHk9Ijk1IiB3aWR0aD0iMzIwIiBoZWlnaHQ9IjE0IiByeD0iNCIgZmlsbD0iIzJjMzEzYSIvPjxyZWN0IHg9IjExMCIgeT0iMTIwIiB3aWR0aD0iMjgwIiBoZWlnaHQ9IjE0IiByeD0iNCIgZmlsbD0iIzJjMzEzYSIvPjxyZWN0IHg9IjQwIiB5PSIxNzAiIHdpZHRoPSI0ODAiIGhlaWdodD0iMTMwIiByeD0iMTAiIGZpbGw9IiMyMzI4MzMiLz48dGV4dCB4PSIyODAiIHk9IjI0NSIgZm9udC1zaXplPSIzMCIgZmlsbD0iIzVhNjQ3OCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+5Z+657q/5oiq5Zu+5YaF5a65PC90ZXh0PjxyZWN0IHg9IjQwIiB5PSIzMzAiIHdpZHRoPSI0ODAiIGhlaWdodD0iMTEwIiByeD0iMTAiIGZpbGw9IiMyMzI4MzMiLz48dGV4dCB4PSIyODAiIHk9IjM5NSIgZm9udC1zaXplPSIyNiIgZmlsbD0iIzRhNTQ2OCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+5YiX6KGo5Yy65Z+fPC90ZXh0Pjwvc3ZnPg=="></div></div>
+    <div class="cbox"><div class="tag">上传实际图片</div><div class="img"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1NjAiIGhlaWdodD0iNTAwIj48cmVjdCB3aWR0aD0iNTYwIiBoZWlnaHQ9IjUwMCIgZmlsbD0iIzE2MTgxZCIvPjxyZWN0IHg9IjIwIiB5PSIyMCIgd2lkdGg9IjUyMCIgaGVpZ2h0PSI0NjAiIHJ4PSIxMiIgZmlsbD0iIzFlMjIyYSIvPjxjaXJjbGUgY3g9IjcwIiBjeT0iODAiIHI9IjI0IiBmaWxsPSIjMmMzMTNhIi8+PHJlY3QgeD0iMTEwIiB5PSI2MCIgd2lkdGg9IjE5MCIgaGVpZ2h0PSIyMiIgcng9IjYiIGZpbGw9IiMzYTQxNTAiLz48cmVjdCB4PSIxMTAiIHk9Ijk1IiB3aWR0aD0iMzEwIiBoZWlnaHQ9IjE0IiByeD0iNCIgZmlsbD0iIzJjMzEzYSIvPjxyZWN0IHg9IjExMCIgeT0iMTIwIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE0IiByeD0iNCIgZmlsbD0iIzJjMzEzYSIvPjxyZWN0IHg9IjQwIiB5PSIxNzAiIHdpZHRoPSI0ODAiIGhlaWdodD0iMTMwIiByeD0iMTAiIGZpbGw9IiMyMzI4MzMiLz48cmVjdCB4PSIzOTAiIHk9IjE4MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI5MCIgZmlsbD0iI0VGNDQ0NCIgb3BhY2l0eT0iMC4zNSIvPjx0ZXh0IHg9IjI4MCIgeT0iMjQ1IiBmb250LXNpemU9IjMwIiBmaWxsPSIjNWE2NDc4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj7lrp7pmYXmiKrlm77lhoXlrrk8L3RleHQ+PHJlY3QgeD0iNDAiIHk9IjMzMCIgd2lkdGg9IjQ4MCIgaGVpZ2h0PSIxMTAiIHJ4PSIxMCIgZmlsbD0iIzIzMjgzMyIvPjx0ZXh0IHg9IjI4MCIgeT0iMzk1IiBmb250LXNpemU9IjI2IiBmaWxsPSIjNGE1NDY4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj7liJfooajljLrln588L3RleHQ+PHJlY3QgeD0iMzgwIiB5PSIxODUiIHdpZHRoPSIxMzAiIGhlaWdodD0iMzAiIGZpbGw9IiNFRjQ0NDQiIG9wYWNpdHk9IjAuNiIvPjwvc3ZnPg=="></div></div>
+  </div>
+  <div class="sim"><span class="n">100.00%</span><span class="pct">相似度</span><span class="lb">· 阈值 98% · Strict 模式</span></div>
+  <div class="pills">
+    <span class="pill">断言范围：元素</span><span class="pill">类型：Toast</span>
+    <span class="pill">忽略区域：0 块</span><span class="pill">判定：通过</span>
+  </div>
+  <div class="foot"><button class="b ghost">取消</button><button class="b pri">调试</button></div>
+</div>
+</body></html>

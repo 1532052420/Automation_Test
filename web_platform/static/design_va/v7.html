@@ -1,0 +1,40 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><style>
+body { width:1280px; height:920px; background:#080a10; display:flex; align-items:center; justify-content:center;
+       font-family:"PingFang SC","Microsoft YaHei",sans-serif; }
+.modal { width:1000px; border-radius:20px; padding:2px;
+         background:linear-gradient(135deg,#EF4444,#F59E0B 40%,#10B981 80%); }
+.inner { border-radius:18px; background:#0c0f15; padding:24px 30px; }
+.hd { display:flex; justify-content:space-between; margin-bottom:18px; }
+.hd .t { font-size:18px; font-weight:700; color:#f0f2f5; }
+.hd .cl { font-size:13px; color:#7a8494; cursor:pointer; }
+.duo { display:flex; gap:16px; }
+.gbox { flex:1; border-radius:12px; overflow:hidden; border:1px solid #1d222b; }
+.gbox img { width:100%; height:230px; object-fit:cover; display:block; }
+.gbox .cap { padding:7px; text-align:center; font-size:12px; color:#aeb8c4; background:#10141b; }
+.simband { margin:18px 0; text-align:center; padding:16px; border-radius:14px;
+           background:linear-gradient(90deg,rgba(239,68,68,.12),rgba(245,158,11,.12));
+           border:1px solid rgba(239,68,68,.25); }
+.simband .n { font-size:56px; font-weight:800; color:#EF4444; }
+.simband .l { font-size:12px; color:#8a94a6; margin-top:2px; }
+.prow { display:flex; gap:12px; }
+.chip { flex:1; background:#10141b; border:1px solid #1d222b; border-radius:10px; padding:9px 14px; text-align:center; }
+.ck { font-size:10.5px; color:#7a8494; }
+.cv { font-size:13.5px; font-weight:700; color:#e8ecf2; margin-top:2px; }
+.foot { display:flex; justify-content:flex-end; gap:12px; margin-top:18px; }
+.b { padding:9px 28px; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; }
+.ghost { background:#10141b; border:1px solid #1d222b; color:#e8ecf2; }
+.pri { background:linear-gradient(135deg,#0a84ff,#0066cc); color:#fff; border:none; }
+</style></head><body>
+<div class="modal"><div class="inner">
+  <div class="hd"><span class="t">🧪 调试视觉断言 · 拖拽健壮性验证</span><span class="cl">✕ 关闭</span></div>
+  <div class="duo">
+    <div class="gbox"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1NjAiIGhlaWdodD0iNTAwIj48cmVjdCB3aWR0aD0iNTYwIiBoZWlnaHQ9IjUwMCIgZmlsbD0iIzE2MTgxZCIvPjxyZWN0IHg9IjIwIiB5PSIyMCIgd2lkdGg9IjUyMCIgaGVpZ2h0PSI0NjAiIHJ4PSIxMiIgZmlsbD0iIzFlMjIyYSIvPjxjaXJjbGUgY3g9IjcwIiBjeT0iODAiIHI9IjI0IiBmaWxsPSIjMmMzMTNhIi8+PHJlY3QgeD0iMTEwIiB5PSI2MCIgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMiIgcng9IjYiIGZpbGw9IiMzYTQxNTAiLz48cmVjdCB4PSIxMTAiIHk9Ijk1IiB3aWR0aD0iMzIwIiBoZWlnaHQ9IjE0IiByeD0iNCIgZmlsbD0iIzJjMzEzYSIvPjxyZWN0IHg9IjExMCIgeT0iMTIwIiB3aWR0aD0iMjgwIiBoZWlnaHQ9IjE0IiByeD0iNCIgZmlsbD0iIzJjMzEzYSIvPjxyZWN0IHg9IjQwIiB5PSIxNzAiIHdpZHRoPSI0ODAiIGhlaWdodD0iMTMwIiByeD0iMTAiIGZpbGw9IiMyMzI4MzMiLz48dGV4dCB4PSIyODAiIHk9IjI0NSIgZm9udC1zaXplPSIzMCIgZmlsbD0iIzVhNjQ3OCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+5Z+657q/5oiq5Zu+5YaF5a65PC90ZXh0PjxyZWN0IHg9IjQwIiB5PSIzMzAiIHdpZHRoPSI0ODAiIGhlaWdodD0iMTEwIiByeD0iMTAiIGZpbGw9IiMyMzI4MzMiLz48dGV4dCB4PSIyODAiIHk9IjM5NSIgZm9udC1zaXplPSIyNiIgZmlsbD0iIzRhNTQ2OCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+5YiX6KGo5Yy65Z+fPC90ZXh0Pjwvc3ZnPg=="><div class="cap">基线 Expected · 自定义区域</div></div>
+    <div class="gbox"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1NjAiIGhlaWdodD0iNTAwIj48cmVjdCB3aWR0aD0iNTYwIiBoZWlnaHQ9IjUwMCIgZmlsbD0iIzE2MTgxZCIvPjxyZWN0IHg9IjIwIiB5PSIyMCIgd2lkdGg9IjUyMCIgaGVpZ2h0PSI0NjAiIHJ4PSIxMiIgZmlsbD0iIzFlMjIyYSIvPjxjaXJjbGUgY3g9IjcwIiBjeT0iODAiIHI9IjI0IiBmaWxsPSIjMmMzMTNhIi8+PHJlY3QgeD0iMTEwIiB5PSI2MCIgd2lkdGg9IjE5MCIgaGVpZ2h0PSIyMiIgcng9IjYiIGZpbGw9IiMzYTQxNTAiLz48cmVjdCB4PSIxMTAiIHk9Ijk1IiB3aWR0aD0iMzEwIiBoZWlnaHQ9IjE0IiByeD0iNCIgZmlsbD0iIzJjMzEzYSIvPjxyZWN0IHg9IjExMCIgeT0iMTIwIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE0IiByeD0iNCIgZmlsbD0iIzJjMzEzYSIvPjxyZWN0IHg9IjQwIiB5PSIxNzAiIHdpZHRoPSI0ODAiIGhlaWdodD0iMTMwIiByeD0iMTAiIGZpbGw9IiMyMzI4MzMiLz48cmVjdCB4PSIzOTAiIHk9IjE4MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI5MCIgZmlsbD0iI0VGNDQ0NCIgb3BhY2l0eT0iMC4zNSIvPjx0ZXh0IHg9IjI4MCIgeT0iMjQ1IiBmb250LXNpemU9IjMwIiBmaWxsPSIjNWE2NDc4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj7lrp7pmYXmiKrlm77lhoXlrrk8L3RleHQ+PHJlY3QgeD0iNDAiIHk9IjMzMCIgd2lkdGg9IjQ4MCIgaGVpZ2h0PSIxMTAiIHJ4PSIxMCIgZmlsbD0iIzIzMjgzMyIvPjx0ZXh0IHg9IjI4MCIgeT0iMzk1IiBmb250LXNpemU9IjI2IiBmaWxsPSIjNGE1NDY4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj7liJfooajljLrln588L3RleHQ+PHJlY3QgeD0iMzgwIiB5PSIxODUiIHdpZHRoPSIxMzAiIGhlaWdodD0iMzAiIGZpbGw9IiNFRjQ0NDQiIG9wYWNpdHk9IjAuNiIvPjwvc3ZnPg=="><div class="cap">实际 Actual · 图片</div></div>
+  </div>
+  <div class="simband"><div class="n">0.00%</div><div class="l">当前相似度（低于阈值 98%）</div></div>
+  <div class="prow">
+    <div class="chip"><div class="ck">比较模式</div><div class="cv">Strict（像素级）</div></div><div class="chip"><div class="ck">忽略区域</div><div class="cv">0 块</div></div><div class="chip"><div class="ck">视觉对象类型</div><div class="cv">图片</div></div><div class="chip"><div class="ck">断言范围</div><div class="cv">自定义区域</div></div>
+  </div>
+  <div class="foot"><button class="b ghost">取消</button><button class="b pri">调试</button></div>
+</div></div>
+</body></html>
