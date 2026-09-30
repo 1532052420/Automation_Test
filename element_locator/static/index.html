@@ -6,7 +6,7 @@
 <!-- color-scheme=dark：声明浏览器加载期画布底色为深色。从平台跳转过来时「旧页销毁→新页首帧」
      的空档浏览器默认画纯白（就是那一下刺眼的白闪），声明后该空档也是深色。 -->
 <meta name="color-scheme" content="dark">
-<title>App 元素定位器 · AutomationTest</title>
+<title>元素定位器 · AutomationTest</title>
 <script>
 /* 首帧前恢复主题：夜间模式在样式表加载前同步挂 night 类 + 给根节点上深色底，
    双保险保证第一帧就是深色（日间模式由 CSS 的 color-scheme:light 覆回，见 style.css）。
@@ -24,7 +24,7 @@ try {
 } catch (e) { /* 隐私模式等场景忽略 */ }
 </script>
 <link rel="stylesheet" href="/static/nav.css">
-<link rel="stylesheet" href="static/style.css?v=75">
+<link rel="stylesheet" href="static/style.css?v=76">
 </head>
 <body>
 <header class="gnav" id="gnav"></header>
@@ -32,10 +32,7 @@ try {
 <aside class="side">
   <div class="brand">
     <svg class="bi brand-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.2-6.5-10a6.5 6.5 0 0 1 13 0c0 4.8-6.5 10-6.5 10z"/><circle cx="12" cy="11" r="2.2"/></svg>
-    <div class="bt">App 元素定位器
-      <span id="app-version" class="ver">v3.3</span>
-      <small>截图点选 → 一键写进元素库</small>
-    </div>
+    <div class="bt">元素定位器</div>
   </div>
   <button id="btn-collect" class="btn ghost side-btn" title="一次性解析当前页面全部节点：过滤纯布局容器 → 去重 → 自动命名与定位候选 → 勾选后批量写入元素库。原始 hierarchy 自动存档到 element_collect/">
     <svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v9"/><path d="M8.5 9.5L12 13l3.5-3.5"/><path d="M4.5 16.5v2A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5v-2"/></svg>
@@ -49,13 +46,13 @@ try {
     <svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5.5"/><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3"/></svg>
     <span class="bt-tx">坐标模式：关</span>
   </button>
-  <button id="btn-restart" class="btn ghost side-btn" title="♻ 重启：完整刷新（截图+元素树），失败时自动重启 adb 服务自愈——最可靠但较慢，画面异常/刷新失败时使用">
-    <svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.7 3.5v3.6h-3.6"/></svg>
-    <span class="bt-tx">重启</span>
-  </button>
   <button id="btn-refresh" class="btn primary side-btn" title="⚡ 刷新：快速重新截图并解析元素树（单次尝试，最快）；画面异常刷不出来时请用「♻ 重启」">
     <svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L5.5 13.5H11L10 21l7.5-10.5H12z"/></svg>
     <span class="bt-tx">刷新</span>
+  </button>
+  <button id="btn-restart" class="btn ghost side-btn" title="♻ 重启：完整刷新（截图+元素树），失败时自动重启 adb 服务自愈——最可靠但较慢，画面异常/刷新失败时使用">
+    <svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.7 3.5v3.6h-3.6"/></svg>
+    <span class="bt-tx">重启</span>
   </button>
   <div class="side-foot">
     <div class="dev-row">
@@ -335,6 +332,6 @@ try {
 </div>
 <script src="/static/nav.js"></script>
 <script src="/static/theme.js"></script>
-<script src="static/index.js?v=75"></script>
+<script src="static/index.js?v=76"></script>
 </body>
 </html>

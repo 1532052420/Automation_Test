@@ -260,6 +260,22 @@ function setupEmbedBar() {
 function renderTopNav() {
   const el = document.getElementById('gnav');
   if (el && window.PlatformNav) window.PlatformNav.render(el, '/locator');
+  // 设备组迁到顶栏右上角横排（独立使用时；内嵌模式仍由 setupEmbedBar 走 embed-bar）
+  if (el && !document.documentElement.classList.contains('embedded')) {
+    const group = document.createElement('span');
+    group.className = 'dev-group gnav-dev';
+    const tag = document.createElement('span');
+    tag.className = 'bar-label';
+    tag.textContent = '📱 设备';
+    group.appendChild(tag);
+    const sel = $('device-sel');
+    if (sel) group.appendChild(sel);
+    const dv = $('dev-info');
+    if (dv) group.appendChild(dv);
+    el.appendChild(group);
+    const foot = document.querySelector('.side-foot');
+    if (foot) foot.style.display = 'none';   // 节点已迁走，侧栏底部空壳隐藏
+  }
 }
 
 async function init() {
@@ -269,8 +285,6 @@ async function init() {
   await loadDevices();
   const st = await fetch('api/status?serial=' + encodeURIComponent(state.serial || '')).then(r => r.json()).catch(() => null);
   const devInfo = $('dev-info');
-  // 版本号以服务端为准（页面缓存旧版本时也能纠正显示）
-  if (st && st.version) $('app-version').textContent = st.version;
   if (st && st.ok) {
     state.serial = st.serial || state.serial;
     devInfo.innerHTML = devInfoHtml(st.device, st.serial);
@@ -382,11 +396,12 @@ function bindColumnResizers() {
   const mid = document.querySelector('.col.middle');
   const right = document.querySelector('.col.right');
   if (!left || !mid || !right) return;
-  // 右栏固定 700px（v6.14.23：700×700 固定，历史拖拽记忆不再恢复/记忆列宽）
+  // 栏宽默认（每次加载复位，拖拽改动不持久）：右栏固定 700；中栏「元素/坐标」默认 900；
+  // 左栏「设备截图」弹性吸收剩余宽度
   try { localStorage.removeItem('locator_col_widths'); } catch (e) {}
   right.style.flex = '0 0 700px';
-  mid.style.flex = '1 1 auto';
-  left.style.flex = '0 1 360px';
+  mid.style.flex = '0 1 900px';
+  left.style.flex = '1 1 360px';
   document.querySelectorAll('.col-resizer').forEach(handle => {
     handle.addEventListener('mousedown', (e) => {
       e.preventDefault();
@@ -473,8 +488,9 @@ function deviceOptionText(d) {
 /* 设备信息展示：型号+系统版本一行，设备ID（serial）单独一行完整显示。
    抽出来是因为 init() 与 refresh() 两处都要写同一份内容，避免改一处漏一处。 */
 function devInfoHtml(device, serial) {
+  // 横排单行：型号 · 系统版本 · 设备ID（顶栏右上角设备组，不再分两行）
   return '📱 ' + esc(device.model) + ' · Android ' + esc(device.platformVersion) +
-    '<br><span class="dev-id" title="设备ID（adb serial）">' + esc(serial || '') + '</span>';
+    ' · <span class="dev-id" title="设备ID（adb serial）">' + esc(serial || '') + '</span>';
 }
 
 async function loadDevices() {
@@ -2263,6 +2279,8 @@ async function openCollectModal(result) {
 }
 
 async function startCollect() {
+  // 二次确认：采集会解析当前页全部节点并生成候选，误触成本高
+  if (!window.confirm('确认采集当前页面全部元素？\n（将解析当前屏幕全部节点 → 过滤去重 → 生成候选清单）')) return;
   const btn = $('btn-collect');
   btn.disabled = true; btn.textContent = '⏳ 采集中…';
   try {

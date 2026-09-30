@@ -76,6 +76,24 @@ html.night .embed-bar { background: #1b1c1f; border: 1px solid rgba(255,255,255,
 .dev-info { font-size: 13px; color: #d1d5db; }
 .dev-info.ok { color: #34d399; }
 .dev-info.bad { color: #f87171; }
+
+/* 顶栏右上角设备组（自侧栏迁入）：绝对定位不占导航布局、不撑高导航栏 */
+.gnav .dev-group.gnav-dev {
+  position: absolute; right: 22px; top: 0; height: var(--nav-h);
+  display: flex; align-items: center; gap: 8px; flex: 0 0 auto;
+}
+.gnav .dev-group .bar-label { font-size: 12.5px; color: var(--nav-muted); flex: 0 0 auto; }
+.gnav .dev-group .mini-select { max-width: 300px; height: 30px; }
+.gnav .dev-group .dev-info {
+  font-size: 12.5px; color: var(--nav-muted); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 36vw;
+}
+.gnav .dev-group .dev-info.ok { color: #047857; }
+.gnav .dev-group .dev-info.bad { color: #b91c1c; }
+.gnav .dev-group .dev-id { margin: 0; font-size: 11.5px; color: var(--nav-muted); }
+html.night .gnav .dev-group .dev-info { color: var(--nav-muted); }
+html.night .gnav .dev-group .dev-info.ok { color: #34d399; }
+html.night .gnav .dev-group .dev-info.bad { color: #f87171; }
 .dev-id {
   display: inline-block; margin-top: 2px;
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -825,10 +843,11 @@ html.night .anchor-card { background: rgba(64,158,255,.08); border-color: #2b4a6
 html.night .steps-list { background: #1b1c1f; border-color: #303236; }
 html.night .el-content { background: #111214; color: #e5e7eb; }
 
-/* ===== 选中元素栏 700×700 固定（v6.14.23 用户要求）：小屏出滚动条兜底，字段增减长度不变 ===== */
+/* ===== 选中元素栏宽固定 700、高自适应浏览器：字段区超高时栏内滚动兜底 ===== */
 main { min-width: 1320px; min-height: 780px; }
-.col.right { flex: 0 0 700px; width: 700px; min-width: 700px; max-width: 700px;
-             height: 700px; min-height: 700px; max-height: 700px; }
+.col.right { flex: 0 0 700px; width: 700px; min-width: 700px; max-width: 700px; }
+.col.middle { min-width: 280px; }
+.col.left { min-width: 280px; }
 
 /* ===== 保存到哪一步 · 分段控件（v6.14.3 · 设计文档 design/ui-proposals/样式方案V1-设计文档.md） ===== */
 /* 用途条在滚动区外（结构上不可能被裁切）：白底通栏 + 底部分隔线 */
