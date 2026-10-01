@@ -1029,10 +1029,18 @@ html.night input::placeholder, html.night textarea::placeholder { color: #9aa3af
   transition: left .2s ease, background .15s, color .15s; }
 .side-toggle:hover { color: #fff; background: #26272b; }
 .side-toggle .st-ic { display: block; transition: transform .2s ease; }
-body.side-collapsed .side-toggle { left: 0; border-radius: 0 10px 10px 0; border-right: 1px solid rgba(255,255,255,.14); }
+body.side-collapsed .side-toggle { left: 44px; }
 body.side-collapsed .side-toggle .st-ic { transform: scaleX(-1); }
-body.side-collapsed .side { width: 0; flex-basis: 0; padding: 0; overflow: hidden;
-  opacity: 0; pointer-events: none; box-shadow: none; }
+/* 收起态 = 56px 图标栏：功能 icon 保留可点击（快捷执行/开关），文字与设备区隐藏 */
+body.side-collapsed .side { width: 56px; flex-basis: 56px; padding: 12px 8px; gap: 10px;
+  overflow: visible; opacity: 1; pointer-events: auto; }
+body.side-collapsed .side .bt-tx, body.side-collapsed .side .brand .bt,
+body.side-collapsed .side .side-foot { display: none; }
+body.side-collapsed .side .brand { justify-content: center; margin-bottom: 4px; }
+body.side-collapsed .side .side-btn { justify-content: center; padding-left: 0; padding-right: 0; }
+/* 开关型按钮的开启态（树对比/坐标模式/视觉断言）：两种形态下都可见 */
+.side-btn.on { border-color: rgba(64,158,255,.55); color: var(--sky); background: rgba(64,158,255,.1); }
+html.night .side-btn.on { border-color: rgba(64,158,255,.5); color: #66b1ff; background: rgba(64,158,255,.14); }
 html.embedded .side-toggle { display: none; }
 html.night .side-toggle { background: #17181b; border-color: #303236; color: #9aa3af; }
 html.night .side-toggle:hover { background: #232428; color: #e5e7eb; }

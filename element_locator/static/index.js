@@ -339,6 +339,7 @@ async function init() {
   // 树 Diff 开关 / 定位器体检 / 会话步骤撤销
   initDialog();
   $('btn-tree-diff').addEventListener('click', toggleTreeDiff);
+  $('btn-tree-diff').classList.toggle('on', state.treeDiffOn);   // 默认开，初始即高亮
   $('btn-coord-mode').addEventListener('click', toggleCoordMode);
   $('btn-visual-mode').addEventListener('click', vaToggleMode);
   const sideToggle = $('side-toggle');
@@ -855,7 +856,7 @@ function vaToggleMode() {
   va.on = !va.on;
   document.body.classList.toggle('va-mode', va.on);
   const btn = $('btn-visual-mode');
-  if (btn) btn.querySelector('.bt-tx').textContent = va.on ? '视觉断言：开' : '视觉断言：关';
+  if (btn) { btn.querySelector('.bt-tx').textContent = va.on ? '视觉断言：开' : '视觉断言：关'; btn.classList.toggle('on', va.on); }
   if (va.on) {
     if (state.coordMode) $('btn-coord-mode').click();   // 与坐标模式互斥
     $('detail').style.display = 'none';
@@ -1630,6 +1631,7 @@ function toggleCoordMode() {
   state.coordMode = !state.coordMode;
   if (!state.coordMode) state.coordPoint = null;
   $('btn-coord-mode').querySelector('.bt-tx').textContent = state.coordMode ? '坐标模式：开' : '坐标模式：关';
+  $('btn-coord-mode').classList.toggle('on', state.coordMode);
   $('btn-coord-mode').classList.toggle('on', state.coordMode);
   showToast(state.coordMode ? '开启成功' : '已关闭');
 }
