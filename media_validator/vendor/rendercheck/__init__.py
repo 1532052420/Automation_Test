@@ -1,6 +1,6 @@
 """rendercheck -- assertions for AI-generated media.（供应商化裁剪版）
 
-上游：https://github.com/rogermsc/rendercheck（MIT License，见同目录 LICENSE）。
+基于上游开源库 rendercheck v0.4.1（MIT License）供应商化。
 本目录为 vendored 静态副本，仅保留**确定性检测核心**（无网络、无密钥、无第三方依赖）：
 _core / _ffmpeg / media / captions / text / lipsync。
 

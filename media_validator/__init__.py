@@ -2,7 +2,7 @@
 """媒体产物检测（Media Artifact Validator）· 独立插件模块
 
 方案来源：《媒体产物检测插件产品方案》。检测引擎基于 vendor/rendercheck
-（MIT，上游 https://github.com/rogermsc/rendercheck，来源与改动见 VENDOR.md）。
+（MIT，基于上游开源库 rendercheck v0.4.1 供应商化，改动清单见 VENDOR.md）。
 
 本模块与自动化测试平台框架**零耦合**：不 import 任何 web_platform / element_locator
 代码，自带模板、静态资源、存储与测试。对框架的全部接触点只有两处（删除即整体下线）：
