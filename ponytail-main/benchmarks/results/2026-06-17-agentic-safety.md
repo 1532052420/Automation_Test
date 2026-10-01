@@ -16,7 +16,6 @@ Model: Claude Haiku 4.5 / Sonnet 4.6 / Opus 4.8 · harness: Claude Code CLI 2.1.
 - With a **fair baseline** (the real coding agent, not a bare model dumping prose), ponytail's
   code-size advantage is small: **13.9 vs 14.5 mean source LOC**, about 4%. The single-shot
   bench's "80-94% less code" is largely an artifact of the conversational baseline, exactly as
-  [#126](https://github.com/DietrichGebert/ponytail/issues/126) argued. We concede that.
 - The interesting result is on the axis the old bench could not see. Two arms dropped safety:
   the bare **"Follow YAGNI"** prompt (98.9% safe) and the **"YAGNI + one-liners"** prompt
   (94.4% safe). ponytail, baseline, and caveman stayed **100% safe**.

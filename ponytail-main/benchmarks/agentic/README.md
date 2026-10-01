@@ -1,7 +1,6 @@
 # Agentic benchmark
 
 The single-shot benchmark (`../promptfooconfig.yaml`) measures one prompt, one completion.
-A fair critique ([#126](https://github.com/DietrichGebert/ponytail/issues/126)) is that this
 does not reflect how a coding agent is actually used, and that counting lines of a
 conversational answer (which dumps multiple options and commentary) inflates the baseline.
 

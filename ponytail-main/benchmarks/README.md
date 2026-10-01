@@ -63,7 +63,6 @@ Versus baseline, ponytail writes **80-94% less code**, costs **42-75% less**, an
 
 > **Read this number honestly (updated 2026-06-18).** The gap above is single-shot, against a bare
 > model that answers with several options plus commentary, so it counts prose, not just code, and
-> overstates the win. [#126](https://github.com/DietrichGebert/ponytail/issues/126) was right about
 > that. The [agentic benchmark](agentic/) re-runs the comparison as a *real Claude Code session on a
 > real public repo*: ponytail cuts **60-94%** on features with an over-build trap (custom component
 > vs native input), is a wash on already-minimal code, never writes more, and stays **100% safe**
@@ -104,5 +103,4 @@ Running the benchmark requires **Python 3**, **pandas**, and **Node.js ≥ 22.22
 ## Notes
 
 - Caveman is a prose-compression skill (it leaves code "normal"), so it lands between baseline and ponytail on code size and wins mainly on prose tokens.
-- Cost reflects single-shot calls (one prompt, one completion), not real multi-turn agent sessions. In a session the ruleset re-injects and the ladder deliberates every turn across many turns, so per-session cost can come out higher or lower than these numbers. Prompt caching offsets some of the re-injection, but a measured agentic A/B ([#121](https://github.com/DietrichGebert/ponytail/issues/121)) found ponytail can also raise tool calls and cost on completion-forced tasks. Treat these as generation numbers, not a session-cost promise.
 - These are everyday tasks. For production-grade specs, where an unconstrained agent bloats much harder, see the writeups in `results/`.

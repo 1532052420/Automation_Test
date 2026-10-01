@@ -209,7 +209,6 @@ assert.match(output.additionalContext, /PONYTAIL MODE ACTIVE — level: full/);
 // Code Copilot doesn't read Claude's statusLine setting.
 const vscodeHome = path.join(temp, 'vscode-copilot-home');
 const vscodePluginRoot = path.join(
-  vscodeHome, '.vscode', 'agent-plugins', 'github.com', 'DietrichGebert', 'ponytail', 'hooks',
 );
 fs.mkdirSync(vscodeHome, { recursive: true });
 result = run('ponytail-activate.js', {

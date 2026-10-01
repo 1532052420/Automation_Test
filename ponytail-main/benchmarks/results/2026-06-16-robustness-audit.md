@@ -1,6 +1,5 @@
 # Robustness audit: does ponytail degrade weak models? (2026-06-16)
 
-Follow-up to [issue #65](https://github.com/DietrichGebert/ponytail/issues/65). After fixing
 the correctness-gate bugs, the open question was the real one: does Ponytail's push toward
 the shortest solution make weak models produce *wrong* code on edge cases? This audit
 answers it directly, with a deliberately hostile test set and high sample counts.

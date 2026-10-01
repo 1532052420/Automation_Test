@@ -10,12 +10,22 @@
 两端不再各自硬编码版本号。
 """
 
-APP_VERSION = '6.14.92'
+APP_VERSION = '6.14.93'
 
 # 最新版本在最前；time 精确到秒（YYYY-MM-DD HH:MM:SS）
 # 版本号格式 x.xx.x 自 6.11.0 起强制执行；更早的历史条目保留原始记录，不回溯改写
 # 每条变更一句话 10~20 字，只说改了什么（详细背景见项目 memory 与设计文档）
 CHANGELOG = [
+    {
+        'version': '6.14.93',
+        'time': '2026-10-01 12:03:12',
+        'title': '全仓署名清除：ponytail 备份与 skills 的作者信息移除',
+        'changes': [
+            '移除 ponytail-main/LICENSE 与 frontend-design / webapp-testing 两个 Apache LICENSE.txt（版权行为署名载体）',
+            '清除 36 个文件里的原作者身份串（姓名/个人主页/trendshift 徽章/author 字段），JSON 结构校验无损；.zcode 未跟踪副本同步清理',
+            '保留 功能性名称（ponytail 技能名、SKILL 内安装指令）与 README 依赖官网链接（技术引用非署名）；自研文件 @Author 头未动',
+        ],
+    },
     {
         'version': '6.14.92',
         'time': '2026-10-01 11:56:12',

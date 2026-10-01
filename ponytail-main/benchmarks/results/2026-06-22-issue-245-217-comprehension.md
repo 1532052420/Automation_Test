@@ -4,10 +4,8 @@
 
 Two issues argued ponytail was lazy in the wrong place:
 
-- [#245 "Dangerously lazy"](https://github.com/DietrichGebert/ponytail/issues/245): the "shortest
   diff wins" reflex makes the agent patch the nearest symptom instead of tracing the problem end to
   end, and ship a confident wrong fix.
-- [#217 "Missing rung"](https://github.com/DietrichGebert/ponytail/issues/217): rungs 2–4 reuse code
   from *outside* the project (stdlib, platform, deps); nothing covered "did I already write this
   here?", a common source of duplicated AI slop.
 

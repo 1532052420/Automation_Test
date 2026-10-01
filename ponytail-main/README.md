@@ -12,21 +12,14 @@
 </p>
 
 <p align="center">
-  <a href="https://trendshift.io/repositories/50668?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-50668" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/50668" alt="DietrichGebert%2Fponytail | Trendshift" width="250" height="55"/></a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/stars/DietrichGebert/ponytail?style=flat-square&color=111111&label=stars" alt="Stars">
-  <img src="https://img.shields.io/github/v/release/DietrichGebert/ponytail?style=flat-square&color=111111&label=release" alt="Release">
-  <img src="https://img.shields.io/npm/v/@dietrichgebert/ponytail?style=flat-square&color=111111&label=npm" alt="npm">
   <img src="https://img.shields.io/badge/works%20with-20%20agents-111111?style=flat-square" alt="Works with 20 agents">
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license">
 </p>
 
 <p align="center">
-  <a href="https://trendshift.io/repositories/50668" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/50668/daily" alt="DietrichGebert/ponytail | Trendshift" width="250" height="55"/></a>
-  <a href="https://trendshift.io/repositories/50668" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/50668/weekly" alt="DietrichGebert/ponytail | Trendshift" width="250" height="55"/></a>
-  <a href="https://trendshift.io/repositories/50668?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-50668" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/50668/monthly?language=JavaScript" alt="DietrichGebert%2Fponytail | Trendshift monthly ranking" width="250" height="55"/></a>
 </p>
 
 <p align="center">
@@ -97,7 +90,6 @@ Five everyday tasks, three models, three arms (no skill, [caveman](https://githu
   <img src="assets/benchmark-3model.svg" width="860" alt="Median lines of code per arm across Haiku, Sonnet and Opus">
 </p>
 
-This showed **80-94% less code**. [#126](https://github.com/DietrichGebert/ponytail/issues/126) fairly pointed out that the bare-model baseline pads its answer with prose and options, so that gap is partly a conversational-baseline artifact. The agentic numbers above are the corrected, defensible version. Reproduce the single-shot run with `npx promptfoo eval -c benchmarks/promptfooconfig.yaml`.
 
 </details>
 
@@ -130,7 +122,6 @@ The Claude Code and Codex plugins (and the Cursor hooks) run two tiny Node.js li
 ### Claude Code
 
 ```
-/plugin marketplace add DietrichGebert/ponytail
 ```
 ```
 /plugin install ponytail@ponytail
@@ -142,7 +133,6 @@ Same steps in the Claude Code Desktop app's Code tab: type the two `/plugin` com
 ### Codex
 
 ```bash
-codex plugin marketplace add DietrichGebert/ponytail
 codex plugin add ponytail@ponytail
 ```
 
@@ -153,14 +143,12 @@ This same install also covers the Codex desktop app: restart the app after insta
 ### GitHub Copilot CLI
 
 ```bash
-copilot plugin marketplace add DietrichGebert/ponytail
 copilot plugin install ponytail@ponytail
 ```
 
 In an interactive Copilot CLI session, use the slash equivalents:
 
 ```
-/plugin marketplace add DietrichGebert/ponytail
 /plugin install ponytail@ponytail
 ```
 
@@ -174,7 +162,6 @@ Copilot CLI namespaces plugin commands by plugin name. For example:
 ### Pi agent harness
 
 ```
-pi install git:github.com/DietrichGebert/ponytail
 ```
 
 ### OpenCode
@@ -182,7 +169,6 @@ pi install git:github.com/DietrichGebert/ponytail
 Add to `opencode.json`:
 
 ```json
-{ "plugin": ["@dietrichgebert/ponytail"] }
 ```
 
 Run from a checkout instead (the plugin reuses `hooks/` and `skills/`):
@@ -198,7 +184,6 @@ The `./` path resolves against your project's `opencode.json`; to share one chec
 ### Gemini CLI
 
 ```bash
-gemini extensions install https://github.com/DietrichGebert/ponytail
 ```
 
 Loads the ruleset as always-on context every session and registers the `/ponytail` commands; the `skills/` ship too, activated when a task needs them.
@@ -215,7 +200,6 @@ For full plugin-tier support (automatic mode activation + ruleset injection on e
 Google is renaming Gemini CLI to Antigravity CLI (the `agy` binary); the same extension installs there:
 
 ```bash
-agy plugin install https://github.com/DietrichGebert/ponytail
 ```
 
 It reuses this repo's `gemini-extension.json`. One difference: Antigravity converts the `/ponytail` commands into skills, so you type them into the chat (e.g. `/ponytail-review` as a message) instead of picking them from a slash menu. Until the migration completes (around June 18, 2026), `gemini extensions install` still works too. To run it as an always-on rule instead, drop the ruleset into `.agents/rules/`.
@@ -223,7 +207,6 @@ It reuses this repo's `gemini-extension.json`. One difference: Antigravity conve
 ### Hermes Agent
 
 ```bash
-hermes plugins install DietrichGebert/ponytail --enable
 ```
 
 Restart Hermes after installing. The plugin injects the active Ponytail mode before each LLM turn, registers the bundled skills as `ponytail:<skill>`, and adds `/ponytail`, `/ponytail-review`, `/ponytail-audit`, `/ponytail-debt`, `/ponytail-gain`, and `/ponytail-help`. In shared gateways, restrict `/ponytail` to trusted users with Hermes slash-command access controls; runtime mode is process-local.
@@ -237,7 +220,6 @@ Reads `AGENTS.md` from the project root, zero setup. Copy [`AGENTS.md`](AGENTS.m
 Stage the collection in your library first, then add the skills you want:
 
 ```bash
-swival skills add --global https://github.com/DietrichGebert/ponytail  # stage into ~/.config/swival/library
 swival skills add ponytail                                             # install the collection into this project
 swival skills add --global ponytail                                    # or activate it in every project
 ```
@@ -249,7 +231,6 @@ On the command line, use a `$` prefix to explicitly activate a skill. For exampl
 ### Devin CLI
 
 ```bash
-devin plugins install DietrichGebert/ponytail
 ```
 
 Installs ponytail as a Devin plugin; skills are available as `/ponytail:ponytail`, `/ponytail:ponytail-review`, and so on.
@@ -265,7 +246,6 @@ Installs ponytail as an OpenClaw skill from ClawHub; the review, audit, debt, ga
 ### Grok Build
 
 ```bash
-grok plugin install DietrichGebert/ponytail --trust
 ```
 
 Enable the plugin (off by default): `/plugins` → Plugins → Space on `ponytail`, or in `~/.grok/config.toml`:
@@ -282,7 +262,6 @@ Start a new session (or reload plugins). Skills show as `/ponytail`, `/ponytail-
 ### Cursor
 
 ```bash
-git clone https://github.com/DietrichGebert/ponytail
 node ponytail/scripts/cursor-hooks.js install
 ```
 
@@ -386,10 +365,6 @@ You know exactly why.
 
 ## Star History
 
-<a href="https://www.star-history.com/dietrichgebert/ponytail#history">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=DietrichGebert/ponytail&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=DietrichGebert/ponytail&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=DietrichGebert/ponytail&type=Date" />
  </picture>
 </a>

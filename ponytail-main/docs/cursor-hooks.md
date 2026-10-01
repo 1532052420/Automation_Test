@@ -15,7 +15,6 @@ install script and a small output branch in `hooks/ponytail-runtime.js`.
 ## Install and uninstall
 
 ```bash
-git clone https://github.com/DietrichGebert/ponytail
 node ponytail/scripts/cursor-hooks.js install            # ~/.cursor/hooks.json, every project
 node ponytail/scripts/cursor-hooks.js install --project  # <cwd>/.cursor/hooks.json, this project only
 node ponytail/scripts/cursor-hooks.js uninstall          # add --project for the project file
