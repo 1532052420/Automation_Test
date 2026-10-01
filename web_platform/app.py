@@ -73,6 +73,11 @@ api_task_scheduler.start_scheduler()
 from web_platform.app_testing.routes import bp as app_testing_bp
 app.register_blueprint(app_testing_bp)
 
+# 媒体产物检测（独立插件模块 media_validator/，与框架零耦合，自带前后端与存储）：
+# 框架侧仅此两行注册 + 首页一张入口卡片；删除即可整体下线，模块目录可整体移除
+from media_validator import bp as media_validator_bp
+app.register_blueprint(media_validator_bp)
+
 # 元素定位器并入平台（原 8001 独立服务取消）：挂载到 /locator 子路径。
 # DispatcherMiddleware 会剥掉 /locator 前缀并处理 /locator → /locator/ 补斜杠跳转，
 # 定位器自身的路由（/api/*、/static/*）完全不用改；其前端已改为相对路径请求。

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>媒体产物检测 · 自动化测试平台</title>
+<script>
+/* 主题：与平台同一契约（localStorage['platform_theme']，html.night=夜间）。
+   本页不引用框架静态资源，故内联同语义的最小实现，保证与平台主题联动一致。 */
+(function(){var m='day';try{if(localStorage.getItem('platform_theme')==='night')m='night'}catch(e){}
+document.documentElement.classList.add(m);})();
+</script>
+<link rel="stylesheet" href="{{ url_for('media_validator.static', filename='mv.css') }}">
+</head>
+<body>
+<header class="gnav">
+  <a class="brand" href="/"><span class="logo">✓</span>自动化测试平台</a>
+  <nav class="crumbs">
+    <a class="crumb crumb-home" href="/" title="回到首页">首页</a>
+    <span class="crumb-sep">/</span><span class="crumb cur">媒体产物检测</span>
+  </nav>
+  <button id="themeFab" class="theme-fab" title="切换日夜模式"></button>
+</header>
+
+<main>
+  <div class="page-head">
+    <div>
+      <h1>媒体产物检测</h1>
+      <p class="sub">检测 AI 生成的音频 / 视频 / 图片产物质量 —— 文件完整性、轨道、时长、静音、黑屏、冻结帧、空白图</p>
+    </div>
+    <div class="tool-chip" id="toolChip" title="检测依赖本机 ffmpeg / ffprobe"><span class="dot"></span>检测中…</div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn primary" id="btnUpload">⬆ 上传文件</button>
+    <button class="btn" id="btnDetectAll" title="按各类默认规则检测全部「待检测」任务">▶ 批量检测</button>
+    <button class="btn ghost" id="btnRefresh" title="重新拉取任务列表">↻ 刷新</button>
+    <span class="toolbar-note">支持 图片 PNG/JPG/WEBP · 音频 MP3/WAV/M4A · 视频 MP4/MOV/MKV，单文件 ≤ 500MB</span>
+  </div>
+
+  <div class="panel">
+    <table class="task-table">
+      <thead>
+        <tr><th>文件名称</th><th>类型</th><th>大小</th><th>状态</th><th>时间</th><th class="ops-th">操作</th></tr>
+      </thead>
+      <tbody id="taskBody"></tbody>
+    </table>
+    <div id="emptyBox"></div>
+  </div>
+</main>
+
+<!-- 上传弹窗：拖拽/点选 → 文件清单 → 各类规则（可改）→ 开始上传并检测 -->
+<div class="modal-mask" id="uploadMask">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>上传媒体文件</h2>
+      <button class="x" id="uploadClose" title="关闭">✕</button>
+    </div>
+    <div class="dropzone" id="dropzone">
+      <input type="file" id="fileInput" multiple
+             accept=".png,.jpg,.jpeg,.webp,.mp3,.wav,.m4a,.mp4,.mov,.mkv">
+      <div class="dz-inner">
+        <div class="dz-icon">⬆</div>
+        <p><b>拖拽文件到此处</b>，或 <span class="dz-pick">点击选择文件</span></p>
+        <p class="dz-note">可多选；支持图片 PNG/JPG/WEBP、音频 MP3/WAV/M4A、视频 MP4/MOV/MKV</p>
+      </div>
+    </div>
+    <div id="pickedBox"></div>
+    <div id="rulesBox"></div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="uploadCancel">取消</button>
+      <button class="btn primary" id="uploadGo" disabled>开始上传并检测</button>
+    </div>
+  </div>
+</div>
+
+<!-- 报告弹窗：文件信息 + 总判定 + 检测项明细 -->
+<div class="modal-mask" id="reportMask">
+  <div class="modal wide">
+    <div class="modal-head">
+      <h2 id="rpTitle">检测报告</h2>
+      <button class="x" id="reportClose" title="关闭">✕</button>
+    </div>
+    <div id="reportBody"></div>
+    <div class="modal-foot">
+      <button class="btn" id="rpRedetect">↻ 重新检测</button>
+      <button class="btn ghost" id="reportOk">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="{{ url_for('media_validator.static', filename='mv.js') }}"></script>
+</body>
+</html>
