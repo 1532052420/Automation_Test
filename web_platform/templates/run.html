@@ -432,72 +432,72 @@
             </div>
           </div>
         </div>
-        <!-- 视觉断言调试弹窗（v7.html 一比一复刻：1000px 渐变描边卡片+深底inner+双图230px+56px相似度+差异高光带；零落盘） -->
+        <!-- 视觉断言调试弹窗（V7 渐变强调 · v6.14.83 全尺寸×0.7 + 日/夜主题变量：日间浅色/夜间深色；零落盘） -->
         <div class="mask" id="visDebugMask">
-          <div style="display:block;width:1000px;max-width:96vw;border-radius:20px;padding:2px;background:linear-gradient(135deg,#EF4444,#F59E0B 40%,#10B981 80%)">
-            <div style="border-radius:18px;background:#0c0f15;padding:24px 30px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
-                <span style="font-size:18px;font-weight:700;color:#f0f2f5">🧪 调试视觉断言 · <span id="vdbgName"></span></span>
-                <span id="vdbgCloseX" style="font-size:13px;color:#7a8494;cursor:pointer">✕ 关闭</span>
+          <div style="display:block;width:700px;max-width:96vw;border-radius:14px;padding:2px;background:linear-gradient(135deg,#EF4444,#F59E0B 40%,#10B981 80%)">
+            <div style="border-radius:13px;background:var(--panel,#fff);padding:17px 21px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
+                <span style="font-size:13px;font-weight:700;color:var(--ink,#1f2937)">🧪 调试视觉断言 · <span id="vdbgName"></span></span>
+                <span id="vdbgCloseX" style="font-size:10px;color:var(--muted,#6e6e73);cursor:pointer">✕ 关闭</span>
               </div>
-              <div style="display:flex;gap:16px">
-                <div style="flex:1;border-radius:12px;overflow:hidden;border:1px solid #1d222b">
-                  <img id="vdbgBase" style="width:100%;height:230px;object-fit:cover;display:block;background:#16181d">
-                  <div style="padding:7px;text-align:center;font-size:12px;color:#aeb8c4;background:#10141b">基线 Expected · <span id="vdbgScopeCn">—</span></div>
+              <div style="display:flex;gap:11px">
+                <div style="flex:1;border-radius:9px;overflow:hidden;border:1px solid var(--line-soft,#e5e7eb)">
+                  <img id="vdbgBase" style="width:100%;height:161px;object-fit:cover;display:block;background:var(--panel2,#f7f8fa)">
+                  <div style="padding:5px;text-align:center;font-size:10px;color:var(--muted,#6e6e73);background:var(--panel2,#f7f8fa)">基线 Expected · <span id="vdbgScopeCn">—</span></div>
                 </div>
-                <div style="flex:1;border-radius:12px;overflow:hidden;border:1px solid #1d222b;position:relative">
-                  <div id="vdbgUpBox" style="height:262px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;background:#10141b;border:1px dashed #2a3140">
-                    <div style="font-size:30px">🖼️</div>
-                    <div style="font-size:13px;font-weight:600;color:#aeb8c4">上传实际图片（PNG / JPG）</div>
-                    <div style="font-size:11.5px;color:#7a8494">点击选择 或 拖拽图片到此区域</div>
-                    <div style="font-size:11px;color:#5a6478">仅本次比对使用，不做保存</div>
+                <div style="flex:1;border-radius:9px;overflow:hidden;border:1px solid var(--line-soft,#e5e7eb);position:relative">
+                  <div id="vdbgUpBox" style="height:183px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;background:var(--panel2,#f7f8fa);border:1px dashed var(--line,#dcdfe6)">
+                    <div style="font-size:21px">🖼️</div>
+                    <div style="font-size:10px;font-weight:600;color:var(--ink2,#374151)">上传实际图片（PNG / JPG）</div>
+                    <div style="font-size:10px;color:var(--muted,#6e6e73)">点击选择 或 拖拽图片到此区域</div>
+                    <div style="font-size:10px;color:var(--muted2,#9ca3af)">仅本次比对使用，不做保存</div>
                   </div>
-                  <img id="vdbgUpImg" style="width:100%;height:230px;object-fit:cover;display:none;background:#16181d">
-                  <span id="vdbgUpX" style="display:none;position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;background:rgba(12,15,21,.85);border:1px solid #2a3140;color:#e8ecf2;font-size:13px;line-height:24px;text-align:center;cursor:pointer;z-index:2" title="移除图片">✕</span>
-                  <div style="padding:7px;text-align:center;font-size:12px;color:#aeb8c4;background:#10141b">实际 Actual · <span id="vdbgBizCn">—</span></div>
+                  <img id="vdbgUpImg" style="width:100%;height:161px;object-fit:cover;display:none;background:var(--panel2,#f7f8fa)">
+                  <span id="vdbgUpX" style="display:none;position:absolute;top:6px;right:6px;width:18px;height:18px;border-radius:50%;background:rgba(12,15,21,.72);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:9px;line-height:16px;text-align:center;cursor:pointer;z-index:2" title="移除图片">✕</span>
+                  <div style="padding:5px;text-align:center;font-size:10px;color:var(--muted,#6e6e73);background:var(--panel2,#f7f8fa)">实际 Actual · <span id="vdbgBizCn">—</span></div>
                   <input type="file" id="vdbgFile" accept="image/png,image/jpeg" style="display:none">
                 </div>
               </div>
-              <div style="margin:18px 0;text-align:center;padding:16px;border-radius:14px;background:linear-gradient(90deg,rgba(239,68,68,.12),rgba(245,158,11,.12));border:1px solid rgba(239,68,68,.25)">
-                <div id="vdbgSim" style="font-size:56px;font-weight:800" data-level="bad">—</div>
-                <div style="font-size:12px;color:#8a94a6;margin-top:2px">当前相似度（<span id="vdbgJudge">低于</span>阈值 <span id="vdbgThTxt">98</span>%，上传图片后点「调试」比对）</div>
+              <div style="margin:13px 0;text-align:center;padding:11px;border-radius:10px;background:linear-gradient(90deg,rgba(239,68,68,.12),rgba(245,158,11,.12));border:1px solid rgba(239,68,68,.25)">
+                <div id="vdbgSim" style="font-size:39px;font-weight:800" data-level="bad">—</div>
+                <div style="font-size:10px;color:var(--muted,#6e6e73);margin-top:2px">当前相似度（<span id="vdbgJudge">低于</span>阈值 <span id="vdbgThTxt">98</span>%，上传图片后点「调试」比对）</div>
               </div>
-              <div id="vdbgDiffWrap" style="display:none;margin:0 0 18px;border-radius:12px;overflow:hidden;border:1px solid #1d222b">
-                <img id="vdbgDiffImg" style="width:100%;max-height:230px;object-fit:contain;display:block;background:#16181d">
-                <div style="padding:7px;text-align:center;font-size:12px;color:#aeb8c4;background:#10141b">差异高光 Diff · 红色为差异区域（左基线 ｜ 中实际 ｜ 右差异）</div>
+              <div id="vdbgDiffWrap" style="display:none;margin:0 0 13px;border-radius:9px;overflow:hidden;border:1px solid var(--line-soft,#e5e7eb)">
+                <img id="vdbgDiffImg" style="width:100%;max-height:161px;object-fit:contain;display:block;background:var(--panel2,#f7f8fa)">
+                <div style="padding:5px;text-align:center;font-size:10px;color:var(--muted,#6e6e73);background:var(--panel2,#f7f8fa)">差异高光 Diff · 红色为差异区域（左基线 ｜ 中实际 ｜ 右差异）</div>
               </div>
-              <div style="display:flex;gap:12px">
-                <div style="flex:1;background:#10141b;border:1px solid #1d222b;border-radius:10px;padding:9px 14px;text-align:center">
-                  <div style="font-size:10.5px;color:#7a8494">比较模式</div>
-                  <select id="vdbgMatchTxt" style="border:none;background:transparent;font-size:13.5px;font-weight:700;color:#e8ecf2;outline:none;cursor:pointer;width:100%;text-align:center;margin-top:2px">
-                    <option value="strict" style="background:#10141b;color:#e8ecf2">Strict（像素级）</option>
-                    <option value="layout" style="background:#10141b;color:#e8ecf2">Layout（布局）</option>
+              <div style="display:flex;gap:8px">
+                <div style="flex:1;background:var(--panel2,#f7f8fa);border:1px solid var(--line-soft,#e5e7eb);border-radius:7px;padding:6px 10px;text-align:center">
+                  <div style="font-size:10px;color:var(--muted,#6e6e73)">比较模式</div>
+                  <select id="vdbgMatchTxt" style="border:none;background:transparent;font-size:11px;font-weight:700;color:var(--ink,#1f2937);outline:none;cursor:pointer;width:100%;text-align:center;margin-top:2px">
+                    <option value="strict">Strict（像素级）</option>
+                    <option value="layout">Layout（布局）</option>
                   </select>
                 </div>
-                <div style="flex:1;background:#10141b;border:1px solid #1d222b;border-radius:10px;padding:9px 14px;text-align:center">
-                  <div style="font-size:10.5px;color:#7a8494">忽略区域</div><div style="font-size:13.5px;font-weight:700;color:#e8ecf2;margin-top:2px" id="vdbgIgnTxt">0 块</div>
+                <div style="flex:1;background:var(--panel2,#f7f8fa);border:1px solid var(--line-soft,#e5e7eb);border-radius:7px;padding:6px 10px;text-align:center">
+                  <div style="font-size:10px;color:var(--muted,#6e6e73)">忽略区域</div><div style="font-size:11px;font-weight:700;color:var(--ink,#1f2937);margin-top:2px" id="vdbgIgnTxt">0 块</div>
                 </div>
-                <div style="flex:1;background:#10141b;border:1px solid #1d222b;border-radius:10px;padding:9px 14px;text-align:center">
-                  <div style="font-size:10.5px;color:#7a8494">相似度阈值</div>
-                  <div style="font-size:13.5px;font-weight:700;color:#e8ecf2;margin-top:2px"><input type="number" id="vdbgTh" min="1" max="100" style="width:52px;border:none;background:transparent;font-size:13.5px;font-weight:700;color:#e8ecf2;outline:none;text-align:center"> %</div>
+                <div style="flex:1;background:var(--panel2,#f7f8fa);border:1px solid var(--line-soft,#e5e7eb);border-radius:7px;padding:6px 10px;text-align:center">
+                  <div style="font-size:10px;color:var(--muted,#6e6e73)">相似度阈值</div>
+                  <div style="font-size:11px;font-weight:700;color:var(--ink,#1f2937);margin-top:2px"><input type="number" id="vdbgTh" min="1" max="100" style="width:38px;border:none;background:transparent;font-size:11px;font-weight:700;color:var(--ink,#1f2937);outline:none;text-align:center"> %</div>
                 </div>
-                <div style="flex:1;background:#10141b;border:1px solid #1d222b;border-radius:10px;padding:9px 14px;text-align:center">
-                  <div style="font-size:10.5px;color:#7a8494">视觉对象类型</div>
-                  <select id="vdbgBizTxt" style="border:none;background:transparent;font-size:13.5px;font-weight:700;color:#e8ecf2;outline:none;cursor:pointer;width:100%;text-align:center;margin-top:2px">
-                    <option value="region" style="background:#10141b;color:#e8ecf2">普通区域</option><option value="icon" style="background:#10141b;color:#e8ecf2">Icon</option>
-                    <option value="logo" style="background:#10141b;color:#e8ecf2">Logo</option><option value="image" style="background:#10141b;color:#e8ecf2">图片</option>
-                    <option value="card" style="background:#10141b;color:#e8ecf2">卡片</option><option value="banner" style="background:#10141b;color:#e8ecf2">Banner</option>
-                    <option value="toast" style="background:#10141b;color:#e8ecf2">Toast</option><option value="popup" style="background:#10141b;color:#e8ecf2">弹窗</option>
-                    <option value="custom" style="background:#10141b;color:#e8ecf2">自定义</option>
+                <div style="flex:1;background:var(--panel2,#f7f8fa);border:1px solid var(--line-soft,#e5e7eb);border-radius:7px;padding:6px 10px;text-align:center">
+                  <div style="font-size:10px;color:var(--muted,#6e6e73)">视觉对象类型</div>
+                  <select id="vdbgBizTxt" style="border:none;background:transparent;font-size:11px;font-weight:700;color:var(--ink,#1f2937);outline:none;cursor:pointer;width:100%;text-align:center;margin-top:2px">
+                    <option value="region">普通区域</option><option value="icon">Icon</option>
+                    <option value="logo">Logo</option><option value="image">图片</option>
+                    <option value="card">卡片</option><option value="banner">Banner</option>
+                    <option value="toast">Toast</option><option value="popup">弹窗</option>
+                    <option value="custom">自定义</option>
                   </select>
                 </div>
-                <div style="flex:1;background:#10141b;border:1px solid #1d222b;border-radius:10px;padding:9px 14px;text-align:center">
-                  <div style="font-size:10.5px;color:#7a8494">断言范围</div><div style="font-size:13.5px;font-weight:700;color:#e8ecf2;margin-top:2px" id="vdbgScope">—</div>
+                <div style="flex:1;background:var(--panel2,#f7f8fa);border:1px solid var(--line-soft,#e5e7eb);border-radius:7px;padding:6px 10px;text-align:center">
+                  <div style="font-size:10px;color:var(--muted,#6e6e73)">断言范围</div><div style="font-size:11px;font-weight:700;color:var(--ink,#1f2937);margin-top:2px" id="vdbgScope">—</div>
                 </div>
               </div>
-              <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:18px">
-                <button id="vdbgCancel" style="padding:9px 28px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:#10141b;border:1px solid #1d222b;color:#e8ecf2">取消</button>
-                <button id="vdbgRun" style="padding:9px 28px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:linear-gradient(135deg,#0a84ff,#0066cc);color:#fff;border:none">调试</button>
+              <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:13px">
+                <button id="vdbgCancel" style="padding:6px 20px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;background:var(--panel2,#f7f8fa);border:1px solid var(--line-soft,#e5e7eb);color:var(--ink,#1f2937)">取消</button>
+                <button id="vdbgRun" style="padding:6px 20px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;background:linear-gradient(135deg,#0a84ff,#0066cc);color:#fff;border:none">调试</button>
               </div>
             </div>
           </div>
