@@ -469,17 +469,14 @@
               <div style="display:flex;gap:8px">
                 <div style="flex:1;background:var(--panel2,#f7f8fa);border:1px solid var(--line-soft,#e5e7eb);border-radius:7px;padding:6px 10px;text-align:center">
                   <div style="font-size:10px;color:var(--muted,#6e6e73)">比较模式</div>
-                  <select id="vdbgMatchTxt" style="border:none;background:transparent;font-size:11px;font-weight:700;color:var(--ink,#1f2937);outline:none;cursor:pointer;width:100%;text-align:center;margin-top:2px">
-                    <option value="strict">Strict（像素级）</option>
-                    <option value="layout">Layout（布局）</option>
+                  <select id="vdbgMatchTxt" title="Strict=逐像素严格比对；Layout=布局结构比对（文字/数字变化不敏感）" style="border:none;background:transparent;font-size:11px;font-weight:700;color:var(--ink,#1f2937);outline:none;cursor:pointer;width:100%;text-align:center;margin-top:2px">
+                    <option value="strict">Strict·像素级</option>
+                    <option value="layout">Layout·布局</option>
                   </select>
                 </div>
                 <div style="flex:1;background:var(--panel2,#f7f8fa);border:1px solid var(--line-soft,#e5e7eb);border-radius:7px;padding:6px 10px;text-align:center">
-                  <div style="font-size:10px;color:var(--muted,#6e6e73)">忽略区域</div><div style="font-size:11px;font-weight:700;color:var(--ink,#1f2937);margin-top:2px" id="vdbgIgnTxt">0 块</div>
-                </div>
-                <div style="flex:1;background:var(--panel2,#f7f8fa);border:1px solid var(--line-soft,#e5e7eb);border-radius:7px;padding:6px 10px;text-align:center">
                   <div style="font-size:10px;color:var(--muted,#6e6e73)">相似度阈值</div>
-                  <div style="font-size:11px;font-weight:700;color:var(--ink,#1f2937);margin-top:2px"><input type="number" id="vdbgTh" min="1" max="100" style="width:38px;border:none;background:transparent;font-size:11px;font-weight:700;color:var(--ink,#1f2937);outline:none;text-align:center"> %</div>
+                  <div style="font-size:11px;font-weight:700;color:var(--ink,#1f2937);margin-top:2px"><input type="number" id="vdbgTh" min="1" max="100" value="98" style="width:38px;border:none;background:transparent;font-size:11px;font-weight:700;color:var(--ink,#1f2937);outline:none;text-align:center"> %</div>
                 </div>
                 <div style="flex:1;background:var(--panel2,#f7f8fa);border:1px solid var(--line-soft,#e5e7eb);border-radius:7px;padding:6px 10px;text-align:center">
                   <div style="font-size:10px;color:var(--muted,#6e6e73)">视觉对象类型</div>

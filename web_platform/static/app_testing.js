@@ -1906,7 +1906,6 @@ function openVisualAssetDebug(name) {
     const thPct = Math.round((a.threshold || 0.98) * 100);
     document.getElementById('vdbgTh').value = thPct;
     document.getElementById('vdbgThTxt').textContent = thPct;
-    document.getElementById('vdbgIgnTxt').textContent = (a.ignore_regions || []).length + ' 块';
   }).catch(() => {});
   // 重置：隐藏 Diff 高光带、清判定词与相似度、恢复上传落区
   document.getElementById('vdbgDiffWrap').style.display = 'none';
