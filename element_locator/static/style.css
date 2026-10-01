@@ -830,8 +830,10 @@ html.night .dup-tip code { background: rgba(251, 191, 36, .12); }
 /* 选中元素栏头部微调：hint 下移不抢标题 */
 .detail-head { font-size: 13.5px; }
 
-/* 选中元素栏固定宽度：不参与拖拽挤压（v6.11.1 用户反馈） */
-.col.right { flex: 0 0 700px; min-width: 700px; }
+/* 三栏 30/30/40 屏幕自适应（v6.14.81 用户指定；取代 v6.11.1 的右栏 700px 固定宽） */
+.col.left { flex: 0 1 30%; min-width: 260px; }
+.col.middle { flex: 0 1 30%; min-width: 260px; }
+.col.right { flex: 1 1 40%; min-width: 340px; }
 /* 夜间遗漏补：详情底栏 / 弹窗 / 锚点卡 / 流程卡 / 步骤列表 */
 html.night .detail-foot { background: #1b1c1f; border-top-color: #303236; }
 html.night .modal { background: #1b1c1f; }
@@ -843,11 +845,11 @@ html.night .anchor-card { background: rgba(64,158,255,.08); border-color: #2b4a6
 html.night .steps-list { background: #1b1c1f; border-color: #303236; }
 html.night .el-content { background: #111214; color: #e5e7eb; }
 
-/* ===== 选中元素栏宽固定 700、高自适应浏览器：字段区超高时栏内滚动兜底 ===== */
-main { min-width: 1320px; min-height: 780px; }
-.col.right { flex: 0 0 700px; width: 700px; min-width: 700px; max-width: 700px; }
-.col.middle { min-width: 280px; }
-.col.left { min-width: 280px; }
+/* ===== 三栏比例自适应（30/30/40）+ 高自适应浏览器：字段区超高时栏内滚动兜底 ===== */
+main { min-width: 900px; min-height: 780px; }
+.col.middle { min-width: 260px; }
+.col.left { min-width: 260px; }
+.col.right { min-width: 340px; }
 
 /* ===== 保存到哪一步 · 分段控件（v6.14.3 · 设计文档 design/ui-proposals/样式方案V1-设计文档.md） ===== */
 /* 用途条在滚动区外（结构上不可能被裁切）：白底通栏 + 底部分隔线 */
@@ -1017,3 +1019,20 @@ html.night .va5-pv { border-color: #303236; }
 /* 输入框占位文字：日间标准灰；夜间提亮（此前无规则走 UA 默认灰，深底看不清） */
 input::placeholder, textarea::placeholder { color: #9ca3af; opacity: 1; }
 html.night input::placeholder, html.night textarea::placeholder { color: #9aa3af; opacity: 1; }
+
+/* ---------- 侧栏收起/展开：右下角固定把手，图标随状态翻转（v6.14.81） ---------- */
+.side { transition: width .2s ease, flex-basis .2s ease, opacity .18s ease; }
+.side-toggle { position: fixed; left: 176px; bottom: 16px; z-index: 60;
+  width: 24px; height: 36px; padding: 0; border: 1px solid rgba(255,255,255,.14); border-right: none;
+  border-radius: 10px 0 0 10px; background: #1d1d1f; color: #cbd5e1; font-size: 15px; line-height: 1;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: left .2s ease, background .15s, color .15s; }
+.side-toggle:hover { color: #fff; background: #26272b; }
+.side-toggle .st-ic { display: block; transition: transform .2s ease; }
+body.side-collapsed .side-toggle { left: 0; border-radius: 0 10px 10px 0; border-right: 1px solid rgba(255,255,255,.14); }
+body.side-collapsed .side-toggle .st-ic { transform: scaleX(-1); }
+body.side-collapsed .side { width: 0; flex-basis: 0; padding: 0; overflow: hidden;
+  opacity: 0; pointer-events: none; box-shadow: none; }
+html.embedded .side-toggle { display: none; }
+html.night .side-toggle { background: #17181b; border-color: #303236; color: #9aa3af; }
+html.night .side-toggle:hover { background: #232428; color: #e5e7eb; }

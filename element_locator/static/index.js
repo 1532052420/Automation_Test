@@ -341,6 +341,11 @@ async function init() {
   $('btn-tree-diff').addEventListener('click', toggleTreeDiff);
   $('btn-coord-mode').addEventListener('click', toggleCoordMode);
   $('btn-visual-mode').addEventListener('click', vaToggleMode);
+  const sideToggle = $('side-toggle');
+  if (sideToggle) sideToggle.addEventListener('click', () => {
+    const off = document.body.classList.toggle('side-collapsed');
+    sideToggle.title = off ? '展开菜单' : '收起菜单';
+  });
   vaBindShotDrag();
   $('btn-locate-check').addEventListener('click', runLocateCheck);
   $('btn-undo-step').addEventListener('click', undoLastStep);
@@ -397,12 +402,8 @@ function bindColumnResizers() {
   const mid = document.querySelector('.col.middle');
   const right = document.querySelector('.col.right');
   if (!left || !mid || !right) return;
-  // 栏宽默认（每次加载复位，拖拽改动不持久）：右栏固定 700；中栏「元素/坐标」默认 900；
-  // 左栏「设备截图」弹性吸收剩余宽度
+  // 栏宽默认交给 CSS（三栏 30/30/40 屏幕自适应，v6.14.81）；拖拽时才写内联 flex（仅本次会话生效）
   try { localStorage.removeItem('locator_col_widths'); } catch (e) {}
-  right.style.flex = '0 0 700px';
-  mid.style.flex = '0 1 900px';
-  left.style.flex = '1 1 360px';
   document.querySelectorAll('.col-resizer').forEach(handle => {
     handle.addEventListener('mousedown', (e) => {
       e.preventDefault();
