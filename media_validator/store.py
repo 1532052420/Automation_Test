@@ -45,12 +45,58 @@ def safe_filename(name):
 def load_tasks():
     """全部任务（按创建时间倒序）；文件不存在/损坏视为空表"""
     with _lock:
-        return _load_unlocked()
+        return _load_from(TASKS_FILE)
 
 
-def _load_unlocked():
+def get_task(task_id):
+    with _lock:
+        for t in _load_from(TASKS_FILE):
+            if t.get('id') == task_id:
+                return t
+    return None
+
+
+def upsert_task(task):
+    """插入或按 id 覆盖任务记录，原子落盘"""
+    upsert_task_into(TASKS_FILE, task)
+
+
+def upsert_task_into(tasks_file, task):
+    """按显式路径落盘任务（供后台线程用：线程生命期长于请求上下文，
+    不能依赖可能被并发改动的模块级路径，否则会把任务写进错误的存储）。"""
+    with _lock:
+        tasks = _load_from(tasks_file)
+        out, replaced = [], False
+        for t in tasks:
+            if t.get('id') == task['id']:
+                out.append(task)
+                replaced = True
+            else:
+                out.append(t)
+        if not replaced:
+            out.append(task)
+        _save_to(tasks_file, out)
+
+
+def delete_task(task_id):
+    """删除任务记录与其上传文件；返回被删的任务（找不到返回 None）"""
+    with _lock:
+        tasks = _load_from(TASKS_FILE)
+        victim = next((t for t in tasks if t.get('id') == task_id), None)
+        if victim is None:
+            return None
+        _save_to(TASKS_FILE, [t for t in tasks if t.get('id') != task_id])
+    if victim.get('stored_path') and os.path.isfile(victim['stored_path']):
+        try:
+            os.remove(victim['stored_path'])
+        except OSError:
+            pass
+    return victim
+
+
+def _load_from(tasks_file):
     try:
-        with open(TASKS_FILE, 'r', encoding='utf-8') as f:
+        with open(tasks_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
     except (OSError, ValueError):
         return []
@@ -62,72 +108,42 @@ def _load_unlocked():
     return [t for t in data if isinstance(t, dict)]
 
 
-def get_task(task_id):
-    with _lock:
-        for t in _load_unlocked():
-            if t.get('id') == task_id:
-                return t
-    return None
-
-
-def upsert_task(task):
-    """插入或按 id 覆盖任务记录，原子落盘"""
-    with _lock:
-        tasks = _load_unlocked()
-        out, replaced = [], False
-        for t in tasks:
-            if t.get('id') == task['id']:
-                out.append(task)
-                replaced = True
-            else:
-                out.append(t)
-        if not replaced:
-            out.append(task)
-        _save_unlocked(out)
-
-
-def delete_task(task_id):
-    """删除任务记录与其上传文件；返回被删的任务（找不到返回 None）"""
-    with _lock:
-        tasks = _load_unlocked()
-        victim = next((t for t in tasks if t.get('id') == task_id), None)
-        if victim is None:
-            return None
-        _save_unlocked([t for t in tasks if t.get('id') != task_id])
-    if victim.get('stored_path') and os.path.isfile(victim['stored_path']):
-        try:
-            os.remove(victim['stored_path'])
-        except OSError:
-            pass
-    return victim
-
-
-def _save_unlocked(tasks):
+def _save_to(tasks_file, tasks):
     _ensure_dirs()
-    tmp = TASKS_FILE + '.tmp'
+    tmp = tasks_file + '.tmp'
     with open(tmp, 'w', encoding='utf-8') as f:
         json.dump(tasks, f, ensure_ascii=False, indent=1)
-    os.replace(tmp, TASKS_FILE)
+    os.replace(tmp, tasks_file)
 
 
 def save_upload(file_storage, filename, task_id):
     """流式落盘上传文件（带大小上限），返回 (绝对路径, 实际字节数)。
 
-    超限抛 ValueError，由路由转 413。流式写避免大文件占内存。
+    超限抛 ValueError，由路由转拒收。流式写避免大文件占内存。
+    """
+    return save_stream(file_storage.stream, filename, task_id)
+
+
+def save_stream(stream, filename, task_id, max_bytes=None):
+    """把任意字节流（上传文件 / URL 下载 / 本地路径副本）流式写入 uploads/。
+
+    超限抛 ValueError 并清理半成品。max_bytes 缺省用模块上限。
     """
     _ensure_dirs()
+    if max_bytes is None:
+        max_bytes = MAX_UPLOAD_BYTES
     stored_name = '%s__%s' % (task_id, safe_filename(filename))
     path = os.path.join(UPLOADS_DIR, stored_name)
     size = 0
     with open(path, 'wb') as f:
         while True:
-            chunk = file_storage.stream.read(1024 * 1024)
+            chunk = stream.read(1024 * 1024)
             if not chunk:
                 break
             size += len(chunk)
-            if size > MAX_UPLOAD_BYTES:
+            if size > max_bytes:
                 f.close()
                 os.remove(path)
-                raise ValueError('文件超过单文件上限 %dMB' % (MAX_UPLOAD_BYTES // (1024 * 1024)))
+                raise ValueError('文件超过单文件上限 %dMB' % (max_bytes // (1024 * 1024)))
             f.write(chunk)
     return path, size

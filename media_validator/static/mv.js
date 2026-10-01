@@ -121,16 +121,31 @@
   }
 
   /* ---------------- 上传弹窗 ---------------- */
-  var picked = [];   // [{file, type, reason?}]
+  var picked = [];        // 本地文件模式：[{file, type, reason?}]
+  var linkLines = [];     // 链接/路径模式：去重后的源字符串
+  var upMode = 'file';    // 'file' | 'link'
 
   function openUpload() {
     picked = [];
-    renderPicked();
+    linkLines = [];
+    upMode = 'file';
+    $('#linkInput').value = '';
+    setMode('file');
     $('#uploadMask').classList.add('show');
   }
   function closeUpload() {
     $('#uploadMask').classList.remove('show');
     $('#fileInput').value = '';
+  }
+
+  function setMode(mode) {
+    upMode = mode;
+    document.querySelectorAll('#upTabs .seg-btn').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.mode === mode);
+    });
+    $('#filePane').style.display = mode === 'file' ? '' : 'none';
+    $('#linkPane').style.display = mode === 'link' ? '' : 'none';
+    renderEntries();
   }
 
   function typeOfName(name) {
@@ -151,22 +166,53 @@
     renderPicked();
   }
 
-  function renderPicked() {
+  function renderEntries() {
     var box = $('#pickedBox');
+    if (upMode === 'link') {
+      if (!linkLines.length) {
+        box.innerHTML = ''; $('#rulesBox').innerHTML = ''; $('#uploadGo').disabled = true; return;
+      }
+      var rows = linkLines.map(function (src, i) {
+        var t = typeOfName(src.split(/[?#]/)[0]);
+        var chip = t ? '<span class="ttype ' + t.type + '">' + TYPE_LABELS[t.type] + '</span>'
+                     : '<span class="ttype unknow">待识别</span>';
+        return '<div class="picked-row"><span class="name" title="' + esc(src) + '">' + esc(src) + '</span>' + chip +
+               '<button class="rm" title="移除" onclick="MV.removeLink(' + i + ')">✕</button></div>';
+      }).join('');
+      box.innerHTML = '<div class="picked-list">' + rows + '</div>';
+      var types = {};
+      linkLines.forEach(function (src) {
+        var t = typeOfName(src);
+        if (t) types[t.type] = true;
+      });
+      $('#rulesBox').innerHTML = Object.keys(types).map(rulesGroupHtml).join('');
+      $('#uploadGo').disabled = linkLines.length === 0;
+      return;
+    }
     if (!picked.length) { box.innerHTML = ''; $('#rulesBox').innerHTML = ''; $('#uploadGo').disabled = true; return; }
-    var rows = picked.map(function (p, i) {
+    var frows = picked.map(function (p, i) {
       var type = p.reason
         ? '<span class="rej">' + esc(p.reason) + '</span>'
         : '<span class="ttype ' + p.type + '">' + TYPE_LABELS[p.type] + '</span> <span class="tsize">' + fmtSize(p.file.size) + '</span>';
       return '<div class="picked-row"><span class="name">' + esc(p.file.name) + '</span>' + type +
              '<button class="rm" title="移除" onclick="MV.removePicked(' + i + ')">✕</button></div>';
     }).join('');
-    box.innerHTML = '<div class="picked-list">' + rows + '</div>';
+    box.innerHTML = '<div class="picked-list">' + frows + '</div>';
 
-    var types = {};
-    picked.forEach(function (p) { if (p.type) types[p.type] = true; });
-    $('#rulesBox').innerHTML = Object.keys(types).map(function (t) { return rulesGroupHtml(t); }).join('');
+    var ftypes = {};
+    picked.forEach(function (p) { if (p.type) ftypes[p.type] = true; });
+    $('#rulesBox').innerHTML = Object.keys(ftypes).map(function (t) { return rulesGroupHtml(t); }).join('');
     $('#uploadGo').disabled = !picked.some(function (p) { return !p.reason; });
+  }
+
+  function parseLinks() {
+    var seen = {};
+    linkLines = [];
+    $('#linkInput').value.split(/\r?\n/).forEach(function (line) {
+      var s = line.trim().replace(/^['"]+|['"]+$/g, '').trim();
+      if (s && !seen[s]) { seen[s] = true; linkLines.push(s); }
+    });
+    renderEntries();
   }
 
   /* 规则表单：按默认值渲染可编辑项；空值表示关闭阈值 */
@@ -220,17 +266,23 @@
 
   function doUpload() {
     var goBtn = $('#uploadGo');
+    if (upMode === 'file' && !picked.some(function (p) { return !p.reason; })) return;
+    if (upMode === 'link' && !linkLines.length) return;
     goBtn.disabled = true;
     var fd = new FormData();
-    picked.forEach(function (p) { if (!p.reason) fd.append('files', p.file); });
+    if (upMode === 'file') {
+      picked.forEach(function (p) { if (!p.reason) fd.append('files', p.file); });
+    } else {
+      fd.append('sources', JSON.stringify(linkLines));
+    }
     fd.append('rules', JSON.stringify(collectRules()));
     fd.append('start', '1');
     api('POST', '/media-validator/api/upload', fd).then(function (d) {
       if (!d.ok) { toast(d.msg || '上传失败', false); goBtn.disabled = false; return; }
       var rejN = (d.rejected || []).length, okN = (d.created || []).length;
       closeUpload();
-      if (rejN) toast('已提交 ' + okN + ' 个文件，' + rejN + ' 个因格式不支持被拒绝', false);
-      else toast('已上传并开始检测 ' + okN + ' 个文件');
+      if (rejN) toast('已提交 ' + okN + ' 个来源，' + rejN + ' 个被拒绝（见输入内容格式）', false);
+      else toast('已提交并开始检测 ' + okN + ' 个来源');
       loadTasks();
       loadOverview();
     }).catch(function () { toast('上传失败（网络异常）', false); goBtn.disabled = false; });
@@ -313,6 +365,7 @@
         '<span class="k">封装</span><span class="v">' + esc(info.container || '-') + ' · 嗅探 ' + esc(info.sniff || '未识别') + '</span>' +
         '<span class="k">时长</span><span class="v">' + fmtDur(info.duration) + '</span>' +
         '<span class="k">流信息</span><span class="v full">' + esc(streamTxt) + '</span>' +
+        '<span class="k">来源</span><span class="v full">' + esc(originText(t.origin)) + '</span>' +
       '</div>' +
       '<div class="items-title">检测项（' + r.items.length + '）</div>' +
       r.items.map(itemHtml).join('');
@@ -322,6 +375,11 @@
     if (sec == null) return '-';
     var m = Math.floor(sec / 60), s = sec - m * 60;
     return m ? m + 'm' + s.toFixed(1) + 's' : s.toFixed(1) + 's';
+  }
+
+  function originText(o) {
+    if (!o || o.kind === 'file' || !o.src) return '本地上传';
+    return (o.kind === 'url' ? '链接：' : '路径：') + o.src;
   }
 
   function itemHtml(it) {
@@ -338,11 +396,18 @@
 
   /* ---------------- 事件绑定 ---------------- */
   window.MV = { openUpload: openUpload, detectAll: detectAll, detectOne: detectOne,
-                remove: remove, showReport: showReport, removePicked: removePicked };
+                remove: remove, showReport: showReport, removePicked: removePicked,
+                removeLink: removeLink };
 
   function removePicked(i) {
     picked.splice(i, 1);
-    renderPicked();
+    renderEntries();
+  }
+
+  function removeLink(i) {
+    linkLines.splice(i, 1);
+    $('#linkInput').value = linkLines.join('\n');
+    renderEntries();
   }
 
   $('#btnUpload').addEventListener('click', openUpload);
@@ -351,6 +416,10 @@
   $('#uploadClose').addEventListener('click', closeUpload);
   $('#uploadCancel').addEventListener('click', closeUpload);
   $('#uploadGo').addEventListener('click', doUpload);
+  document.querySelectorAll('#upTabs .seg-btn').forEach(function (b) {
+    b.addEventListener('click', function () { setMode(b.dataset.mode); });
+  });
+  $('#linkInput').addEventListener('input', parseLinks);
   $('#reportClose').addEventListener('click', function () { $('#reportMask').classList.remove('show'); });
   $('#reportOk').addEventListener('click', function () { $('#reportMask').classList.remove('show'); });
   $('#rpRedetect').addEventListener('click', function () { if (reportTaskId) detectOne(reportTaskId); });

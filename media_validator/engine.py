@@ -42,6 +42,26 @@ def tools_available():
     return {'ffmpeg': bool(shutil.which('ffmpeg')), 'ffprobe': bool(shutil.which('ffprobe'))}
 
 
+# 魔数嗅探名 → 标准扩展名（ftyp 品牌按家族归位）
+_SNIFF_EXT = {'png': 'png', 'jpeg': 'jpg', 'webp': 'webp', 'wav': 'wav', 'mp3': 'mp3',
+              'm4a': 'm4a', 'qt': 'mov'}
+
+
+def sniff_ext(path):
+    """文件头魔数 → 标准扩展名（png/jpg/webp/wav/mp3/m4a/mov/mkv/mp4），识别不了返回 None。
+
+    供链接/路径来源在无扩展名时做类型识别。
+    """
+    s = _sniff_magic(path)
+    if not s:
+        return None
+    if s in _SNIFF_EXT:
+        return _SNIFF_EXT[s]
+    if s == 'matroska':
+        return 'mkv'
+    return 'mp4'          # 其余 ftyp 品牌（isom/mp42/avc1…）一律按 mp4 家族
+
+
 def _sniff_magic(path):
     """文件头魔数 → 嗅探格式名（识别不了的返回 None）"""
     try:

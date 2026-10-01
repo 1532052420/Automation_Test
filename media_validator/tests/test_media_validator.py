@@ -6,12 +6,14 @@
 运行：cd <项目根> && .venv/bin/python -m pytest media_validator/tests -v
 """
 import io
+import json
 import math
 import os
 import shutil
 import struct
 import subprocess
 import sys
+import threading
 import time
 import zlib
 
@@ -471,3 +473,132 @@ def test_uncaught_engine_exception_becomes_error(client, wav_ok, monkeypatch):
         time.sleep(0.3)
     assert got['status'] == 'ERROR'
     assert '模拟引擎崩溃' in got['error']
+
+
+# ================================================================ 链接 / 路径来源
+import http.server                                                        # noqa: E402
+from functools import partial                                             # noqa: E402
+
+
+@pytest.fixture(scope='module')
+def media_server(tmp_path_factory):
+    """本地 HTTP 服务：提供真 URL 的媒体文件（good.wav / 无扩展名 PNG / 大文件）"""
+    root = tmp_path_factory.mktemp('srv')
+    make_wav(str(root / 'good.wav'))
+    make_png(str(root / 'rawimage'))                  # 无扩展名 → 服务端按魔数识别
+    with open(str(root / 'good.wav'), 'rb') as f:
+        big = f.read() * 2
+    (root / 'big.wav').write_bytes(big)
+    handler = partial(http.server.SimpleHTTPRequestHandler, directory=str(root))
+    srv = http.server.ThreadingHTTPServer(('127.0.0.1', 0), handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    yield {'base': 'http://127.0.0.1:%d' % srv.server_address[1], 'root': str(root)}
+    srv.shutdown()
+
+
+def _poll_terminal(client, tid, timeout=60):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        t = client.get('/media-validator/api/task/%s' % tid).get_json()['task']
+        if t['status'] in ('PASSED', 'FAILED', 'ERROR'):
+            return t
+        time.sleep(0.3)
+    raise AssertionError('检测 %ds 未终态' % timeout)
+
+
+@pytest.mark.skipif(not HAS_FFMPEG, reason='未安装 ffmpeg/ffprobe')
+class TestSources:
+    def _upload_sources(self, client, sources, **extra):
+        data = {'sources': json.dumps(sources), 'start': '1'}
+        data.update(extra)
+        return client.post('/media-validator/api/upload', data=data,
+                           content_type='multipart/form-data').get_json()
+
+    def test_url_upload_detect_pass(self, client, media_server):
+        """http 链接 → 下载 → 建任务 → 检测 PASS，来源记录为链接"""
+        d = self._upload_sources(client, [media_server['base'] + '/good.wav'])
+        assert d['ok'] and len(d['created']) == 1
+        t = d['created'][0]
+        assert t['media_type'] == 'audio' and t['origin']['kind'] == 'url'
+        final = _poll_terminal(client, t['id'])
+        assert final['status'] == 'PASSED'
+
+    def test_url_without_ext_sniffed(self, client, media_server):
+        """无扩展名 URL → 魔数识别为 png → 建任务并检测 PASS"""
+        d = self._upload_sources(client, [media_server['base'] + '/rawimage'])
+        assert len(d['created']) == 1 and d['rejected'] == []
+        t = d['created'][0]
+        assert t['media_type'] == 'image' and t['ext'] == 'png'
+        assert t['filename'].endswith('.png')
+        final = _poll_terminal(client, t['id'])
+        assert final['status'] == 'PASSED'
+
+    def test_url_404_rejected(self, client, media_server):
+        d = self._upload_sources(client, [media_server['base'] + '/nope.wav'])
+        assert not d['created'] and '下载失败' in d['rejected'][0]['reason']
+
+    def test_url_bad_scheme_rejected(self, client):
+        d = self._upload_sources(client, ['ftp://example.com/a.mp3'])
+        assert not d['created'] and '协议' in d['rejected'][0]['reason']
+
+    def test_url_oversize_rejected(self, client, media_server, monkeypatch):
+        monkeypatch.setattr(store, 'MAX_UPLOAD_BYTES', 1024)
+        d = self._upload_sources(client, [media_server['base'] + '/good.wav'])
+        assert not d['created'] and '上限' in d['rejected'][0]['reason']
+
+    def test_absolute_path_upload(self, client, wav_ok):
+        d = self._upload_sources(client, [wav_ok])
+        assert len(d['created']) == 1 and d['created'][0]['origin']['kind'] == 'path'
+        final = _poll_terminal(client, d['created'][0]['id'])
+        assert final['status'] == 'PASSED'
+        assert os.path.isfile(final['stored_path'])          # 副本在 uploads
+        assert os.path.isfile(wav_ok)                        # 原文件不受删除影响
+
+    def test_relative_path_upload(self, client, tmp_path, monkeypatch):
+        """相对路径基于进程 CWD 解析（平台进程 = 项目根）"""
+        make_wav(str(tmp_path / 'rel_ok.wav'))
+        monkeypatch.chdir(str(tmp_path))
+        d = self._upload_sources(client, ['rel_ok.wav'])
+        assert len(d['created']) == 1
+        final = _poll_terminal(client, d['created'][0]['id'])
+        assert final['status'] == 'PASSED'
+
+    def test_tilde_path_upload(self, client, tmp_path, monkeypatch):
+        make_wav(str(tmp_path / 'home_ok.wav'))
+        monkeypatch.setenv('HOME', str(tmp_path))
+        d = self._upload_sources(client, ['~/home_ok.wav'])
+        assert len(d['created']) == 1
+
+    def test_path_missing_rejected(self, client):
+        d = self._upload_sources(client, ['/no/such/file.mp4', 'no/such/rel.wav'])
+        assert not d['created'] and len(d['rejected']) == 2
+
+    def test_path_is_dir_rejected(self, client, tmp_path):
+        d = self._upload_sources(client, [str(tmp_path)])
+        assert not d['created'] and '不是文件' in d['rejected'][0]['reason']
+
+    def test_path_unknown_type_rejected(self, client, tmp_path):
+        p = tmp_path / 'mystery.bin'
+        p.write_bytes(b'\x00\x01\x02\x03' * 16)
+        d = self._upload_sources(client, [str(p)])
+        assert not d['created'] and '无法识别' in d['rejected'][0]['reason']
+
+    def test_mixed_sources_and_files(self, client, wav_ok, media_server):
+        """文件 + 链接 + 路径混提：同一请求建 3 个任务"""
+        with open(wav_ok, 'rb') as f:
+            resp = client.post('/media-validator/api/upload',
+                               data={'files': (f, 'mix.wav'),
+                                     'sources': json.dumps([media_server['base'] + '/good.wav', wav_ok]),
+                                     'start': '0'},
+                               content_type='multipart/form-data').get_json()
+        assert len(resp['created']) == 3 and resp['rejected'] == []
+        kinds = {t['origin']['kind'] for t in resp['created']}
+        assert kinds == {'file', 'url', 'path'}
+        for t in resp['created']:
+            client.delete('/media-validator/api/task/%s' % t['id'])
+
+    def test_sources_only_bad_json_400(self, client):
+        resp = client.post('/media-validator/api/upload',
+                           data={'sources': '{not-json'},
+                           content_type='multipart/form-data')
+        assert resp.status_code == 400
