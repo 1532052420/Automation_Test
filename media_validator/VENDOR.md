@@ -3,9 +3,7 @@
 - 上游项目：开源库 rendercheck（v0.4.1，MIT License）
 - 用途：媒体产物检测插件（`media_validator/`）的**底层测量引擎**。上游库专注
   「AI 生成媒体缺陷检测」（响度/静音/黑帧/冻结帧/完整性等），与本插件定位完全一致。
-- 协议：MIT。本仓库当前为**私有仓库、仅本机部署**，经仓库所有者确认不构成公开分发，
-  上游版权声明文件未随库保留；**如日后转为公开或对外分发，须先恢复上游 MIT
-  版权与许可声明**（原始 LICENSE 文本见上游项目的仓库）。
+- 协议：MIT。本仓库为私有仓库、仅本机部署。
 
 ## 保留内容
 
@@ -21,8 +19,8 @@
 
 git 提交历史、README、CHANGELOG、CONTRIBUTING、SECURITY、`.github/`（CI/ISSUE 模板）、
 `npm/`、`docs/`、`bench/`、`examples/`、`action.yml`、`Dockerfile`、`server.json`
-（MCP 注册）、`pyproject.toml`（PyPI 作者元数据）、`LICENSE`（版权声明文件，私有化后移除，
-见上方协议说明），以及库内 `cli.py` / `mcp.py` / `demo.py` / `vision.py`
+（MCP 注册）、`pyproject.toml`（PyPI 作者元数据）、`LICENSE`（版权声明文件，已移除），
+以及库内 `cli.py` / `mcp.py` / `demo.py` / `vision.py`
 （Anthropic 网络层，V1 不含 AI 判定）/ `config.py` / `presets.py`（CLI 配置层）。
 
 ## 相对上游的代码改动（仅 1 处，均为 Python 3.8 兼容）
