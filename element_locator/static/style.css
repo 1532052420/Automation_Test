@@ -1013,3 +1013,7 @@ html.night .va5-seg button.on { background: #2a2d33; color: #66b1ff; box-shadow:
 html.night .va5-seg button:hover:not(.on) { color: #cfd4dc; }
 .va5-pv { max-height: 200px; border-radius: 8px; border: 1px solid #e5e7eb; }
 html.night .va5-pv { border-color: #303236; }
+
+/* 输入框占位文字：日间标准灰；夜间提亮（此前无规则走 UA 默认灰，深底看不清） */
+input::placeholder, textarea::placeholder { color: #9ca3af; opacity: 1; }
+html.night input::placeholder, html.night textarea::placeholder { color: #9aa3af; opacity: 1; }
