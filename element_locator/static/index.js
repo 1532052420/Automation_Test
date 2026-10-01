@@ -662,7 +662,7 @@ function hitFromEvent(e) {
 /* ================= 视觉断言采集模式（三范围 + 忽略区域 + Layout + 业务类型） ================= */
 /* 状态机：va.on 模式开关；scope=element/region/screen；region 框选设备坐标；
    ignores 相对视觉区域左上角存（执行侧裁剪出区域图后直接可用，元素位移时随区域整体平移）。 */
-var va = { on: false, scope: 'element', region: null, ignores: [], ignoreArmed: false,
+var va = { on: false, scope: 'element', match: 'strict', region: null, ignores: [], ignoreArmed: false,
            preview: null, els: {} };
 
 function vaShotRect() { return $('shot').getBoundingClientRect(); }
@@ -722,7 +722,7 @@ function vaCollect() {   // 面板 → API 参数
   const c = {
     scope: va.scope,
     biz_type: $('va-biz').value,
-    match_mode: document.querySelector('input[name=va-match]:checked').value,
+    match_mode: va.match || 'strict',
     threshold: Math.min(1, Math.max(0.5, (parseFloat($('va-th').value) || 98) / 100)),
     ignore_regions: va.ignores,
   };
@@ -738,41 +738,58 @@ function vaRenderPanel() {
   const p = $('visualPanel');
   if (!p) return;
   p.style.display = 'block';
+  /* V5 渐变强调（design_vacl/V5_SPEC.md）：渐变描边卡 + 红琥珀绿三色小节 + 分段控件 */
   p.innerHTML = `
-    <div class="detail-head">视觉断言采集 <span class="hint">选元素 / 框选区域 / 整屏</span></div>
-    <div class="field"><label>名称 <b style="color:#d33">*</b></label>
-      <input id="va-name" placeholder="如：登录成功用户卡片"></div>
-    <div class="field"><label>断言范围</label>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <label class="chk"><input type="radio" name="va-scope" value="element" ${va.scope==='element'?'checked':''}>元素</label>
-        <label class="chk"><input type="radio" name="va-scope" value="region" ${va.scope==='region'?'checked':''}>自定义区域</label>
-        <label class="chk"><input type="radio" name="va-scope" value="screen" ${va.scope==='screen'?'checked':''}>整屏</label>
+    <div class="va5-card"><div class="va5-in">
+      <div class="va5-hd"><span class="t">🧪 视觉断言采集</span><span class="hint">基线比对</span></div>
+      <div class="field"><label>名称 <b style="color:#e34d4d">*</b></label>
+        <input id="va-name" placeholder="如：登录成功用户卡片"></div>
+      <div class="va5-sec"><span class="va5-dot r"></span>断言范围</div>
+      <div class="va5-seg" id="va-scope-seg">
+        <button data-v="element">元素</button><button data-v="region">自定义区域</button><button data-v="screen">整屏</button>
       </div>
-      <div class="hint" id="va-scope-hint"></div></div>
-    <div class="field"><label>视觉对象类型 <span class="hint">（仅用于资产分类管理）</span></label>
-      <select id="va-biz">${['region|普通区域','icon|Icon','logo|Logo','image|图片','card|卡片','banner|Banner','toast|Toast','popup|弹窗','custom|自定义'].map(o=>{const [v,n]=o.split('|');return `<option value="${v}">${n}</option>`}).join('')}</select>
-      <div class="hint" id="va-biz-hint"></div></div>
-    <div class="field"><label>比较模式</label>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <label class="chk"><input type="radio" name="va-match" value="strict" checked>Strict（像素）</label>
-        <label class="chk"><input type="radio" name="va-match" value="layout">Layout（布局）</label>
+      <div class="hint" id="va-scope-hint"></div>
+      <div class="va5-sec"><span class="va5-dot a"></span>比对参数</div>
+      <div class="field"><label>视觉对象类型 <span class="hint" style="display:inline">（仅用于资产分类管理）</span></label>
+        <select id="va-biz">${['region|普通区域','icon|Icon','logo|Logo','image|图片','card|卡片','banner|Banner','toast|Toast','popup|弹窗','custom|自定义'].map(o=>{const [v,n]=o.split('|');return `<option value="${v}">${n}</option>`}).join('')}</select>
+        <div class="hint" id="va-biz-hint"></div></div>
+      <div class="field"><label>比较模式</label>
+        <div class="va5-seg" id="va-match-seg">
+          <button data-v="strict">Strict（像素）</button><button data-v="layout">Layout（布局）</button>
+        </div>
+        <div class="hint">Strict 逐像素比对；Layout 缩成粗粒度结构图比对——文字/数字变化不敏感，位置与尺寸变化敏感</div></div>
+      <div class="field"><label>相似度阈值（% · 默认 98）</label>
+        <input id="va-th" type="number" min="50" max="100" step="1" value="98"></div>
+      <div class="va5-sec"><span class="va5-dot g"></span>忽略与预览</div>
+      <div class="field"><button class="ghost mini" id="va-add-ignore">＋ 添加忽略区域</button>
+        <div class="hint" id="va-ignore-hint">点击后回到左侧截图，在视觉区域内拖拽一块</div>
+        <div class="va-chips" id="va-chips"></div></div>
+      <div class="field"><label>基线预览</label>
+        <div id="va-preview" class="muted" style="font-size:12px">点「预览」实时截图按范围裁剪确认</div></div>
+      <div class="detail-foot" style="justify-content:flex-start">
+        <button class="btn small" id="va-preview-btn">预览</button>
+        <button class="btn small primary" id="va-save-btn">保存视觉断言</button>
       </div>
-      <div class="hint">Strict 逐像素比对；Layout 缩成粗粒度结构图比对——文字/数字变化不敏感，位置与尺寸变化敏感</div></div>
-    <div class="field"><label>相似度阈值（%·默认 98）</label>
-      <input id="va-th" type="number" min="50" max="100" step="1" value="98"></div>
-    <div class="field"><label>忽略区域 <span class="hint">（时间/数字等动态内容，比对时涂白跳过）</span></label>
-      <button class="ghost mini" id="va-add-ignore">＋ 添加忽略区域</button>
-      <div class="hint" id="va-ignore-hint">点击后回到左侧截图，在视觉区域内拖拽一块</div>
-      <div class="va-chips" id="va-chips"></div></div>
-    <div class="field"><label>基线预览</label>
-      <div id="va-preview" class="muted" style="font-size:12px">点「预览」实时截图按范围裁剪确认</div></div>
-    <div class="detail-foot" style="justify-content:flex-start">
-      <button class="btn small" id="va-preview-btn">预览</button>
-      <button class="btn small primary" id="va-save-btn">保存视觉断言</button>
-    </div>
-`;
-  document.querySelectorAll('input[name=va-scope]').forEach(r =>
-    r.addEventListener('change', () => { va.scope = r.value; va.ignores = []; va.region = null; vaDrawRects(); vaSyncHints(); }));
+    </div></div>`;
+  const syncSeg = (segId, val) => {
+    const seg = $(segId);
+    seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === val));
+  };
+  syncSeg('va-scope-seg', va.scope);
+  syncSeg('va-match-seg', va.match);
+  $('va-scope-seg').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b || b.dataset.v === va.scope) return;
+    va.scope = b.dataset.v; va.ignores = []; va.region = null;   // 与旧 radio 语义一致：换范围清空框选与忽略
+    syncSeg('va-scope-seg', va.scope);
+    vaRenderChips(); vaDrawRects(); vaSyncHints();
+  });
+  $('va-match-seg').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    va.match = b.dataset.v;
+    syncSeg('va-match-seg', va.match);
+  });
   $('va-biz').addEventListener('change', vaSyncHints);
   $('va-add-ignore').addEventListener('click', () => {
     if (!vaTargetBox()) { showToast('请先选定视觉区域（选元素或框选区域）'); return; }
@@ -788,7 +805,7 @@ function vaRenderPanel() {
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(vaCollect()) })
       .then(x => x.json()).catch(() => null);
     if (!r || !r.ok) { $('va-preview').textContent = '❌ ' + ((r && r.msg) || '预览失败'); return; }
-    $('va-preview').innerHTML = `<img src="${r.thumb}" style="max-height:200px;border-radius:8px;border:1px solid #eee">` +
+    $('va-preview').innerHTML = `<img class="va5-pv" src="${r.thumb}">` +
       `<div class="muted" style="font-size:11.5px;margin-top:4px">${r.size[0]}×${r.size[1]} px</div>`;
   });
   $('va-save-btn').addEventListener('click', async () => {
@@ -841,7 +858,7 @@ function vaToggleMode() {
   if (va.on) {
     if (state.coordMode) $('btn-coord-mode').click();   // 与坐标模式互斥
     $('detail').style.display = 'none';
-    va.scope = 'element'; va.region = null; va.ignores = []; va.ignoreArmed = false;
+    va.scope = 'element'; va.match = 'strict'; va.region = null; va.ignores = []; va.ignoreArmed = false;
     vaRenderPanel(); vaDrawRects();
     showToast('视觉断言采集：点击截图选元素 / 切「区域」拖拽框选');
   } else {
