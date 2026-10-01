@@ -298,6 +298,22 @@ def debug_compare(name, actual_bytes):
     except Exception as e:
         return False, '配置读取失败: %s' % e
     from common.appium import visual_assertions as _va
+    # 调试路径不拒绝异尺寸图：自动缩放到基线尺寸再比对（执行链护栏不动）。
+    # 调试的本意就是传任意图验证阈值有效性，拒绝尺寸 = 无法调试。
+    resized, resized_from = False, ''
+    try:
+        from PIL import Image
+        import io as _io
+        bw, bh = Image.open(baseline).size
+        aw, ah = Image.open(_io.BytesIO(actual_bytes)).size
+        if (aw, ah) != (bw, bh):
+            img = Image.open(_io.BytesIO(actual_bytes)).convert('RGB').resize((bw, bh))
+            buf = _io.BytesIO()
+            img.save(buf, format='PNG')
+            actual_bytes = buf.getvalue()
+            resized, resized_from = True, '%dx%d' % (aw, ah)
+    except Exception:
+        pass   # PIL 不可用或图损坏时按原图交引擎处理，由引擎报真实错误
     tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
     try:
         tmp.write(actual_bytes)
@@ -315,6 +331,8 @@ def debug_compare(name, actual_bytes):
             except Exception:
                 return ''
         return True, {
+            'resized': resized,
+            'resized_from': resized_from,
             'passed': ok,
             'similarity': (actual or {}).get('similarity'),
             'threshold': float(cfg.get('threshold') or 0.98),

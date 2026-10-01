@@ -1910,6 +1910,7 @@ function openVisualAssetDebug(name) {
   // 重置：隐藏 Diff 高光带、清判定词与相似度、恢复上传落区
   document.getElementById('vdbgDiffWrap').style.display = 'none';
   document.getElementById('vdbgDiffImg').removeAttribute('src');
+  document.getElementById('vdbgResize').style.display = 'none';
   const simEl = document.getElementById('vdbgSim');
   simEl.textContent = '—'; simEl.dataset.level = 'bad';
   document.getElementById('vdbgJudge').textContent = '低于';
@@ -2035,6 +2036,14 @@ function bindVdbgOnce(name) {
     document.getElementById('vdbgThTxt').textContent = th;
     document.getElementById('vdbgJudge').textContent = d.passed ? '达到' : '低于';
     mask.dataset.lastSim = String(sim * 100);
+    const rz = document.getElementById('vdbgResize');
+    if (d.resized) {
+      rz.textContent = '⚠ 上传图 ' + (d.resized_from || '?') + ' 已缩放至基线尺寸 ' +
+        (d.actual_size ? d.actual_size.replace('x', '×') : '') + ' 比对——仅供阈值有效性验证';
+      rz.style.display = '';
+    } else {
+      rz.style.display = 'none';
+    }
     if (d.triple) {
       document.getElementById('vdbgDiffImg').src = d.triple;
       diffWrap.style.display = '';
