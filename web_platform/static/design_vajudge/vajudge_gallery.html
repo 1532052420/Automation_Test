@@ -1,0 +1,78 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>调试弹窗 · 成功/失败判定位置 6 方案</title><style>
+* { margin:0; padding:0; box-sizing:border-box; font-family:"PingFang SC","Microsoft YaHei",sans-serif; }
+body { background:#0a0c10; color:#e8ecf2; padding:28px 36px; }
+h1 { font-size:22px; margin-bottom:4px; }
+.sub { color:#8a94a6; font-size:13px; margin-bottom:16px; }
+.modebar { display:flex; gap:10px; align-items:center; margin-bottom:22px; }
+.modebar button { padding:7px 20px; border-radius:999px; border:1px solid #262b34; background:#12151c; color:#aeb8c4; font-size:13px; cursor:pointer; }
+.modebar button.on { background:#0071e3; border-color:#0071e3; color:#fff; font-weight:600; }
+.modebar .tip { color:#5a6478; font-size:12px; margin-left:8px; }
+.grid { display:grid; grid-template-columns:repeat(2,1fr); gap:22px; }
+.cell h3 { font-size:14.5px; margin-bottom:8px; color:#aeb8c4; font-weight:600; }
+.cell h3 .no { color:#0071e3; margin-right:6px; font-weight:800; }
+.cell .d { font-size:12px; color:#5a6478; margin-bottom:8px; }
+.frame { border:1px solid #262b34; border-radius:12px; overflow:hidden; cursor:zoom-in; transition:border-color .15s; background:#0e1116; }
+.frame:hover { border-color:#0071e3; }
+.frame img { width:100%; display:block; }
+.lb { position:fixed; inset:0; background:rgba(0,0,0,.86); display:none; align-items:center; justify-content:center; z-index:99; cursor:zoom-out; }
+.lb.show { display:flex; }
+.lb img { max-width:min(1000px,94vw); max-height:92vh; border-radius:8px; background:#0e1116; }
+.lb .tip { position:fixed; top:20px; left:32px; color:#8a94a6; font-size:13px; }
+.lb .x { position:fixed; top:14px; right:22px; width:40px; height:40px; border-radius:50%; border:1px solid #3a4150; background:#161a22; color:#cfd6e0; font-size:20px; line-height:38px; text-align:center; cursor:pointer; z-index:101; user-select:none; }
+.lb .x:hover { border-color:#0071e3; color:#fff; }
+</style></head><body>
+<h1>✅ 调试弹窗 · 成功/失败判定位置 6 方案</h1>
+<div class="sub">每张图上半=成功态（99.10% ≥ 98%）、下半=失败态（93.20% &lt; 98%）· 日/夜双模式 · 点击放大 · 由您挑编号后按所选实现</div>
+<div class="modebar">
+  <button id="mDay" class="on">☀️ 日间模式</button>
+  <button id="mNight">🌙 夜间模式</button>
+  <span class="tip">切换后所有卡片与放大图同步换模式</span>
+</div>
+<div class="grid" id="grid"></div>
+<div class="lb" id="lb"><span class="tip">点击图片外遮罩或按 ESC 关闭</span><div class="x" id="lbx">✕</div><img id="lbi" alt=""></div>
+<script>
+const names = [
+  ['V1 带内左徽章', '相似度带改三栏：左「✓成功/✗失败」实心徽章 · 中大字 · 右阈值——结果与数字同排，扫读最快'],
+  ['V2 带内顶部判定条', '带内第一行左「判定：成功/失败」右「阈值98%」，数字居中下移——信息分层清晰'],
+  ['V3 数字下胶囊', '大字下方一枚实心胶囊「✓ 成功 · 达到阈值98%」——判定紧跟结果，最醒目'],
+  ['V4 标题旁徽章', '弹窗标题右侧常驻徽章——不占内容区，开关弹窗都能看到结果'],
+  ['V5 底部按钮左徽章', '取消/调试按钮左侧软徽章——操作与结果同排，符合「看完再操作」'],
+  ['V6 印章式圆章', '带右端旋转印章 PASS/FAIL——检测报告风格，仪式感最强'],
+];
+let mode = 'day';
+const grid = document.getElementById('grid');
+names.forEach((n, i) => {
+  const v = i + 1;
+  const cell = document.createElement('div');
+  cell.className = 'cell';
+  cell.innerHTML = '<h3><span class="no">' + String(v).padStart(2,'0') + '</span>' + n[0] + '</h3>' +
+    '<div class="d">' + n[1] + '</div>' +
+    '<div class="frame" data-v="' + v + '"><img src="img/v' + v + '_' + mode + '.jpg" alt=""></div>';
+  grid.appendChild(cell);
+});
+function setMode(m) {
+  mode = m;
+  document.getElementById('mDay').classList.toggle('on', m === 'day');
+  document.getElementById('mNight').classList.toggle('on', m === 'night');
+  document.querySelectorAll('.frame img').forEach(im => {
+    im.src = 'img/v' + im.parentElement.dataset.v + '_' + m + '.jpg';
+  });
+  const lb = document.getElementById('lb');
+  if (lb.classList.contains('show')) {
+    document.getElementById('lbi').src = 'img/v' + lb.dataset.v + '_' + m + '.jpg';
+  }
+}
+document.getElementById('mDay').addEventListener('click', () => setMode('day'));
+document.getElementById('mNight').addEventListener('click', () => setMode('night'));
+const lb = document.getElementById('lb');
+grid.addEventListener('click', e => {
+  const f = e.target.closest('.frame');
+  if (!f) return;
+  lb.dataset.v = f.dataset.v;
+  document.getElementById('lbi').src = 'img/v' + f.dataset.v + '_' + mode + '.jpg';
+  lb.classList.add('show');
+});
+lb.addEventListener('click', e => { if (e.target === lb) lb.classList.remove('show'); });
+document.getElementById('lbx').addEventListener('click', () => lb.classList.remove('show'));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') lb.classList.remove('show'); });
+</script></body></html>
