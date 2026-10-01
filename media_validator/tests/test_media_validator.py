@@ -298,6 +298,30 @@ class TestRules:
         assert rules_mod.media_type_of('noext') is None
 
 
+class TestFpsDisplay:
+    def test_garbage_nominal_not_shown(self):
+        """录屏类文件的 r_frame_rate=1000000 占位值不进展示与判定，以实际均值为准"""
+        txt, judge, note = engine._fps_display({'fps': 1000000.0, 'avg_fps': 71.642})
+        assert txt == '71.642 fps'
+        assert '1000000' not in txt and judge == 71.642 and note is None
+
+    def test_vfr_note_when_nominal_plausible(self):
+        txt, judge, note = engine._fps_display({'fps': 30.0, 'avg_fps': 24.5})
+        assert '标称 30' in txt and judge == 24.5 and note and '变帧率' in note
+
+    def test_cfr_no_note(self):
+        txt, judge, note = engine._fps_display({'fps': 25.0, 'avg_fps': 25.0})
+        assert txt == '25.000 fps' and judge == 25.0 and note is None
+
+    def test_nominal_only(self):
+        txt, judge, note = engine._fps_display({'fps': 25.0, 'avg_fps': None})
+        assert '标称' in txt and judge == 25.0
+
+    def test_all_garbage(self):
+        txt, judge, note = engine._fps_display({'fps': 1000000.0, 'avg_fps': None})
+        assert txt == '未知' and judge is None
+
+
 # ================================================================ API 层
 @pytest.fixture()
 def client(tmp_path, monkeypatch):

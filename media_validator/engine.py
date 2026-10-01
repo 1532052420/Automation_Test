@@ -188,9 +188,35 @@ def _stream_desc(s):
     elif s.get('kind') == 'video':
         if s.get('width') and s.get('height'):
             parts.append('%dx%d' % (s['width'], s['height']))
-        if s.get('fps'):
-            parts.append('%.3f fps' % s['fps'])
+        _, fps_disp, _ = _fps_display(s)
+        if fps_disp is not None:
+            parts.append('%.3f fps' % fps_disp)
     return '、'.join(parts) or '未知'
+
+
+_NOMINAL_CAP = 500
+"""标称帧率（r_frame_rate）可信上限：录屏/部分封装常塞 1000000、90000 之类的
+占位垃圾值，超过一律视为容器占位而非真实能力，展示与判定都不采用。"""
+
+
+def _fps_display(v):
+    """帧率展示与判定基准。
+
+    实际帧率（avg_frame_rate = 总帧数/时长）为主；标称值只在「可信且与实际
+    不一致」时作为变帧率注记。返回 (展示文本, 用于判定的帧率, 注记)。
+    """
+    nominal, avg = v.get('fps'), v.get('avg_fps')
+    nominal_ok = bool(nominal and nominal <= _NOMINAL_CAP)
+    if avg:
+        txt = '%.3f fps' % avg
+        note = None
+        if nominal_ok and abs(avg - nominal) > max(0.01, nominal * 0.01):
+            txt += '（标称 %g，变帧率）' % nominal
+            note = '标称帧率与实际均值不一致，属于变帧率文件，剪辑软件里音画易漂移'
+        return txt, avg, note
+    if nominal_ok:
+        return '%.3f fps（标称）' % nominal, nominal, '容器未提供实际均值帧率，仅标称值参考'
+    return '未知', None, '容器未提供可用帧率（标称值为占位数据）'
 
 
 # ---------------------------------------------------------------- 共用项：完整性 + 格式
@@ -322,16 +348,15 @@ def _items_video(path, info, rules):
         else:
             items.append(_item('resolution', '分辨率', None, '仅报告', res))
 
-        fps_txt, fps_note = '未知', None
-        if v['fps']:
-            fps_txt = '%.3f fps' % v['fps']
-            if v['avg_fps'] and abs(v['avg_fps'] - v['fps']) > 0.01:
-                fps_txt += '（均值 %.3f，变帧率）' % v['avg_fps']
-                fps_note = '标称帧率与实际均值不一致，属于变帧率文件，剪辑软件里音画易漂移'
+        fps_txt, judge_fps, fps_note = _fps_display(v)
         if rules.get('min_fps') is not None:
-            passed = v['avg_fps'] is not None and v['avg_fps'] >= rules['min_fps']
-            if passed is False and fps_note is None:
-                fps_note = '实际帧率低于 %g fps，观感卡顿' % rules['min_fps']
+            if judge_fps is None:
+                passed, extra = None, '无法获取可用帧率，未判定'
+            else:
+                passed = judge_fps >= rules['min_fps']
+                extra = '实际帧率低于 %g fps，观感卡顿' % rules['min_fps'] if passed is False else None
+            if fps_note is None and extra:
+                fps_note = extra
             items.append(_item('fps', '帧率', passed, '≥ %g fps' % rules['min_fps'], fps_txt, fps_note))
         else:
             items.append(_item('fps', '帧率', None, '仅报告', fps_txt, fps_note))
