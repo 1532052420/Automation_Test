@@ -1833,6 +1833,16 @@ function renderVisualAssets() {
     }));
   $('#visTbody').querySelectorAll('[data-visedit]').forEach(b =>
     b.addEventListener('click', () => openVisualAssetEdit(b.dataset.visedit)));
+  $('#visTbody').querySelectorAll('[data-visdebug]').forEach(b =>
+    b.addEventListener('click', () => openVisualAssetDebug(b.dataset.visdebug)));
+  $('#visTbody').querySelectorAll('[data-visdel]').forEach(b =>
+    b.addEventListener('click', async () => {
+      if (!confirm('删除视觉资产「' + b.dataset.visdel + '」？基线图与配置将一并删除。')) return;
+      const r = await api('/api/appui/visual_assets/' + encodeURIComponent(b.dataset.visdel), { method: 'DELETE' });
+      toast((r && r.msg) || (r && r.ok ? '已删除' : '删除失败'), r && r.ok);
+      loadVisualAssets();
+    }));
+}
 
 /* 编辑视觉断言：可改 视觉对象类型/比较模式/相似度阈值；名称/范围/忽略区域/基线 置灰只读（改=重采集） */
 async function openVisualAssetEdit(name) {
@@ -1865,16 +1875,6 @@ async function openVisualAssetEdit(name) {
     toast((rr && rr.msg) || (rr && rr.ok ? '配置已更新' : '保存失败'), rr && rr.ok);
     if (rr && rr.ok) { mask.classList.remove('show'); loadVisualAssets(); }
   };
-}
-  $('#visTbody').querySelectorAll('[data-visdebug]').forEach(b =>
-    b.addEventListener('click', () => openVisualAssetDebug(b.dataset.visdebug)));
-  $('#visTbody').querySelectorAll('[data-visdel]').forEach(b =>
-    b.addEventListener('click', async () => {
-      if (!confirm('删除视觉资产「' + b.dataset.visdel + '」？基线图与配置将一并删除。')) return;
-      const r = await api('/api/appui/visual_assets/' + encodeURIComponent(b.dataset.visdel), { method: 'DELETE' });
-      toast((r && r.msg) || (r && r.ok ? '已删除' : '删除失败'), r && r.ok);
-      loadVisualAssets();
-    }));
 }
 
 /* 调试视觉断言（方案5优化）：基线VS上传图；相似度按值分色；类型/模式改动即存 */

@@ -1,0 +1,33 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><style>
+* { margin:0; padding:0; box-sizing:border-box; font-family:"PingFang SC","Microsoft YaHei",sans-serif; }
+:root { --bg:#eef1f5; --card:#ffffff; --ink:#1f2937; --ink2:#374151; --mut:#6b7280; --mut2:#9ca3af;
+        --line:#e5e7eb; --line2:#d1d5db; --brand:#409eff; --brand-soft:#ecf5ff;
+        --amber-ink:#92400e; --amber-bg:#fffbeb; --amber-line:#f59e0b; }
+html.night { --bg:#141519; --card:#1e2025; --ink:#e5e7eb; --ink2:#cfd4dc; --mut:#9aa3af; --mut2:#6b7280;
+        --line:#303236; --line2:#3d4046; --brand:#409eff; --brand-soft:rgba(64,158,255,.14);
+        --amber-ink:#fcd34d; --amber-bg:rgba(251,191,36,.08); --amber-line:rgba(251,191,36,.45); }
+body { width:900px; height:1100px; background:var(--bg); display:flex; align-items:center; justify-content:center; color:var(--ink); }
+.meta { position:fixed; top:18px; left:22px; font-size:13px; color:var(--mut); display:flex; gap:10px; align-items:center; z-index:9; }
+.meta b { color:var(--ink); font-size:14px; }
+.meta .md { border:1px solid var(--line); border-radius:999px; padding:2px 10px; font-size:11.5px; background:var(--card); }
+.btn { padding:8px 22px; border-radius:9px; font-size:13px; font-weight:600; cursor:pointer; border:1px solid var(--line); background:var(--card); color:var(--ink); }
+.btn.pri { background:var(--brand); border-color:var(--brand); color:#fff; }
+.btn.mini { padding:5px 12px; font-size:12px; }
+input[type=text], input[type=number], select { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:13px; background:var(--card); color:var(--ink); outline:none; }
+input[readonly] { background:var(--brand-soft); color:var(--mut); }
+.fl { font-size:12.5px; color:var(--ink2); font-weight:600; margin-bottom:6px; display:block; }
+.hint { font-size:11.5px; color:var(--mut); margin-top:4px; line-height:1.5; }
+.chip { display:inline-flex; align-items:center; gap:6px; font-size:11.5px; border:1px dashed var(--amber-line); color:var(--amber-ink); background:var(--amber-bg); border-radius:6px; padding:3px 8px; }
+.chip b { cursor:pointer; font-weight:700; }
+.chips { margin-top:7px; display:flex; gap:6px; flex-wrap:wrap; }
+.seg { display:flex; background:var(--bg); border-radius:9px; padding:3px; gap:2px; }
+.seg button { flex:1; padding:7px 0; font-size:12.5px; border:none; background:transparent; color:var(--mut); border-radius:7px; cursor:pointer; }
+.seg button.on { background:var(--card); color:var(--brand); font-weight:600; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+.card { background:var(--card); border-radius:14px; padding:20px 22px; box-shadow:0 8px 30px rgba(0,0,0,.08); }
+.hd { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; }
+.hd .t { font-size:15.5px; font-weight:700; }
+.hd .hint { margin:0; }
+.f { margin-bottom:13px; }
+.pv { width:100%; max-height:150px; object-fit:cover; border-radius:8px; border:1px solid var(--line); display:block; }
+.foot { display:flex; justify-content:flex-end; gap:10px; padding-top:12px; border-top:1px solid var(--line); }
+.card{width:500px} .tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);margin:2px 0 14px} .tab{padding:8px 2px;font-size:13px;color:var(--mut);cursor:pointer} .tab.on{color:var(--brand);border-bottom:2px solid var(--brand);font-weight:700} .clp{display:flex;align-items:center;padding:12px 2px;border-bottom:1px solid var(--line);font-size:13px;color:var(--ink2)} .clp .sum{margin-left:auto;color:var(--mut);font-size:12px} .clp .ar{margin-left:10px;color:var(--mut2)}</style><script>(function(){var n=location.search.indexOf("m=night")>-1;if(n)document.documentElement.classList.add("night");document.addEventListener("DOMContentLoaded",function(){var l=document.getElementById("mdlab");if(l)l.textContent=n?"夜间":"日间"})})()</script></head><body><div class="meta"><b>V8 · 标签页折叠</b><span class="md" id="mdlab"></span></div><div class="card"><div class="hd"><span class="t">📑 视觉断言采集</span><span class="hint">分页配置</span></div><div class="f"><label class="fl">名称 <b style="color:#e34d4d">*</b></label><input type="text" value="登录成功用户卡片"></div><div class="tabs"><span class="tab on">① 断言范围</span><span class="tab">② 比对参数</span><span class="tab">③ 忽略 · 预览</span></div><div class="seg"><button>元素</button><button class="on">自定义区域</button><button>整屏</button></div><div class="hint">自定义区域：在左侧截图拖拽框选比对范围</div><div class="clp" style="margin-top:12px"><span>② 比对参数</span><span class="sum">卡片 · Strict · 98%</span><span class="ar">›</span></div><div class="clp"><span>③ 忽略 · 预览</span><span class="sum">2 块 · 已预览 883×819</span><span class="ar">›</span></div><img class="pv" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMTcwIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE3MCIgZmlsbD0iI2YzZjRmNiIvPjxyZWN0IHg9IjEyIiB5PSIxMiIgd2lkdGg9IjI3NiIgaGVpZ2h0PSIxNDYiIHJ4PSIxMCIgZmlsbD0iI2ZmZmZmZiIgc3Ryb2tlPSIjZTVlN2ViIi8+PHJlY3QgeD0iMjQiIHk9IjI0IiB3aWR0aD0iMTIwIiBoZWlnaHQ9IjE0IiByeD0iNyIgZmlsbD0iI2RiZWFmZSIvPjxyZWN0IHg9IjI0IiB5PSI0OCIgd2lkdGg9IjIyMCIgaGVpZ2h0PSIxMCIgcng9IjUiIGZpbGw9IiNlNWU3ZWIiLz48cmVjdCB4PSIyNCIgeT0iNjYiIHdpZHRoPSIxODAiIGhlaWdodD0iMTAiIHJ4PSI1IiBmaWxsPSIjZTVlN2ViIi8+PGNpcmNsZSBjeD0iMjUwIiBjeT0iNDAiIHI9IjEyIiBmaWxsPSIjZDFmYWU1Ii8+PHBhdGggZD0iTTI0NCA0MGw1IDUgOC05IiBzdHJva2U9IiMxMGI5ODEiIHN0cm9rZS13aWR0aD0iMi41IiBmaWxsPSJub25lIi8+PHJlY3QgeD0iMjQiIHk9IjkyIiB3aWR0aD0iMjUyIiBoZWlnaHQ9IjUwIiByeD0iOCIgZmlsbD0iI2Y5ZmFmYiIgc3Ryb2tlPSIjZjFmNWY5Ii8+PHRleHQgeD0iMTUwIiB5PSIxMjIiIGZvbnQtc2l6ZT0iMTMiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkJBU0VMSU5FPC90ZXh0Pjwvc3ZnPg==" style="margin-top:12px;max-height:120px"><div class="foot" style="justify-content:flex-end"><button class="btn">预览</button><button class="btn pri">保存视觉断言</button></div></div></body></html>

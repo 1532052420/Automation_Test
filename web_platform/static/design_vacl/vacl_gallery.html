@@ -1,0 +1,80 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>视觉断言采集表单 · 10 套设计方案</title><style>
+* { margin:0; padding:0; box-sizing:border-box; font-family:"PingFang SC","Microsoft YaHei",sans-serif; }
+body { background:#0a0c10; color:#e8ecf2; padding:28px 36px; }
+h1 { font-size:22px; margin-bottom:4px; }
+.sub { color:#8a94a6; font-size:13px; margin-bottom:16px; }
+.modebar { display:flex; gap:10px; align-items:center; margin-bottom:22px; }
+.modebar button { padding:7px 20px; border-radius:999px; border:1px solid #262b34; background:#12151c; color:#aeb8c4; font-size:13px; cursor:pointer; }
+.modebar button.on { background:#0071e3; border-color:#0071e3; color:#fff; font-weight:600; }
+.modebar .tip { color:#5a6478; font-size:12px; margin-left:8px; }
+.grid { display:grid; grid-template-columns:repeat(2,1fr); gap:22px; }
+.cell h3 { font-size:14.5px; margin-bottom:8px; color:#aeb8c4; font-weight:600; }
+.cell h3 .no { color:#0071e3; margin-right:6px; font-weight:800; }
+.frame { border:1px solid #262b34; border-radius:12px; overflow:hidden; cursor:zoom-in; transition:border-color .15s; background:#0e1116; }
+.frame:hover { border-color:#0071e3; }
+.frame img { width:100%; display:block; }
+.lb { position:fixed; inset:0; background:rgba(0,0,0,.86); display:none; align-items:center; justify-content:center; z-index:99; cursor:zoom-out; }
+.lb.show { display:flex; }
+.lb img { max-width:min(1100px,94vw); max-height:92vh; border-radius:8px; background:#0e1116; }
+.lb .tip { position:fixed; top:20px; left:32px; color:#8a94a6; font-size:13px; }
+.lb .x { position:fixed; top:14px; right:22px; width:40px; height:40px; border-radius:50%; border:1px solid #3a4150; background:#161a22; color:#cfd6e0; font-size:20px; line-height:38px; text-align:center; cursor:pointer; z-index:101; user-select:none; }
+.lb .x:hover { border-color:#0071e3; color:#fff; }
+</style></head><body>
+<h1>🎯 视觉断言采集表单 · 10 套设计方案</h1>
+<div class="sub">每套均含 日间 / 夜间 双模式（右上角切换）· 点击任意方案放大查看 · 演示数据仅作占位</div>
+<div class="modebar">
+  <button id="mDay" class="on">☀️ 日间模式</button>
+  <button id="mNight">🌙 夜间模式</button>
+  <span class="tip">切换后所有卡片与放大图同步换模式</span>
+</div>
+<div class="grid" id="grid"></div>
+<div class="lb" id="lb"><span class="tip">点击图片外遮罩或按 ESC 关闭</span><div class="x" id="lbx">✕</div><img id="lbi" alt=""></div>
+<script>
+const names = [
+  ['V1 分段控件卡', '分段选择器+滑杆阈值，Element Plus 精致风'],
+  ['V2 步骤条向导', '三步竖向导流：范围→参数→忽略与预览'],
+  ['V3 紧凑双列', '双列网格一屏尽览，预览横条压缩高度'],
+  ['V4 分组卡片', '三张分组小卡各答一事：比对什么/怎么比/跳过什么'],
+  ['V5 渐变强调', '渐变描边卡片（呼应调试弹窗 V7），三色圆点分段'],
+  ['V6 极简线框', '黑白线框+下划线控件+等宽字号，极客风'],
+  ['V7 图标行列表', '每行前导图标瓦片，逐行清晰扫读'],
+  ['V8 标签页折叠', '三页签分步配置，折叠行显示参数摘要'],
+  ['V9 侧边预览', '左表单右侧实时预览列，边配边看'],
+  ['V10 大控件触控', '大瓦片范围/模式选择+步进器阈值+虚线投放区'],
+];
+let mode = 'day';
+const grid = document.getElementById('grid');
+names.forEach((n, i) => {
+  const v = i + 1;
+  const cell = document.createElement('div');
+  cell.className = 'cell';
+  cell.innerHTML = '<h3><span class="no">' + String(v).padStart(2,'0') + '</span>' + n[0] + '</h3>' +
+    '<div class="frame" data-v="' + v + '"><img src="img/v' + v + '_' + mode + '.jpg" alt="' + n[1] + '"></div>';
+  grid.appendChild(cell);
+});
+function setMode(m) {
+  mode = m;
+  document.getElementById('mDay').classList.toggle('on', m === 'day');
+  document.getElementById('mNight').classList.toggle('on', m === 'night');
+  document.querySelectorAll('.frame img').forEach(im => {
+    im.src = 'img/v' + im.parentElement.dataset.v + '_' + m + '.jpg';
+  });
+  const lb = document.getElementById('lb');
+  if (lb.classList.contains('show')) {
+    document.getElementById('lbi').src = lb.dataset.v + '_' + m + '.jpg';
+  }
+}
+document.getElementById('mDay').addEventListener('click', () => setMode('day'));
+document.getElementById('mNight').addEventListener('click', () => setMode('night'));
+const lb = document.getElementById('lb');
+grid.addEventListener('click', e => {
+  const f = e.target.closest('.frame');
+  if (!f) return;
+  lb.dataset.v = f.dataset.v;
+  document.getElementById('lbi').src = 'img/v' + f.dataset.v + '_' + mode + '.jpg';
+  lb.classList.add('show');
+});
+lb.addEventListener('click', e => { if (e.target === lb) lb.classList.remove('show'); });
+document.getElementById('lbx').addEventListener('click', () => lb.classList.remove('show'));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') lb.classList.remove('show'); });
+</script></body></html>
