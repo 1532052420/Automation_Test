@@ -5,6 +5,7 @@
 本机 ffmpeg 合成（未装 ffmpeg 的机器自动跳过视频用例，其余照常）。
 运行：cd <项目根> && .venv/bin/python -m pytest media_validator/tests -v
 """
+import io
 import math
 import os
 import shutil
@@ -273,15 +274,21 @@ class TestEngineGuards:
 
 class TestRules:
     def test_sanitize_rejects_unknown_and_bad_types(self):
-        out = rules_mod.sanitize('audio', {'duration_min': 'abc', 'max_silence': -5,
-                                           'hacker_key': 'x', 'require_sound': 'yes'})
-        assert out['duration_min'] is None or isinstance(out['duration_min'], (int, float))
+        out = rules_mod.sanitize('audio', {'duration_min': 'abc', 'hacker_key': 'x', 'require_sound': 'yes'})
+        assert out['duration_min'] is None                # 'abc' 非法 → 回退默认（默认即 None）
         assert 'hacker_key' not in out
-        assert out['require_sound'] is True            # 非布尔输入回退默认
+        assert out['require_sound'] is True               # 非布尔输入回退默认
 
     def test_sanitize_none_disables_threshold(self):
         out = rules_mod.sanitize('video', {'max_black': None})
         assert out['max_black'] is None
+
+    def test_sanitize_clamps_below_floor(self):
+        """非法负值/过小值钳到下限，而不是静默关闭（防假 PASS）"""
+        out = rules_mod.sanitize('audio', {'max_silence': -5})
+        assert out['max_silence'] == 0.5                  # _LIMITS 中 max_silence 下限
+        out2 = rules_mod.sanitize('video', {'max_black': 0.1})
+        assert out2['max_black'] == 0.5
 
     def test_media_type_of_whitelist(self):
         assert rules_mod.media_type_of('a.MP3') == 'audio'
@@ -353,6 +360,20 @@ class TestApi:
         data = client.get('/media-validator/api/overview').get_json()
         assert data['ok'] is True and 'tools' in data and 'stats' in data
 
+    def test_sweep_rescues_stuck_running(self, client):
+        """重启自愈：遗留 RUNNING 任务被启动扫描置 ERROR，且可重新检测"""
+        from media_validator import routes
+        store.upsert_task({'id': 'mvqa_ghost', 'filename': 'ghost.wav', 'ext': 'wav',
+                           'stored_path': '/nonexistent', 'media_type': 'audio',
+                           'size_bytes': 1, 'status': 'RUNNING', 'rules': {},
+                           'report': None, 'error': None,
+                           'created_at': 'x', 'finished_at': None})
+        swept = routes.sweep_interrupted()
+        assert 'mvqa_ghost' in swept
+        t = store.get_task('mvqa_ghost')
+        assert t['status'] == 'ERROR' and '中断' in t['error']
+        store.delete_task('mvqa_ghost')
+
     def test_missing_task_404(self, client):
         assert client.get('/media-validator/api/task/nope').status_code == 404
         assert client.delete('/media-validator/api/task/nope').status_code == 404
@@ -366,6 +387,67 @@ class TestApi:
         assert client.delete('/media-validator/api/task/%s' % task['id']).status_code == 200
         assert client.get('/media-validator/api/task/%s' % task['id']).status_code == 404
         assert not os.path.isfile(task['stored_path'])   # 上传文件一并清理
+
+    def test_upload_size_cap_rejects(self, client, wav_ok, monkeypatch):
+        """请求级 413 预检：Content-Length 超上限的请求在读入前就被拒"""
+        monkeypatch.setattr(store, 'MAX_UPLOAD_BYTES', 1024)
+        with open(wav_ok, 'rb') as f:                      # 176KB > (1024+64KB) 预检线
+            resp = client.post('/media-validator/api/upload',
+                               data={'files': (f, 'big.wav')},
+                               content_type='multipart/form-data')
+        assert resp.status_code == 413                     # 请求级预检直接 413
+
+    def test_upload_size_cap_stream_rejects(self, client, monkeypatch):
+        """流式落盘上限：预检之下、单文件超限时拒收并给原因"""
+        monkeypatch.setattr(store, 'MAX_UPLOAD_BYTES', 1024)
+        small_but_over = io.BytesIO(b'x' * 2048)           # 2KB：过 413 预检，超 1KB 落盘上限
+        resp = client.post('/media-validator/api/upload',
+                           data={'files': (small_but_over, 'big.wav')},
+                           content_type='multipart/form-data')
+        data = resp.get_json()
+        assert not data['created'] and len(data['rejected']) == 1
+        assert '上限' in data['rejected'][0]['reason']
+
+    def test_save_upload_cap_raises(self, tmp_path, monkeypatch):
+        """store 层：超上限抛 ValueError 并不留残文件"""
+        monkeypatch.setattr(store, 'UPLOADS_DIR', str(tmp_path))
+        monkeypatch.setattr(store, 'MAX_UPLOAD_BYTES', 1024)
+
+        class _Fake:
+            def __init__(self, data):
+                self.stream = io.BytesIO(data)
+
+        with pytest.raises(ValueError):
+            store.save_upload(_Fake(b'x' * 2048), 'big.wav', 'testid')
+        assert not list(tmp_path.iterdir())                # 超限文件已删除，无残留
+
+    def test_detect_one_accepts_wrapper_and_flat_rules(self, client, wav_ok):
+        """单任务检测接口两种规则形态都收：{audio:{...}} 包装式与扁平式"""
+        with open(wav_ok, 'rb') as f:
+            task = client.post('/media-validator/api/upload',
+                               data={'files': (f, 'rules.wav')},
+                               content_type='multipart/form-data').get_json()['created'][0]
+        tid = task['id']
+
+        def wait_terminal():
+            deadline = time.time() + 60
+            while time.time() < deadline:
+                t = client.get('/media-validator/api/task/%s' % tid).get_json()['task']
+                if t['status'] in ('PASSED', 'FAILED', 'ERROR'):
+                    return t
+                time.sleep(0.3)
+            raise AssertionError('检测 60s 未终态')
+
+        # 包装式（与批量接口一致）
+        r1 = client.post('/media-validator/api/task/%s/detect' % tid,
+                         json={'rules': {'audio': {'max_silence': 0.5}}}).get_json()
+        t1 = wait_terminal()
+        assert r1['ok'] is True and t1['rules']['max_silence'] == 0.5
+        # 扁平式（等上一次检测终态后再发，否则命中防重入 409）
+        r2 = client.post('/media-validator/api/task/%s/detect' % tid,
+                         json={'rules': {'max_silence': 20}}).get_json()
+        t2 = wait_terminal()
+        assert r2['ok'] is True and t2['rules']['max_silence'] == 20.0
 
 
 @pytest.mark.skipif(not HAS_FFMPEG, reason='未安装 ffmpeg/ffprobe')

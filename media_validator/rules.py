@@ -73,7 +73,14 @@ def media_type_of(filename):
 
 
 def sanitize(media_type, raw):
-    """把外部传入的规则清洗成本类型合法快照：只收已知键，类型/下限不对回退默认值"""
+    """把外部传入的规则清洗成本类型合法快照。
+
+    语义（防假 PASS 为先）：
+    - 键不存在 / 显式 null = 关闭阈值（仅报告实测）；
+    - 非法值（'abc'、布尔等非数值）= 回退默认值——用户想设值设错了，
+      静默关闭会制造「没测当测了」的假 PASS，宁可退到保守默认；
+    - 合法数值但低于下限 = 钳到下限（保留用户意图，尊重检测器最小区分度）。
+    """
     base = DEFAULT_RULES.get(media_type) or {}
     if not isinstance(raw, dict):
         return dict(base)
@@ -86,14 +93,17 @@ def sanitize(media_type, raw):
             out[key] = bool(val) if isinstance(val, bool) else default
         elif key in _LIMITS:
             kind, floor = _LIMITS[key]
+            if val is None:
+                out[key] = None           # 显式 null = 关闭该阈值
+                continue
             num = val if isinstance(val, numbers.Number) and not isinstance(val, bool) else None
             if num is None:
-                out[key] = None       # 显式 null = 关闭该阈值
+                out[key] = default        # 非数值：回退默认，不静默关闭
+                continue
+            try:
+                num = kind(float(num))
+            except (TypeError, ValueError):
+                out[key] = default
             else:
-                try:
-                    num = kind(float(num))
-                except (TypeError, ValueError):
-                    out[key] = default
-                else:
-                    out[key] = None if num < floor else num
+                out[key] = max(num, floor)
     return out

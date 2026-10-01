@@ -35,6 +35,26 @@ _detecting = set()          # 正在检测的任务 id（防重复提交）
 _detect_lock = threading.Lock()
 
 
+def sweep_interrupted():
+    """把遗留的 RUNNING 任务置为 ERROR。
+
+    检测跑在后台线程，平台重启/进程退出会杀死线程而任务状态停在 RUNNING——
+    没有本扫描的话该任务永远显示「检测中」、前端永远轮询。蓝图加载时执行一次。
+    """
+    swept = []
+    for t in store.load_tasks():
+        if t.get('status') == 'RUNNING':
+            t['status'] = 'ERROR'
+            t['error'] = '检测中断（平台重启或进程退出），请重新检测'
+            t['finished_at'] = time.strftime('%Y-%m-%d %H:%M:%S')
+            store.upsert_task(t)
+            swept.append(t['id'])
+    return swept
+
+
+sweep_interrupted()
+
+
 # ---------------------------------------------------------------- 页面
 @bp.route('/')
 def page():
@@ -165,8 +185,11 @@ def api_detect_one(task_id):
     if t is None:
         return jsonify({'ok': False, 'msg': '任务不存在'}), 404
     body = request.get_json(silent=True) or {}
-    if isinstance(body.get('rules'), dict) and body['rules']:
-        t['rules'] = rules_mod.sanitize(t['media_type'], body['rules'])
+    raw = body.get('rules')
+    if isinstance(raw, dict) and raw:
+        # 兼容两种形态：{媒体类型: {规则}}（与批量接口一致）或该任务类型的扁平 {规则}
+        inner = raw.get(t['media_type'])
+        t['rules'] = rules_mod.sanitize(t['media_type'], inner if isinstance(inner, dict) else raw)
         store.upsert_task(t)
     if not _spawn_detect(task_id):
         return jsonify({'ok': False, 'msg': '该任务正在检测中'}), 409

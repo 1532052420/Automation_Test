@@ -190,13 +190,18 @@
              '<input id="' + key + '" data-type="' + type + '" data-key="' + f[0] + '" ' +
              'placeholder="留空=仅报告"></div>';
     }).join('');
+    // 布尔开关按类型渲染：require_sound 属音频、detect_blank 属图片，错组渲染会误导用户
+    var checks = '';
+    if (type === 'audio') {
+      checks += '<div class="rule-field"><label>非纯静音</label><input type="checkbox" data-type="' + type + '" data-key="require_sound" ' +
+                (defaultRules.audio && defaultRules.audio.require_sound ? 'checked' : '') + '></div>';
+    }
+    if (type === 'image') {
+      checks += '<div class="rule-field"><label>画面内容检查</label><input type="checkbox" data-type="' + type + '" data-key="detect_blank" ' +
+                (defaultRules.image && defaultRules.image.detect_blank ? 'checked' : '') + '></div>';
+    }
     return '<details class="rules-group" open><summary>' + TYPE_LABELS[type] + '检测规则（可改）</summary>' +
-           '<div class="rules-grid">' + cells +
-           '<div class="rule-field"><label>非纯静音</label><input type="checkbox" data-type="' + type + '" data-key="require_sound" ' +
-           (defaultRules[type] && defaultRules[type].require_sound ? 'checked' : '') + '></div>' +
-           '<div class="rule-field"><label>画面内容检查</label><input type="checkbox" data-type="' + type + '" data-key="detect_blank" ' +
-           (defaultRules[type] && defaultRules[type].detect_blank ? 'checked' : '') + '></div>' +
-           '</div></details>';
+           '<div class="rules-grid">' + cells + checks + '</div></details>';
   }
 
   function collectRules() {
