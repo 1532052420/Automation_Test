@@ -29,6 +29,9 @@ app = Flask(__name__,
 
 # 关闭强缓存（改完即刷，对齐元素定位器的开发体验）与全局 no-store
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+# 模板改完即生效：debug=False 时 Jinja auto_reload 默认关闭，会内存缓存首次渲染的模板，
+# 之后改 run.html 等模板伺服仍是旧版（曾致「修复已提交但页面看不可见」）——开发服务器必须开
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 
 @app.after_request
