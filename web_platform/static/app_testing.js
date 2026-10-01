@@ -17,7 +17,7 @@ function showToast(msg, ok) {
   if (!t) {
     t = document.createElement('div');
     t.id = 'atToast';
-    t.style.cssText = 'position:fixed;left:50%;bottom:36px;transform:translateX(-50%);padding:10px 22px;border-radius:10px;font-size:13.5px;font-weight:600;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;transition:opacity .2s;pointer-events:none';
+    t.style.cssText = 'position:fixed;left:50%;bottom:36px;transform:translateX(-50%);padding:10px 22px;border-radius:10px;font-size:13.5px;font-weight:600;color:#fff;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;transition:opacity .2s;pointer-events:none';
     document.body.appendChild(t);
   }
   t.textContent = msg;
