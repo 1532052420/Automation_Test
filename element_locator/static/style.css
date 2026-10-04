@@ -34,17 +34,21 @@ html.night .embed-bar { background: #1b1c1f; border: 1px solid rgba(255,255,255,
 
 /* ---------- 布局：左侧边栏（与测试平台一致）+ 右侧三栏主内容 ---------- */
 .side {
-  width: 188px; flex: 0 0 188px; height: 100%; position: sticky; top: var(--nav-h);
+  width: 188px; flex: 0 0 188px; height: auto; align-self: stretch; position: sticky; top: calc(var(--nav-h) + 10px);
   display: flex; flex-direction: column; gap: 4px;
-  background: #1d1d1f; color: #e5e7eb; padding: 16px 12px 12px;
+  background: #1d1d1f; color: #e5e7eb; padding: 16px 12px;
+  margin: 10px 0 10px 12px; border-radius: 18px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, .10);
 }
 /* 品牌头：对齐平台 .subnav-label（小字距标签 + 底部分隔线）。
    限定 .side 作用域——否则会命中顶部导航 .gnav 里的 .brand（自动化测试平台），
    给它加上 padding 与底部分隔线，造成文案与其他页面对不齐 */
-.side .brand { display: flex; align-items: center; gap: 8px; font-size: 18px; padding: 2px 12px 10px;
+.side .brand { display: flex; align-items: center; gap: 8px; font-size: 14px; padding: 2px 12px 10px;
   border-bottom: 1px solid rgba(255,255,255,.08); margin-bottom: 8px; }
-.side .brand .bt { display: flex; flex-direction: column; gap: 2px; font-size: 13px; font-weight: 600; color: #fff; }
-.side .brand .bt small { font-size: 10.5px; color: rgba(255,255,255,.38); font-weight: 400; line-height: 1.5; }
+.side .brand .brand-ic { width: 15px; height: 15px; opacity: .55; }
+.side .brand .bt { display: flex; flex-direction: column; gap: 2px; font-size: 11.5px; font-weight: 600;
+  color: rgba(255,255,255,.38); letter-spacing: .08em; }
+.side .brand .bt small { font-size: 10.5px; color: rgba(255,255,255,.38); font-weight: 400; line-height: 1.5; letter-spacing: 0; }
 .ver {
   font-size: 10.5px; font-weight: 600; color: #a5f3fc; align-self: flex-start;
   background: #334155; border: 1px solid #475569; border-radius: 4px; padding: 0 6px;
@@ -410,7 +414,12 @@ html.night { color-scheme: dark; }
    主题确定后日间模式的表单控件（下拉/输入框弹层）仍按浅色渲染 */
 html:not(.night) { color-scheme: light; }
 html.night body { background: #101012; color: #e5e7eb; }
-html.night .side { background: #17181b; }
+html.night .side { background: #0b0b0c; }
+/* 夜间侧栏菜单行：压过 html.night .btn 的边框底色（specificity 0,3,0 > 0,2,1），对齐平台无边框行 */
+html.night .side .side-btn { background: transparent; border-color: transparent; color: rgba(255,255,255,.72); box-shadow: none; }
+html.night .side .side-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
+html.night .side .side-btn.primary { background: rgba(74,169,255,.16); color: #4aa9ff; font-weight: 600; }
+html.night .side .side-btn.on { background: rgba(74,169,255,.16); color: #4aa9ff; font-weight: 600; }
 html.night .side .brand .bt { color: #f3f4f6; }
 html.night .side-foot { border-top-color: #303236; }
 html.night .col { background: #1b1c1f; }
@@ -496,7 +505,7 @@ body {
 /* ---------- 侧栏：品牌渐变点缀 ---------- */
 .side .brand .bt { color: #f8fafc; }
 .ver { background: var(--grad-sky); border: none; color: #fff; border-radius: 999px; padding: 1px 8px; box-shadow: 0 2px 8px rgba(14,165,233,.3); }
-.side { border-right: none; box-shadow: 1px 0 0 rgba(255,255,255,.06), 4px 0 24px rgba(0,0,0,.25); }
+/* 悬浮阴影已在 .side 主规则（对齐平台 .subnav 的 var(--shadow) 悬浮感） */
 .side-btn { border-radius: 10px; text-align: left; }
 /* 侧栏按钮行样式：对齐平台 AppUI 自动化左侧菜单（.subnav a）——
    通栏行式布局、左侧对齐、hover 白字浅底；主操作（刷新）用蓝色激活底 */
@@ -1022,14 +1031,14 @@ html.night input::placeholder, html.night textarea::placeholder { color: #9aa3af
 
 /* ---------- 侧栏收起/展开：右下角固定把手，图标随状态翻转（v6.14.81） ---------- */
 .side { transition: width .2s ease, flex-basis .2s ease, opacity .18s ease; }
-.side-toggle { position: fixed; left: 176px; bottom: 16px; z-index: 60;
+.side-toggle { position: fixed; left: 188px; bottom: 16px; z-index: 60;
   width: 24px; height: 36px; padding: 0; border: 1px solid rgba(255,255,255,.14); border-right: none;
   border-radius: 10px 0 0 10px; background: #1d1d1f; color: #cbd5e1; font-size: 15px; line-height: 1;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
   transition: left .2s ease, background .15s, color .15s; }
 .side-toggle:hover { color: #fff; background: #26272b; }
 .side-toggle .st-ic { display: block; transition: transform .2s ease; }
-body.side-collapsed .side-toggle { left: 44px; }
+body.side-collapsed .side-toggle { left: 56px; }
 body.side-collapsed .side-toggle .st-ic { transform: scaleX(-1); }
 /* 收起态 = 56px 图标栏：功能 icon 保留可点击（快捷执行/开关），文字与设备区隐藏 */
 body.side-collapsed .side { width: 56px; flex-basis: 56px; padding: 12px 8px; gap: 10px;
@@ -1039,8 +1048,8 @@ body.side-collapsed .side .side-foot { display: none; }
 body.side-collapsed .side .brand { justify-content: center; margin-bottom: 4px; }
 body.side-collapsed .side .side-btn { justify-content: center; padding-left: 0; padding-right: 0; }
 /* 开关型按钮的开启态（树对比/坐标模式/视觉断言）：两种形态下都可见 */
-.side-btn.on { border-color: rgba(64,158,255,.55); color: var(--sky); background: rgba(64,158,255,.1); }
-html.night .side-btn.on { border-color: rgba(64,158,255,.5); color: #66b1ff; background: rgba(64,158,255,.14); }
+.side-btn.on { border-color: transparent; color: #4aa9ff; background: rgba(74,169,255,.16); font-weight: 600; }
+html.night .side-btn.on { border-color: transparent; color: #4aa9ff; background: rgba(74,169,255,.16); }
 html.embedded .side-toggle { display: none; }
-html.night .side-toggle { background: #17181b; border-color: #303236; color: #9aa3af; }
+html.night .side-toggle { background: #0b0b0c; border-color: #303236; color: #9aa3af; }
 html.night .side-toggle:hover { background: #232428; color: #e5e7eb; }
