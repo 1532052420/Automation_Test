@@ -418,7 +418,6 @@ html.night .side { background: #0b0b0c; }
 /* 夜间侧栏菜单行：压过 html.night .btn 的边框底色（specificity 0,3,0 > 0,2,1），对齐平台无边框行 */
 html.night .side .side-btn { background: transparent; border-color: transparent; color: rgba(255,255,255,.72); box-shadow: none; }
 html.night .side .side-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
-html.night .side .side-btn.primary { background: rgba(74,169,255,.16); color: #4aa9ff; font-weight: 600; }
 html.night .side .side-btn.on { background: rgba(74,169,255,.16); color: #4aa9ff; font-weight: 600; }
 html.night .side .brand .bt { color: #f3f4f6; }
 html.night .side-foot { border-top-color: #303236; }
@@ -516,8 +515,6 @@ body {
   transition: background .16s ease, color .16s ease;
 }
 .side .side-btn:hover { background: rgba(255,255,255,.08); color: #fff; transform: none; box-shadow: none; }
-.side .side-btn.primary { background: rgba(74,169,255,.16); color: #4aa9ff; font-weight: 600; box-shadow: none; }
-.side .side-btn.primary:hover { background: rgba(74,169,255,.26); color: #6bb8ff; box-shadow: none; }
 
 /* ---------- 三栏卡片：圆角/阴影/hover ---------- */
 .col { border-radius: var(--radius-lg); box-shadow: 0 2px 12px rgba(0,0,0,.1); border: 1px solid rgba(0,0,0,.04); transition: box-shadow .2s, transform .2s; }
@@ -775,7 +772,6 @@ select.locked { opacity: .45; }
 /* ===== 侧栏按钮 iOS 线性图标（v6.11.3）：icon + 文字横排，动态文字走 .bt-tx ===== */
 .side-btn { display: flex; align-items: center; gap: 9px; text-align: left; }
 .side-btn .bi { width: 18px; height: 18px; flex: none; }
-.side-btn.primary { color: #fff; }
 .side-btn.on { border-color: var(--sky); color: var(--sky-deep); background: #ecf5ff; }
 html.night .side-btn.on { background: rgba(64,158,255,.14); color: var(--sky-2); }
 .brand { align-items: flex-start; }
