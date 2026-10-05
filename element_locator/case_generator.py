@@ -79,11 +79,17 @@ def _q(s):
 
 
 def _asserts_of(step):
-    """步骤里的组合断言列表（四栏改版）：非法项剔除"""
+    """步骤里的组合断言列表（四栏改版）：非法项剔除。
+    键兼容：前端断言卡下发 v 键（{v:'exists',...}），统一归一为 type——
+    历史上 v/type 不兼容曾致断言全部静默丢失（v6.14.52 修复、54 回滚复发）。"""
     out = []
     for a in step.get('asserts') or []:
-        if isinstance(a, dict) and a.get('type') in ASSERT_KINDS:
-            out.append(a)
+        if isinstance(a, dict):
+            t = a.get('type') or a.get('v')
+            if t in ASSERT_KINDS:
+                a2 = dict(a)
+                a2['type'] = t
+                out.append(a2)
     return out
 
 
@@ -739,6 +745,27 @@ def append_code_to_method(case_file, method_name, step, gen_page_method=False, i
         return {'ok': False, 'msg': '用例方法名不合法'}
     if not isinstance(step, dict) or step.get('type') not in STEP_TYPES:
         return {'ok': False, 'msg': '步骤结构不合法'}
+    # sleep/custom 无页面方法承载断言段：挂断言属非法组合，明确报错（前端已禁用，此处兜底）
+    if step.get('type') in ('sleep', 'custom') and _asserts_of(step):
+        return {'ok': False, 'msg': '固定等待/自定义代码步骤不支持挂断言（无元素操作主体）——请去掉断言后保存'}
+    # 数字类参数校验：sleep/tap 参数原样拼接进代码，非数字会生成 NameError 级损坏用例——入口拦截
+    if step.get('type') == 'sleep':
+        try:
+            float((step.get('param') or '').strip())
+        except (TypeError, ValueError):
+            return {'ok': False, 'msg': '固定等待秒数需为数字（示例：3 或 1.5），收到：%r'
+                                           % (step.get('param') or '')}
+    if step.get('type') == 'tap':
+        parts = [x.strip() for x in (step.get('param') or '').split(',') if x.strip()]
+        ok_xy = len(parts) == 2
+        if ok_xy:
+            try:
+                float(parts[0]); float(parts[1])
+            except ValueError:
+                ok_xy = False
+        if not ok_xy:
+            return {'ok': False, 'msg': '坐标点击参数需为 x,y 数字格式（示例：320,540），收到：%r'
+                                           % (step.get('param') or '')}
     line = case_step_line(step)
     if not line:
         return {'ok': False, 'msg': '该操作类型没有可追加的代码行'}
@@ -791,7 +818,10 @@ def append_code_to_method(case_file, method_name, step, gen_page_method=False, i
             new_body = (body[:chunk_end].rstrip('\n') + '\n\n' + comment_line + IND * 2 + line + '\n\n'
                         + body[chunk_end:].lstrip('\n'))
         else:
-            new_body = body.rstrip('\n') + '\n' + comment_line + IND * 2 + line + '\n\n'
+            # 末尾追加：注释接续现有步骤数编号（首步 # 1. 由用例包生成，此后 2、3… 连续）
+            step_no = len(list(re.finditer(r'^%s# ' % (IND * 2), body, re.MULTILINE))) + 1
+            numbered = (IND * 2 + '# %d. %s\n' % (step_no, case_comment)) if step_no > 1 else comment_line
+            new_body = body.rstrip('\n') + '\n' + numbered + IND * 2 + line + '\n\n'
     new_content = content[:body_start] + new_body + content[body_end:]
     new_content = _sync_method_docstring(new_content, method_name)   # docstring 同步步骤描述汇总（场景描述）
     _write(path, new_content)

@@ -1466,7 +1466,7 @@ async function loadPages() {
 async function openModal() {
   // ⌖ 坐标模式：选了精确坐标即可打开（不需要树里有选中元素）
   const coordPick = state.coordMode && state.coordPoint;
-  if (!state.selNode && !coordPick) { alert('请先在截图或元素树里选中一个元素（或开启坐标模式点选坐标）'); return; }
+  if (!state.selNode && !coordPick) { uiAlert('请先在截图或元素树里选中一个元素（或开启坐标模式点选坐标）'); return; }
   const node = state.selNode || {};
   // 自动名称：优先 resource-id 末段，其次 text 截断；坐标模式用 coord_x_y
   let auto = '';
@@ -1497,6 +1497,10 @@ async function openModal() {
   $('el-op-type').value = 'click';
   $('el-op-type').disabled = false;
   $('el-op-special').value = '';   // 特殊操作每次打开复位为「无」
+  ['el-name', 'el-type', 'el-value', 'el-cn-name'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.disabled = false;
+  });
   resetAssertToggle();              // 断言开关复位：关 + 清空勾选
   paramAuto = true;  // 打开弹窗重置为「自动预填」状态
   // ⌖ 坐标模式：默认「坐标点击」并回填最后选中的点
@@ -1860,6 +1864,12 @@ function assertsDescSuffix() {
 }
 
 function onOpTypeChange() {
+  const noAssert = currentOpType() === 'sleep' || currentOpType() === 'custom';
+  const tg = $('asToggle');
+  if (tg) {
+    tg.disabled = noAssert;
+    if (noAssert && tg.checked) { tg.click(); showToast('固定等待/自定义代码步骤不支持挂断言，已自动关闭'); }
+  }
   const special = $('el-op-special').value;
   const t = opTypeInfo(currentOpType());
   const paramWrap = $('el-op-param-wrap');
@@ -1894,6 +1904,11 @@ function onOpTypeChange() {
 function onSpecialOpChange() {
   syncAssertSide();
   const isSpecial = !!$('el-op-special').value;
+  // 特殊操作不写元素库：元素栏置灰（防误以为名称参与保存）；与代码注释声明一致
+  ['el-name', 'el-type', 'el-value', 'el-cn-name'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.disabled = isSpecial;
+  });
   // 操作类型的禁用改由 applyOpMutual 视觉互斥承担（物理 disabled 会造成两侧都无法切回的死锁）
   if (isSpecial && purposeValue() !== 'all') {
     document.querySelector('input[name="el-purpose"][value="all"]').checked = true;
@@ -2012,6 +2027,11 @@ function syncElFileNote() {
 function onCaseFileChange() {
   // 新建用例：切换到「新建输入模式」——方法/插入位置无意义，页面/元素文件自动派生
   const newCase = isNewCase();
+  if (newCase && $('el-file').value !== NEW_FILE_OPT) {
+    // 三件套静态绑定要求两个下拉同态：用例切「新建」时元素文件自动跟随（仍可手动改回）
+    $('el-file').value = NEW_FILE_OPT;
+    $('el-file-new-wrap').style.display = '';
+  }
   $('el-case-new-wrap').style.display = newCase ? '' : 'none';
   $('el-case-method').disabled = newCase;
   $('el-insert-pos').disabled = newCase;
@@ -2047,7 +2067,12 @@ function onCaseFileChange() {
       posOpts += '<option value="' + i + '">第 ' + i + ' 步之后 · ' + esc(String(steps[i - 1]).slice(0, 12)) + '</option>';
     }
     posSel.innerHTML = posOpts;
-    posSel.value = (curPos !== '' && curPos !== null && parseInt(curPos, 10) <= steps.length) ? curPos : '0';
+    if (curPos !== '' && curPos !== null && parseInt(curPos, 10) <= steps.length) {
+      posSel.value = curPos;
+    } else {
+      posSel.value = '0';
+      if (curPos !== '' && curPos !== null && curPos !== '0') showToast('原插入位置超出当前方法步骤数，已改为末尾');
+    }
   }
   renderStepsList(steps);
   // 三件套联动：写入元素文件 ← 目标用例页面实际引用的元素文件（必须一致）
@@ -2102,7 +2127,7 @@ function pkgElementFileName() {
   return norm + '.py';
 }
 function pkgElementClassName() { const f = pkgElementFileName(); return f ? capFirst(f.replace('.py', '')) : ''; }
-function pkgPageFileName() { const b = pkgBase(); return b ? capFirst(b) + 'Page.py' : ''; }
+function pkgPageFileName() { const b = pkgBase(); return b ? b + 'Page.py' : ''; }   // 小写文件名（与元素文件派生风格统一）；类名仍驼峰
 function pkgPageClassName() { const f = pkgPageFileName(); return f ? capFirst(f.replace('.py', '')) : ''; }
 function pkgCaseFileName() { const b = pkgBase(); return b ? 'test_' + b + '.py' : ''; }
 function pkgStepComment() { return $('el-op-comment').value.trim() || genStepDesc(currentStepObj()); }
@@ -2162,6 +2187,7 @@ function pkgMethodBlock(step) {
       + '        pass  # 该弹窗未出现，跳过';
   }
   else if (t === 'screenshot') { sig = 'wait_and_shot(self, tag)'; body = 'import time\ntime.sleep(1)\nself.appOperator.get_screenshot(tag)'; }
+  else if (t === 'sleep' || t === 'custom') return null;   // time.sleep/自定义代码行直入用例，无页面方法（对齐后端 page_method_code）
   else if (t === 'tap') { sig = 'tap_xy(self, x, y)'; body = 'self.appOperator.tap(x, y)'; }
   if (t === 'click') body = 'self.appOperator.click(self._elements.' + el + ')';
   // 四栏改版：④断言栏组合 → 操作段包 try/except 记 failures，断言段逐条全量执行，末尾汇总抛错
@@ -2228,7 +2254,7 @@ function pkgFiles() {
     + '        self.appOperator = appOperator\n'
     + '        self._elements = ' + elemClass + '()\n'
     + '\n'
-    + methodBlock + '\n';
+    + (methodBlock ? methodBlock + '\n' : '');
   const cnTitle = ($('el-case-cn').value || '').trim();
   const casePy = '# -*- coding: utf-8 -*-\n'
     + (cnTitle ? '# 用例中文名：' + cnTitle + '\n' : '')
@@ -2270,12 +2296,24 @@ function pkgFiles() {
   ];
 }
 async function onSaveElement(continueMode) {
+  // 防重入：上一笔保存未完成（含确认框挂起）时拒绝新保存——并发保存会互相污染状态/丢步骤
+  if (state._saving) { showToast('上一步保存还在进行，请稍候…', false); return; }
+  state._saving = true;
+  try {
+    return await _doSaveElement(continueMode);
+  } finally {
+    state._saving = false;
+    document.getElementById('btn-modal-save').disabled = false;
+    document.getElementById('btn-modal-save-continue').disabled = false;
+  }
+}
+async function _doSaveElement(continueMode) {
   const purpose = purposeValue();
   if (!purpose) return;
   // 用途③：登记随机弹窗——写规则库，与元素库/用例三件套完全无关
   if (purpose === 'popup') { await savePopupRule(continueMode); return; }
   const special = $('el-op-special').value;   // 特殊操作：不碰元素库，只写用例
-  const name = special ? '' : $('el-name').value.trim();
+  let name = special ? '' : $('el-name').value.trim();
   if (purpose !== 'only') {
     // 新建状态必须同步（都新建或都选已有）。这是架构约束而非误操作防护：
     // 三件套是静态绑定——页面对象 import 固定的元素文件、页面方法体固定引用
@@ -2301,6 +2339,21 @@ async function onSaveElement(continueMode) {
       if (missing.length) {
         showElResult('⚠️ 请补齐必填项：' + missing.join('、'), false);
         return;
+      }
+      // 数字类参数格式校验：非数字会被后端拦截，但前端先拦体验更直接
+      const opT = $('el-op-type').value, pVal = $('el-op-param').value.trim();
+      if (opT === 'sleep' && pVal && isNaN(parseFloat(pVal))) {
+        showElResult('⚠️ 固定等待秒数需为数字（示例：3 或 1.5），收到：' + pVal, false); return;
+      }
+      if (opT === 'tap') {
+        const xy = pVal.split(',').map(x => x.trim());
+        if (xy.length !== 2 || xy.some(x => x === '' || isNaN(parseFloat(x)))) {
+          showElResult('⚠️ 坐标点击参数需为 x,y 数字格式（示例：320,540），收到：' + pVal, false); return;
+        }
+      }
+      // 自定义代码原样写入用例（不转义），落盘前二次确认
+      if (opT === 'custom' && pVal) {
+        if (!await uiConfirm('自定义代码将原样写入用例文件（不经过任何转义），请确认内容安全：\n\n' + pVal)) return;
       }
     }
     // 新建用例（填写了自定义文件名）：首次「保存并继续/保存」即三件套（元素+用例+页面，
@@ -2344,7 +2397,28 @@ async function onSaveElement(continueMode) {
       '点「确定」= 覆盖更新\n点「取消」= 不保存')) return;
   }
   // 按需求：添加测试用例不判断重复——同名直接覆盖、同定位直接新增，元素照常入库
-  let r = special ? { ok: true, msg: '' } : await saveElement(false);
+  let r = special ? { ok: true, msg: '' } : await saveElement(true);
+  if (!r) return;
+  if (!r.ok && r.duplicate) {
+    // 同定位已有元素：推荐复用（避免同定位多元素条目）；跨文件复用会破坏页面静态绑定，仅提示不自动切
+    if (r.duplicate.filename === fname) {
+      const reuse = await uiConfirm(
+        '已存在相同定位的元素「' + r.duplicate.name + '」（' + r.duplicate.filename + '）。\n\n' +
+        '点「确定」= 使用已有元素「' + r.duplicate.name + '」继续（推荐，避免重复条目）\n' +
+        '点「取消」= 仍要新建/覆盖当前名称「' + name + '」', { okText: '使用已有元素' });
+      if (reuse) {
+        $('el-name').value = r.duplicate.name;
+        name = r.duplicate.name;
+        r = { ok: true, msg: '复用已有元素 ' + r.duplicate.name };
+      } else {
+        r = await saveElement(false);   // 用户坚持新建（同名走覆盖确认）/覆盖
+      }
+    } else {
+      showElResult('⚠️ 相同定位已存在于元素文件 ' + r.duplicate.filename + '（元素「' +
+        r.duplicate.name + '」），与本页引用的 ' + fname + ' 不同文件——请改用已有元素名或修改定位值', false);
+      return;
+    }
+  }
   if (!r) return;
   if (!r.ok) { showElResult(r.msg || '元素保存失败', false); return; }
   let savedName = special ? '' : name;

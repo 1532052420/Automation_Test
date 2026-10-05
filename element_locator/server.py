@@ -25,6 +25,11 @@ from tutorials import TUTORIALS, search_tutorials
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 
+# 三件套/元素库文件写入互斥锁：append_code_to_method 等是「读→改→写」非原子，
+# 并发保存（同名确认框并发放行/快速连点）会互相覆盖丢步骤——所有落盘接口串行过锁
+import threading
+_save_lock = threading.Lock()
+
 # 元素定位器版本号：与平台统一，唯一数据源为 web_platform/changelog.py（APP_VERSION）。
 # 左上角会显示，用来确认本地是否已更新。改版本号请改 changelog.py，勿在这里硬编码。
 try:
@@ -174,6 +179,10 @@ def api_library():
 
 @app.route('/api/add_element', methods=['POST'])
 def api_add_element():
+    with _save_lock:
+        return _add_element_locked()
+
+def _add_element_locked():
     data = request.get_json(silent=True) or {}
     # check_dup：默认 True 先做重复检测（库中已有相同定位 → 返回 duplicate 不落盘，前端决定用已有/新建）
     check_dup = data.get('check_dup', True)
@@ -280,6 +289,10 @@ def api_save_case_package():
 def api_add_code():
     """「保存并添加到用例」：把一步操作代码追加到目标用例文件的指定方法体末尾。
     gen_page_method=True（功能③）时同步生成/更新该操作的页面方法（三件套联动）。"""
+    with _save_lock:
+        return _add_code_locked()
+
+def _add_code_locked():
     data = request.get_json(silent=True) or {}
     step = data.get('step') or {}
     if not isinstance(step, dict) or not step.get('type'):
