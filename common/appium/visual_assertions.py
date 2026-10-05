@@ -138,6 +138,7 @@ def compare_images(baseline_path, actual_path, threshold=0.95, diff_out=None,
                   'ignored': len(ignore_regions or []),
                   'diff_bbox': diff_bbox,
                   'baseline_size': '%dx%d' % (aw, ah), 'actual_size': '%dx%d' % (bw, bh)}
+        err = None if sim >= threshold else ('相似度 %.4f 低于阈值 %.2f（模式 %s）' % (sim, threshold, match_mode))
         if diff_bbox:
             err = (err or '') + '（差异集中区域 x=%d, y=%d, %dx%d——见三联图红色高亮）' % tuple(diff_bbox)
         return (sim >= threshold), actual, err, triple
