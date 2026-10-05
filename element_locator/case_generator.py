@@ -143,10 +143,16 @@ def _assert_body_lines(step, el):
                 th = float(a.get('threshold'))
             except (TypeError, ValueError):
                 th = 0.95
-            lines.append(_probe_line(el, 3))
-            lines.append("self.appOperator.assert_visual_or_record(failures, '%s·视觉', probe,\n"
-                         "                                        baseline=%s, threshold=%.2f)"
-                         % (no, _q(_visual_baseline_path(step, el)), th))
+            if (a.get('asset') or '').strip():
+                # 视觉资产版：基线/范围/忽略区域/模式全部来自资产库（视觉断言采集产出），
+                # 执行器按资产配置自行取实际图（元素探针/区域裁剪/整屏），无需元素探针行
+                lines.append("self.appOperator.assert_visual_asset_record(failures, '%s·视觉资产', %s, threshold=%.2f)"
+                             % (no, _q(a['asset'].strip()), th))
+            else:
+                lines.append(_probe_line(el, 3))
+                lines.append("self.appOperator.assert_visual_or_record(failures, '%s·视觉', probe,\n"
+                             "                                        baseline=%s, threshold=%.2f)"
+                             % (no, _q(_visual_baseline_path(step, el)), th))
     return lines
 
 

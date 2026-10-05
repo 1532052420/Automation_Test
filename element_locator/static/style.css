@@ -1049,3 +1049,7 @@ html.night .side-btn.on { border-color: transparent; color: #4aa9ff; background:
 html.embedded .side-toggle { display: none; }
 html.night .side-toggle { background: #0b0b0c; border-color: #303236; color: #9aa3af; }
 html.night .side-toggle:hover { background: #232428; color: #e5e7eb; }
+
+/* 断言区：视觉资产未开启置灰态 */
+.as-item.greyed { opacity: .45; cursor: not-allowed; }
+.as-item.greyed input[type=checkbox] { cursor: not-allowed; }

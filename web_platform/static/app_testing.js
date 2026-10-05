@@ -1816,6 +1816,7 @@ function renderVisualAssets() {
     <td>${a.match_mode === 'layout' ? 'Layout（布局）' : 'Strict（像素级）'}</td>
     <td>${Math.round((a.threshold || 0.98) * 100)}%</td>
     <td>${a.ignore_count || 0}</td>
+    <td>${esc(a.case_name || '—')}</td>
     <td class="muted">${esc(a.created || '—')}</td>
     <td class="ops">
       <button class="mini" data-visedit="${esc(a.name)}">编辑</button>

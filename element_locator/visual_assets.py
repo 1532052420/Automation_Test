@@ -204,6 +204,7 @@ def list_assets():
         except Exception:
             continue
         item = {'name': n, 'scope': cfg.get('scope'), 'biz_type': cfg.get('biz_type'),
+                'case_name': cfg.get('case_name') or '',
                 'biz_type_name': BIZ_TYPE_NAMES.get(cfg.get('biz_type'), cfg.get('biz_type')),
                 'threshold': cfg.get('threshold'), 'match_mode': cfg.get('match_mode'),
                 'ignore_count': len(cfg.get('ignore_regions') or []),

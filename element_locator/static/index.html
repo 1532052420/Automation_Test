@@ -24,7 +24,7 @@ try {
 } catch (e) { /* 隐私模式等场景忽略 */ }
 </script>
 <link rel="stylesheet" href="/static/nav.css">
-<link rel="stylesheet" href="static/style.css?v=97">
+<link rel="stylesheet" href="static/style.css?v=98">
 </head>
 <body>
 <header class="gnav" id="gnav"></header>
@@ -339,6 +339,13 @@ try {
 </div>
 <script src="/static/nav.js"></script>
 <script src="/static/theme.js"></script>
-<script src="static/index.js?v=103"></script>
+<script src="static/index.js?v=107"></script>
+<!-- 采集图片放大查看（lightbox） -->
+<div id="va-shot-lightbox" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.82);align-items:center;justify-content:center;cursor:zoom-out">
+  <div style="position:relative">
+    <img id="vaShotBig" style="max-width:88vw;max-height:86vh;border-radius:12px" alt="采集图片放大">
+    <span id="vaShotBigX" title="关闭" style="position:absolute;top:-14px;right:-14px;width:34px;height:34px;border-radius:50%;background:#EF4444;color:#fff;font-size:16px;line-height:34px;text-align:center;cursor:pointer">✕</span>
+  </div>
+</div>
 </body>
 </html>

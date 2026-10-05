@@ -697,6 +697,62 @@ class AppOperator:
         httpResponseResult=self._doRequest.get('/session/'+self._session_id+'/location')
         return httpResponseResult.body
 
+    def assert_visual_asset_record(self, failures, desc, asset_name, threshold=None):
+        """视觉资产断言（资产库版）：按资产 config 的范围取实际图与基线比对。
+        成功与失败都把 基线图/实际图/diff 三联 提交报告（失败附差异集中区域说明）。
+        资产由定位器「视觉断言采集」产出：page_objects/.../elements/visual_asserts/<名称>/。"""
+        try:
+            from element_locator import visual_assets as va
+            from common.appium import visual_assertions as _va
+            cfg = va.get_config(asset_name) or {}
+            base_p = va.baseline_path(asset_name)
+            if not cfg or not base_p:
+                self._assert_step(failures, desc, False, '视觉资产不存在：%s（请先在定位器采集）' % asset_name)
+                return
+            th = float(cfg.get('threshold') or 0.98) if threshold is None else float(threshold)
+            mode = cfg.get('match_mode') or 'strict'
+            ignores = [tuple(r) for r in (cfg.get('ignore_regions') or [])]
+            scope = cfg.get('scope') or 'screen'
+            tag = 'va_%s_%s' % (asset_name, DateTimeTool.getNowTime('%H%M%S%f'))
+            os.makedirs('output/tmp/', exist_ok=True)
+            if scope == 'element':
+                loc = cfg.get('locator') or {}
+                probe = self._assert_probe(
+                    CreateElement.create(loc.get('strategy', 'id').upper(), loc.get('value', ''),
+                                         wait_type=Wait_By.VISIBILITY_OF, wait_seconds=6), 6)
+                actual_path = self.save_element_image(probe, tag)
+            else:
+                png = self._driver.get_screenshot_as_png()
+                actual_path = os.path.abspath('output/tmp/%s.png' % tag)
+                with open(actual_path, 'wb') as f:
+                    f.write(png)
+                region = cfg.get('region')
+                if scope == 'region' and region:
+                    from PIL import Image
+                    im = Image.open(actual_path)
+                    x, y, w, h = [int(v) for v in region]
+                    im.crop((x, y, min(x + w, im.size[0]), min(y + h, im.size[1]))).save(actual_path)
+            triple_path = os.path.abspath('output/tmp/%s_triple.png' % tag)
+            ok, actual, err, triple = _va.compare_images(
+                base_p, actual_path, th, triple_path,
+                ignore_regions=ignores, match_mode=mode)
+            # 成功与失败都提交对比证据：基线图 + 实际图 + 三联（红色高亮差异）
+            try:
+                allure.attach(name=('基线图_' + desc)[:40], body=open(base_p, 'rb').read(),
+                              attachment_type=allure.attachment_type.PNG)
+                allure.attach(name=('实际图_' + desc)[:40], body=open(actual_path, 'rb').read(),
+                              attachment_type=allure.attachment_type.PNG)
+                if triple and os.path.isfile(triple):
+                    with open(triple, 'rb') as f:
+                        allure.attach(name=('视觉三联图_' + desc)[:40], body=f.read(),
+                                      attachment_type=allure.attachment_type.PNG)
+            except Exception:
+                pass
+            self._assert_step(failures, desc, ok, err or ('相似度 %s' % (actual or {}).get('similarity')),
+                              actual=actual)
+        except Exception as e:
+            self._assert_step(failures, desc, False, e)
+
     def set_geolocation(self,latitude,longitude,altitude):
         """
         设置定位信息

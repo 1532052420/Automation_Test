@@ -57,7 +57,7 @@ var ASSERT_KINDS = [
   { v: 'text', n: '断言文本是否正确', d: '文案相等', p: { text: '' } },
   { v: 'toast', n: '断言Toast是否出现', d: '页面级', p: { toast: '' } },
   { v: 'gone', n: '断言元素是否消失', d: '弹窗已关闭', p: { wait: 2 } },
-  { v: 'visual', n: '视觉断言', d: '基线比对', p: { threshold: 0.95, captured: false }, isNew: true },
+  { v: 'visual', n: '视觉资产', d: '采集图片入资产库，执行时基线比对', p: { threshold: 0.95, asset: '' }, isNew: true, needVa: true },
 ];
 
 function assertState() { return state.modalAsserts || (state.modalAsserts = []); }
@@ -88,8 +88,9 @@ function renderAssertCol() {
   if (!box) return;
   box.innerHTML = ASSERT_KINDS.map(function (d) {
     var r = findAssert(d.v), on = !!r;
-    var html = '<div class="as-item' + (on ? ' on' : '') + '" data-as="' + d.v + '">' +
-      '<input type="checkbox" ' + (on ? 'checked' : '') + '>' +
+    var greyed = (d.v === 'visual' && d.needVa && !(typeof va !== 'undefined' && va.on));
+    var html = '<div class="as-item' + (on ? ' on' : '') + (greyed ? ' greyed' : '') + '" data-as="' + d.v + '">' +
+      '<input type="checkbox" ' + (on ? 'checked' : '') + (greyed ? ' disabled' : '') + '>' +
       '<span class="ai-n">' + d.n + '</span>' +
       (d.isNew ? '<span class="visual-tag">视觉断言</span>' : '') +
       '<span class="ai-d">' + d.d + '</span></div>';
@@ -100,16 +101,23 @@ function renderAssertCol() {
       if (d.v === 'toast') p = '<label class="wide">Toast 文本<input value="' + esc(r.toast == null ? '' : r.toast) + '" data-af="toast" placeholder="如：已加入歌单"></label>';
       if (d.v === 'gone') p = '<label>等待秒数<input type="number" value="' + esc(r.wait == null ? 2 : r.wait) + '" data-af="wait"></label>';
       if (d.v === 'visual') {
+        var vaOn = (typeof va !== 'undefined' && va.on);
+        var hasAsset = !!(r.asset);
         var th = (r.threshold == null ? 0.95 : +r.threshold);
-        p = '<label>相似度阈值（低于阈值判失败）<div class="thresh"><input type="range" min="0.8" max="1" step="0.01" value="' + th + '" data-af="threshold">' +
-            '<span class="val" id="asTv">' + th.toFixed(2) + '</span></div></label>' +
-            '<div><button class="btn" id="asCapBtn" style="font-size:11.5px;padding:5px 14px;width:100%">' + (r.captured ? '更新基线' : '采集基线（元素需在当前屏幕）') + '</button></div>' +
-            '<div class="as-hint">基线存 elements/baselines/（随包进 git）；尺寸不一致判「分辨率不匹配」，不硬比</div>' +
-            '<div class="wide tri">' +
-            '<div class="tri-slot"><div class="tt">基线</div><div class="tri-img">' + (r.thumbnail ? '<img src="' + r.thumbnail + '">' : '<div class="glyph">🖼️</div>') + '</div><div class="simline">' + (r.captured ? '已采集' : '未采集') + '</div></div>' +
-            '<div class="tri-slot"><div class="tt">实际</div><div class="tri-img"><div class="glyph">📱</div></div><div class="simline">执行时截取</div></div>' +
-            '<div class="tri-slot"><div class="tt">diff</div><div class="tri-img"><div class="glyph">🔍</div></div><div class="simline">失败时随报告输出</div></div>' +
-            '</div>';
+        if (!vaOn) {
+          p = '<div class="as-hint" style="color:var(--muted,#9ca3af)">🔒 视觉资产需先在左侧开启「视觉断言」采集模式（当前关闭，不可勾选）</div>';
+        } else {
+          p = '<label>相似度阈值（低于阈值判失败）<div class="thresh"><input type="range" min="0.8" max="1" step="0.01" value="' + th + '" data-af="threshold">' +
+              '<span class="val" id="asTv">' + th.toFixed(2) + '</span></div></label>' +
+              '<div><button class="btn" id="asCapBtn" style="font-size:11.5px;padding:5px 14px;width:100%">' +
+              (hasAsset ? '🔄 重新采集视觉资产' : '📷 采集图片（跳转视觉断言采集）') + '</button></div>' +
+              (hasAsset
+                ? '<div class="va-shot-wrap" style="position:relative;display:inline-block;margin-top:6px">' +
+                  '<img id="vaShotThumb" src="' + (r.thumbnail || '') + '" style="max-width:150px;max-height:88px;border-radius:8px;border:1px solid var(--line,#dcdfe6);cursor:zoom-in">' +
+                  '<span id="vaShotX" title="移除已采集图片" style="position:absolute;top:-8px;right:-8px;width:20px;height:20px;border-radius:50%;background:#EF4444;color:#fff;font-size:11px;line-height:20px;text-align:center;cursor:pointer">✕</span>' +
+                  '<div class="as-hint">资产「' + esc(r.asset) + '」已采集（点击图片放大）</div></div>'
+                : '<div class="as-hint">勾选后点上方按钮：暂时关闭本弹窗，在右侧「视觉断言采集」设置参数并保存，保存后自动回到本弹窗（已填内容保留）</div>');
+        }
       }
       html += '<div class="as-param' + (d.v === 'visual' ? ' as-param--visual' : '') + '" data-pv="' + d.v + '">' + p + '</div>';
     }
@@ -119,6 +127,10 @@ function renderAssertCol() {
     it.addEventListener('click', function (e) {
       if (e.target.tagName === 'INPUT' && e.target.type === 'checkbox') e.stopPropagation();
       var v = it.dataset.as, r = findAssert(v);
+      if (v === 'visual' && !(typeof va !== 'undefined' && va.on)) {
+        showToast('视觉断言未开启：请先点左侧「视觉断言」开启采集模式', false);
+        return;
+      }
       if (r) state.modalAsserts = assertState().filter(function (x) { return x.v !== v; });
       else {
         r = Object.assign({ v: v }, ASSERT_KINDS.find(function (k) { return k.v === v; }).p);
@@ -136,31 +148,35 @@ function renderAssertCol() {
     });
   });
   var cap = box.querySelector('#asCapBtn');
-  if (cap) cap.addEventListener('click', function () { captureBaseline().catch(e => showToast(e.message)); });
+  if (cap) cap.addEventListener('click', function () {
+    var r = findAssert('visual');
+    if (!r) return;
+    if (!(typeof va !== 'undefined' && va.on)) { showToast('请先在左侧开启「视觉断言」', false); return; }
+    // 视觉资产采集流程：暂时关闭本弹窗（字段保留，回来即回显），右侧已是视觉断言采集面板
+    state.vaCapture = {
+      active: true,
+      caseFile: (function () {
+        var cf = $('el-case-file').value;
+        return (cf && cf !== '__new__') ? cf : (($('el-case-new').value || '').trim() ? 'test_' + newCaseBase() + '.py' : '');
+      })(),
+      threshold: (r.threshold == null ? 0.95 : +r.threshold),
+    };
+    $('modal-mask').style.display = 'none';
+    showToast('请在右侧「视觉断言采集」设置参数并点「保存视觉断言」，完成后自动回到本弹窗');
+  });
+  // 采集图片缩略图：点击放大（lightbox）；右上角 ✕ = 移除已采集
+  var thumb = box.querySelector('#vaShotThumb');
+  if (thumb) thumb.addEventListener('click', function () {
+    var lb = document.getElementById('va-shot-lightbox');
+    if (lb) { document.getElementById('vaShotBig').src = thumb.src; lb.style.display = 'flex'; }
+  });
+  var shotX = box.querySelector('#vaShotX');
+  if (shotX) shotX.addEventListener('click', function () {
+    var r = findAssert('visual');
+    if (r) { r.asset = ''; r.thumbnail = ''; renderAssertCol(); }
+  });
 }
 
-async function captureBaseline() {
-  var r = findAssert('visual');
-  if (!r) return;
-  var cap = document.getElementById('asCapBtn');
-  if (!state.selNode && !state.coordPoint) { showToast('请先在截图/元素树选中元素'); return; }
-  var origText = cap ? cap.textContent : '';
-  if (cap) { cap.disabled = true; cap.textContent = '采集中…'; }
-  try {
-    var resp = await fetch('api/element/baseline', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ locator_type: $('el-type').value, locator_value: $('el-value').value.trim(),
-                              element_file: $('el-file').value, element_name: $('el-name').value.trim() }) });
-    var d = await resp.json();
-    if (!d.ok) throw new Error(d.msg || '采集失败');
-    r.captured = true; r.thumbnail = d.thumbnail; r.path = d.path;
-    showToast('基线已采集：' + d.path);
-    renderAssertCol();   // 重建卡组：按钮变「更新基线」，三图区出现基线缩略图
-  } catch (e) {
-    // 失败原因可见 + 按钮回到采集前状态（可立即重新采集）
-    showToast('采集失败：' + (e && e.message ? e.message : e));
-    if (cap) { cap.disabled = false; cap.textContent = origText; }
-  }
-}
 
 /* 断言副作用：特殊操作时断言卡置灰（无断言语义） */
 function syncAssertSide() {
@@ -199,6 +215,24 @@ function genStepDesc(s) {
     case 'custom': return (p || '自定义代码').split('\n')[0];
     default: return '未定义步骤';
   }
+}
+
+/* 视觉断言采集保存成功 → 自动回到添加测试用例弹窗（字段原样回显），把资产回填断言区 */
+function vaCaptureReturn(assetName, thumbnail) {
+  var cap = state.vaCapture || {};
+  if (!cap.active) return false;
+  state.vaCapture = { active: false, assetName: assetName, thumbnail: thumbnail };
+  var r = findAssert('visual');
+  if (!r) {
+    r = Object.assign({ v: 'visual' }, ASSERT_KINDS.find(function (k) { return k.v === 'visual'; }).p);
+    state.modalAsserts.push(r);
+  }
+  r.asset = assetName;
+  r.thumbnail = thumbnail;
+  $('modal-mask').style.display = 'flex';   // 不走 openModal：字段原样回显
+  renderAssertCol(); syncAssertSide();
+  showToast('视觉资产「' + assetName + '」已采集保存，请继续配置断言');
+  return true;
 }
 
 /* ---------- 工具 ---------- */
@@ -342,6 +376,12 @@ async function init() {
   $('btn-tree-diff').classList.toggle('on', state.treeDiffOn);   // 默认开，初始即高亮
   $('btn-coord-mode').addEventListener('click', toggleCoordMode);
   $('btn-visual-mode').addEventListener('click', vaToggleMode);
+  // 采集图片放大层：点击遮罩/✕ 关闭
+  const vaLb = $('va-shot-lightbox');
+  if (vaLb) {
+    vaLb.addEventListener('click', function () { vaLb.style.display = 'none'; });
+    $('vaShotBigX').addEventListener('click', function (e) { e.stopPropagation(); vaLb.style.display = 'none'; });
+  }
   const sideToggle = $('side-toggle');
   if (sideToggle) sideToggle.addEventListener('click', () => {
     const off = document.body.classList.toggle('side-collapsed');
@@ -814,11 +854,24 @@ function vaRenderPanel() {
     const err = vaValidate(true);
     if (err) { showToast(err); return; }
     const body = Object.assign({ name: $('va-name').value.trim() }, vaCollect());
+    // 所属用例绑定：从添加用例弹窗跳转采集时，记录当前目标用例（视觉断言管理列表「所属用例」列）
+    if (state.vaCapture && state.vaCapture.active && state.vaCapture.caseFile) body.case_name = state.vaCapture.caseFile;
     const r = await fetch('api/visual_asset/save', { method: 'POST',
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       .then(x => x.json()).catch(() => null);
     showToast((r && r.msg) || (r && r.ok ? '视觉断言已保存' : '保存失败'), r && r.ok);
-    if (r && r.ok) { $('va-name').value = ''; }
+    if (r && r.ok) {
+      // 视觉资产采集链：从「添加测试用例」弹窗跳转而来 → 回填资产并自动恢复弹窗（字段原样回显）
+      var cap = state.vaCapture;
+      if (cap && cap.active) {
+        var assetName = $('va-name').value.trim() || (cap.assetName || '');
+        var thumb = (r.asset && r.asset.thumb) || '';
+        vaCaptureReturn(assetName, thumb);
+        $('va-name').value = '';
+        return;
+      }
+      $('va-name').value = '';
+    }
   });
   vaSyncHints(); vaRenderChips();
 }
@@ -859,6 +912,7 @@ function vaToggleMode() {
   if (btn) { btn.querySelector('.bt-tx').textContent = va.on ? '视觉断言：开' : '视觉断言：关'; btn.classList.toggle('on', va.on); }
   if (va.on) {
     if (state.coordMode) $('btn-coord-mode').click();   // 与坐标模式互斥
+    if ($('modal-mask').style.display !== 'none') renderAssertCol();   // 弹窗开着：视觉资产勾选项即时解禁
     $('detail').style.display = 'none';
     va.scope = 'element'; va.match = 'strict'; va.region = null; va.ignores = []; va.ignoreArmed = false;
     vaRenderPanel(); vaDrawRects();
@@ -867,6 +921,7 @@ function vaToggleMode() {
     $('visualPanel').style.display = 'none';
     vaClearRects();
     if (state.selNode) $('detail').style.display = '';
+    if ($('modal-mask').style.display !== 'none') renderAssertCol();   // 弹窗开着：视觉资产勾选项即时置灰
   }
 }
 /* 截图拖拽框选：region 范围主框 + 忽略区域追加框 */
@@ -2213,9 +2268,14 @@ function pkgMethodBlock(step) {
         assertLines.push("self.appOperator.assert_gone_or_record(failures, '" + no + "·消失', probe, wait_seconds=" + (a.wait == null ? 2 : a.wait) + ")");
       } else if (a.v === 'visual') {
         const th = (a.threshold == null ? 0.95 : +a.threshold).toFixed(2);
-        assertLines.push(probeBodyLines(el, '3').replace(/PRESENCE_OF_ELEMENT_LOCATED/, 'VISIBILITY_OF'));
-        assertLines.push("self.appOperator.assert_visual_or_record(failures, '" + no + "·视觉', probe,");
-        assertLines.push("                                        baseline='page_objects/app_ui/android/demoProject/elements/baselines/" + elFileStem + '/' + el + ".png', threshold=" + th + ")");
+        if (a.asset) {
+          // 视觉资产版：与后端 _assert_body_lines 同语义（执行器按资产 config 取实际图，无需元素探针）
+          assertLines.push("self.appOperator.assert_visual_asset_record(failures, '" + no + "·视觉资产', '" + escQ(a.asset) + "', threshold=" + th + ")");
+        } else {
+          assertLines.push(probeBodyLines(el, '3').replace(/PRESENCE_OF_ELEMENT_LOCATED/, 'VISIBILITY_OF'));
+          assertLines.push("self.appOperator.assert_visual_or_record(failures, '" + no + "·视觉', probe,");
+          assertLines.push("                                        baseline='page_objects/app_ui/android/demoProject/elements/baselines/" + elFileStem + '/' + el + ".png', threshold=" + th + ")");
+        }
       }
     });
     body = 'failures = []\ntry:\n' + body.split('\n').map(l => '    ' + l).join('\n')
