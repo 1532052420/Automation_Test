@@ -21,7 +21,7 @@ from perf_config import CONFIG_PATH, PERF_DIR, RUNNER, VENV_PYTHON, read_config,
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PERF_RUNS_DIR = os.path.join(BASE_DIR, 'output', 'perf_runs')
 
-_lock = threading.Lock()
+_lock = threading.RLock()   # RLock：list_runs 持锁时会嵌套调 get_run（同样加锁），非重入 Lock 会自死锁
 _tasks = {}          # run_id -> task dict
 
 

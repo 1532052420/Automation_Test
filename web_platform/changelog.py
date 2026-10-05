@@ -10,12 +10,21 @@
 两端不再各自硬编码版本号。
 """
 
-APP_VERSION = '6.14.101'
+APP_VERSION = '6.14.102'
 
 # 最新版本在最前；time 精确到秒（YYYY-MM-DD HH:MM:SS）
 # 版本号格式 x.xx.x 自 6.11.0 起强制执行；更早的历史条目保留原始记录，不回溯改写
 # 每条变更一句话 10~20 字，只说改了什么（详细背景见项目 memory 与设计文档）
 CHANGELOG = [
+    {
+        'version': '6.14.102',
+        'time': '2026-10-06 06:02:30',
+        'title': '修复压测任务列表自死锁：RLock 替换非重入 Lock',
+        'changes': [
+            '修复 P1 全平台巡检抓出：list_runs() 持 _lock 时嵌套调 get_run()（再次加同一把非重入锁）→ 自死锁，任一压测任务存在后 /api/perf/runs 与 stop 永久挂起、压测页任务列表打不开（需重启平台恢复）',
+            '修复 _lock 改 threading.RLock（可重入），死锁根除；perf/runs、perf/run/<id> 实测恢复 200',
+        ],
+    },
     {
         'version': '6.14.101',
         'time': '2026-10-05 23:46:03',
