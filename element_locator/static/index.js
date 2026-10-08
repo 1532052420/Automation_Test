@@ -100,7 +100,7 @@ function renderAssertCol() {
       if (d.v === 'exists') p = '<label>等待秒数<input type="number" value="' + esc(r.wait == null ? 3 : r.wait) + '" data-af="wait"></label>';
       if (d.v === 'text') p = '<label>期望文本<input value="' + esc(r.text == null ? '' : r.text) + '" data-af="text" placeholder="如：写新歌"></label>';
       if (d.v === 'toast') p = '<label class="wide">Toast 文本<input value="' + esc(r.toast == null ? '' : r.toast) + '" data-af="toast" placeholder="如：已加入歌单"></label>';
-      if (d.v === 'text_page') p = '<label class="wide">期望文本（页面包含即可）<input value="' + esc(r.text == null ? '' : r.text) + '" data-af="text" placeholder="如：卖号"></label>';
+      if (d.v === 'text_page') p = '<label class="wide">期望文本（页面包含即可）<input value="' + esc(r.text == null ? '' : r.text) + '" data-af="text" placeholder="如：发布成功"></label>';
       if (d.v === 'gone') p = '<label>等待秒数<input type="number" value="' + esc(r.wait == null ? 2 : r.wait) + '" data-af="wait"></label>';
       if (d.v === 'visual') {
         var vaOn = (typeof va !== 'undefined' && va.on);
