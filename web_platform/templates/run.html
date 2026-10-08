@@ -432,6 +432,17 @@
             </div>
           </div>
         </div>
+        <!-- 视觉断言删除确认（屏幕居中） -->
+        <div class="mask" id="visDelConfirmMask" style="z-index:1100">
+          <div style="background:var(--panel,#fff);border:1px solid var(--line-soft,#e5e7eb);border-radius:16px;padding:22px 26px;width:380px;max-width:90vw;box-shadow:0 18px 60px rgba(0,0,0,.3)">
+            <div style="font-size:15px;font-weight:700;color:var(--ink,#1f2937);margin-bottom:10px">删除视觉断言</div>
+            <div style="font-size:13px;color:var(--ink2,#374151);line-height:1.7">确认删除视觉断言「<b id="visDelName"></b>」？<br><span style="font-size:12px;color:var(--muted,#6e6e73)">基线图与配置将一并删除，不可恢复。</span></div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+              <button id="visDelCancel" style="padding:7px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:var(--panel2,#f7f8fa);border:1px solid var(--line-soft,#e5e7eb);color:var(--ink,#1f2937)">取消</button>
+              <button id="visDelOk" style="padding:7px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:#EF4444;color:#fff;border:none">确认删除</button>
+            </div>
+          </div>
+        </div>
         <!-- 视觉断言调试弹窗（V7 渐变强调 · v6.14.83 全尺寸×0.7 + 日/夜主题变量：日间浅色/夜间深色；零落盘） -->
         <div class="mask" id="visDebugMask">
           <div style="display:block;width:700px;max-width:96vw;border-radius:14px;padding:2px;background:linear-gradient(135deg,#EF4444,#F59E0B 40%,#10B981 80%)">

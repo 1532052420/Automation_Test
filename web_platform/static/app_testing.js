@@ -1837,11 +1837,22 @@ function renderVisualAssets() {
   $('#visTbody').querySelectorAll('[data-visdebug]').forEach(b =>
     b.addEventListener('click', () => openVisualAssetDebug(b.dataset.visdebug)));
   $('#visTbody').querySelectorAll('[data-visdel]').forEach(b =>
-    b.addEventListener('click', async () => {
-      if (!confirm('删除视觉资产「' + b.dataset.visdel + '」？基线图与配置将一并删除。')) return;
-      const r = await api('/api/appui/visual_assets/' + encodeURIComponent(b.dataset.visdel), { method: 'DELETE' });
-      toast((r && r.msg) || (r && r.ok ? '已删除' : '删除失败'), r && r.ok);
-      loadVisualAssets();
+    b.addEventListener('click', () => {
+      // 居中确认弹窗（替代原生 confirm）：确认=删除，取消=仅关闭
+      const name = b.dataset.visdel;
+      document.getElementById('visDelName').textContent = name;
+      const mask = document.getElementById('visDelConfirmMask');
+      const okBtn = document.getElementById('visDelOk');
+      const cancelBtn = document.getElementById('visDelCancel');
+      mask.classList.add('show');
+      const close = () => { mask.classList.remove('show'); okBtn.onclick = null; cancelBtn.onclick = null; };
+      cancelBtn.onclick = close;
+      okBtn.onclick = async () => {
+        close();
+        const r = await api('/api/appui/visual_assets/' + encodeURIComponent(name), { method: 'DELETE' });
+        toast((r && r.msg) || (r && r.ok ? '已删除' : '删除失败'), r && r.ok);
+        loadVisualAssets();
+      };
     }));
 }
 
