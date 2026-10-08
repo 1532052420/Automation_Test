@@ -1036,13 +1036,43 @@ html.night input::placeholder, html.night textarea::placeholder { color: #9aa3af
 .side-toggle .st-ic { display: block; transition: transform .2s ease; }
 body.side-collapsed .side-toggle { left: 56px; }
 body.side-collapsed .side-toggle .st-ic { transform: scaleX(-1); }
-/* 收起态 = 56px 图标栏：功能 icon 保留可点击（快捷执行/开关），文字与设备区隐藏 */
+/* 收起态 = 56px 图标栏：功能 icon 保留可点击（快捷执行/开关），文字与设备区隐藏。
+   按钮文字（.bt-tx）不在此隐藏——改为悬停气泡（见下方 v6.14.105 规则），文案实时取自 .bt-tx 本身 */
 body.side-collapsed .side { width: 56px; flex-basis: 56px; padding: 12px 8px; gap: 10px;
-  overflow: visible; opacity: 1; pointer-events: auto; }
-body.side-collapsed .side .bt-tx, body.side-collapsed .side .brand .bt,
+  overflow: visible; opacity: 1; pointer-events: auto;
+  z-index: 70;  /* sticky 自建层叠上下文(z auto=0)，DOM 靠后的 main 会盖住溢出的悬停气泡——提到主内容之上（<弹窗100，收起态把手在 56px 外不重叠） */ }
+body.side-collapsed .side .brand .bt,
 body.side-collapsed .side .side-foot { display: none; }
 body.side-collapsed .side .brand { justify-content: center; margin-bottom: 4px; }
 body.side-collapsed .side .side-btn { justify-content: center; padding-left: 0; padding-right: 0; }
+
+/* ---------- 收起态悬停气泡 + 刷新/重启读秒（v6.14.105） ---------- */
+/* 悬停气泡：收起态鼠标移入按钮 → 文字以气泡浮出在按钮右侧，移出消失；
+   直接浮 .bt-tx 原节点，树对比/坐标模式等动态文案自动保持最新 */
+body.side-collapsed .side .side-btn { position: relative; }
+body.side-collapsed .side .side-btn .bt-tx {
+  display: block; position: absolute; left: calc(100% + 12px); top: 50%; transform: translateY(-50%);
+  opacity: 0; pointer-events: none; z-index: 90;
+  padding: 5px 11px; border-radius: 8px; white-space: nowrap; font-size: 12.5px; font-weight: 500;
+  background: #26272b; color: #fff; box-shadow: 0 4px 14px rgba(0,0,0,.22);
+  transition: opacity .15s ease .08s;
+}
+body.side-collapsed .side .side-btn:hover .bt-tx,
+body.side-collapsed .side .side-btn:focus-visible .bt-tx { opacity: 1; transition-delay: 0s; }
+/* 读秒徽标：刷新/重启点击起逐秒计时，接口返回停表，2s 内渐隐（1.2s 过渡 + 1.5s 移除节点）；
+   收起态按要求不显示（计时本身继续，展开后恢复可见） */
+.side-btn .btn-timer {
+  margin-left: 1px; padding: 0 7px; border-radius: 999px;
+  background: rgba(255,255,255,.14); color: #fff;
+  font-size: 11.5px; font-weight: 600; line-height: 18px;
+  font-variant-numeric: tabular-nums;
+  transition: opacity 1.2s ease;
+}
+.side-btn .btn-timer.fade { opacity: 0; }
+#embed-bar .side-btn .btn-timer { background: #ecf5ff; color: var(--sky-deep); }
+html.night .side-btn .btn-timer { background: rgba(74,169,255,.18); color: var(--sky-2); }
+html.night #embed-bar .side-btn .btn-timer { background: rgba(74,169,255,.18); color: var(--sky-2); }
+body.side-collapsed .side .btn-timer { display: none; }
 /* 开关型按钮的开启态（树对比/坐标模式/视觉断言）：两种形态下都可见 */
 .side-btn.on { border-color: transparent; color: #4aa9ff; background: rgba(74,169,255,.16); font-weight: 600; }
 html.night .side-btn.on { border-color: transparent; color: #4aa9ff; background: rgba(74,169,255,.16); }
@@ -1053,3 +1083,16 @@ html.night .side-toggle:hover { background: #232428; color: #e5e7eb; }
 /* 断言区：视觉资产未开启置灰态 */
 .as-item.greyed { opacity: .45; cursor: not-allowed; }
 .as-item.greyed input[type=checkbox] { cursor: not-allowed; }
+
+/* ---------- 调试结果条（v6.14.107）：临时用例真跑的逐条结果，临时数据不入库 ---------- */
+.debug-result { margin: 10px 12px 0; padding: 8px 10px; border-radius: 8px;
+  background: #f6f8fa; border: 1px dashed #d7dce3; max-height: 150px; overflow: auto; }
+.debug-result .dbg-line { font-size: 12.5px; line-height: 1.7; word-break: break-all; }
+.debug-result .dbg-line.ok { color: #1a7f37; }
+.debug-result .dbg-line.err { color: #d8352a; }
+.debug-result .dbg-line.dbg-meta { color: #8a919c; font-size: 11.5px; }
+.debug-result .dbg-line a { color: var(--sky-deep, #337ecc); }
+html.night .debug-result { background: #141519; border-color: #303236; }
+html.night .debug-result .dbg-line.ok { color: #4ade80; }
+html.night .debug-result .dbg-line.err { color: #f87171; }
+html.night .debug-result .dbg-line.dbg-meta { color: #9aa3af; }

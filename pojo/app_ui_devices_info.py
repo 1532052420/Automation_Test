@@ -33,6 +33,7 @@ class APP_UI_Devices_Info:
         self.fullResets = []
         self.noResets = []
         self.waitForIdleTimeouts = []
+        self.dontStopAppOnResets = []
 
     def get_devices_info(self):
         devices_info = []
@@ -97,6 +98,10 @@ class APP_UI_Devices_Info:
                         nativeWebScreenshot=True
                     desired_capabilities.update({'nativeWebScreenshot':nativeWebScreenshot})
                 desired_capabilities.update({'systemPort': self.systemports[i].strip()})
+                # 可选 conf 键 dontStopAppOnResets：true 时会话启动不强制杀 App（配合 noReset 保留前台页面，
+                # 供定位器「调试」等附着式场景使用；不配置则维持原冷启动行为）
+                if len(self.dontStopAppOnResets) > i:
+                    desired_capabilities.update({'dontStopAppOnReset': self.dontStopAppOnResets[i].strip().lower() == 'true'})
                 # Appium3/W3C 下键名为 systemPort(驼峰)；不再 skipServerInstallation——
                 # 跳过安装会掩盖设备端 uiautomator2 server 进程重启后的 session 丢失(报 session not known)，
                 # 让 driver 每次建 session 自行校验/重启设备端 server 更稳

@@ -707,6 +707,23 @@ class AppOperator:
         except Exception as e:
             self._assert_step(failures, desc, False, e)
 
+    def assert_page_text_or_record(self, failures, desc, text, wait_seconds=5):
+        """断言页面文本出现（多断言版）：页面级，任意节点文本包含期望即通过（v6.14.108）。
+        与元素级文本断言（assert_text_or_record，读元素自身 text）的区别：
+        本方法不绑定元素——适合「点击进入下个页面后，断言页面上出现了某文案」的场景。"""
+        ok = False
+        detail = '等待%ds内页面未出现含「%s」的文本' % (wait_seconds, text)
+        if text:
+            try:
+                probe = CreateElement.create(Locator_Type.XPATH, "//*[contains(@text,'%s')]" % text, None,
+                                             Wait_By.PRESENCE_OF_ELEMENT_LOCATED, wait_seconds=wait_seconds)
+                self.getElement(probe)
+                ok = True
+                detail = ''
+            except Exception as e:
+                detail = str(e)[:160] or detail
+        self._assert_step(failures, desc, ok, detail)
+
     def assert_visual_or_record(self, failures, desc, element, baseline='', threshold=0.95, wait_seconds=3):
         """视觉断言（多断言版）：元素区域截图 vs 基线相似度；
         基线缺失→自动建立（通过并在报告注明）；尺寸不一致→不硬比；

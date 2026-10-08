@@ -29,8 +29,8 @@ STEP_TYPES = [
 ]
 
 # ④断言栏 · 组合断言类型（操作与断言解耦：一步 = 操作 + 断言组合）
-# exists/text/gone/visual 绑定本元素；toast 页面级
-ASSERT_KINDS = ('exists', 'text', 'toast', 'gone', 'visual')
+# exists/text/gone/visual 绑定本元素；toast/text_page 页面级
+ASSERT_KINDS = ('exists', 'text', 'toast', 'text_page', 'gone', 'visual')
 
 # 页面里固定实现的工具方法：已存在则不重复生成
 TOOL_METHODS = {'wait_and_shot', 'tap_xy', 'assert_toast', 'dismiss_keyboard',
@@ -130,6 +130,9 @@ def _assert_body_lines(step, el):
         elif t == 'toast':
             lines.append("self.appOperator.assert_toast_or_record(failures, '%s·Toast', %s, wait_seconds=5)"
                          % (no, _q(a.get('toast') or '')))
+        elif t == 'text_page':
+            lines.append("self.appOperator.assert_page_text_or_record(failures, '%s·页面文本', %s, wait_seconds=5)"
+                         % (no, _q(a.get('text') or '')))
         elif t == 'gone':
             try:
                 w = int(a.get('wait'))

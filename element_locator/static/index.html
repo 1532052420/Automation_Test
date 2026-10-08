@@ -24,7 +24,7 @@ try {
 } catch (e) { /* 隐私模式等场景忽略 */ }
 </script>
 <link rel="stylesheet" href="/static/nav.css">
-<link rel="stylesheet" href="static/style.css?v=98">
+<link rel="stylesheet" href="static/style.css?v=101">
 </head>
 <body>
 <header class="gnav" id="gnav"></header>
@@ -290,8 +290,10 @@ try {
       <pre id="el-content" class="el-content"></pre>
     </div>
     <div id="tri-bar" class="tri-bar" style="display:none"></div>
+    <div id="debug-result" class="debug-result" style="display:none"></div>
     <div class="modal-foot">
       <button id="btn-modal-cancel" class="btn">取消</button>
+      <button id="btn-debug-run" class="btn ghost" title="临时生成一条单步用例真机执行：当前操作 + 勾选断言真跑一次，结果临时展示，用例自动删除（约 20~40s）">🔍 调试</button>
       <button id="btn-modal-save-continue" class="btn" title="保存后不结束：回到定位器点下一个元素，自动弹出本窗口连续录入">💾 保存并继续</button>
       <button id="btn-modal-save" class="btn primary">💾 保存</button>
     </div>
@@ -339,7 +341,7 @@ try {
 </div>
 <script src="/static/nav.js"></script>
 <script src="/static/theme.js"></script>
-<script src="static/index.js?v=107"></script>
+<script src="static/index.js?v=110"></script>
 <!-- 采集图片放大查看（lightbox） -->
 <div id="va-shot-lightbox" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.82);align-items:center;justify-content:center;cursor:zoom-out">
   <div style="position:relative">

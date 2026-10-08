@@ -11,6 +11,7 @@ import base64
 import os
 import re
 import sys
+import time
 
 from flask import Flask, jsonify, request, send_file
 
@@ -610,6 +611,322 @@ def api_visual_baseline(name):
     if not p:
         return jsonify({'ok': False, 'msg': '基线图不存在'}), 404
     return send_file(p)
+
+
+# ---------- 调试：临时用例真跑（v6.14.107） ----------
+# 思路：把「选中元素 + 操作类型 + 勾选断言」临时生成一条单步用例，交平台现有 runner 真跑一次，
+# 结果 JSON 回读展示、用例文件跑完即删（临时数据，不入元素库/不入用例/不提交 git）。
+# 不新建任何会话管理：Appium 会话由用例运行时（Client 单例）自建自清，与用例执行完全同源；
+# 与平台执行用例的互斥由 runner.start_run 内置（有任务在跑直接拒绝）。
+
+_DEBUG_CONF = 'config/demoProject/app_ui_android_devices_info_demoProject.conf'
+_DEBUG_CONF_OUT = 'config/app_ui_tmp/devices_info_debug.conf'   # 调试专用（gitignore 目录）
+_DEBUG_CASE_DIR = 'cases/app_ui/android/demoProject'
+_DEBUG_TIMEOUT_MIN = 10
+# 调试支持的操作类型 → 执行描述（v1；custom/组合弹窗处理等生成型类型暂不支持）
+_DEBUG_OP_NAMES = {
+    'click': '点击', 'input': '输入', 'long_press': '长按', 'tap': '坐标点击',
+    'screenshot': '截图', 'sleep': '固定等待', 'wait_element': '轮询等待出现',
+    'if_click': '出现才点击', 'assert_visible': '断言存在', 'hide_keyboard': '收起键盘',
+}
+_DEBUG_NEED_ELEMENT = {'click', 'input', 'long_press', 'wait_element', 'if_click',
+                       'assert_visible'}
+_DEBUG_ASSERT_NAMES = {
+    'exists': '断言元素是否可见', 'text': '断言文本是否正确', 'toast': '断言Toast是否出现',
+    'text_page': '断言页面文本出现', 'gone': '断言元素是否消失', 'visual': '视觉资产比对',
+}
+
+
+def _debug_case_source(token, lt, lv, wait_type, wait_sec, op_type, param, asserts):
+    """生成临时调试用例源码。probe/操作/断言全部内联（不依赖页面与元素文件），
+    操作与断言调用与 case_generator.page_method_code 完全同一批运行时方法（保真）。"""
+    lines = [
+        "# -*- coding: utf-8 -*-",
+        "# 临时调试用例（定位器自动生成，跑完即删，勿提交）：token=%s" % token,
+        "import time",
+        "import ujson",
+        "import allure",
+        "from base.app_ui.android.demoProject.app_ui_android_demoProject_client import APP_UI_Android_demoProject_Client",
+        "from page_objects.createElement import CreateElement",
+        "from page_objects.app_ui.locator_type import Locator_Type",
+        "from page_objects.app_ui.wait_type import Wait_Type as Wait_By",
+        "",
+        "RESULT_FILE = 'output/%s.json'" % token,
+        "",
+        "@allure.parent_suite('快歌APP自动化')",
+        "@allure.suite('定位器调试')",
+        "class TestDebugTmp:",
+        "",
+        "    def setup_class(self):",
+        "        client = APP_UI_Android_demoProject_Client(is_need_kill_app=False)",
+        "        self.op = client.appOperator",
+        "",
+        "    def test_debug(self):",
+        "        results = {'op': None, 'asserts': [], 'finished_at': ''}",
+        "        op = self.op",
+    ]
+    # 操作段（probe 复用「元素等待方式/等待秒数」，与保存用例的元素行为一致）
+    need_el = op_type in _DEBUG_NEED_ELEMENT
+    if need_el:
+        lines += [
+            "        el = CreateElement.create(Locator_Type.%s, %r, None," % (lt, lv),
+            "                                  Wait_By.%s, wait_seconds=%s)" % (wait_type, wait_sec),
+        ]
+    if op_type == 'click':
+        body = ["op.click(op.getElement(el))"]
+    elif op_type == 'input':
+        body = ["op.sendText(op.getElement(el), %r)" % (param or '')]
+    elif op_type == 'long_press':
+        body = ["op.touch_long_press(op.getElement(el), duration_sconds=2)"]
+    elif op_type == 'tap':
+        x, y = [int(v) for v in str(param).split(',')]
+        body = ["op.tap(%d, %d)" % (x, y)]
+    elif op_type == 'sleep':
+        body = ["time.sleep(%d)" % int(float(param or 2))]
+    elif op_type == 'screenshot':
+        body = ["time.sleep(1)", "op.get_screenshot('定位器调试截图')"]
+    elif op_type == 'wait_element':
+        body = ["op.getElement(el)"]
+    elif op_type == 'if_click':
+        body = [
+            "try:",
+            "    op.click(op.getElement(el))",
+            "except Exception:",
+            "    pass",
+        ]
+    elif op_type == 'assert_visible':
+        body = ["op.getElement(el)"]
+    elif op_type == 'hide_keyboard':
+        body = [
+            "try:",
+            "    if op.is_keyboard_shown():",
+            "        op.hide_keyboard()",
+            "except Exception:",
+            "    op.press_keycode(4)",
+            "time.sleep(1)",
+        ]
+    elif op_type:
+        body = None
+    else:
+        body = ["pass  # 仅断言调试：无操作"]
+    if body is None:
+        return None, '操作类型 %s 暂不支持调试' % op_type
+    lines.append("        try:")
+    for b in body:
+        lines.append("            " + b)
+    lines += [
+        "            results['op'] = {'desc': %r, 'ok': True, 'error': ''}" % _DEBUG_OP_NAMES.get(op_type, op_type),
+        "        except Exception as e:",
+        "            results['op'] = {'desc': %r, 'ok': False, 'error': str(e)[:200]}" % _DEBUG_OP_NAMES.get(op_type, op_type),
+        "        time.sleep(1)  # 操作后留 1s 等页面稳定，再执行断言",
+    ]
+    # 断言段（多选，逐条收集不中断——与用例运行时同一批 assert_*_or_record 方法）
+    lines.append("        results['asserts'] = []")
+    if any((a.get('type') or '') in ('exists', 'text', 'gone') for a in asserts) and not need_el:
+        # 操作段没用元素探针（坐标点击/等待/仅断言调试等），断言需要时在此补建
+        lines += [
+            "        el = CreateElement.create(Locator_Type.%s, %r, None," % (lt, lv),
+            "                                  Wait_By.%s, wait_seconds=%s)" % (wait_type, wait_sec),
+        ]
+    for i, a in enumerate(asserts, 1):
+        kind = (a.get('type') or '').strip()
+        desc = '调试·断言%d·%s' % (i, _DEBUG_ASSERT_NAMES.get(kind, kind))
+        lines.append("        _f = []")
+        if kind == 'exists':
+            try:
+                w = int(a.get('wait') or 3)
+            except (TypeError, ValueError):
+                w = 3
+            lines.append("        op.assert_exists_or_record(_f, %r, el, wait_seconds=%d)" % (desc, w))
+        elif kind == 'text':
+            try:
+                w = int(a.get('wait') or 3)
+            except (TypeError, ValueError):
+                w = 3
+            lines.append("        op.assert_text_or_record(_f, %r, el, expected=%r)" % (desc, a.get('text') or ''))
+            # 语义提示：元素级文本断言读的是选中元素自身的 text——文本常在子节点上（容器 text 为空）。
+            # 失败时页面级检索一次：期望文本若在页面其他节点上，给出可操作的修正建议
+            _hint_tpl = ('提示：页面级检索到 %d 个含「' + (a.get('text') or '')
+                         + '」的节点——文本在别的节点上：请重新选中该文本节点本身再断言，或改用「断言页面文本出现」')
+            lines += [
+                "        if _f:",
+                "            try:",
+                "                _hits = op.getElements(CreateElement.create(",
+                "                    Locator_Type.XPATH, \"//*[contains(@text,%r)]\", None," % (a.get('text') or ''),
+                "                    Wait_By.PRESENCE_OF_ELEMENT_LOCATED, wait_seconds=3))",
+                "                if _hits:",
+                "                    _f.append(%r %% len(_hits))" % _hint_tpl,
+                "                else:",
+                "                    _f.append('提示：页面级检索也未发现该文本——页面可能仍在启动/加载中，或文本尚未出现')",
+                "            except Exception as _he:",
+                "                _f.append('提示：页面级检索异常: ' + str(_he)[:80])",
+            ]
+        elif kind == 'toast':
+            lines.append("        op.assert_toast_or_record(_f, %r, %r, wait_seconds=5)" % (desc, a.get('toast') or ''))
+        elif kind == 'text_page':
+            lines.append("        op.assert_page_text_or_record(_f, %r, %r, wait_seconds=5)" % (desc, a.get('text') or ''))
+        elif kind == 'gone':
+            try:
+                w = int(a.get('wait') or 2)
+            except (TypeError, ValueError):
+                w = 2
+            lines.append("        op.assert_gone_or_record(_f, %r, el, wait_seconds=%d)" % (desc, w))
+        elif kind == 'visual':
+            asset = (a.get('asset') or '').strip()
+            try:
+                th = float(a.get('threshold') or 0.95)
+            except (TypeError, ValueError):
+                th = 0.95
+            if asset:
+                lines.append("        op.assert_visual_asset_record(_f, %r, %r, threshold=%.2f)" % (desc, asset, th))
+            else:
+                lines.append("        _f.append('未选择视觉资产（请先在视觉断言里采集资产）')")
+        else:
+            lines.append("        _f.append('未知断言类型 %s')" % kind)
+        lines.append("        results['asserts'].append({'kind': %r, 'name': %r, 'ok': not _f, 'detail': '; '.join(_f)[:400]})"
+                     % (kind, _DEBUG_ASSERT_NAMES.get(kind, kind)))
+    lines += [
+        "        results['finished_at'] = time.strftime('%Y-%m-%d %H:%M:%S')",
+        "        with open(RESULT_FILE, 'w', encoding='utf-8') as f:",
+        "            ujson.dump(results, f, ensure_ascii=False)",
+    ]
+    return '\n'.join(lines) + '\n', ''
+
+
+def _debug_cleanup_cases(older_than_sec=7200, token_prefix=None):
+    """清理临时调试用例（跑完即删 + 孤儿兜底：默认删 2h 前的残留，_pyc 一并清）"""
+    import glob
+    d = os.path.join(os.getcwd(), _DEBUG_CASE_DIR)
+    now = time.time()
+    removed = 0
+    for p in glob.glob(os.path.join(d, 'test_zdebug_*.py')):
+        if token_prefix and token_prefix not in p:
+            continue
+        try:
+            if older_than_sec is None or now - os.path.getmtime(p) >= older_than_sec:
+                os.remove(p)
+                removed += 1
+        except OSError:
+            pass
+    for p in glob.glob(os.path.join(d, '__pycache__', 'test_zdebug_*.pyc')):
+        try:
+            os.remove(p)
+        except OSError:
+            pass
+    return removed
+
+
+@app.route('/api/debug_run', methods=['POST'])
+def api_debug_run():
+    """调试：临时生成单步用例（操作+勾选断言）→ 现有 runner 真机执行 → 前端轮询取临时结果"""
+    data = request.get_json(silent=True) or {}
+    serial = _request_serial()
+    if not serial:
+        return jsonify({'ok': False, 'msg': '未检测到在线设备'})
+    lt = (data.get('locator_type') or '').strip()
+    lv = (data.get('locator_value') or '').strip()
+    wait_type = (data.get('wait_type') or 'PRESENCE_OF_ELEMENT_LOCATED').strip()
+    wait_sec = (data.get('wait_sec') or 6)
+    op_type = (data.get('op_type') or '').strip()
+    param = (data.get('param') or '').strip()
+    asserts = [a for a in (data.get('asserts') or []) if (a.get('type') or '').strip()]
+    if op_type and op_type not in _DEBUG_OP_NAMES:
+        return jsonify({'ok': False, 'msg': '操作类型 %s 暂不支持调试（v1 支持：点击/输入/长按/坐标点击/截图/等待/出现才点击/收起键盘）' % op_type})
+    need_el = (op_type in _DEBUG_NEED_ELEMENT) or any(
+        (a.get('type') or '') in ('exists', 'text', 'gone') for a in asserts)
+    if need_el and (not lt or not lv):
+        return jsonify({'ok': False, 'msg': '该操作/断言需要元素定位值（定位方式+定位值）'})
+    if not op_type and not asserts:
+        return jsonify({'ok': False, 'msg': '请先选操作类型或勾选断言'})
+    if need_el:
+        from page_objects.app_ui.locator_type import Locator_Type as _LT
+        if not hasattr(_LT, lt):
+            return jsonify({'ok': False, 'msg': '未知定位方式 %s' % lt})
+    try:
+        wait_sec = max(1, min(600, int(wait_sec)))
+    except (TypeError, ValueError):
+        wait_sec = 6
+    if op_type == 'tap':
+        try:
+            xs, ys = str(param).split(',')
+            int(xs), int(ys)
+        except (ValueError, TypeError):
+            return jsonify({'ok': False, 'msg': '坐标点击参数格式应为 x,y（如 360,800）'})
+    if op_type == 'sleep':
+        try:
+            int(float(param or 2))
+        except (ValueError, TypeError):
+            return jsonify({'ok': False, 'msg': '固定等待参数应为秒数（数字）'})
+    from web_platform import runner
+    if runner.manager.running_task():
+        return jsonify({'ok': False, 'msg': '平台正在执行用例——调试与执行互斥，请等用例跑完再调试'})
+    # 孤儿兜底：清 2h 前的临时用例残留
+    _debug_cleanup_cases(older_than_sec=7200)
+    # 调试专用 conf：保留 appPackages/appActivitys（pojo 需要它构建 caps），但注入
+    # dontStopAppOnReset=true + 复用 noReset=true —— uiautomator2 驱动此时跳过启动、
+    # 不执行 am start -S 强杀，会话附着到前台：调试的就是用户正在看的页面
+    try:
+        conf_text = open(_DEBUG_CONF, encoding='utf-8').read()
+        if re.search(r'(?m)^dontStopAppOnResets\s*=', conf_text):
+            conf_text = re.sub(r'(?m)^dontStopAppOnResets\s*=.*$', 'dontStopAppOnResets = True ||', conf_text)
+        else:
+            conf_text += '\n# 定位器调试：会话附着前台不重启 App（自动生成）\ndontStopAppOnResets = True ||\n'
+        os.makedirs(os.path.dirname(os.path.join(os.getcwd(), _DEBUG_CONF_OUT)), exist_ok=True)
+        with open(os.path.join(os.getcwd(), _DEBUG_CONF_OUT), 'w', encoding='utf-8') as f:
+            f.write(conf_text)
+    except OSError as e:
+        return jsonify({'ok': False, 'msg': '生成调试 conf 失败: %s' % e})
+    token = 'debug_' + time.strftime('%Y%m%d%H%M%S')
+    case_name = 'test_zdebug_%s.py' % token
+    case_abs = os.path.join(os.getcwd(), _DEBUG_CASE_DIR, case_name)
+    src, err = _debug_case_source(token, lt, lv, wait_type, wait_sec, op_type, param, asserts)
+    if err:
+        return jsonify({'ok': False, 'msg': err})
+    try:
+        compile(src, case_name, 'exec')   # 生成即语法校验，坏代码不落盘
+    except SyntaxError as e:
+        return jsonify({'ok': False, 'msg': '临时用例生成语法错误: %s' % e})
+    with open(case_abs, 'w', encoding='utf-8') as f:
+        f.write(src)
+    node = '%s/%s::TestDebugTmp::test_debug' % (_DEBUG_CASE_DIR, case_name)
+    ok, run_id_or_err = runner.manager.start_run(
+        _DEBUG_CONF_OUT, [node], overrides={'udid': serial},
+        owner='定位器调试', timeout_minutes=_DEBUG_TIMEOUT_MIN,
+        setup_reset=False,   # 调试绝不前置清数据（会毁掉用户当前页面状态）
+        teardown_reset=False)
+    if not ok:
+        try:
+            os.remove(case_abs)
+        except OSError:
+            pass
+        return jsonify({'ok': False, 'msg': run_id_or_err})
+    return jsonify({'ok': True, 'token': token, 'run_id': run_id_or_err})
+
+
+@app.route('/api/debug_result')
+def api_debug_result():
+    """轮询调试结果：执行中返回 state=running；结束后回读临时结果 JSON 并删除临时用例"""
+    token = (request.args.get('token') or '').strip()
+    run_id = (request.args.get('run_id') or '').strip()
+    if not re.match(r'^debug_\d{14}$', token) or not re.match(r'^[0-9_]+$', run_id):
+        return jsonify({'ok': False, 'msg': '参数不合法'}), 400
+    from web_platform import runner
+    task = runner.manager.get_task(run_id)
+    if task and task.get('status') in ('PENDING', 'RUNNING'):
+        return jsonify({'ok': True, 'state': 'running', 'status': task['status']})
+    results = None
+    rf = os.path.join(os.getcwd(), 'output', '%s.json' % token)
+    try:
+        import ujson
+        with open(rf, 'r', encoding='utf-8') as f:
+            results = ujson.load(f)
+    except Exception:
+        results = None
+    removed = _debug_cleanup_cases(older_than_sec=None, token_prefix=token)
+    case_abs = os.path.join(os.getcwd(), _DEBUG_CASE_DIR, 'test_zdebug_%s.py' % token)
+    status = task.get('status') if task else 'UNKNOWN'
+    return jsonify({'ok': True, 'state': 'finished', 'run_id': run_id, 'task_status': status,
+                    'results': results, 'case_cleaned': not os.path.isfile(case_abs)})
 
 
 if __name__ == '__main__':

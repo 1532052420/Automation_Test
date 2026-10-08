@@ -106,6 +106,7 @@ def parse_devices_info(conf_file):
     devices.fullResets = _split_values(config.get('devices_info', 'fullResets', fallback=''))
     devices.noResets = _split_values(config.get('devices_info', 'noResets', fallback=''))
     devices.waitForIdleTimeouts = _split_values(config.get('devices_info', 'waitForIdleTimeouts', fallback=''))
+    devices.dontStopAppOnResets = _split_values(config.get('devices_info', 'dontStopAppOnResets', fallback=''))
     return devices.get_devices_info()
 
 

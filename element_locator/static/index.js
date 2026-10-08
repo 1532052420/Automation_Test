@@ -56,6 +56,7 @@ var ASSERT_KINDS = [
   { v: 'exists', n: '断言元素是否可见', d: '元素可见', p: { wait: 3 } },
   { v: 'text', n: '断言文本是否正确', d: '文案相等', p: { text: '' } },
   { v: 'toast', n: '断言Toast是否出现', d: '页面级', p: { toast: '' } },
+  { v: 'text_page', n: '断言页面文本出现', d: '页面级', p: { text: '' } },
   { v: 'gone', n: '断言元素是否消失', d: '弹窗已关闭', p: { wait: 2 } },
   { v: 'visual', n: '视觉资产', d: '采集图片入资产库，执行时基线比对', p: { threshold: 0.95, asset: '' }, isNew: true, needVa: true },
 ];
@@ -99,6 +100,7 @@ function renderAssertCol() {
       if (d.v === 'exists') p = '<label>等待秒数<input type="number" value="' + esc(r.wait == null ? 3 : r.wait) + '" data-af="wait"></label>';
       if (d.v === 'text') p = '<label>期望文本<input value="' + esc(r.text == null ? '' : r.text) + '" data-af="text" placeholder="如：写新歌"></label>';
       if (d.v === 'toast') p = '<label class="wide">Toast 文本<input value="' + esc(r.toast == null ? '' : r.toast) + '" data-af="toast" placeholder="如：已加入歌单"></label>';
+      if (d.v === 'text_page') p = '<label class="wide">期望文本（页面包含即可）<input value="' + esc(r.text == null ? '' : r.text) + '" data-af="text" placeholder="如：卖号"></label>';
       if (d.v === 'gone') p = '<label>等待秒数<input type="number" value="' + esc(r.wait == null ? 2 : r.wait) + '" data-af="wait"></label>';
       if (d.v === 'visual') {
         var vaOn = (typeof va !== 'undefined' && va.on);
@@ -370,6 +372,8 @@ async function init() {
   });
   $('btn-modal-save').addEventListener('click', () => onSaveElement(false));
   $('btn-modal-save-continue').addEventListener('click', () => onSaveElement(true));
+  const bdr = $('btn-debug-run');
+  if (bdr) bdr.addEventListener('click', debugRun);   // 🔍 调试：临时用例真机执行
   // 树 Diff 开关 / 定位器体检 / 会话步骤撤销
   initDialog();
   $('btn-tree-diff').addEventListener('click', toggleTreeDiff);
@@ -593,12 +597,38 @@ function settleTapTip(ok, msg) {
   clearTimeout(settleTapTip._t);
   settleTapTip._t = setTimeout(() => { tip.textContent = ''; tip.className = 'tap-tip'; }, 4000);
 }
+/* ---------- 刷新/重启按钮读秒徽标 ----------
+   点击开始逐秒计时，接口返回即停表（成功/失败都停——失败不收敛秒会一直走），2s 内渐隐移除。
+   计时状态挂在按钮元素上：_timerInterval 为计时句柄，_timerToken 记录归属的刷新序号，
+   过期响应（token 已被更新的刷新覆盖）的 finally 不会误停新一次的计时。 */
+function btnTimerStart(btn) {
+  if (btn._timerInterval) { clearInterval(btn._timerInterval); btn._timerInterval = null; }
+  const old = btn.querySelector('.btn-timer');
+  if (old) old.remove();
+  const t = document.createElement('span');
+  t.className = 'btn-timer';
+  t.textContent = '0s';
+  btn.appendChild(t);                                    // 文字（.bt-tx）右侧
+  const started = Date.now();
+  btn._timerToken = refreshSeq;
+  btn._timerInterval = setInterval(() => {
+    t.textContent = Math.floor((Date.now() - started) / 1000) + 's';
+  }, 1000);
+}
+function btnTimerStop(btn) {
+  if (btn._timerInterval) { clearInterval(btn._timerInterval); btn._timerInterval = null; }
+  const t = btn.querySelector('.btn-timer');
+  if (!t) return;
+  t.classList.add('fade');                               // CSS：1.2s 渐隐，1.5s 后移除节点（整体 <2s）
+  setTimeout(() => t.remove(), 1500);
+}
 /* fast=true ⚡刷新：单次 dump 最快路径；fast=false ♻ 重启：完整自愈链（可重启 adb） */
 async function refresh(fast = false) {
   const myToken = ++refreshSeq;
   const btn = $(fast ? 'btn-refresh' : 'btn-restart');
   const other = $(fast ? 'btn-restart' : 'btn-refresh');
   btn.querySelector('.bt-tx').textContent = fast ? '刷新中…' : '重启中…'; btn.disabled = true; other.disabled = true;
+  btnTimerStart(btn);
   try {
     const r = await fetch('api/refresh', {
       method: 'POST',
@@ -662,8 +692,12 @@ async function refresh(fast = false) {
     $('shot-empty').style.display = 'block';
     settleTapTip(false, '刷新出错');
   } finally {
-    btn.querySelector('.bt-tx').textContent = fast ? '刷新' : '重启';
-    btn.disabled = false; other.disabled = false;
+    // 过期响应（期间已发起更新的刷新/切换）不动按钮态与读秒——由最新一次的 finally 收尾
+    if (myToken === refreshSeq) {
+      btn.querySelector('.bt-tx').textContent = fast ? '刷新' : '重启';
+      btn.disabled = false; other.disabled = false;
+      btnTimerStop(btn);
+    }
   }
 }
 
@@ -2355,6 +2389,96 @@ function pkgFiles() {
     { dir: 'page_objects/app_ui/android/demoProject/elements', name: elemFile, content: elemPy },
   ];
 }
+/* ---------- 调试（临时用例真跑，v6.14.107） ----------
+   当前操作 + 勾选断言 → 服务端临时生成一条单步用例 → 现有 runner 真机执行 → 轮询取临时结果。
+   临时数据：用例跑完自动删除；结果只在页面临时展示，不入元素库/不入用例。 */
+var debugPolling = false;
+
+function collectDebugPayload() {
+  return {
+    serial: state.serial,
+    locator_type: $('el-type').value,
+    locator_value: $('el-value').value,
+    wait_type: $('el-wait').value,
+    wait_sec: $('el-wait-sec').value,
+    op_type: currentOpType(),
+    param: $('el-op-param').value,
+    asserts: assertState().map(function (r) {
+      return { type: r.v, wait: r.wait, text: r.text, toast: r.toast, threshold: r.threshold, asset: r.asset };
+    }),
+  };
+}
+
+async function debugRun() {
+  if (debugPolling) return;
+  const btn = $('btn-debug-run'), box = $('debug-result');
+  const payload = collectDebugPayload();
+  debugPolling = true;
+  btn.disabled = true;
+  box.style.display = 'block';
+  box.innerHTML = '<div class="dbg-line">⏳ 正在生成临时用例并提交真机执行…（约 20~40s）</div>';
+  try {
+    const r = await fetch('api/debug_run', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(x => x.json()).catch(() => null);
+    if (!r || !r.ok) {
+      box.innerHTML = '<div class="dbg-line err">✕ ' + esc((r && r.msg) || '调试提交失败') + '</div>';
+      return;
+    }
+    const deadline = Date.now() + 180000;   // 3 分钟兜底
+    while (Date.now() < deadline) {
+      await new Promise(res => setTimeout(res, 2500));
+      const s = await fetch('api/debug_result?token=' + encodeURIComponent(r.token)
+        + '&run_id=' + encodeURIComponent(r.run_id)).then(x => x.json()).catch(() => null);
+      if (!s || !s.ok) { box.innerHTML = '<div class="dbg-line err">✕ 调试状态查询失败</div>'; return; }
+      if (s.state === 'running') {
+        box.innerHTML = '<div class="dbg-line">⏳ 真机执行中…（Appium 会话 + 单步用例）</div>';
+        continue;
+      }
+      renderDebugResult(s, box);
+      if (payload.op_type) refresh(true);   // 操作真跑了：刷新画面立刻看到效果
+      return;
+    }
+    box.innerHTML = '<div class="dbg-line err">✕ 调试超时（3 分钟未完成）——到「执行用例」页查看任务状态</div>';
+  } finally {
+    debugPolling = false;
+    btn.disabled = false;
+  }
+}
+
+function renderDebugResult(s, box) {
+  const rs = s.results;
+  if (!rs) {
+    box.innerHTML = '<div class="dbg-line err">✕ 任务已结束(' + esc(s.task_status || '未知')
+      + ')但未取到调试结果——到「执行用例」页看日志定位原因</div>';
+    return;
+  }
+  let html = '';
+  if (rs.op) {
+    html += '<div class="dbg-line ' + (rs.op.ok ? 'ok' : 'err') + '">'
+      + (rs.op.ok ? '✓ 操作成功' : '✕ 操作失败') + ' · ' + esc(rs.op.desc)
+      + (rs.op.error ? '：' + esc(rs.op.error) : '') + '</div>';
+  }
+  (rs.asserts || []).forEach(function (a) {
+    html += '<div class="dbg-line ' + (a.ok ? 'ok' : 'err') + '">'
+      + (a.ok ? '✓ ' : '✕ ') + esc(a.name || a.kind)
+      + (a.detail ? '：' + esc(a.detail) : '') + '</div>';
+  });
+  html += '<div class="dbg-line dbg-meta">临时用例已删除 · 结果为临时数据不入库'
+    + (s.run_id ? ' · <a href="#" id="dbg-report-link">查看完整报告</a>' : '') + '</div>';
+  box.innerHTML = html;
+  const link = $('dbg-report-link');
+  if (link) link.addEventListener('click', function (e) {
+    e.preventDefault();
+    fetch('/api/run/' + s.run_id + '/report/open', { method: 'POST' })
+      .then(x => x.json()).then(j => {
+        if (j && j.ok && j.url) window.open(j.url, '_blank');
+        else showToast((j && j.msg) || '报告打开失败', false);
+      });
+  });
+}
+
 async function onSaveElement(continueMode) {
   // 防重入：上一笔保存未完成（含确认框挂起）时拒绝新保存——并发保存会互相污染状态/丢步骤
   if (state._saving) { showToast('上一步保存还在进行，请稍候…', false); return; }
