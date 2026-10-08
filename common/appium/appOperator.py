@@ -29,6 +29,10 @@ import base64
 import time
 import ujson
 import os
+import threading
+import collections
+import subprocess
+import shutil
 
 # 操作步骤编号：日志里给每个操作标「步骤N」并分行展示（动作/详情/结果各占一行），
 # 每条用例开始时由 conftest 调 reset_action_step_no() 归零
@@ -541,9 +545,34 @@ class AppOperator:
             script_arg.update({'action':action_type})
         self._driver.execute_script(script,script_arg)
 
+    @staticmethod
+    def _toast_capture_frames(udid, stop_event, frames):
+        """toast 像素证据抓帧线程：adb exec-out screencap 连续抓屏。
+        不走 Appium session（与等待轮询并行、互不抢锁）；帧只留最新 2 张；
+        adb 缺失/异常静默退出——证据尽力而为，不影响断言本体。"""
+        adb = shutil.which('adb')
+        if not adb:
+            return
+        cmd = [adb]
+        if udid:
+            cmd += ['-s', udid]
+        cmd += ['exec-out', 'screencap', '-p']
+        while not stop_event.is_set():
+            try:
+                p = subprocess.run(cmd, capture_output=True, timeout=10)
+                if p.returncode == 0 and p.stdout[:4] == b'\x89PNG':
+                    frames.append(p.stdout)
+            except Exception:
+                pass
+            time.sleep(0.4)
+
     def is_toast_visible(self, text, platformName='android', automationName='UiAutomator2', isRegexp=False, wait_seconds=5):
         """
         仅支持Android
+        证据链（v6.14.106）：①XPath 限定 android.widget.Toast——只有真实 toast 节点能命中，
+        页面上文本相同的常驻控件不再造成假成功（命中本身即证明 server 收到了真实 toast 通知事件）；
+        ②等待期间后台 adb 连拍，命中后把最接近命中时刻的帧与文本证据附入 allure——
+        toast 存活仅 2~3.5s，命中后再截图必迟到，只能靠等待期连拍抢到它。
         :param text:
         :param platformName: android、ios
         :param automationName: 支持UiAutomator2、Espresso
@@ -554,15 +583,36 @@ class AppOperator:
             return False
         if 'android' == platformName.lower():
             if 'uiautomator2' == automationName.lower():
-                with allure.step('检查 toast「%s」(最多等%ds)'%(text,wait_seconds)):
-                    toast_element = CreateElement.create(Locator_Type.XPATH, ".//*[contains(@text,'%s')]" % text, None,
-                                                         Wait_By.PRESENCE_OF_ELEMENT_LOCATED, wait_seconds=wait_seconds)
-                    try:
+                udid = self._driver.capabilities.get('udid') or self._driver.capabilities.get('deviceUDID') or ''
+                stop_event = threading.Event()
+                frames = collections.deque(maxlen=2)
+                cap = threading.Thread(target=self._toast_capture_frames, args=(udid, stop_event, frames), daemon=True)
+                cap.start()
+                try:
+                    with allure.step('检查 toast「%s」(最多等%ds)'%(text,wait_seconds)):
+                        toast_element = CreateElement.create(Locator_Type.XPATH, ".//android.widget.Toast[contains(@text,'%s')]" % text, None,
+                                                             Wait_By.PRESENCE_OF_ELEMENT_LOCATED, wait_seconds=wait_seconds)
                         self.getElement(toast_element)
-                        logger.info('toast「%s」出现'%text)
-                        return True
-                    except:
-                        return False
+                    logger.info('toast「%s」出现'%text)
+                    hit = True
+                except Exception:
+                    hit = False
+                finally:
+                    stop_event.set()
+                    cap.join(timeout=3)   # 等在拍的一帧落地（可能正是命中后那一帧）
+                    if hit:
+                        hit_at = DateTimeTool.getNowTime('%Y-%m-%d %H:%M:%S')
+                        if frames:
+                            allure.attach(name='toast像素证据_命中%s' % hit_at, body=frames[-1],
+                                          attachment_type=allure.attachment_type.PNG)
+                            logger.info('toast 像素证据已入 allure（等待期连拍，最接近命中时刻的帧）')
+                        else:
+                            logger.info('toast 连拍未取到帧（adb 慢或不可用）——命中判定来自系统通知事件，仍可信')
+                        allure.attach(name='toast文本证据_命中%s' % hit_at,
+                                      body='无障碍树命中 android.widget.Toast 节点（文本包含「%s」），命中时刻 %s。'
+                                           '该节点来自系统 toast 通知事件，命中即目击。' % (text, hit_at),
+                                      attachment_type=allure.attachment_type.TEXT)
+                return hit
             elif 'espresso' == automationName.lower():
                 script_arg = {'text': text}
                 if isRegexp:
