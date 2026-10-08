@@ -743,24 +743,30 @@ def _debug_case_source(token, lt, lv, wait_type, wait_sec, op_type, param, asser
                 w = int(a.get('wait') or 3)
             except (TypeError, ValueError):
                 w = 3
-            lines.append("        op.assert_text_or_record(_f, %r, el, expected=%r)" % (desc, a.get('text') or ''))
-            # 语义提示：元素级文本断言读的是选中元素自身的 text——文本常在子节点上（容器 text 为空）。
-            # 失败时页面级检索一次：期望文本若在页面其他节点上，给出可操作的修正建议
-            _hint_tpl = ('提示：页面级检索到 %d 个含「' + (a.get('text') or '')
-                         + '」的节点——文本在别的节点上：请重新选中该文本节点本身再断言，或改用「断言页面文本出现」')
-            lines += [
-                "        if _f:",
-                "            try:",
-                "                _hits = op.getElements(CreateElement.create(",
-                "                    Locator_Type.XPATH, \"//*[contains(@text,%r)]\", None," % (a.get('text') or ''),
-                "                    Wait_By.PRESENCE_OF_ELEMENT_LOCATED, wait_seconds=3))",
-                "                if _hits:",
-                "                    _f.append(%r %% len(_hits))" % _hint_tpl,
-                "                else:",
-                "                    _f.append('提示：页面级检索也未发现该文本——页面可能仍在启动/加载中，或文本尚未出现')",
-                "            except Exception as _he:",
-                "                _f.append('提示：页面级检索异常: ' + str(_he)[:80])",
-            ]
+            exp = a.get('text') or ''
+            lines.append("        op.assert_text_or_record(_f, %r, el, expected=%r)" % (desc, exp))
+            # 语义诊断（按序）：元素级文本断言是全等比较，失败时分三种情况给对应指引——
+            # ①元素文本包含期望（部分匹配差异）②文本在页面其他节点上 ③两边都没有
+            other_hint = ('提示：页面级检索到 %d 个含「' + exp
+                          + '」的节点——文本在别的节点上：请重新选中该文本节点本身再断言，或改用「断言页面文本出现」')
+            lines.append("        if _f:")
+            lines.append("            try:")
+            lines.append("                _actual = op.getText(el)")
+            lines.append("            except Exception:")
+            lines.append("                _actual = ''")
+            lines.append("            if _actual and %r in _actual:" % exp)
+            lines.append("                _f.append('提示：元素文本为「' + _actual + '」，包含「%s」——当前断言是全等比较（期望需与元素完整文本完全一致）；若只需校验文本出现，请改用「断言页面文本出现」')" % exp)
+            lines.append("            else:")
+            lines.append("                try:")
+            lines.append("                    _hits = op.getElements(CreateElement.create(")
+            lines.append("                        Locator_Type.XPATH, \"//*[contains(@text,%r)]\", None," % exp)
+            lines.append("                        Wait_By.PRESENCE_OF_ELEMENT_LOCATED, wait_seconds=3))")
+            lines.append("                    if _hits:")
+            lines.append("                        _f.append(%r %% len(_hits))" % other_hint)
+            lines.append("                    else:")
+            lines.append("                        _f.append('提示：页面级检索也未发现该文本——页面可能仍在加载中，或文本尚未出现')")
+            lines.append("                except Exception as _he:")
+            lines.append("                    _f.append('提示：页面级检索异常: ' + str(_he)[:80])")
         elif kind == 'toast':
             lines.append("        op.assert_toast_or_record(_f, %r, %r, wait_seconds=5)" % (desc, a.get('toast') or ''))
         elif kind == 'text_page':
