@@ -174,7 +174,9 @@ def dump_xml(serial):
     通道选择：u2 server 在设备上运行时（刚跑完真机用例会常驻），系统 dump 必然
     卡死到超时——此时直接走 u2，秒级出树；系统 dump 的单次超时也从 30s 收紧到 8s
     （正常 2~3s 就该完成），避免被占用场景下 3 次重试拖到几十秒才降级。"""
-    u2_running = _u2_state(serial)['ok'] or _u2_server_running(serial)
+    st = _u2_state(serial)
+    in_cooldown = st.get('cooldown_until', 0) > time.time()
+    u2_running = (st['ok'] or _u2_server_running(serial)) and not in_cooldown
     if u2_running:
         u2 = _dump_via_u2(serial)
         if u2:
@@ -331,23 +333,26 @@ def _u2_session_alive(serial):
 
 def _dump_via_u2(serial):
     """uiautomator2 通道抓当前页元素树 XML；失败返回 None
-    /source 返回 JSON：{"sessionId":..., "value":"<xml>"} —— 需取 value 字段"""
+    /source 返回 JSON：{"sessionId":..., "value":"<xml>"} —— 需取 value 字段
+    性能：sid 为空/失效时绝不带着 None 去打 /source（server 会挂满超时才回 invalid
+    session id——单这一步就白等约 10s）；先 ensure 建真会话，失败立即返回 None。"""
     if not _u2_ensure(serial):
         return None
-    st = _u2_state(serial)
-    if not _u2_session_alive(serial):
-        st['session'] = None
-        st['ok'] = False
-        if not _u2_ensure(serial):
-            return None
-    sid = st['session']
-    resp = _u2_http(serial, 'GET', '/wd/hub/session/%s/source' % sid, timeout=30)
+    sid = _u2_state(serial).get('session')
+    if not sid:
+        return None
+    # 动画页面 u2 会等 root 节点到默认 ~10s 才超时——收短到 2s：
+    # 抓不到立即返回，让上层马上切系统 dump 通道（实测系统通道 2~3s 可出树）
+    resp = _u2_http(serial, 'GET', '/wd/hub/session/%s/source' % sid, timeout=2.5)
     try:
         xml = json.loads(resp).get('value') or ''
+        if isinstance(xml, str) and '<hierarchy' in xml:
+            _u2_state(serial)['cooldown_until'] = 0
+            return xml
     except Exception:
-        return None
-    if isinstance(xml, str) and '<hierarchy' in xml:
-        return xml
+        pass
+    # 失败结论缓存 30s：同页面动画场景重试必然再超时，缓存期内直接跳过 u2 省 2.7s
+    _u2_state(serial)['cooldown_until'] = time.time() + 30
     return None
 
 

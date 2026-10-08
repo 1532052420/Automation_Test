@@ -87,8 +87,12 @@ def _refresh_once():
     serial = device.get_device(asked)
     if not serial:
         return None, '未检测到在线设备（USB 断开、未授权或 adb 掉线）'
-    png = device.screenshot_png(serial)
-    xml = device.dump_xml(serial)
+    # 截图与取树相互独立：并行执行（原串行两段耗时相加，实测白等约 1s）
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        f_png = ex.submit(device.screenshot_png, serial)
+        xml = ex.submit(device.dump_xml, serial).result()
+        png = f_png.result()
     if not xml:
         return None, device.last_error or '界面 dump 失败'
     try:
