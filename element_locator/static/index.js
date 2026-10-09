@@ -947,9 +947,7 @@ function vaToggleMode() {
   if (va.on) {
     if (state.coordMode) $('btn-coord-mode').click();   // 与坐标模式互斥
     if ($('modal-mask').style.display !== 'none') renderAssertCol();   // 弹窗开着：视觉资产勾选项即时解禁
-    // 需求②：开启态选中元素列照常显示（上次选中保留；无选中显示空态）——不再整体隐藏
-    if (!state.selNode) renderDetailEmpty();
-    else $('detail').style.display = 'block';
+    $('detail').style.display = 'none';
     va.scope = 'element'; va.match = 'strict'; va.region = null; va.ignores = []; va.ignoreArmed = false;
     vaRenderPanel(); vaDrawRects();
     showToast('视觉断言采集：点击截图选元素 / 切「区域」拖拽框选');
@@ -1388,28 +1386,13 @@ function applyShotSize() {
   }
   if (state.selNode) highlightShot(state.selNode);
 }
-function renderDetailEmpty() {
-  // 空态只清内容区，绝不动 #detail 结构（「设备上点击/添加测试用例」按钮在结构里，覆盖=按钮消失）
-  const d = $('detail');
-  if (!d) return;
-  d.style.display = 'block';
-  const attrsWrap = d.querySelector('.attrs-wrap');
-  if (attrsWrap) attrsWrap.innerHTML = '<div class="empty" style="padding:26px 8px">尚未选中元素<br>点击左侧截图或元素树选择</div>';
-  const hc = d.querySelector('.hit-cands'); if (hc) { hc.style.display = 'none'; hc.innerHTML = ''; }
-  const tt = d.querySelector('.tap-tip'); if (tt) tt.style.display = 'none';
-  const loc = d.querySelector('#locators'); if (loc) loc.innerHTML = '';
-  const dup = d.querySelector('#dup-tip'); if (dup) { dup.style.display = 'none'; dup.innerHTML = ''; }
-}
-
 function renderDetail(node) {
-  // 视觉断言开启态：详情照常显示（需求②：选中元素列显示选中元素），采集面板在下共存；
-  // 点选同时驱动采集范围（vaDrawRects 里 element 范围取 state.selNode bounds）
-  $('detail').style.display = 'block';
   if (va.on) {
+    $('detail').style.display = 'none';
     vaDrawRects();
-    if (typeof vaCapSyncScopeTxt === 'function') vaCapSyncScopeTxt();
     return;
   }
+  $('detail').style.display = 'block';
   // 候选元素：截图同一点可能命中多层（容器/文字/按钮），点选更精确的
   const candBox = $('hit-cands');
   if (state.hitCands && state.hitCands.length > 1) {
