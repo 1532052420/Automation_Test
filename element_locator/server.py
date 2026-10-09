@@ -96,6 +96,17 @@ def _refresh_once():
         png = f_png.result()
     if not xml:
         return None, device.last_error or '界面 dump 失败'
+    # 稳定二次校验（v6.14.114）：页面转场动画期间抓到的树是中间态（元素缺失/坐标不完整），
+    # 用户只能手动再刷一次。这里自动 0.4s 后重 dump 一次：节点数明显变化 → 页面未稳定，
+    # 采用后一次的树并重拍截图与之同帧；节点数基本一致 → 沿用首次结果（零额外开销路径）。
+    n1 = xml.count('<node')
+    time.sleep(0.4)
+    xml2 = device.dump_xml(serial)
+    if xml2 and abs(xml2.count('<node') - n1) > max(4, n1 // 10):
+        png2 = device.screenshot_png(serial)
+        if png2:
+            png = png2
+        xml = xml2
     try:
         data = device.xml_to_tree(xml)
     except Exception as e:

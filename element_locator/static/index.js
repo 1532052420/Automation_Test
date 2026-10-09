@@ -859,6 +859,13 @@ function vaRenderPanel() {
     const seg = $(segId);
     seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === val));
   };
+  // 名称自动预填（可改）：空名称点保存只会收到「名称必填」提示，从根上消除矛盾反馈
+  if (!$('va-name').value.trim()) {
+    var _base = (va.scope === 'element' && state.selNode && state.selNode['resource-id'])
+      ? state.selNode['resource-id'].split('/').pop()
+      : ({ element: '元素', region: '区域', screen: '整屏' })[va.scope] || '视觉';
+    $('va-name').value = _base + '_' + new Date().toTimeString().slice(0, 8).replace(/:/g, '');
+  }
   syncSeg('va-scope-seg', va.scope);
   syncSeg('va-match-seg', va.match);
   $('va-scope-seg').addEventListener('click', e => {
@@ -987,6 +994,9 @@ function vaBindShotDrag() {
     drag.el.style.opacity = '.6';
     wrap.appendChild(drag.el);
     document.body.classList.add('va-dragging');
+    // 每次按下都挂一次收尾监听（finish 收尾后自移除）——只挂一次的话，首次 mouseup
+    // 就把监听消费掉，之后所有拖拽永远无法收尾（va.region 不赋值 = 自定义区域失效）
+    document.addEventListener('mouseup', finish);
   });
   // move/up 挂 document：拖拽中鼠标冲出截图区也能持续跟踪（快速拖拽必踩 wrap 丢事件）
   const onMove = (e) => {
@@ -1025,7 +1035,7 @@ function vaBindShotDrag() {
   };
   wrap.addEventListener('mousemove', onMove);
   document.addEventListener('mousemove', onMove);
-  document.addEventListener('mouseup', finish);
+  // mouseup 收尾监听改在 mousedown 时挂（finish 自移除）——见上方 mousedown 处注释
 }
 
 
