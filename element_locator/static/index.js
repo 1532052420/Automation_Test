@@ -164,6 +164,10 @@ function renderAssertCol() {
       threshold: (r.threshold == null ? 0.95 : +r.threshold),
     };
     $('modal-mask').style.display = 'none';
+    // 选中元素列切换为采集面板（设参数、保存视觉断言）；面板状态由 va 对象保持
+    va.panelActive = true;
+    $('detail').style.display = 'none';
+    vaRenderPanel();
     showToast('请在右侧「视觉断言采集」设置参数并点「保存视觉断言」，完成后自动回到本弹窗');
   });
   // 采集图片缩略图：点击放大（lightbox）；右上角 ✕ = 移除已采集
@@ -232,6 +236,10 @@ function vaCaptureReturn(assetName, thumbnail) {
   r.asset = assetName;
   r.thumbnail = thumbnail;
   $('modal-mask').style.display = 'flex';   // 不走 openModal：字段原样回显
+  // 采集完成：选中元素列还原为元素详情（va 仍开启；下次点「采集」再切面板）
+  va.panelActive = false;
+  $('visualPanel').style.display = 'none';
+  if (state.selNode) { $('detail').style.display = 'block'; renderDetail(state.selNode); }
   renderAssertCol(); syncAssertSide();
   showToast('视觉资产「' + assetName + '」已采集保存，请继续配置断言');
   return true;
@@ -738,7 +746,7 @@ function hitFromEvent(e) {
 /* ================= 视觉断言采集模式（三范围 + 忽略区域 + Layout + 业务类型） ================= */
 /* 状态机：va.on 模式开关；scope=element/region/screen；region 框选设备坐标；
    ignores 相对视觉区域左上角存（执行侧裁剪出区域图后直接可用，元素位移时随区域整体平移）。 */
-var va = { on: false, scope: 'element', match: 'strict', region: null, ignores: [], ignoreArmed: false,
+var va = { on: false, panelActive: false, scope: 'element', match: 'strict', region: null, ignores: [], ignoreArmed: false,
            preview: null, els: {} };
 
 function vaShotRect() { return $('shot').getBoundingClientRect(); }
@@ -947,11 +955,15 @@ function vaToggleMode() {
   if (va.on) {
     if (state.coordMode) $('btn-coord-mode').click();   // 与坐标模式互斥
     if ($('modal-mask').style.display !== 'none') renderAssertCol();   // 弹窗开着：视觉资产勾选项即时解禁
-    $('detail').style.display = 'none';
+    // 开启不动选中元素列：详情照常显示，采集面板只在点「采集」时才切换过来
+    va.panelActive = false;
+    $('visualPanel').style.display = 'none';
+    if (state.selNode) { $('detail').style.display = 'block'; renderDetail(state.selNode); }
     va.scope = 'element'; va.match = 'strict'; va.region = null; va.ignores = []; va.ignoreArmed = false;
-    vaRenderPanel(); vaDrawRects();
-    showToast('视觉断言采集：点击截图选元素 / 切「区域」拖拽框选');
+    vaDrawRects();
+    showToast('视觉断言已开启：点选元素正常查看详情；在添加用例弹窗勾选「视觉资产」后点采集');
   } else {
+    va.panelActive = false;
     $('visualPanel').style.display = 'none';
     vaClearRects();
     if (state.selNode) $('detail').style.display = '';
@@ -1387,12 +1399,13 @@ function applyShotSize() {
   if (state.selNode) highlightShot(state.selNode);
 }
 function renderDetail(node) {
-  if (va.on) {
-    $('detail').style.display = 'none';
+  if (va.on && va.panelActive) {
+    // 采集面板占据选中元素列：点选截图只更新视觉范围（蓝框随选中元素走），不切回详情
     vaDrawRects();
     return;
   }
   $('detail').style.display = 'block';
+  if (va.on) vaDrawRects();   // 视觉断言开启：视觉区域蓝框随选中元素刷新
   // 候选元素：截图同一点可能命中多层（容器/文字/按钮），点选更精确的
   const candBox = $('hit-cands');
   if (state.hitCands && state.hitCands.length > 1) {
