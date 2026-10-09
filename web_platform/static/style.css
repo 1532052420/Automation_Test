@@ -1037,3 +1037,6 @@ html.night #vdbgSim[data-level="perfect"] { color:#34D399; }
 html.night #vdbgSim[data-level="good"]    { color:#6EE7B7; }
 html.night #vdbgSim[data-level="warn"]    { color:#FBBF24; }
 html.night #vdbgSim[data-level="bad"]     { color:#F87171; }
+
+/* AI 用例生成首页卡片：最近任务状态行（无任务不展示） */
+.nav-card .ai-card-status { font-size: 12px; color: var(--muted2); margin: 0; }

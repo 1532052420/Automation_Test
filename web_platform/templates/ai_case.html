@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 用例生成 · 自动化测试平台</title>
+<script src="/assets/{{ asset_v }}/theme.js"></script>
+<link rel="stylesheet" href="/assets/{{ asset_v }}/nav.css">
+<link rel="stylesheet" href="/assets/{{ asset_v }}/style.css">
+<style>
+/* 页面级样式（.aic- 前缀，token 全部取自平台 style.css 变量，日夜主题自动跟随） */
+.hidden { display: none !important; }
+.aic-main { max-width: 1280px; margin: 0 auto; padding: 26px 22px 60px; }
+.aic-head { display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+.aic-head h1 { font-size: 22px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; }
+.aic-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.aic-phase { margin-left: auto; font-size: 12px; color: var(--brand); background: var(--brand-tint);
+  border-radius: var(--r-pill); padding: 4px 12px; }
+.aic-grid { display: grid; grid-template-columns: 340px minmax(380px, 1fr) 380px; gap: 16px; align-items: start; }
+.aic-panel { background: var(--panel); border-radius: var(--r-card); box-shadow: var(--shadow); padding: 18px; }
+.aic-panel > h2 { font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 14px; }
+.aic-panel label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin: 12px 0 5px; }
+.aic-panel label:first-of-type { margin-top: 0; }
+.aic-panel textarea, .aic-panel select, .aic-panel input {
+  width: 100%; font: inherit; font-size: 13px; color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--r-input); padding: 9px 11px; background: var(--panel2);
+}
+.aic-panel textarea { resize: vertical; min-height: 120px; line-height: 1.55; }
+.aic-radio { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--ink2); }
+.aic-radio .aic-opt { display: flex; align-items: flex-start; gap: 7px; font-weight: 400;
+  margin: 0; cursor: pointer; text-align: left; }
+.aic-radio .aic-opt input { width: auto; margin-top: 3px; }
+.aic-radio .aic-opt span { flex: 1; }
+.aic-btn { display: inline-flex; align-items: center; justify-content: center; width: 100%;
+  font-size: 14px; font-weight: 600; padding: 10px; border-radius: var(--r-pill);
+  background: var(--brand); color: #fff; margin-top: 14px; transition: background .2s; }
+.aic-btn:hover { background: var(--brand-hover); }
+.aic-btn:disabled { opacity: .4; cursor: not-allowed; }
+.aic-ghost { font-size: 13px; color: var(--bad); background: none; border: 1px solid var(--line);
+  border-radius: var(--r-pill); padding: 6px 14px; margin-top: 12px; }
+.aic-ghost:hover { background: var(--bad-bg); border-color: var(--bad); }
+.aic-note { font-size: 12px; color: var(--muted2); margin-top: 8px; }
+.aic-observe { border: 1px solid var(--line-soft); border-radius: 14px; padding: 12px 14px;
+  margin-bottom: 14px; background: var(--panel2); }
+.aic-ob-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.aic-ob-head h2 { font-size: 13px; margin: 0; font-weight: 600; color: var(--ink); }
+.aic-ob-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.aic-ob-body { display: flex; gap: 12px; align-items: flex-start; }
+.aic-screen { width: 186px; min-height: 300px; border: 6px solid #111; border-radius: 18px;
+  background: #fff; overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.aic-screen img { width: 100%; display: block; }
+.aic-shot-empty { font-size: 11.5px; color: var(--muted2); padding: 12px; text-align: center; }
+.aic-ob-side { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.aic-ob-side .aic-btn { width: 100%; margin-top: 0; padding: 8px; font-size: 13px; }
+.aic-ob-side .aic-ghost { margin-top: 0; text-align: center; }
+.aic-ob-side .aic-ghost.danger { color: var(--warn); }
+.aic-hierout { font: 11px/1.7 ui-monospace, Menlo, monospace; background: var(--panel3);
+  border-radius: 10px; padding: 8px 10px; color: var(--muted); max-height: 148px;
+  overflow-y: auto; margin-top: 2px; word-break: break-all; }
+.aic-recent { margin-top: 18px; border-top: 1px solid var(--line-soft); padding-top: 12px; }
+.aic-recent h3 { font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
+.aic-jobrow { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  font-size: 12.5px; color: var(--ink2); padding: 7px 9px; border-radius: 10px; }
+.aic-jobrow:hover { background: var(--panel3); }
+.aic-jobrow .jid { color: var(--muted2); flex-shrink: 0; }
+.aic-jobrow .jtxt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aic-states { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.aic-states .st { font-size: 11.5px; padding: 3px 10px; border-radius: var(--r-pill);
+  background: var(--panel3); color: var(--muted2); white-space: nowrap; }
+.aic-states .st.cur { background: var(--brand); color: #fff; font-weight: 600; }
+.aic-states .st.past { background: var(--ok-bg); color: var(--ok); }
+.aic-states .st.locked { opacity: .55; }
+.aic-meta { font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 12px; }
+.aic-meta b { color: var(--ink); font-weight: 600; }
+.aic-clarify { border: 2px solid var(--brand); background: var(--brand-tint); border-radius: 14px;
+  padding: 13px 15px; font-size: 13px; margin-bottom: 12px; }
+.aic-clarify h4 { font-size: 13px; color: var(--brand); margin-bottom: 5px; }
+.aic-clarify .opts { display: flex; flex-direction: column; gap: 7px; margin-top: 9px; }
+.aic-clarify .opts button { text-align: left; font-size: 13px; padding: 8px 12px; border-radius: 10px;
+  background: var(--panel); border: 1px solid var(--line); transition: all .2s; }
+.aic-clarify .opts button:hover { border-color: var(--brand); background: var(--brand-tint); }
+.aic-clarify .picked { border-color: var(--ok) !important; background: var(--ok-bg) !important;
+  color: var(--ok); font-weight: 600; }
+.aic-console { background: var(--dark); color: var(--dark-ink); border-radius: 14px;
+  font: 11.5px/1.75 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  padding: 12px 14px; height: 240px; overflow-y: auto; margin-top: 10px; }
+.aic-console .ln { display: flex; gap: 8px; }
+.aic-console .tm { color: var(--muted2); flex-shrink: 0; }
+.aic-console .ty { flex-shrink: 0; font-weight: 600; }
+.aic-console .ty.stage { color: #64d2ff; } .aic-console .ty.human { color: #0a84ff; }
+.aic-console .ty.clarification { color: #ffd60a; } .aic-console .ty.risk { color: #ff9f0a; }
+.aic-sec { margin-top: 16px; }
+.aic-sec h3 { font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
+.aic-goal { font-size: 13.5px; color: var(--ink); font-weight: 600; margin-bottom: 8px; }
+.aic-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.aic-tag { font-size: 11.5px; padding: 2px 10px; border-radius: var(--r-pill); background: var(--panel3); color: var(--muted); }
+.aic-tag.warn { background: rgba(255,149,0,.14); color: var(--warn); }
+.aic-tag.bad { background: var(--bad-bg); color: var(--bad); }
+.aic-tag.ok { background: var(--ok-bg); color: var(--ok); }
+.aic-tag.ai { background: rgba(175,82,222,.13); color: #8944ab; }
+.aic-step { border: 1px solid var(--line-soft); border-radius: 12px; padding: 8px 11px;
+  font-size: 12.5px; background: var(--panel2); display: flex; align-items: center; gap: 8px; }
+.aic-step + .aic-step { margin-top: 6px; }
+.aic-step .no { font-weight: 700; color: var(--muted2); font-size: 11px; flex-shrink: 0; }
+.aic-step .tt { flex: 1; color: var(--ink); min-width: 0; }
+.aic-empty { font-size: 13px; color: var(--muted2); padding: 6px 2px; }
+@media (max-width: 1100px) { .aic-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body data-page="ai-case">
+<header class="gnav" id="sidebar"></header>
+<main class="aic-main">
+  <div class="aic-head">
+    <div>
+      <h1>AI 用例生成</h1>
+      <p class="aic-sub">输入需求，AI 结合真实 App 页面生成并验证自动化用例 · 需求没写明的信息 AI 只提问，不编造</p>
+    </div>
+    <span class="aic-phase" id="aicPhase">P1 已接入：需求解析 · 状态机 · 事件流</span>
+  </div>
+
+  <div class="aic-grid">
+    <aside class="aic-panel">
+      <h2>① 需求与任务配置</h2>
+      <label for="aicReq">需求描述（自然语言 / 需求文档粘贴）</label>
+      <textarea id="aicReq" placeholder="例：验证「发布歌曲」主流程：从「我的」进入「创作中心」，点击「发布歌曲」，输入歌名《测试之歌A1》、选择分类「流行」后点发布。断言：出现「发布成功」提示；列表新增该歌曲。"></textarea>
+      <label for="aicProject">项目</label>
+      <select id="aicProject"><option value="">（未配置项目）</option></select>
+      <label for="aicPkg">App 包名（取自项目配置或手动填写，AI 不猜测）</label>
+      <input id="aicPkg" placeholder="com.example.app">
+      <label for="aicDevice">设备</label>
+      <select id="aicDevice"></select>
+      <p class="aic-note" id="aicDeviceNote"></p>
+      <label>入口模式</label>
+      <div class="aic-radio" id="aicEntryModes"></div>
+      <button class="aic-btn" id="aicCreate">分析需求</button>
+      <div class="aic-recent">
+        <h3>最近任务（点击恢复）</h3>
+        <div id="aicRecent"><p class="aic-empty">暂无任务</p></div>
+      </div>
+    </aside>
+
+    <section class="aic-panel">
+      <h2>② 任务状态与事件流</h2>
+      <div class="aic-observe">
+        <div class="aic-ob-head">
+          <h2>📱 设备观察</h2>
+          <div class="aic-ob-tags">
+            <span class="aic-tag" id="aicObMaestro">Maestro: —</span>
+            <span class="aic-tag" id="aicObDev">设备：—</span>
+            <span class="aic-tag" id="aicObLock">锁：未锁定</span>
+            <span class="aic-tag" id="aicObLimit">上限：—</span>
+          </div>
+        </div>
+        <div class="aic-ob-body">
+          <div class="aic-screen">
+            <img id="aicShot" class="hidden" alt="设备画面">
+            <div class="aic-shot-empty" id="aicShotEmpty">左侧选择在线设备后，点「刷新画面」</div>
+          </div>
+          <div class="aic-ob-side">
+            <button class="aic-btn" id="aicShotBtn">刷新画面</button>
+            <button class="aic-ghost" id="aicHierBtn">读取层级</button>
+            <button class="aic-ghost" id="aicLockBtn">锁定设备</button>
+            <div class="aic-hierout" id="aicHierOut">层级摘要：—</div>
+          </div>
+        </div>
+      </div>
+      <div class="aic-states" id="aicStates"><p class="aic-empty">尚未创建任务：左侧录入需求后点「分析需求」</p></div>
+      <div class="aic-meta" id="aicMeta"></div>
+      <div id="aicClarify"></div>
+      <div class="aic-console" id="aicEvents"></div>
+      <button class="aic-ghost" id="aicCancel" hidden>取消任务</button>
+    </section>
+
+    <aside class="aic-panel">
+      <h2>③ 解析结果与步骤</h2>
+      <div id="aicAnalysis"><p class="aic-empty">解析结果将显示在这里</p></div>
+      <div class="aic-sec"><h3>操作步骤（P3 起映射元素库）</h3><div id="aicSteps"><p class="aic-empty">—</p></div></div>
+      <div class="aic-sec"><h3>断言</h3><div id="aicAsserts"><p class="aic-empty">—</p></div></div>
+    </aside>
+  </div>
+</main>
+<div id="toast"></div>
+<script src="/assets/{{ asset_v }}/nav.js"></script>
+<script src="/assets/{{ asset_v }}/ai_case.js"></script>
+</body>
+</html>

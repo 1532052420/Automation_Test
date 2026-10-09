@@ -1,0 +1,6 @@
+# AI 编排服务独立环境依赖（Python 3.11+，勿装入平台 3.8 venv）
+# 版本锁定于 2026-10-09（Pip index 查询当日最新），升级前先跑兼容冒烟
+langgraph==1.2.14
+mcp==2.3.0
+pydantic==2.14.0
+requests>=2.31

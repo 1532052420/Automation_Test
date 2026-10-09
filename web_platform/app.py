@@ -73,6 +73,10 @@ api_task_scheduler.start_scheduler()
 from web_platform.app_testing.routes import bp as app_testing_bp
 app.register_blueprint(app_testing_bp)
 
+# AI 用例生成（Maestro MCP 方案 V1.1 · P1：卡片入口 + 需求解析/状态机/SSE；P2+ 接真机探索）
+from web_platform.ai_case_routes import bp as ai_case_bp
+app.register_blueprint(ai_case_bp)
+
 # 元素定位器并入平台（原 8001 独立服务取消）：挂载到 /locator 子路径。
 # DispatcherMiddleware 会剥掉 /locator 前缀并处理 /locator → /locator/ 补斜杠跳转，
 # 定位器自身的路由（/api/*、/static/*）完全不用改；其前端已改为相对路径请求。

@@ -71,6 +71,8 @@ const ICONS = {
         + '<path d="M4.5 15.5v2.9a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.9"/>',
   scan: '<path d="M4 8.2V6a2 2 0 0 1 2-2h2.2M15.8 4H18a2 2 0 0 1 2 2v2.2M20 15.8V18a2 2 0 0 1-2 2h-2.2M8.2 20H6a2 2 0 0 1-2-2v-2.2"/>'
       + '<circle cx="12" cy="12" r="3.1"/>',
+  ai: '<path d="M12 3.6 13.8 8.6 18.8 10.4 13.8 12.2 12 17.2 10.2 12.2 5.2 10.4 10.2 8.6Z"/>'
+    + '<path d="M18.4 15.2 19.2 17.4 21.4 18.2 19.2 19 18.4 21.2 17.6 19 15.4 18.2 17.6 17.4Z"/>',
   bolt: '<path d="M13.2 2.8 5.8 13.2h4.9L10.8 21.2 18.2 10.8h-4.9Z"/>',
   /* AppUI 编排/套件用：流程（编排）/ 层叠（套件） */
   flow: '<circle cx="5.4" cy="6" r="2.3"/><circle cx="18.6" cy="18" r="2.3"/>'
@@ -432,6 +434,17 @@ function initIndex() {
   document.querySelectorAll('.card-icon .ico[data-ico]').forEach(el => {
     el.innerHTML = icon(el.dataset.ico, 34);
   });
+  // AI 用例生成卡片：有历史任务才展示最近状态（方案 3.1：无任务不展示占位数据）
+  api('/api/ai-case/jobs?limit=1').then(d => {
+    const j = (d.results || [])[0];
+    const el = document.querySelector('#aiCaseStatus');
+    if (!j || !el) return;
+    const t = new Date(j.updated_at * 1000);
+    const p = (n) => String(n).padStart(2, '0');
+    el.textContent = '最近任务：' + j.status + ' · ' + (t.getMonth() + 1) + '-' + t.getDate() +
+      ' ' + p(t.getHours()) + ':' + p(t.getMinutes());
+    el.hidden = false;
+  }).catch(() => { /* 状态获取失败不影响首页 */ });
 }
 
 /* 统计卡右上角的淡色线性图标：图标定义只在 app.js 一处，模板只声明用哪个（测试报告页用） */

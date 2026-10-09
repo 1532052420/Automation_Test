@@ -10,12 +10,34 @@
 两端不再各自硬编码版本号。
 """
 
-APP_VERSION = '6.14.116'
+APP_VERSION = '6.14.118'
 
 # 最新版本在最前；time 精确到秒（YYYY-MM-DD HH:MM:SS）
 # 版本号格式 x.xx.x 自 6.11.0 起强制执行；更早的历史条目保留原始记录，不回溯改写
 # 每条变更一句话 10~20 字，只说改了什么（详细背景见项目 memory 与设计文档）
 CHANGELOG = [
+    {
+        'version': '6.14.118',
+        'time': '2026-10-09 19:03:39',
+        'title': 'AI 用例生成 P2 设备观察上线：Maestro MCP 客户端 + 独占锁 + 截图/层级',
+        'changes': [
+            'P0 收尾：ai_case_service 独立环境（py3.14）建成并通过 langgraph/mcp/pydantic 导入冒烟；Maestro MCP 真机探针完成（握手/工具清单/设备枚举，入参契约已落码）',
+            '新增官方 maestro mcp 最小 stdio 客户端（串行可重入锁+每调用超时+崩溃自愈），修复 _ensure 嵌套加锁导致的永久死锁',
+            '设备观察区上线：真机画面刷新（Maestro 主通道、adb 自动兜底）、层级摘要读取、设备独占锁（TTL 30 分钟、任务取消联动释放）、探索上限可配置（默认 15 跳/5 分钟）',
+            '新增 API：devices / observe·screenshot / observe·hierarchy / devices·lock / settings / evidence，设备离线秒回友好提示，绝不挂起',
+        ],
+    },
+    {
+        'version': '6.14.117',
+        'time': '2026-10-09 17:49:08',
+        'title': 'AI 用例生成 P1 上线：首页卡片 + 需求解析 + 状态机 + SSE 事件流',
+        'changes': [
+            '首页新增「AI 用例生成」卡片（展示最近任务状态），进入 /ai-case 工作台：需求配置 / 任务状态与事件流 / 解析结果与步骤三栏布局',
+            '新增任务 API：创建+需求解析、澄清确认、取消、列表（任务即草稿，刷新可恢复）、SSE 实时事件流；需求没写明的信息 AI 只生成澄清问题，不编造',
+            '需求解析器两级实现：环境变量配置 AI_CASE_MODEL_URL 时走模型服务，否则规则兜底 v0（中文动宾/断言/入口/高风险词识别，结果标注待人工确认）',
+            'P0 环境验证：Maestro 2.10.0 / Java 17 / adb 就绪；依赖锁定清单 ai_case_service/requirements.txt（langgraph 1.2.14 / mcp 2.3.0 / pydantic 2.14.0）',
+        ],
+    },
     {
         'version': '6.14.116',
         'time': '2026-10-09 17:09:15',
