@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 用例生成 · 操作链路动态演示</title>
+<style>
+/* ============================================================
+   AI 用例生成 · 操作链路动态演示（单文件 · 零外部依赖）
+   视觉契约：沿用 web_platform 设计语言（Apple 风格）
+   信息编码：紫色 = AI 自动动作 / 蓝色 = 人工确认点 / 绿 = 通过
+   ============================================================ */
+:root {
+  color-scheme: light;
+  --brand: #0071e3; --brand-hover: #0077ed; --brand-tint: rgba(0,113,227,.08);
+  --ink: #1d1d1f; --ink2: #3a3a3c; --muted: #6e6e73; --muted2: #86868b;
+  --bg: #f5f5f7; --panel: #fff; --panel2: #fbfbfd; --panel3: #f0f0f2;
+  --dark: #1d1d1f; --dark-ink: #e8e8ed;
+  --line: #d2d2d7; --line-soft: rgba(0,0,0,.07);
+  --ok: #1d7a3a;  --ok-bg: rgba(52,199,89,.13);
+  --bad: #d70015; --bad-bg: rgba(255,59,48,.12);
+  --warn: #b25000; --warn-bg: rgba(255,149,0,.14);
+  --ai: #8944ab;  --ai-bg: rgba(175,82,222,.13);
+  --run-bg: rgba(0,113,227,.12);
+  --r-card: 18px; --r-input: 12px; --r-pill: 980px;
+  --shadow: 0 4px 24px rgba(0,0,0,.06);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: var(--bg); color: var(--ink2); min-height: 100vh;
+}
+button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.hidden { display: none !important; }
+
+/* ---------- 顶栏 ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 12px 22px; background: rgba(255,255,255,.82);
+  backdrop-filter: saturate(180%) blur(18px); -webkit-backdrop-filter: saturate(180%) blur(18px);
+  border-bottom: 1px solid var(--line-soft);
+}
+.topbar h1 { font-size: 17px; font-weight: 600; color: var(--ink); letter-spacing: -.01em; }
+.topbar .ver { font-size: 12px; color: var(--muted2); }
+.topbar .spacer { flex: 1; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 500; padding: 3px 10px; border-radius: var(--r-pill);
+  background: var(--panel3); color: var(--muted); white-space: nowrap;
+}
+.chip-ai   { background: var(--ai-bg); color: var(--ai); }
+.chip-run  { background: var(--run-bg); color: var(--brand); }
+.chip-ok   { background: var(--ok-bg); color: var(--ok); }
+.chip-warn { background: var(--warn-bg); color: var(--warn); }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 14px; font-weight: 500; padding: 8px 18px; border-radius: var(--r-pill);
+  background: var(--panel3); color: var(--ink); transition: transform .15s ease, background .2s;
+}
+.btn:hover { background: #e8e8ed; }
+.btn:active { transform: scale(.97); }
+.btn.primary { background: var(--brand); color: #fff; }
+.btn.primary:hover { background: var(--brand-hover); }
+.btn.ai { background: var(--ai); color: #fff; }
+.btn.ai:hover { background: #9a58bd; }
+.btn.ghost { background: transparent; color: var(--brand); }
+.btn.ghost:hover { background: var(--brand-tint); }
+.btn:disabled { opacity: .35; cursor: not-allowed; transform: none; }
+.btn.sm { font-size: 13px; padding: 5px 14px; }
+.btn.pulse { animation: pulse 1.6s ease infinite; }
+@keyframes pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(0,113,227,.35); }
+  55%     { box-shadow: 0 0 0 9px rgba(0,113,227,0); }
+}
+.pulse-ai { animation: pulseAi 1.6s ease infinite !important; }
+@keyframes pulseAi {
+  0%,100% { box-shadow: 0 0 0 0 rgba(137,68,171,.35); }
+  55%     { box-shadow: 0 0 0 9px rgba(137,68,171,0); }
+}
+
+/* ---------- 链路地图（8 节点，本就是序列，编号有实义） ---------- */
+.chain {
+  display: flex; align-items: center; gap: 4px; overflow-x: auto;
+  padding: 14px 22px 6px; max-width: 1440px; margin: 0 auto;
+}
+.chain .node {
+  display: flex; align-items: center; gap: 7px; flex-shrink: 0;
+  font-size: 12.5px; color: var(--muted2); padding: 6px 12px;
+  border-radius: var(--r-pill); background: transparent; transition: all .4s;
+}
+.chain .node i {
+  font-style: normal; width: 20px; height: 20px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; background: var(--panel3); color: var(--muted2); transition: all .4s;
+}
+.chain .node.doing { color: var(--ink); font-weight: 600; background: var(--brand-tint); }
+.chain .node.doing i { background: var(--brand); color: #fff; }
+.chain .node.doing.ai-step { background: var(--ai-bg); }
+.chain .node.doing.ai-step i { background: var(--ai); }
+.chain .node.done { color: var(--muted); }
+.chain .node.done i { background: var(--ok); color: #fff; }
+.chain .arrow { color: var(--line); flex-shrink: 0; font-size: 12px; }
+
+/* ---------- 说明条 ---------- */
+.hint {
+  max-width: 1440px; margin: 6px auto 0; padding: 10px 22px;
+  font-size: 13px; color: var(--muted);
+}
+.hint b.ai-c { color: var(--ai); } .hint b.hu-c { color: var(--brand); }
+
+main { max-width: 1440px; margin: 0 auto; padding: 14px 22px 60px; }
+
+/* ---------- 场景一：平台首页（模拟） ---------- */
+#sceneHome .navmock {
+  display: flex; align-items: center; gap: 26px; padding: 14px 6px;
+  font-size: 13px; color: var(--muted);
+}
+#sceneHome .navmock b { color: var(--ink); font-size: 15px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 18px; margin-top: 18px; }
+.card {
+  background: var(--panel); border-radius: var(--r-card); box-shadow: var(--shadow);
+  padding: 24px 22px; min-height: 150px; display: flex; flex-direction: column; gap: 8px;
+}
+.card.dim { opacity: .45; }
+.card .ic { font-size: 26px; }
+.card h3 { font-size: 16px; font-weight: 600; color: var(--ink); letter-spacing: -.01em; }
+.card p { font-size: 13px; color: var(--muted); flex: 1; }
+.card.new {
+  cursor: pointer; border: 2px solid var(--brand); position: relative;
+  transition: transform .25s ease, box-shadow .25s ease;
+}
+.card.new:hover { transform: translateY(-3px); box-shadow: 0 10px 34px rgba(0,113,227,.16); }
+.card.new .flag {
+  position: absolute; top: 14px; right: 14px; font-size: 11px; font-weight: 600;
+  background: var(--ai); color: #fff; border-radius: var(--r-pill); padding: 2px 9px;
+}
+.card.new .go { font-size: 13px; font-weight: 600; color: var(--brand); }
+.card .status { font-size: 12px; color: var(--muted2); }
+
+/* ---------- 场景二：工作台三栏 ---------- */
+.statestrip {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  background: var(--panel); border-radius: 14px; box-shadow: var(--shadow);
+  padding: 10px 16px; margin-bottom: 16px; font-size: 12px;
+}
+.statestrip .lab { color: var(--muted2); margin-right: 4px; font-weight: 500; }
+.statestrip .st { padding: 3px 10px; border-radius: var(--r-pill); background: var(--panel3); color: var(--muted2); white-space: nowrap; }
+.statestrip .st.cur { background: var(--brand); color: #fff; font-weight: 600; }
+.statestrip .st.past { background: var(--ok-bg); color: var(--ok); }
+.cols { display: grid; grid-template-columns: 340px minmax(420px,1fr) 400px; gap: 16px; align-items: start; }
+.pane {
+  background: var(--panel); border-radius: var(--r-card); box-shadow: var(--shadow);
+  padding: 18px; 
+}
+.pane > h2 { font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.field { margin-bottom: 12px; }
+.field label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 5px; }
+.field textarea, .field select {
+  width: 100%; font: inherit; font-size: 13px; color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--r-input); padding: 9px 11px; background: var(--panel2);
+}
+.field textarea { resize: vertical; min-height: 96px; line-height: 1.5; }
+.field .radio-row { display: flex; flex-direction: column; gap: 6px; }
+.field .radio-row label { display: flex; align-items: center; gap: 7px; font-weight: 400; font-size: 13px; color: var(--ink2); margin: 0; cursor: pointer; }
+.parse-card {
+  border: 1px solid var(--ai); border-radius: 14px; padding: 12px 14px;
+  background: var(--ai-bg); margin-top: 14px; font-size: 13px;
+  animation: rise .45s ease both;
+}
+.parse-card h4 { font-size: 13px; color: var(--ai); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.parse-card ul { list-style: none; display: flex; flex-direction: column; gap: 4px; color: var(--ink2); }
+.parse-card .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.clarify {
+  border: 2px solid var(--brand); border-radius: 14px; padding: 12px 14px;
+  background: var(--brand-tint); margin-top: 12px; font-size: 13px; animation: rise .45s ease both;
+}
+.clarify h4 { font-size: 13px; color: var(--brand); margin-bottom: 6px; }
+.clarify .opts { display: flex; flex-direction: column; gap: 7px; margin-top: 9px; }
+.clarify .opts button {
+  text-align: left; font-size: 13px; padding: 8px 12px; border-radius: 10px;
+  background: #fff; border: 1px solid var(--line); transition: all .2s;
+}
+.clarify .opts button:hover { border-color: var(--brand); background: var(--brand-tint); }
+.clarify .opts button.picked { border-color: var(--ok); background: var(--ok-bg); color: var(--ok); font-weight: 600; }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* ---------- 中栏：设备 + 探索 + 事件流 ---------- */
+.devhead { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.devhead .name { font-size: 14px; font-weight: 600; color: var(--ink); }
+.crumb { font-size: 12.5px; color: var(--muted); background: var(--panel3); border-radius: var(--r-pill); padding: 4px 12px; }
+.crumb em { font-style: normal; color: var(--ink); font-weight: 600; }
+.devwrap { display: flex; gap: 16px; align-items: flex-start; }
+.phone {
+  width: 252px; flex-shrink: 0; border-radius: 34px; background: #111;
+  padding: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.22); position: relative;
+}
+.phone .scr {
+  position: relative; height: 470px; border-radius: 26px; overflow: hidden; background: #fff;
+}
+.scr-indicator {
+  position: absolute; top: 7px; left: 50%; transform: translateX(-50%);
+  width: 74px; height: 17px; background: #111; border-radius: var(--r-pill); z-index: 9;
+}
+.appscreen {
+  position: absolute; inset: 0; padding: 34px 14px 14px; display: flex; flex-direction: column;
+  background: #fff; opacity: 0; transform: translateX(24px); pointer-events: none;
+  transition: opacity .35s ease, transform .35s ease; font-size: 12px;
+}
+.appscreen.on { opacity: 1; transform: none; pointer-events: auto; }
+.appscreen.back { transform: translateX(-24px); }
+.appscreen h5 { font-size: 16px; color: var(--ink); letter-spacing: -.01em; margin-bottom: 10px; }
+.abtn {
+  position: relative; display: flex; align-items: center; gap: 8px;
+  background: var(--panel2); border: 1px solid var(--line-soft); border-radius: 12px;
+  padding: 11px 12px; font-size: 12.5px; color: var(--ink); width: 100%; text-align: left;
+}
+.abtn .em { font-size: 16px; }
+.abtn.big { justify-content: center; background: #fa2d48; color: #fff; border: none; font-weight: 600; border-radius: var(--r-pill); padding: 11px; }
+.abtn.primary { background: var(--brand); color: #fff; border: none; justify-content: center; font-weight: 600; }
+.abtn.input { color: var(--muted2); background: #fff; }
+.abtn.chipon { background: var(--brand-tint); border-color: var(--brand); color: var(--brand); font-weight: 600; }
+.abtn + .abtn { margin-top: 8px; }
+.tabbar { margin-top: auto; display: flex; border-top: 1px solid var(--line-soft); padding-top: 8px; }
+.tabbar .tab { flex: 1; text-align: center; font-size: 10.5px; color: var(--muted2); display: flex; flex-direction: column; gap: 2px; align-items: center; }
+.tabbar .tab .em { font-size: 17px; }
+.tabbar .tab.on { color: #fa2d48; font-weight: 600; }
+.okbanner {
+  background: var(--ok-bg); color: var(--ok); font-weight: 600; font-size: 13px;
+  border-radius: 12px; padding: 12px; text-align: center; margin-bottom: 10px;
+}
+.ripple {
+  position: absolute; width: 46px; height: 46px; border-radius: 50%; pointer-events: none;
+  background: rgba(137,68,171,.35); border: 2px solid var(--ai); transform: translate(-50%,-50%) scale(.3);
+  animation: rip .8s ease forwards; z-index: 20;
+}
+@keyframes rip { to { transform: translate(-50%,-50%) scale(1.6); opacity: 0; } }
+.runoverlay {
+  position: absolute; inset: 0; z-index: 15; background: rgba(17,17,17,.86); color: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  font-size: 12.5px; text-align: center; padding: 20px; border-radius: 26px;
+}
+.runoverlay .bar { width: 80%; height: 6px; background: rgba(255,255,255,.2); border-radius: var(--r-pill); overflow: hidden; }
+.runoverlay .bar i { display: block; height: 100%; width: 0; background: #30d158; border-radius: var(--r-pill); transition: width .5s ease; }
+.sidebox { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.evidence { display: flex; gap: 8px; flex-wrap: wrap; }
+.evidence .shot {
+  width: 86px; border-radius: 10px; border: 1px solid var(--line); overflow: hidden; background: #fff;
+  animation: rise .4s ease both;
+}
+.evidence .shot .mini { height: 118px; padding: 16px 7px 7px; display: flex; flex-direction: column; gap: 4px; }
+.evidence .shot .mini i { display: block; height: 7px; border-radius: 4px; background: var(--panel3); }
+.evidence .shot .mini i.hl { background: var(--brand-tint); border: 1px solid var(--brand); height: 12px; }
+.evidence .shot .mini i.red { background: #fde3e7; height: 12px; }
+.evidence .shot figcaption { font-size: 10px; color: var(--muted2); padding: 4px 6px; border-top: 1px solid var(--line-soft); }
+.console {
+  background: var(--dark); color: var(--dark-ink); border-radius: 14px;
+  font: 11.5px/1.7 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  padding: 12px 14px; height: 168px; overflow-y: auto;
+}
+.console .ln { display: flex; gap: 8px; animation: rise .3s ease both; }
+.console .tm { color: #86868b; flex-shrink: 0; }
+.console .tag { flex-shrink: 0; font-weight: 600; }
+.console .tag.maestro { color: #ff9f0a; }
+.console .tag.platform { color: #64d2ff; }
+.console .tag.model { color: #bf5af2; }
+.console .tag.appium { color: #30d158; }
+.console .tag.zip { color: #ffd60a; }
+.console .tag.human { color: #0a84ff; }
+
+/* ---------- 候选路径卡 ---------- */
+.candidates { display: flex; flex-direction: column; gap: 10px; }
+.cand {
+  border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 14px;
+  font-size: 13px; animation: rise .4s ease both; transition: all .25s;
+}
+.cand .path { font-weight: 600; color: var(--ink); margin-bottom: 5px; }
+.cand .evi { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; }
+.cand .pick { display: flex; align-items: center; gap: 8px; }
+.cand.reco { border-color: var(--ai); background: var(--ai-bg); }
+.cand.picked { border-color: var(--ok); background: var(--ok-bg); }
+
+/* ---------- 右栏：步骤审核 ---------- */
+.steplist { display: flex; flex-direction: column; gap: 7px; max-height: 560px; overflow-y: auto; padding-right: 2px; }
+.step {
+  border: 1px solid var(--line-soft); border-radius: 12px; padding: 9px 11px;
+  font-size: 12.5px; animation: rise .35s ease both; background: var(--panel2);
+}
+.step .row1 { display: flex; align-items: center; gap: 7px; }
+.step .no { font-style: normal; font-weight: 700; color: var(--muted2); font-size: 11px; flex-shrink: 0; }
+.step .tt { flex: 1; color: var(--ink); font-weight: 500; }
+.step .row2 { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; align-items: center; }
+.step .el { font: 11px ui-monospace, Menlo, monospace; color: var(--muted); background: var(--panel3); padding: 1px 7px; border-radius: 6px; }
+.step.act-focus { border-color: var(--ai); background: var(--ai-bg); }
+.step .capbtn { font-size: 11.5px; color: #fff; background: var(--brand); border-radius: var(--r-pill); padding: 2px 10px; }
+.badge { font-size: 10.5px; font-weight: 600; padding: 1.5px 8px; border-radius: var(--r-pill); flex-shrink: 0; }
+.badge.matched { background: var(--ok-bg); color: var(--ok); }
+.badge.capture { background: var(--warn-bg); color: var(--warn); }
+.badge.verify  { background: var(--run-bg); color: var(--brand); }
+.badge.verified{ background: var(--ok-bg); color: var(--ok); }
+.badge.assert  { background: var(--ai-bg); color: var(--ai); }
+.specchip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ai); background: var(--ai-bg); border-radius: 10px; padding: 7px 11px; margin-bottom: 10px; }
+.footacts { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.report {
+  border: 1.5px solid var(--ok); background: var(--ok-bg); border-radius: 14px;
+  padding: 13px 14px; font-size: 13px; margin-top: 12px; animation: rise .45s ease both;
+}
+.report h4 { color: var(--ok); font-size: 13.5px; margin-bottom: 7px; }
+.report .kv { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--ink2); font-size: 12.5px; }
+.ziptree {
+  background: var(--dark); color: var(--dark-ink); border-radius: 12px;
+  font: 11.5px/1.8 ui-monospace, Menlo, monospace; padding: 11px 14px; margin-top: 12px;
+}
+.ziptree b { color: #ffd60a; font-weight: 600; }
+
+/* ---------- 采集弹窗 ---------- */
+.modal {
+  position: fixed; inset: 0; z-index: 90; background: rgba(0,0,0,.42);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.modal .box {
+  background: var(--panel); border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,.3);
+  width: min(760px, 96vw); max-height: 90vh; overflow: auto; padding: 22px 24px;
+  animation: rise .35s ease both;
+}
+.modal h3 { font-size: 17px; color: var(--ink); letter-spacing: -.01em; display: flex; align-items: center; gap: 9px; }
+.modal .sub { font-size: 13px; color: var(--muted); margin: 6px 0 16px; }
+.locgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.tree { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; font: 12px/1.9 ui-monospace, Menlo, monospace; color: var(--ink2); max-height: 250px; overflow: auto; }
+.tree .hit { background: var(--brand-tint); color: var(--brand); font-weight: 700; border-radius: 6px; padding: 0 5px; }
+.tree .dimn { color: var(--muted2); }
+.locdef { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 12.5px; display: flex; flex-direction: column; gap: 8px; }
+.locdef .kv { display: flex; gap: 8px; } .locdef .kv b { color: var(--muted); font-weight: 500; flex-shrink: 0; width: 74px; }
+.locdef code { font: 11.5px ui-monospace, Menlo, monospace; background: var(--panel3); padding: 2px 7px; border-radius: 6px; word-break: break-all; }
+.modal .acts { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
+
+/* ---------- Toast ---------- */
+#toast {
+  position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%) translateY(20px);
+  background: var(--dark); color: #fff; font-size: 13.5px; padding: 11px 22px;
+  border-radius: var(--r-pill); box-shadow: 0 10px 30px rgba(0,0,0,.3);
+  opacity: 0; pointer-events: none; transition: all .35s ease; z-index: 99; max-width: 86vw;
+}
+#toast.show { opacity: 1; transform: translateX(-50%); }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,.18); border-radius: 8px; }
+
+@media (max-width: 1180px) { .cols { grid-template-columns: 1fr 1fr; } .col-right { grid-column: 1 / -1; } }
+@media (max-width: 760px)  { .cols { grid-template-columns: 1fr; } .devwrap { flex-direction: column; } .locgrid { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <h1>AI 用例生成 · 操作链路动态演示</h1>
+  <span class="ver">对应《AI 用例生成模块技术方案》V1.0 · 评审用原型</span>
+  <span class="spacer"></span>
+  <span class="chip chip-ai hidden" id="modeChip">● 自动演示中（确认点自动通过）</span>
+  <button class="btn ai" id="btnAuto">▶ 自动演示全流程</button>
+  <button class="btn ghost" id="btnStop" disabled>暂停</button>
+  <button class="btn" id="btnReset">重置</button>
+</header>
+
+<nav class="chain" id="chain" aria-label="操作链路">
+  <span class="node" data-i="1"><i>1</i>解析需求</span><span class="arrow">→</span>
+  <span class="node ai-step" data-i="2"><i>2</i>检索现有资产</span><span class="arrow">→</span>
+  <span class="node ai-step" data-i="3"><i>3</i>设备加锁</span><span class="arrow">→</span>
+  <span class="node ai-step" data-i="4"><i>4</i>探索入口</span><span class="arrow">→</span>
+  <span class="node" data-i="5"><i>5</i>确认入口<span style="font-size:10px;color:var(--brand)">人</span></span><span class="arrow">→</span>
+  <span class="node ai-step" data-i="6"><i>6</i>生成步骤</span><span class="arrow">→</span>
+  <span class="node" data-i="7"><i>7</i>元素映射<span style="font-size:10px;color:var(--brand)">人</span></span><span class="arrow">→</span>
+  <span class="node" data-i="8"><i>8</i>试运行</span><span class="arrow">→</span>
+  <span class="node" data-i="9"><i>9</i>打包入库<span style="font-size:10px;color:var(--brand)">人</span></span>
+</nav>
+
+<p class="hint">
+  <b class="ai-c">紫色 = AI 自动完成</b>（LangGraph 编排 / Maestro MCP 真机探索 / Platform MCP 调平台能力），
+  <b class="hu-c">蓝色 = 需要你确认</b>（澄清、选入口、采元素、生成正式包）。
+  可直接点右上「自动演示全流程」，也可进入后按页面提示手动操作。
+</p>
+
+<main>
+  <!-- ============ 场景一：平台首页 ============ -->
+  <section id="sceneHome">
+    <div class="navmock"><b>🧪 自动化测试平台</b><span>元素定位器</span><span>用例管理</span><span>执行报告</span><span>接口测试</span></div>
+    <div class="cards">
+      <div class="card dim"><span class="ic">🎯</span><h3>元素定位器</h3><p>真机画面采集元素、可视化断言、生成三件套。</p><span class="status">上次使用：昨天</span></div>
+      <div class="card dim"><span class="ic">🗂️</span><h3>用例管理</h3><p>用例包入库、套件编排、定时执行。</p><span class="status">共 128 条用例</span></div>
+      <div class="card dim"><span class="ic">📊</span><h3>执行报告</h3><p>Allure 报告、失败录屏、历史趋势。</p><span class="status">最近通过率 96%</span></div>
+      <div class="card new" id="cardAi" role="button" tabindex="0" aria-label="进入 AI 用例生成">
+        <span class="flag">AI · 新模块</span>
+        <span class="ic">✨</span>
+        <h3>AI 用例生成</h3>
+        <p>输入需求，AI 结合真实 App 页面生成并验证自动化用例。</p>
+        <span class="status">最近任务：未开始</span>
+        <span class="go">开始生成 →</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 场景二：AI 用例生成工作台 ============ -->
+  <section id="sceneWork" class="hidden">
+    <div class="statestrip" id="stateStrip"><span class="lab">任务状态</span></div>
+    <div class="cols">
+
+      <!-- A. 需求与任务配置 -->
+      <aside class="pane col-left">
+        <h2>📝 需求与任务配置</h2>
+        <div class="field">
+          <label for="reqText">自然语言需求 / 需求文档</label>
+          <textarea id="reqText">验证「发布歌曲」主流程：从「我的」进入「创作中心」，点击「发布歌曲」，填写歌名《测试之歌A1》、选择分类「流行」后点发布。
+断言：出现「发布成功」提示；「我的作品」列表新增该歌曲。</textarea>
+        </div>
+        <div class="field">
+          <label for="selApp">App / 项目（取自平台配置，AI 不猜包名）</label>
+          <select id="selApp"><option>云音乐 demo（com.netease.cloudmusic.demo）</option></select>
+        </div>
+        <div class="field">
+          <label for="selDev">设备</label>
+          <select id="selDev"><option>emulator-5554 · 在线 · 空闲</option></select>
+        </div>
+        <div class="field">
+          <label>入口模式</label>
+          <div class="radio-row">
+            <label><input type="radio" name="entry" checked> AI 探索入口</label>
+            <label><input type="radio" name="entry"> 从当前页面开始</label>
+            <label><input type="radio" name="entry"> 我手动打开页面后设为入口</label>
+          </div>
+        </div>
+        <button class="btn primary" id="btnParse" style="width:100%;justify-content:center">分析需求</button>
+        <div id="parseOut"></div>
+      </aside>
+
+      <!-- B. 设备画面与入口探索 -->
+      <div class="pane col-mid">
+        <h2>📱 设备画面与入口探索 <span class="chip" id="devState">待接入</span></h2>
+        <div class="devhead">
+          <span class="name">emulator-5554</span>
+          <span class="crumb" id="crumb">路径：—</span>
+          <span class="chip hidden" id="exploreCnt"></span>
+        </div>
+        <div class="devwrap">
+          <div class="phone">
+            <div class="scr">
+              <div class="scr-indicator"></div>
+
+              <!-- 屏1：App 首页 -->
+              <div class="appscreen" id="scrHome">
+                <h5>云音乐</h5>
+                <button class="abtn" id="aBanner"><span class="em">Banner</span> 音乐人计划 · 官方活动入口</button>
+                <button class="abtn"><span class="em">🔥</span> 每日推荐</button>
+                <button class="abtn"><span class="em">📻</span> 私人电台</button>
+                <div class="tabbar">
+                  <button class="tab on" id="tabHome"><span class="em">🏠</span>首页</button>
+                  <button class="tab" id="tabMine"><span class="em">👤</span>我的</button>
+                </div>
+              </div>
+
+              <!-- 屏2：我的 -->
+              <div class="appscreen" id="scrMine">
+                <h5>我的</h5>
+                <button class="abtn" id="aCreation"><span class="em">🎛️</span> 创作中心</button>
+                <button class="abtn"><span class="em">❤️</span> 我喜欢的音乐</button>
+                <button class="abtn"><span class="em">💾</span> 我的作品 <em style="font-style:normal;color:var(--muted2)" id="worksCnt">（0）</em></button>
+                <div class="tabbar">
+                  <button class="tab" id="tabHome2"><span class="em">🏠</span>首页</button>
+                  <button class="tab on"><span class="em">👤</span>我的</button>
+                </div>
+              </div>
+
+              <!-- 屏3：创作中心 -->
+              <div class="appscreen" id="scrCreation">
+                <h5>创作中心</h5>
+                <button class="abtn" id="aPublish"><span class="em">🎵</span> 发布歌曲</button>
+                <button class="abtn"><span class="em">📄</span> 发布歌单</button>
+                <button class="abtn"><span class="em">📈</span> 数据看板</button>
+                <div class="tabbar">
+                  <button class="tab" id="tabHome3"><span class="em">🏠</span>首页</button>
+                  <button class="tab on"><span class="em">👤</span>我的</button>
+                </div>
+              </div>
+
+              <!-- 屏4：发布歌曲表单 -->
+              <div class="appscreen" id="scrPublish">
+                <h5>发布歌曲</h5>
+                <button class="abtn input" id="aSongName"><span class="em">✏️</span> <span id="songNameTxt">请输入歌名</span></button>
+                <div style="display:flex;gap:6px;margin-top:8px">
+                  <button class="abtn" style="margin:0;flex:1;justify-content:center" id="gPop">流行</button>
+                  <button class="abtn" style="margin:0;flex:1;justify-content:center">摇滚</button>
+                  <button class="abtn" style="margin:0;flex:1;justify-content:center">民谣</button>
+                </div>
+                <button class="abtn big" id="aPublishGo" style="margin-top:auto">发 布</button>
+              </div>
+
+              <!-- 屏5：发布结果 -->
+              <div class="appscreen" id="scrDone">
+                <h5>发布歌曲</h5>
+                <div class="okbanner">🎉 发布成功</div>
+                <button class="abtn"><span class="em">💾</span> 我的作品 <em style="font-style:normal;color:var(--muted2)">（1）</em></button>
+                <button class="abtn input" style="color:var(--ink)">《测试之歌A1》 · 流行 · 刚刚</button>
+              </div>
+
+              <div class="runoverlay hidden" id="runOverlay">
+                <div style="font-size:15px;font-weight:600">⚙️ Appium + pytest 试运行</div>
+                <div id="runPhase" style="color:#a1a1a6">已释放 Maestro 设备锁，Appium 接管…</div>
+                <div class="bar"><i id="runBar"></i></div>
+                <div id="runSteps" style="font:11px ui-monospace,Menlo,monospace;color:#30d158;min-height:15px"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="sidebox">
+            <div>
+              <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:7px">探索证据（截图存档）</div>
+              <div class="evidence" id="evidence"></div>
+            </div>
+            <div>
+              <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:7px">探索与编排事件流（SSE）</div>
+              <div class="console" id="console"></div>
+            </div>
+            <div id="candBox"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- C. 步骤审核 -->
+      <aside class="pane col-right">
+        <h2>🪜 步骤审核 <span class="chip hidden" id="stepCnt"></span></h2>
+        <div class="specchip hidden" id="specChip">🧩 case_spec.json · Schema 校验通过</div>
+        <div class="steplist" id="stepList">
+          <p id="stepEmpty" style="font-size:13px;color:var(--muted2);padding:8px 2px">入口确认后，AI 生成的步骤会逐条出现在这里，每条都带定位来源与断言状态。</p>
+        </div>
+        <div id="reportBox"></div>
+        <div id="zipBox"></div>
+        <div class="footacts">
+          <button class="btn" id="btnDraft" disabled>保存草稿</button>
+          <button class="btn primary" id="btnDry" disabled>试运行验证</button>
+          <button class="btn primary hidden" id="btnZip" disabled>确认并生成正式用例包</button>
+        </div>
+      </aside>
+    </div>
+  </section>
+</main>
+
+<!-- 元素定位器采集弹窗 -->
+<div class="modal hidden" id="modalLoc" role="dialog" aria-modal="true" aria-label="元素定位器采集">
+  <div class="box">
+    <h3>🎯 元素定位器 · 采集元素 <span class="chip chip-ai">由 AI 用例生成带入</span></h3>
+    <p class="sub">目标：步骤4「点击发布歌曲」· 期望控件：创作中心页的「发布歌曲」按钮 · 已带回当前页面快照</p>
+    <div class="locgrid">
+      <div class="tree" id="locTree">
+        <div class="dimn">&lt;android.widget.FrameLayout&gt;</div>
+        <div class="dimn">&nbsp;&nbsp;&lt;androidx.recyclerview…&gt;</div>
+        <div>&nbsp;&nbsp;&nbsp;&lt;android.widget.TextView text="发布歌单" /&gt;</div>
+        <div class="hit">&nbsp;&nbsp;&nbsp;&lt;android.widget.Button<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;resource-id="com.netease.cloudmusic.demo:id/btn_publish_song"<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;text="发布歌曲" clickable="true" /&gt;</div>
+        <div>&nbsp;&nbsp;&nbsp;&lt;android.widget.TextView text="数据看板" /&gt;</div>
+        <div class="dimn">&nbsp;&nbsp;&lt;/androidx.recyclerview…&gt;</div>
+        <div class="dimn">&lt;/android.widget.FrameLayout&gt;</div>
+      </div>
+      <div class="locdef">
+        <div class="kv"><b>元素名</b><code>btn_publish_song</code></div>
+        <div class="kv"><b>定位方式</b><code>resource-id（唯一命中 1 个节点）</code></div>
+        <div class="kv"><b>候选备份</b><code>text=发布歌曲</code></div>
+        <div class="kv"><b>验证</b><span class="chip chip-ok" id="locVerifyChip">✓ 实机定位验证通过（1/1）</span></div>
+        <div class="kv"><b>来源记录</b><span style="color:var(--muted)">AI 用例生成任务 job-1009 · 采集人：当前用户</span></div>
+      </div>
+    </div>
+    <div class="acts">
+      <button class="btn" id="locCancel">取消</button>
+      <button class="btn primary" id="locSave">确认并保存到元素库</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ============================================================
+   演示驱动：一套阶段函数，两条触发路径（手动点击 / 自动播放）
+   ============================================================ */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const now = () => new Date().toTimeString().slice(0, 8);
+
+const S = { stage: 'home', auto: false, stop: false };
+
+/* ---------- 通用小组件 ---------- */
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600);
+}
+function log(tag, cls, msg) {
+  const c = $('#console');
+  const ln = document.createElement('div'); ln.className = 'ln';
+  ln.innerHTML = `<span class="tm">${now()}</span><span class="tag ${cls}">[${tag}]</span><span>${msg}</span>`;
+  c.appendChild(ln); c.scrollTop = c.scrollHeight;
+  while (c.children.length > 40) c.firstChild.remove();
+}
+const STATES = ['草稿','需求解析中','待探索','探索中','待确认入口','生成步骤','待定位','待验证','验证通过','已生成用例包'];
+function setState(name) {
+  const i = STATES.indexOf(name);
+  $('#stateStrip').innerHTML = '<span class="lab">任务状态</span>' + STATES.map((s, k) =>
+    `<span class="st ${k < i ? 'past' : k === i ? 'cur' : ''}">${s}</span>`).join('');
+}
+function setChain(i) {
+  $$('#chain .node').forEach(n => {
+    const k = +n.dataset.i;
+    n.classList.toggle('done', k < i);
+    n.classList.toggle('doing', k === i);
+  });
+}
+function screen(id, back) {
+  $$('.appscreen').forEach(sc => sc.classList.remove('back'));
+  $$('.appscreen').forEach(sc => { if (sc.id !== id && sc.classList.contains('on')) sc.classList.add('back'); });
+  $$('.appscreen').forEach(sc => sc.classList.toggle('on', sc.id === id));
+  if (back) $$('.appscreen').forEach(sc => sc.classList.remove('back'));
+}
+function ripple(targetSel) {
+  const host = $(targetSel), scr = $('.phone .scr');
+  if (!host || !host.offsetParent) return;
+  const a = host.getBoundingClientRect(), b = scr.getBoundingClientRect();
+  const rp = document.createElement('div'); rp.className = 'ripple';
+  rp.style.left = (a.left - b.left + a.width / 2) + 'px';
+  rp.style.top = (a.top - b.top + a.height / 2) + 'px';
+  scr.appendChild(rp); setTimeout(() => rp.remove(), 850);
+}
+const MINIS = {
+  home:   '<i style="width:60%"></i><i class="hl"></i><i></i><i></i><i class="red"></i>',
+  mine:   '<i style="width:40%"></i><i class="hl"></i><i></i><i></i>',
+  create: '<i style="width:50%"></i><i class="hl"></i><i></i><i></i>',
+  publish:'<i style="width:45%"></i><i></i><i class="hl"></i><i class="red" style="margin-top:auto"></i>',
+  done:   '<i style="width:55%"></i><i class="red"></i><i class="hl"></i><i></i>'
+};
+function shot(kind, label) {
+  const f = document.createElement('figure'); f.className = 'shot';
+  f.innerHTML = `<div class="mini">${MINIS[kind]}</div><figcaption>${label}<br>${now()}</figcaption>`;
+  $('#evidence').appendChild(f);
+}
+function crumb(path) { $('#crumb').innerHTML = '路径：' + (path || '—'); }
+
+/* ---------- 步骤数据 ---------- */
+const STEPS = [
+  { t: '启动 App（前置：登录测试账号 u_test_01）', el: '—（前置条件）', badge: ['matched', '已确认'] },
+  { t: '点击底部 Tab「我的」',                     el: 'tab_mine',        badge: ['matched', '已匹配元素库 · 复用'] },
+  { t: '点击「创作中心」入口',                     el: 'entry_creation',  badge: ['matched', '已匹配元素库 · 复用'] },
+  { t: '点击「发布歌曲」',                         el: 'btn_publish_song', badge: ['capture', '待采集'], cap: true },
+  { t: '输入歌名《测试之歌A1》',                   el: 'input_song_name', badge: ['matched', '已匹配元素库 · 复用'] },
+  { t: '选择分类「流行」',                         el: 'chip_genre_pop',  badge: ['matched', '已匹配元素库 · 复用'] },
+  { t: '点击「发布」',                             el: 'btn_publish',     badge: ['matched', '已匹配元素库 · 复用'] },
+  { t: '断言：出现文案「发布成功」',               el: 'text=发布成功',   badge: ['assert', '断言 · 文本'] },
+  { t: '视觉断言：成功横幅区域（排除头像/时间等动态内容）', el: 'visual_assert', badge: ['assert', '断言 · 视觉'] },
+  { t: '断言：「我的作品」列表新增该歌曲',         el: 'list_first_item', badge: ['verify', '待实机验证'] },
+];
+function renderStep(i, badgeOverride) {
+  $('#stepEmpty')?.remove();
+  const d = STEPS[i];
+  const [cls, txt] = badgeOverride || d.badge;
+  const el = document.createElement('div'); el.className = 'step'; el.id = 'step' + i;
+  el.innerHTML = `<div class="row1"><i class="no">${String(i + 1).padStart(2, '0')}</i>
+    <span class="tt">${d.t}</span><span class="badge ${cls}">${txt}</span></div>
+    <div class="row2"><span class="el">${d.el}</span>${d.cap ? '<button class="capbtn" id="capBtn">打开元素定位器采集</button>' : ''}</div>`;
+  $('#stepList').appendChild(el);
+  $('#stepCnt')?.classList.remove('hidden');
+  const done = $$('#stepList .step').length;
+  if ($('#stepCnt')) $('#stepCnt').textContent = `${done}/${STEPS.length} 步`;
+}
+function focusStep(i) {
+  $$('.step').forEach(s => s.classList.remove('act-focus'));
+  $('#step' + i)?.classList.add('act-focus');
+}
+
+/* ---------- 阶段 1：进入工作台 ---------- */
+async function enterWork() {
+  if (S.stage !== 'home') return;
+  S.stage = 'entry';
+  $('#sceneHome').classList.add('hidden');
+  $('#sceneWork').classList.remove('hidden');
+  $('#devState').textContent = '待接入';
+  setState('草稿'); setChain(0);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  log('LangGraph', 'model', '任务 job-20261009-001 已创建，等待需求解析');
+}
+$('#cardAi').addEventListener('click', enterWork);
+$('#cardAi').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') enterWork(); });
+
+/* ---------- 阶段 2：解析需求（含澄清） ---------- */
+async function phaseParse() {
+  if (S.stage !== 'entry') return;
+  S.stage = 'parsing';
+  setChain(1); setState('需求解析中');
+  $('#btnParse').disabled = true;
+  $('#btnParse').textContent = '解析中…';
+  $('#devState').textContent = '待接入';
+  log('模型', 'model', '需求解析：抽取测试目标 / 前置 / 步骤 / 断言 / 待澄清…');
+  await sleep(S.auto ? 1200 : 300);
+
+  $('#parseOut').innerHTML = `
+    <div class="parse-card">
+      <h4>✨ 结构化解析结果</h4>
+      <ul>
+        <li>场景：发布歌曲主流程</li>
+        <li>前置：已登录测试账号 u_test_01</li>
+        <li>操作步骤：7 步 · 断言：3 条（文本 1 / 视觉 1 / 列表 1）</li>
+        <li>风险：发布为业务写入动作 → 仅在测试环境执行，提交前需人工确认</li>
+      </ul>
+      <div class="tags">
+        <span class="chip chip-ai">目标 1</span><span class="chip chip-ai">步骤 7</span>
+        <span class="chip chip-ai">断言 3</span><span class="chip chip-warn">待澄清 1</span>
+      </div>
+    </div>
+    <div class="clarify" id="clarifyBox">
+      <h4>❓ 待确认（需求未写明入口，AI 不擅自编造）</h4>
+      <p>需求中「从我的进入创作中心」存在两个可选入口，请选择：</p>
+      <div class="opts">
+        <button data-pick="A">A. 底部 Tab「我的」→ 创作中心（平台惯例路径）</button>
+        <button data-pick="B">B. 首页 Banner「音乐人计划」→ 发布歌曲（活动路径）</button>
+      </div>
+    </div>`;
+  $('#btnParse').textContent = '重新解析';
+  $('#btnParse').disabled = false;
+  log('LangGraph', 'model', '解析完成，生成 1 条澄清问题 → 等待人工确认');
+
+  const pick = await waitPick('#clarifyBox');
+  log('human', 'human', '人工确认：入口采用方案 ' + pick);
+  $('#clarifyBox').querySelector('.opts').innerHTML =
+    `<span class="chip chip-ok">✓ 已确认：方案 ${pick} · 底部 Tab「我的」路径</span>`;
+  S.stage = 'parsed';
+}
+function waitPick(boxSel) {
+  return new Promise(res => {
+    S._pick = res;
+    $(boxSel).classList.add('pulse');
+    if (!S.auto) $(boxSel).scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('#clarifyBox .opts button');
+  if (b && S._pick) { b.classList.add('picked'); const f = S._pick; S._pick = null; $('#clarifyBox').classList.remove('pulse'); f(b.dataset.pick); }
+});
+
+/* ---------- 阶段 3+4：设备加锁 + 探索入口 ---------- */
+async function phaseExplore() {
+  if (S.stage !== 'parsed') return;
+  S.stage = 'exploring';
+  setChain(3); setState('探索中');
+  $('#devState').textContent = 'Maestro MCP · 探索中';
+  $('#devState').className = 'chip chip-ai';
+  log('Maestro MCP', 'maestro', 'list_devices → emulator-5554 在线，获取设备独占锁 ✓');
+  await sleep(S.auto ? 900 : 200);
+  log('Maestro MCP', 'maestro', '读取当前页面：首页（UI 层级 42 节点）+ 截图');
+  screen('scrHome'); shot('home', '首页 · 起点');
+  crumb('<em>首页</em>');
+  $('#exploreCnt').classList.remove('hidden');
+  $('#exploreCnt').textContent = '探索跳转 0/15 · 上限可配置';
+  setChain(4);
+  await sleep(S.auto ? 1100 : 200);
+
+  // 跳1：首页 → 我的
+  ripple('#tabMine');
+  log('Maestro MCP', 'maestro', '点击 底部Tab「我的」（resource-id=tab_mine，元素库命中）');
+  await sleep(S.auto ? 700 : 150);
+  screen('scrMine'); shot('mine', '我的 · 第1跳');
+  crumb('首页 → <em>我的</em>');
+  $('#exploreCnt').textContent = '探索跳转 1/15 · 页面变化符合预期 ✓';
+  await sleep(S.auto ? 1000 : 200);
+
+  // 跳2：我的 → 创作中心
+  ripple('#aCreation');
+  log('Maestro MCP', 'maestro', '点击「创作中心」（text=创作中心，稳定属性）');
+  await sleep(S.auto ? 700 : 150);
+  screen('scrCreation'); shot('create', '创作中心 · 第2跳');
+  crumb('首页 → 我的 → <em>创作中心</em>');
+  $('#exploreCnt').textContent = '探索跳转 2/15 · 页面变化符合预期 ✓';
+  await sleep(S.auto ? 900 : 200);
+
+  // 发现目标页，给出候选
+  log('Maestro MCP', 'maestro', '在创作中心发现「发布歌曲」目标控件 ✓ 探索暂停');
+  log('LangGraph', 'model', '生成 2 条候选入口路径，附截图与层级证据 → 转人工确认');
+  $('#devState').textContent = '待人工确认';
+  $('#devState').className = 'chip chip-run';
+  $('#candBox').innerHTML = `
+    <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:7px">候选入口路径（带证据，AI 不静默选择）</div>
+    <div class="candidates">
+      <div class="cand reco" id="candA">
+        <div class="path">A. 首页 → 我的 → 创作中心 → 发布歌曲　<span class="chip chip-ai">AI 推荐</span></div>
+        <div class="evi"><span class="chip">3 张截图</span><span class="chip">tab_mine · 元素库命中</span><span class="chip">路径最短</span></div>
+        <div class="pick"><button class="btn primary sm pickbtn" data-c="A">选择此路径</button></div>
+      </div>
+      <div class="cand" id="candB">
+        <div class="path">B. 首页 → Banner「音乐人计划」→ 发布歌曲</div>
+        <div class="evi"><span class="chip">经活动页，多 1 层跳转</span><span class="chip">Banner 带运营参数，稳定性弱</span></div>
+        <div class="pick"><button class="btn sm pickbtn" data-c="B">选择此路径</button></div>
+      </div>
+    </div>`;
+  S.stage = 'awaitEntry';
+  setState('待确认入口');
+  if (!S.auto) $('#candBox').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('.pickbtn');
+  if (b) chooseEntry(b.dataset.c);
+});
+async function chooseEntry(c) {
+  if (S.stage !== 'awaitEntry') return;
+  S.stage = 'entryChosen';
+  const card = c === 'A' ? '#candA' : '#candB';
+  $(card).classList.add('picked');
+  $$('.pickbtn').forEach(x => x.remove());
+  log('human', 'human', `人工确认入口：路径 ${c}（确认人：当前用户 · ${now()}）`);
+  $('#devState').textContent = '入口已确认';
+  $('#devState').className = 'chip chip-ok';
+  setChain(5); setState('生成步骤');
+  await phaseSteps();
+}
+
+/* ---------- 阶段 6：生成步骤（case_spec） ---------- */
+async function phaseSteps() {
+  if (S.stage !== 'entryChosen') return;
+  S.stage = 'stepping';
+  log('LangGraph', 'model', '生成统一中间步骤文档 case_spec.json（Pydantic 校验）…');
+  $('#specChip').classList.remove('hidden');
+  for (let i = 0; i < STEPS.length; i++) {
+    renderStep(i);
+    focusStep(i);
+    log('LangGraph', 'model', `步骤 ${i + 1}/${STEPS.length} · ${STEPS[i].t}`);
+    await sleep(S.auto ? 420 : 120);
+  }
+  $('#stepCnt').textContent = `${STEPS.length}/${STEPS.length} 步`;
+  log('Platform MCP', 'platform', '元素库检索：7 个控件中 6 个可直接复用，1 个待采集（禁止重复建元素）');
+  setChain(6); setState('待定位');
+  $('#btnDraft').disabled = false;
+  const cap = $('#capBtn');
+  if (cap) { cap.classList.add('pulse'); if (!S.auto) cap.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+  S.stage = 'awaitCapture';
+}
+
+/* ---------- 阶段 7：元素映射（采集弹窗） ---------- */
+async function phaseCapture() {
+  if (S.stage !== 'awaitCapture') return;
+  S.stage = 'capturing';
+  $('#capBtn')?.classList.remove('pulse');
+  $('#modalLoc').classList.remove('hidden');
+  $('#locVerifyChip').textContent = '验证中…';
+  log('Platform MCP', 'platform', 'prepare_locator_capture：带入 App / 页面快照 / 目标描述');
+  await sleep(S.auto ? 1100 : 400);
+  $('#locVerifyChip').textContent = '✓ 实机定位验证通过（唯一命中 1/1）';
+  log('Platform MCP', 'platform', 'validate_locator：resource-id 唯一命中，实机验证通过');
+  S.stage = 'awaitSave';
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('#capBtn')) phaseCapture();
+  if (e.target.closest('#locCancel')) { $('#modalLoc').classList.add('hidden'); if (S.stage === 'awaitSave') S.stage = 'awaitCapture'; }
+});
+document.addEventListener('click', async e => {
+  if (!e.target.closest('#locSave') || S.stage !== 'awaitSave') return;
+  S.stage = 'captured';
+  $('#modalLoc').classList.add('hidden');
+  const st = $('#step3 .badge');
+  st.className = 'badge matched'; st.textContent = '已采集 · 已匹配元素库';
+  $('#step3 .el').textContent = 'btn_publish_song（新增）';
+  $('#capBtn')?.remove();
+  $('#step3').classList.remove('act-focus');
+  log('Platform MCP', 'platform', '元素 btn_publish_song 已保存（记录来源 / 定位方式 / 验证状态 / 采集人）');
+  toast('元素已保存，返回 AI 用例生成任务继续');
+  setChain(6); setState('待验证');
+  $('#btnDry').disabled = false;
+  $('#btnDry').classList.add('pulse');
+  S.stage = 'readyRun';
+});
+
+/* ---------- 阶段 8：试运行（Appium 接管） ---------- */
+const RUN_STEPS = ['启动 App ✓', '点击「我的」✓', '点击「创作中心」✓', '点击「发布歌曲」✓', '填表并发布 ✓', '断言 3/3 通过 ✓'];
+async function phaseDry() {
+  if (S.stage !== 'readyRun') return;
+  S.stage = 'running';
+  $('#btnDry').disabled = true; $('#btnDry').classList.remove('pulse');
+  setChain(7); setState('待验证');
+  log('LangGraph', 'model', '静态校验通过：元素引用 / 页面操作 / 断言参数完整');
+  log('Maestro MCP', 'maestro', '探索结束，释放设备锁 → 交接 Appium（同设备禁止双引擎并发）');
+  await sleep(S.auto ? 800 : 200);
+  $('#runOverlay').classList.remove('hidden');
+  $('#runBar').style.width = '0';
+  $('#runSteps').textContent = '';
+  log('Appium', 'appium', 'pytest 试运行开始（可复现初始状态 → 重新导航进入目标页）');
+  for (let i = 0; i < RUN_STEPS.length; i++) {
+    await sleep(S.auto ? 750 : 180);
+    $('#runPhase').textContent = `执行 ${i + 1}/${RUN_STEPS.length}`;
+    $('#runBar').style.width = ((i + 1) / RUN_STEPS.length * 100) + '%';
+    $('#runSteps').textContent = RUN_STEPS.slice(0, i + 1).join('  ');
+  }
+  await sleep(S.auto ? 500 : 150);
+  screen('scrDone'); shot('done', '发布成功 · 终态');
+  await sleep(S.auto ? 700 : 200);
+  $('#runOverlay').classList.add('hidden');
+  const st = $('#step9 .badge');
+  st.className = 'badge verified'; st.textContent = '已实机验证 ✓';
+  $('#reportBox').innerHTML = `
+    <div class="report">
+      <h4>✅ 试运行通过（现有报告体系归档）</h4>
+      <div class="kv">
+        <span>结果：<b style="color:var(--ok)">5/5 步通过 · 断言 3/3</b></span>
+        <span>耗时 42.6s</span>
+        <span><a href="javascript:void 0" onclick="return false">Allure 报告 ↗</a></span>
+        <span><a href="javascript:void 0" onclick="return false">失败录屏（本次无失败）</a></span>
+      </div>
+    </div>`;
+  log('Appium', 'appium', '试运行通过：断言「发布成功」+ 列表新增均命中，证据已归档');
+  setChain(8); setState('验证通过');
+  $('#btnZip').classList.remove('hidden');
+  $('#btnZip').disabled = false;
+  $('#btnZip').classList.add('pulse');
+  S.stage = 'readyZip';
+}
+$('#btnDry').addEventListener('click', phaseDry);
+
+/* ---------- 阶段 9：打包入库 ---------- */
+async function phaseZip() {
+  if (S.stage !== 'readyZip') return;
+  S.stage = 'zipping';
+  $('#btnZip').disabled = true; $('#btnZip').classList.remove('pulse');
+  log('Platform MCP', 'platform', '按现有上传解析规则打包三件套…');
+  await sleep(S.auto ? 900 : 250);
+  $('#zipBox').innerHTML = `
+    <div class="ziptree">
+      <b>publish_song_01_case.zip</b><br>
+      ├─ cases/app_ui/android/demoProject/<b>test_publish_song_01.py</b><br>
+      ├─ page_objects/…/elements/<b>publishSongElements.py</b><br>
+      └─ page_objects/…/pages/<b>publishSongPage.py</b>
+    </div>`;
+  await sleep(S.auto ? 900 : 250);
+  log('zip', 'zip', '用例包入库校验通过 → 已写入受管目录（备份 + 登记）✓');
+  toast('✅ 用例包已通过「用例包入库」进入平台正式用例库');
+  setChain(9); setState('已生成用例包');
+  $('#devState').textContent = '任务完成';
+  $('#devState').className = 'chip chip-ok';
+  $('#exploreCnt').textContent = '探索跳转 2/15 · 已停用';
+  S.stage = 'done';
+  endAuto();
+}
+$('#btnZip').addEventListener('click', phaseZip);
+$('#btnDraft').addEventListener('click', () => toast('草稿已保存（未验证草稿不进入正式用例列表）'));
+
+/* ---------- 自动演示驱动 ---------- */
+async function autoRun() {
+  if (S.auto) return;
+  S.auto = true; S.stop = false;
+  $('#modeChip').classList.remove('hidden');
+  $('#btnAuto').disabled = true; $('#btnStop').disabled = false;
+  const stop = () => S.stop;
+  await guard(enterWork, stop); if (S.stop) return endAuto();
+  await sleep(600);
+  const parsing = guard(phaseParse, stop);   // 解析含澄清等待，不阻塞选择
+  await sleep(S.auto ? 1900 : 300);
+  if (S._pick) { const f = S._pick; S._pick = null; $('#clarifyBox').classList.remove('pulse'); f('A'); }
+  await parsing; if (S.stop) return endAuto();
+  await sleep(600);
+  await guard(phaseExplore, stop); if (S.stop) return endAuto();
+  await sleep(1600);                    // 高亮候选路径，示意人工确认
+  await chooseEntry('A');
+  await sleep(400);
+  await guard(phaseCapture, stop); if (S.stop) return endAuto();
+  await sleep(600);
+  document.querySelector('#locSave').click();
+  await sleep(500);
+  await guard(phaseDry, stop); if (S.stop) return endAuto();
+  await sleep(900);
+  await guard(phaseZip, stop);
+  endAuto();
+}
+async function guard(fn, stop) { if (!stop()) await fn(); }
+function endAuto() {
+  S.auto = false;
+  $('#modeChip').classList.add('hidden');
+  $('#btnAuto').disabled = false; $('#btnStop').disabled = true;
+}
+$('#btnAuto').addEventListener('click', autoRun);
+$('#btnStop').addEventListener('click', () => { S.stop = true; toast('自动演示将在当前步骤后暂停'); });
+
+/* ---------- 重置 ---------- */
+$('#btnReset').addEventListener('click', () => location.reload());
+
+/* ---------- 手动模式：主按钮 ---------- */
+$('#btnParse').addEventListener('click', phaseParse);
+</script>
+</body>
+</html>

@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 用例生成 · 操作链路动态流程图</title>
+<style>
+:root {
+  color-scheme: light;
+  --brand: #0071e3; --brand-hover: #0077ed; --brand-tint: rgba(0,113,227,.08);
+  --ink: #1d1d1f; --ink2: #3a3a3c; --muted: #6e6e73; --muted2: #86868b;
+  --bg: #f5f5f7; --panel: #fff; --panel3: #f0f0f2; --dark: #1d1d1f;
+  --line: #d2d2d7; --line-soft: rgba(0,0,0,.07);
+  --ok: #1d7a3a; --ok-bg: rgba(52,199,89,.13);
+  --warn: #b25000; --bad: #d70015;
+  --ai: #8944ab; --ai-bg: rgba(175,82,222,.13);
+  --sys: #6e6e73; --sys-bg: rgba(110,110,115,.10);
+  --r-card: 18px; --r-pill: 980px;
+  --shadow: 0 4px 24px rgba(0,0,0,.06);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: var(--bg); color: var(--ink2); min-height: 100vh;
+}
+button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+button:disabled { opacity: .35; cursor: not-allowed; }
+
+/* ---------- 顶栏 ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 12px 22px; background: rgba(255,255,255,.84);
+  backdrop-filter: saturate(180%) blur(18px); -webkit-backdrop-filter: saturate(180%) blur(18px);
+  border-bottom: 1px solid var(--line-soft);
+}
+.topbar h1 { font-size: 17px; font-weight: 600; color: var(--ink); letter-spacing: -.01em; }
+.topbar .ver { font-size: 12px; color: var(--muted2); }
+.topbar .spacer { flex: 1; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13.5px; font-weight: 500; padding: 7px 16px; border-radius: var(--r-pill);
+  background: var(--panel3); color: var(--ink); transition: transform .15s, background .2s;
+  white-space: nowrap;
+}
+.btn:hover { background: #e8e8ed; }
+.btn:active { transform: scale(.97); }
+.btn.primary { background: var(--brand); color: #fff; }
+.btn.primary:hover { background: var(--brand-hover); }
+.btn.tag-ai { background: var(--ai); color: #fff; }
+.btn.tag-ai:hover { background: #9a58bd; }
+
+/* ---------- 图例 ---------- */
+.legend {
+  max-width: 1240px; margin: 0 auto; padding: 14px 22px 0;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  font-size: 12.5px; color: var(--muted);
+}
+.legend .lg { display: inline-flex; align-items: center; gap: 6px; }
+.legend .dot { width: 10px; height: 10px; border-radius: 3px; }
+.legend .ln-sample { width: 26px; height: 0; border-top: 2.2px solid; }
+
+/* ---------- 画布 ---------- */
+#wrap { position: relative; max-width: 1240px; margin: 6px auto 0; padding: 0 22px; }
+#canvasHolder { position: relative; width: 100%; }
+#canvas {
+  position: absolute; top: 0; left: 0; width: 1240px; height: 690px;
+  transform-origin: 0 0;
+  background: var(--panel); border-radius: var(--r-card); box-shadow: var(--shadow);
+}
+#edges, #dots { position: absolute; inset: 0; width: 1240px; height: 690px; }
+#dots { pointer-events: none; }
+.edgelabel {
+  font: 600 11px/1.4 -apple-system, "PingFang SC", sans-serif;
+  paint-order: stroke; stroke: #fff; stroke-width: 4px; stroke-linejoin: round;
+}
+
+/* ---------- 节点 ---------- */
+.node {
+  position: absolute; width: 180px; height: 74px;
+  background: #fff; border: 1.5px solid var(--line); border-radius: 14px;
+  padding: 9px 12px 8px 14px; transition: all .35s ease;
+}
+.node::before {
+  content: ''; position: absolute; left: -1.5px; top: 12px; bottom: 12px; width: 4px;
+  border-radius: 4px; background: var(--nc);
+}
+.node .row1 { display: flex; align-items: center; gap: 6px; }
+.node .no {
+  font-style: normal; font-size: 10px; font-weight: 700; color: #fff;
+  background: var(--nc); border-radius: 6px; padding: 1px 5px; flex-shrink: 0;
+}
+.node .em { font-size: 15px; flex-shrink: 0; }
+.node .tt { font-size: 13.5px; font-weight: 600; color: var(--ink); letter-spacing: -.01em; white-space: nowrap; }
+.node .sub { font-size: 11px; color: var(--muted2); margin-top: 4px; white-space: nowrap; }
+.node.active {
+  border-color: var(--nc); box-shadow: 0 0 0 4px color-mix(in srgb, var(--nc) 16%, transparent),
+    0 10px 28px color-mix(in srgb, var(--nc) 22%, transparent);
+  transform: translateY(-2px);
+}
+.node.wait { animation: waitRing 1.3s ease infinite; }
+@keyframes waitRing {
+  0%,100% { box-shadow: 0 0 0 3px rgba(0,113,227,.18); }
+  50%     { box-shadow: 0 0 0 9px rgba(0,113,227,0); }
+}
+.node.done { background: color-mix(in srgb, var(--nc) 7%, #fff); border-color: color-mix(in srgb, var(--nc) 38%, #fff); }
+.node.done::after {
+  content: '✓'; position: absolute; top: -8px; right: -8px; width: 19px; height: 19px;
+  background: var(--nc); color: #fff; font-size: 11px; font-weight: 700;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+}
+.node.t15.done::after { content: '🎉'; background: #fff; width: 24px; height: 24px; top: -11px; right: -11px; font-size: 14px; }
+.node.side { width: 190px; height: 52px; border-style: dashed; padding: 8px 12px; }
+.node.side .tt { font-size: 12.5px; }
+.node.side .sub { margin-top: 2px; }
+.notetext {
+  position: absolute; font-size: 10.5px; color: var(--muted2);
+  background: var(--panel3); border-radius: var(--r-pill); padding: 2px 9px; white-space: nowrap;
+}
+
+/* ---------- 说明面板 ---------- */
+.captionbar {
+  max-width: 1240px; margin: 10px auto 0; padding: 0 22px 46px;
+}
+.caption {
+  background: var(--panel); border-radius: var(--r-card); box-shadow: var(--shadow);
+  padding: 15px 20px; min-height: 84px; display: flex; gap: 14px; align-items: flex-start;
+}
+.caption .prog {
+  flex-shrink: 0; font-size: 12px; font-weight: 700; color: var(--muted2);
+  background: var(--panel3); border-radius: 10px; padding: 6px 10px; min-width: 64px; text-align: center;
+}
+.caption .body { flex: 1; min-width: 0; }
+.caption .head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.caption .head b { font-size: 15px; color: var(--ink); letter-spacing: -.01em; }
+.caption .chip {
+  font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: var(--r-pill);
+}
+.chip-ai { background: var(--ai-bg); color: var(--ai); }
+.chip-hu { background: var(--brand-tint); color: var(--brand); }
+.chip-sy { background: var(--sys-bg); color: var(--sys); }
+.chip-warn { background: rgba(255,149,0,.14); color: var(--warn); }
+.caption .desc { font-size: 13.5px; color: var(--ink2); }
+.caption .out { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+.caption .out b { color: var(--ok); font-weight: 600; }
+
+#toast {
+  position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(16px);
+  background: var(--dark); color: #fff; font-size: 13.5px; padding: 11px 22px;
+  border-radius: var(--r-pill); box-shadow: 0 10px 30px rgba(0,0,0,.3);
+  opacity: 0; pointer-events: none; transition: all .35s ease; z-index: 99; max-width: 86vw;
+}
+#toast.show { opacity: 1; transform: translateX(-50%); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <h1>AI 用例生成 · 操作链路动态流程图</h1>
+  <span class="ver">对应《AI 用例生成模块技术方案》V1.0</span>
+  <span class="spacer"></span>
+  <button class="btn primary" id="btnPlay">▶ 播放主流程</button>
+  <button class="btn" id="btnPause" disabled>⏸ 暂停</button>
+  <button class="btn tag-ai" id="btnBA" title="入口明确时：手机上手动打开页面，点「设为入口」直接确认">分支① 手动设入口</button>
+  <button class="btn tag-ai" id="btnBB" title="元素库已齐备：跳过采集直接校验">分支② 元素齐备</button>
+  <button class="btn tag-ai" id="btnBC" title="试运行失败：回退修正步骤/元素后重跑">分支③ 失败回退</button>
+  <button class="btn" id="btnSpeed">速度 1x</button>
+  <button class="btn" id="btnReset">↺ 重置</button>
+</header>
+
+<div class="legend">
+  <span class="lg"><span class="dot" style="background:var(--ai)"></span>AI 自动（LangGraph · Maestro MCP · Platform MCP）</span>
+  <span class="lg"><span class="dot" style="background:var(--brand)"></span>人工确认点（方案核心：AI 干活，人把关）</span>
+  <span class="lg"><span class="dot" style="background:var(--sys)"></span>复用现有平台能力（不重做）</span>
+  <span class="lg"><span class="ln-sample" style="border-color:#c6c6cc"></span>主链路</span>
+  <span class="lg"><span class="ln-sample" style="border-color:var(--warn);border-top-style:dashed"></span>条件分支</span>
+  <span class="lg"><span class="ln-sample" style="border-color:var(--bad);border-top-style:dashed"></span>失败回退</span>
+</div>
+
+<div id="wrap"><div id="canvasHolder">
+  <div id="canvas">
+    <svg id="edges" viewBox="0 0 1240 690" aria-hidden="true"></svg>
+    <svg id="dots" viewBox="0 0 1240 690" aria-hidden="true"></svg>
+  </div>
+</div></div>
+
+<div class="captionbar">
+  <div class="caption">
+    <div class="prog" id="prog">准备</div>
+    <div class="body">
+      <div class="head"><b id="capTitle">AI 用例生成 · 完整操作链路</b><span class="chip chip-sy" id="capChip">演示</span></div>
+      <div class="desc" id="capDesc">点击右上「▶ 播放主流程」观看全链路：需求进 → 真机探索 → 人工把关 → 试运行 → 用例包入库。三个分支按钮可单独演示条件与回退闭环。</div>
+      <div class="out" id="capOut"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ============================================================
+   动态流程图驱动：节点点亮 + 边上脉冲流动 + 分支闭环
+   ============================================================ */
+const W = 1240, H = 690;
+const $ = s => document.querySelector(s);
+const COLORS = { ai: '#8944ab', hu: '#0071e3', sy: '#6e6e73', warn: '#b25000', bad: '#d70015' };
+
+/* ---------- 节点定义 ---------- */
+const NODES = {
+  n1:  { x: 40,   y: 110, t: 'ai', em: '📥', tt: '输入需求',       sub: '需求文本 / 文档',      cap: ['人工操作', 'hu', '粘贴自然语言需求或上传需求文档；选择 App、设备与入口模式，AI 不自行猜包名。', '创建生成任务（job）'] },
+  n2:  { x: 285,  y: 110, t: 'ai', em: '✨', tt: '需求解析',       sub: 'LangGraph + 模型',    cap: ['AI 自动', 'ai', '拆出测试目标、前置条件、操作步骤、断言与风险等级；需求没写的业务规则不编造。', '结构化需求 + 待澄清清单'] },
+  n3:  { x: 530,  y: 110, t: 'hu', em: '❓', tt: '澄清确认',       sub: '补信息 / 选路径',      cap: ['人工确认', 'hu', 'AI 只给选项不代答：确认入口路径、补齐缺失信息后才能继续生成。', '已确认前置与入口意向'] },
+  n4:  { x: 775,  y: 110, t: 'ai', em: '🔎', tt: '检索现有资产',   sub: 'Platform MCP · 只读',  cap: ['AI 自动', 'ai', '只读查询元素库、页面操作、断言类型；已有元素优先复用，禁止重复创建同名元素。', '可复用清单 + 缺失清单'] },
+  n5:  { x: 1020, y: 110, t: 'ai', em: '🔒', tt: '设备加锁',       sub: '独占锁 · 引擎串行',    cap: ['AI 自动', 'ai', '校验设备在线与占用状态，获取独占锁；Maestro 与 Appium 严格串行，不抢会话。', '设备独占会话'] },
+  n6:  { x: 1020, y: 340, t: 'ai', em: '📱', tt: '真机探索入口',   sub: 'Maestro MCP',          cap: ['AI 自动', 'ai', '小步循环「观察→点击→再观察」，每步截图留证；上限 15 跳 / 5 分钟；删除、支付等高风险动作不自动提交。', '候选入口路径 + 前后证据'] },
+  n7:  { x: 775,  y: 340, t: 'hu', em: '✅', tt: '确认入口',       sub: '选路径 / 设为入口',    cap: ['人工确认', 'hu', '多候选路径列出证据供选择；也可在手机上手动打开目标页面后点「设为入口」。', '已确认入口（记录确认人 / 时间）'] },
+  n8:  { x: 530,  y: 340, t: 'ai', em: '🧩', tt: '生成 case_spec', sub: 'Schema 强校验',        cap: ['AI 自动', 'ai', '输出统一中间步骤文档（步骤 / 定位 / 断言 / 证据 / 来源）；Schema 校验不过不得进入下一步。', 'case_spec.json'] },
+  n9:  { x: 285,  y: 340, t: 'ai', em: '🗺️', tt: '元素映射',       sub: 'Platform MCP · 复用优先', cap: ['AI 自动', 'ai', '将步骤目标映射到元素库引用；未验证的候选定位需人工确认，绝不静默写入正式库。', '元素映射表 + 待采集清单'] },
+  n10: { x: 40,   y: 340, t: 'hu', em: '🎯', tt: '采集缺失元素',   sub: 'Web 元素定位器',       cap: ['人工操作', 'hu', '带着页面快照与 AI 的目标描述跳转定位器采集，实机验证通过后保存，自动返回任务继续。', '新增元素（含来源记录）'] },
+  n11: { x: 40,   y: 570, t: 'ai', em: '🧪', tt: '静态校验',       sub: '引用 / 参数完整',      cap: ['AI 自动', 'ai', '检查元素引用存在、页面操作齐备、断言参数完整；缺一不可进入试运行。', '校验通过报告'] },
+  n12: { x: 285,  y: 570, t: 'sy', em: '⚙️', tt: '试运行',         sub: 'Appium + pytest',      cap: ['现有执行引擎', 'sy', '先释放 Maestro 锁再交接；从可复现初始状态执行正式用例，复用现有截图、录屏与报告。', '通过 / 失败 + 全套证据'] },
+  n13: { x: 530,  y: 570, t: 'hu', em: '📋', tt: '结果确认',       sub: '报告 / 录屏 / 失败步骤', cap: ['人工确认', 'hu', '查看报告与失败步骤；支持修改后只重跑受影响步骤，确认通过才放行。', '验证通过确认'] },
+  n14: { x: 775,  y: 570, t: 'ai', em: '📦', tt: '打包三件套',     sub: '用例 + 元素 + 页面操作', cap: ['AI 自动', 'ai', '按现有上传解析规则生成 ZIP，目录结构与解析器契约完全一致，否则入库被拒。', 'publish_song_case.zip'] },
+  n15: { x: 1020, y: 570, t: 'sy', em: '☁️', tt: '用例包入库',     sub: '现有上传入口 ✓',       cap: ['现有平台能力', 'sy', '走「用例包入库」校验：受管目录、备份、登记，进入平台正式用例库，全程无第二套用例库。', '✅ 全链路完成'] },
+  stub:{ x: 770,  y: 218, t: 'hu', em: '🖐️', tt: '手动打开页面',   sub: '「设为入口」直达确认', side: true,
+         cap: ['人工操作', 'hu', '在手机上手动打开目标页面，回到本页点「设为入口」——适合入口明确或 AI 探索受阻时。', '入口直达确认'] },
+};
+for (const [id, n] of Object.entries(NODES)) {
+  const el = document.createElement('div');
+  el.className = 'node' + (n.side ? ' side' : '') + (id === 'n15' ? ' t15' : '');
+  el.id = id;
+  el.style.cssText = `left:${n.x}px;top:${n.y}px;--nc:${COLORS[n.t]}`;
+  el.innerHTML = `<div class="row1">${n.side ? '' : `<i class="no">${id === 'stub' ? '' : id.slice(1).padStart(2, '0')}</i>`}<span class="em">${n.em}</span><span class="tt">${n.tt}</span></div><div class="sub">${n.sub}</div>`;
+  $('#canvas').appendChild(el);
+}
+/* 节点脚注 */
+const NOTES = [
+  { x: 1018, y: 424, txt: '≤15 跳 / 5 分钟 · 高风险动作不自动提交' },
+  { x: 283,  y: 654, txt: '失败自动留证：截图 / 录屏 / 日志' },
+  { x: 1018, y: 192, txt: '被占用时不抢占、不杀进程' },
+];
+NOTES.forEach(o => {
+  const el = document.createElement('div');
+  el.className = 'notetext'; el.style.cssText = `left:${o.x}px;top:${o.y}px`; el.textContent = o.txt;
+  $('#canvas').appendChild(el);
+});
+
+/* ---------- 边定义（主链路实线 / 条件与回退虚线） ---------- */
+const EDGES = [
+  { id: 'm1',  d: 'M220,147 H281',    c: 'ai',   dash: 0 },
+  { id: 'm2',  d: 'M465,147 H526',    c: 'ai',   dash: 0 },
+  { id: 'm3',  d: 'M710,147 H771',    c: 'hu',   dash: 0 },
+  { id: 'm4',  d: 'M955,147 H1016',   c: 'ai',   dash: 0 },
+  { id: 'm5',  d: 'M1110,184 V334',   c: 'ai',   dash: 0 },
+  { id: 'm6',  d: 'M1020,377 H961',   c: 'ai',   dash: 0 },
+  { id: 'm7',  d: 'M775,377 H716',    c: 'hu',   dash: 0 },
+  { id: 'm8',  d: 'M530,377 H469',    c: 'ai',   dash: 0 },
+  { id: 'm9',  d: 'M285,377 H224',    c: 'warn', dash: 1, label: '缺元素时', lx: 254, ly: 396 },
+  { id: 'm10', d: 'M130,414 V564',    c: 'hu',   dash: 0 },
+  { id: 'm11', d: 'M220,607 H281',    c: 'ai',   dash: 0 },
+  { id: 'm12', d: 'M465,607 H526',    c: 'sy',   dash: 0 },
+  { id: 'm13', d: 'M710,607 H771',    c: 'hu',   dash: 0 },
+  { id: 'm14', d: 'M955,607 H1016',   c: 'ai',   dash: 0 },
+  { id: 'bA',  d: 'M865,272 V334',    c: 'hu',   dash: 1, label: '入口直达', lx: 920, ly: 306 },
+  { id: 'bB',  d: 'M375,414 V486 H108 V564', c: 'sy', dash: 1, label: '元素已齐备 · 跳过', lx: 250, ly: 480 },
+  { id: 'bC',  d: 'M375,570 V500 H620 V420', c: 'bad', dash: 1, label: '失败：回退修正', lx: 497, ly: 494 },
+];
+const markerFor = c => `url(#mk-${c})`;
+let svgStr = `<defs>${Object.entries(COLORS).map(([k, v]) =>
+  `<marker id="mk-${k}" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${v}"/></marker>`).join('')}</defs>`;
+for (const e of EDGES) {
+  svgStr += `<path id="p-${e.id}" d="${e.d}" fill="none" stroke="${COLORS[e.c]}" stroke-width="2.2"
+    ${e.dash ? 'stroke-dasharray="6 6"' : ''} opacity=".8" marker-end="${markerFor(e.c)}"/>`;
+  if (e.label) svgStr += `<text class="edgelabel" x="${e.lx}" y="${e.ly}" text-anchor="middle" fill="${COLORS[e.c]}">${e.label}</text>`;
+}
+$('#edges').innerHTML = svgStr;
+const edgeEl = id => $(`#p-${id}`);
+
+/* ---------- 动画驱动 ---------- */
+let runSeq = 0, paused = false, speed = 1;
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const clampSeq = s => { if (s !== runSeq) throw 'abort'; };
+
+function setNode(id, state) {
+  const el = $('#' + id);
+  el.classList.remove('active', 'done', 'wait');
+  if (state) el.classList.add(state);
+}
+function resetAll() {
+  runSeq++;
+  paused = false; $('#btnPause').textContent = '⏸ 暂停';
+  Object.keys(NODES).forEach(n => setNode(n, null));
+  $('#dots').innerHTML = '';
+  caption('准备', '演示', 'chip-sy', '已重置', '点击「▶ 播放主流程」开始，或用分支按钮演示条件与回退闭环。', '');
+}
+function caption(prog, chipTag, chipCls, title, desc, out) {
+  $('#prog').textContent = prog;
+  const chip = $('#capChip');
+  chip.textContent = chipTag; chip.className = 'chip ' + chipCls;
+  $('#capTitle').textContent = title;
+  $('#capDesc').textContent = desc;
+  $('#capOut').innerHTML = out ? '产出：<b>' + out + '</b>' : '';
+}
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 3200);
+}
+function sleepC(ms, seq) {
+  if (reduced) ms = Math.min(ms, 120);
+  return new Promise((res, rej) => {
+    let el = 0, last = performance.now();
+    (function f(t) {
+      if (seq !== runSeq) return rej('abort');
+      const dt = t - last; last = t;
+      if (!paused) el += dt * speed;
+      if (el >= ms) return res();
+      requestAnimationFrame(f);
+    })(performance.now());
+  });
+}
+function walkDot(edgeId, seq) {
+  const path = edgeEl(edgeId);
+  if (reduced) return Promise.resolve();
+  return new Promise((res, rej) => {
+    const len = path.getTotalLength();
+    const dur = Math.max(500, len * 2.2);
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    const dots = [0, .12, .24].map(op => {
+      const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      c.setAttribute('r', op === 0 ? 5 : 3.4);
+      c.setAttribute('fill', path.getAttribute('stroke'));
+      c.setAttribute('opacity', op === 0 ? 1 : op * .5);
+      g.appendChild(c); return c;
+    });
+    $('#dots').appendChild(g);
+    let el = 0, last = performance.now();
+    (function f(t) {
+      if (seq !== runSeq) { g.remove(); return rej('abort'); }
+      const dt = t - last; last = t;
+      if (!paused) el += dt * speed;
+      const head = Math.min(1, el / dur);
+      const pts = [head, head - .04, head - .08];
+      pts.forEach((p, i) => {
+        if (p < 0) { dots[i].setAttribute('opacity', 0); return; }
+        const pt = path.getPointAtLength(p * len);
+        dots[i].setAttribute('cx', pt.x); dots[i].setAttribute('cy', pt.y);
+      });
+      if (head >= 1) { setTimeout(() => g.remove(), 350); return res(); }
+      requestAnimationFrame(f);
+    })(performance.now());
+  });
+}
+async function stage(nodeId, edgeId, seq, human) {
+  clampSeq(seq);
+  if (edgeId) { try { await walkDot(edgeId, seq); } catch (e) { if (e !== 'abort') throw e; throw e; } }
+  clampSeq(seq);
+  const n = NODES[nodeId];
+  setNode(nodeId, human ? 'wait' : 'active');
+  const [chipTag, chipCls, desc, out] = n.cap;
+  const num = nodeId === 'stub' ? '旁路' : '阶段 ' + nodeId.slice(1) + '/15';
+  caption(num, chipTag, 'chip-' + chipCls, (n.em + ' ' + n.tt), desc, out);
+  await sleepC(human ? 1700 : 1150, seq);
+  clampSeq(seq);
+  setNode(nodeId, 'done');
+  if (human) { $('#capChip').textContent = '已确认 ✓'; $('#capChip').className = 'chip chip-ai'; }
+}
+
+/* ---------- 主流程 ---------- */
+const MAIN = ['n1','n2','n3','n4','n5','n6','n7','n8','n9','n10','n11','n12','n13','n14','n15'];
+const MAIN_EDGES = ['m1','m2','m3','m4','m5','m6','m7','m8','m9','m10','m11','m12','m13','m14'];
+const HUMAN = new Set(['n1', 'n3', 'n7', 'n10', 'n13']);
+async function playMain() {
+  const seq = ++runSeq;
+  setButtons(true);
+  try {
+    for (let i = 0; i < MAIN.length; i++) {
+      await stage(MAIN[i], MAIN_EDGES[i - 1], seq, HUMAN.has(MAIN[i]));
+    }
+    clampSeq(seq);
+    caption('完成', '演示结束', 'chip-sy', '🎉 用例已进入平台正式用例库',
+      '整条链路：AI 完成解析、探索、生成与打包；人在澄清、入口、采集、结果四处把关；执行与入库全部复用现有平台能力。', '');
+    toast('✅ 主流程演示完成：三件套 ZIP 已通过「用例包入库」进入正式用例库');
+  } catch (e) { if (e !== 'abort') throw e; }
+  setButtons(false);
+}
+function setButtons(running) {
+  $('#btnPlay').disabled = running;
+  $('#btnPause').disabled = !running;
+}
+
+/* ---------- 分支演示 ---------- */
+const BRANCHES = {
+  A: { nodes: ['stub', 'n7', 'n8'], edges: [null, 'bA', 'm7'],
+       end: ['分支①结束', '分支演示', 'chip-warn', '🖐️ 入口明确时的捷径',
+             '测试人员在手机上手动打开目标页面 → 点「设为入口」，跳过 AI 探索直接确认；之后的生成、映射、试运行与主流程一致。', ''] },
+  B: { nodes: ['n9', 'n11', 'n12'], edges: [null, 'bB', 'm11'],
+       end: ['分支②结束', '分支演示', 'chip-warn', '🔎 元素库已齐备时',
+             '步骤目标全部命中元素库即可跳过采集，直接进入静态校验与试运行——元素库积累越厚，AI 生成越接近全自动。', ''] },
+  C: { nodes: ['n12', 'n8', 'n9', 'n10', 'n11', 'n12'], edges: [null, 'bC', 'm8', 'm9', 'm10', 'm11'],
+       end: ['分支③结束', '分支演示', 'chip-warn', '🔁 试运行失败 ≠ 推倒重来',
+             '失败步骤、截图、日志自动归档；修正步骤或元素后回到生成/映射环节，静态校验通过即可只重跑受影响部分。', ''] },
+};
+async function playBranch(key) {
+  const seq = ++runSeq;
+  setButtons(true);
+  Object.keys(NODES).forEach(n => setNode(n, null));
+  $('#dots').innerHTML = '';
+  const b = BRANCHES[key];
+  try {
+    for (let i = 0; i < b.nodes.length; i++) {
+      await stage(b.nodes[i], b.edges[i], seq, HUMAN.has(b.nodes[i]));
+    }
+    clampSeq(seq);
+    caption(...b.end);
+  } catch (e) { if (e !== 'abort') throw e; }
+  setButtons(false);
+}
+
+/* ---------- 控件 ---------- */
+$('#btnPlay').addEventListener('click', () => { Object.keys(NODES).forEach(n => setNode(n, null)); $('#dots').innerHTML = ''; playMain(); });
+$('#btnBA').addEventListener('click', () => playBranch('A'));
+$('#btnBB').addEventListener('click', () => playBranch('B'));
+$('#btnBC').addEventListener('click', () => playBranch('C'));
+$('#btnPause').addEventListener('click', () => {
+  paused = !paused;
+  $('#btnPause').textContent = paused ? '▶ 继续' : '⏸ 暂停';
+});
+$('#btnSpeed').addEventListener('click', () => {
+  speed = speed === 1 ? 2 : 1;
+  $('#btnSpeed').textContent = '速度 ' + speed + 'x';
+});
+$('#btnReset').addEventListener('click', resetAll);
+
+/* ---------- 自适应缩放 ---------- */
+function fit() {
+  const w = $('#canvasHolder').clientWidth;
+  const s = Math.min(1, w / W);
+  $('#canvas').style.transform = `scale(${s})`;
+  $('#canvasHolder').style.height = H * s + 'px';
+}
+addEventListener('resize', fit); fit();
+</script>
+</body>
+</html>
