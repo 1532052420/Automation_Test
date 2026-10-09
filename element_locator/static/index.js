@@ -2322,6 +2322,10 @@ function pkgMethodBlock(step) {
         assertLines.push("self.appOperator.assert_text_or_record(failures, '" + no + "·文本', probe, expected='" + escQ(a.text || '') + "')");
       } else if (a.v === 'toast') {
         assertLines.push("self.appOperator.assert_toast_or_record(failures, '" + no + "·Toast', '" + escQ(a.toast || '') + "', wait_seconds=5)");
+      } else if (a.v === 'text_page') {
+        assertLines.push("self.appOperator.assert_page_text_or_record(failures, '" + no + "·页面文本', '" + escQ(a.text || '') + "', wait_seconds=5)");
+      } else if (a.v === 'text_page_gone') {
+        assertLines.push("self.appOperator.assert_page_text_gone_or_record(failures, '" + no + "·文案消失', '" + escQ(a.text || '') + "', wait_seconds=5)");
       } else if (a.v === 'gone') {
         assertLines.push(probeBodyLines(el, String(a.wait == null ? 2 : a.wait)));
         assertLines.push("self.appOperator.assert_gone_or_record(failures, '" + no + "·消失', probe, wait_seconds=" + (a.wait == null ? 2 : a.wait) + ")");
