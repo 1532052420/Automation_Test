@@ -724,6 +724,33 @@ class AppOperator:
                 detail = str(e)[:160] or detail
         self._assert_step(failures, desc, ok, detail)
 
+    def assert_page_text_gone_or_record(self, failures, desc, text, wait_seconds=5):
+        """断言页面文案不再出现（多断言版）：页面级，等待期内任意节点文本仍包含该文案即失败（v6.14.113）。
+        场景：删除歌曲/删除评论后，断言列表中不再有该条目名称。探针与「页面文本出现」同构，方向相反。"""
+        still_there = False
+        detail = ''
+        if text:
+            probe = CreateElement.create(Locator_Type.XPATH, "//*[contains(@text,'%s')]" % text, None,
+                                         Wait_By.PRESENCE_OF_ELEMENT_LOCATED, wait_seconds=wait_seconds)
+            try:
+                el = self.getElement(probe)
+                still_there = True
+                try:
+                    detail = '仍存在含「%s」的节点（text=%s）' % (text, (el.text or '')[:60])
+                except Exception:
+                    detail = '仍存在含「%s」的节点' % text
+            except Exception as e:
+                detail = str(e)[:160]   # 等待期满未找到 = 消失成立
+        else:
+            detail = '未填写待消失文案'
+        ok = not still_there and bool(text)
+        if not ok and still_there:
+            try:
+                self.get_screenshot('文案未消失_' + text[:20])
+            except Exception:
+                pass
+        self._assert_step(failures, desc, ok, detail)
+
     def assert_visual_or_record(self, failures, desc, element, baseline='', threshold=0.95, wait_seconds=3):
         """视觉断言（多断言版）：元素区域截图 vs 基线相似度；
         基线缺失→自动建立（通过并在报告注明）；尺寸不一致→不硬比；

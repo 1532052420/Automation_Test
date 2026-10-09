@@ -57,6 +57,7 @@ var ASSERT_KINDS = [
   { v: 'text', n: '断言文本是否正确', d: '文案相等', p: { text: '' } },
   { v: 'toast', n: '断言Toast是否出现', d: '页面级', p: { toast: '' } },
   { v: 'text_page', n: '断言页面文本出现', d: '页面级', p: { text: '' } },
+  { v: 'text_page_gone', n: '断言文案不再出现', d: '页面级', p: { text: '' } },
   { v: 'gone', n: '断言元素是否消失', d: '弹窗已关闭', p: { wait: 2 } },
   { v: 'visual', n: '视觉资产', d: '采集图片入资产库，执行时基线比对', p: { threshold: 0.95, asset: '' }, isNew: true, needVa: true },
 ];
@@ -101,6 +102,7 @@ function renderAssertCol() {
       if (d.v === 'text') p = '<label>期望文本<input value="' + esc(r.text == null ? '' : r.text) + '" data-af="text" placeholder="如：写新歌"></label>';
       if (d.v === 'toast') p = '<label class="wide">Toast 文本<input value="' + esc(r.toast == null ? '' : r.toast) + '" data-af="toast" placeholder="如：已加入歌单"></label>';
       if (d.v === 'text_page') p = '<label class="wide">期望文本（页面包含即可）<input value="' + esc(r.text == null ? '' : r.text) + '" data-af="text" placeholder="如：发布成功"></label>';
+      if (d.v === 'text_page_gone') p = '<label class="wide">期望消失的文案<input value="' + esc(r.text == null ? '' : r.text) + '" data-af="text" placeholder="如：已删除的歌曲名"></label>';
       if (d.v === 'gone') p = '<label>等待秒数<input type="number" value="' + esc(r.wait == null ? 2 : r.wait) + '" data-af="wait"></label>';
       if (d.v === 'visual') {
         var vaOn = (typeof va !== 'undefined' && va.on);
