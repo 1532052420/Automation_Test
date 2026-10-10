@@ -71,6 +71,7 @@ const ICONS = {
         + '<path d="M4.5 15.5v2.9a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.9"/>',
   scan: '<path d="M4 8.2V6a2 2 0 0 1 2-2h2.2M15.8 4H18a2 2 0 0 1 2 2v2.2M20 15.8V18a2 2 0 0 1-2 2h-2.2M8.2 20H6a2 2 0 0 1-2-2v-2.2"/>'
       + '<circle cx="12" cy="12" r="3.1"/>',
+  screen: '<rect x="3" y="4.2" width="18" height="12.6" rx="2"/><path d="M12 16.8v3.4M8.2 20.2h7.6"/>',
   ai: '<path d="M12 3.6 13.8 8.6 18.8 10.4 13.8 12.2 12 17.2 10.2 12.2 5.2 10.4 10.2 8.6Z"/>'
     + '<path d="M18.4 15.2 19.2 17.4 21.4 18.2 19.2 19 18.4 21.2 17.6 19 15.4 18.2 17.6 17.4Z"/>',
   bolt: '<path d="M13.2 2.8 5.8 13.2h4.9L10.8 21.2 18.2 10.8h-4.9Z"/>',
@@ -517,6 +518,27 @@ function initIndex() {
       ' ' + p(t.getHours()) + ':' + p(t.getMinutes());
     el.hidden = false;
   }).catch(() => { /* 状态获取失败不影响首页 */ });
+
+  // 投屏控制台卡片：显示 escrcpy 状态，点击一键拉起桌面 App
+  const ecEl = document.querySelector('#escrcpyStatus');
+  api('/api/escrcpy/status').then(d => {
+    if (!d.ok || !ecEl) return;
+    ecEl.textContent = d.running ? '运行中' : (d.installed ? '已部署 · 未运行' : '未部署');
+    ecEl.hidden = false;
+  }).catch(() => {});
+  const ecCard = document.querySelector('#cardEscrcpy');
+  if (ecCard) ecCard.addEventListener('click', async (e) => {
+    e.preventDefault();
+    toast('正在启动 escrcpy…（首次启动约需几秒）');
+    let d;
+    try { d = await postJson('/api/escrcpy/launch', {}); }
+    catch (err) { return toast('启动请求失败', false); }
+    toast(d.ok ? '✓ escrcpy 已启动：在本机屏幕 / Dock 找到它的窗口' : (d.msg || '启动失败'), d.ok);
+    if (d.ok && ecEl) {
+      ecEl.textContent = '运行中'; ecEl.hidden = false;
+    }
+    api('/api/escrcpy/status').catch(() => {});
+  });
 }
 
 /* 统计卡右上角的淡色线性图标：图标定义只在 app.js 一处，模板只声明用哪个（测试报告页用） */

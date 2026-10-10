@@ -10,12 +10,31 @@
 两端不再各自硬编码版本号。
 """
 
-APP_VERSION = '6.14.130'
+APP_VERSION = '6.14.132'
 
 # 最新版本在最前；time 精确到秒（YYYY-MM-DD HH:MM:SS）
 # 版本号格式 x.xx.x 自 6.11.0 起强制执行；更早的历史条目保留原始记录，不回溯改写
 # 每条变更一句话 10~20 字，只说改了什么（详细背景见项目 memory 与设计文档）
 CHANGELOG = [
+    {
+        'version': '6.14.132',
+        'time': '2026-10-10 12:36:03',
+        'title': '新增独立项目「escrcpy 投屏控制台」：首页卡片一键拉起桌面投屏',
+        'changes': [
+            '部署 escrcpy v3.3.1（scrcpy 图形化封装：实时镜像/控制/录屏/截图/群控/AI 助手）到独立目录 escrcpy/，与 damai_u2 同等对待（App 本体不入库）',
+            '首页新增「投屏控制台」卡片：显示运行状态，点击由平台后端一键拉起桌面 App（自动清 quarantine，首次启动自动放行）',
+            '新增 API：escrcpy/status（安装/运行状态）、escrcpy/launch（启动，惰性导入 escrcpy/launcher.py，远端仓库无该目录时安全降级为未部署）',
+        ],
+    },
+    {
+        'version': '6.14.131',
+        'time': '2026-10-10 12:01:45',
+        'title': '新增投屏工具对比页：GitHub Top5 + Sonic 六工具功能全景矩阵',
+        'changes': [
+            '新增 docs/phone_screen_tools_comparison.html：scrcpy/escrcpy/QtScrcpy/ya-webadb/stf/Sonic 六工具对比，21 项功能矩阵 + 评分卡（使用度50%好评度35%维护15%）+ 场景选型',
+            '数据取自 GitHub API 实时核验（2026-10-10）：星数/提交时间/协作者比；Sonic 已归档按需求保留对比并橙色标注',
+        ],
+    },
     {
         'version': '6.14.130',
         'time': '2026-10-10 11:50:00',

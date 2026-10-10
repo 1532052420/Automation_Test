@@ -189,6 +189,33 @@ def api_service_shutdown():
                     'msg': '全部平台服务进程正在结束（%d 个）' % len(pids)})
 
 
+# ---------------- escrcpy 投屏控制台（独立项目 escrcpy/，Electron 桌面应用） ----------------
+# escrcpy 不是 web 服务——这里只提供「检测状态 + 一键拉起桌面 App」；
+# 惰性导入 escrcpy.launcher：仓库远端没有该目录时接口返回未部署，不影响平台其他功能。
+
+@bp.route('/api/escrcpy/status')
+def api_escrcpy_status():
+    try:
+        from escrcpy.launcher import status
+    except Exception as e:
+        return jsonify({'ok': True, 'installed': False, 'running': False,
+                        'msg': 'escrcpy 项目未部署（%s）' % str(e)[:80]})
+    return jsonify({'ok': True, **status()})
+
+
+@bp.route('/api/escrcpy/launch', methods=['POST'])
+def api_escrcpy_launch():
+    try:
+        from escrcpy.launcher import launch
+    except Exception as e:
+        return jsonify({'ok': False, 'msg': 'escrcpy 项目未部署（%s）' % str(e)[:80]})
+    ok, info = launch()
+    if ok:
+        return jsonify({'ok': True, 'msg': 'escrcpy 已启动（在本机屏幕/Dock 找到它的窗口）',
+                        'app_path': info})
+    return jsonify({'ok': False, 'msg': info})
+
+
 @bp.route('/api/status')
 def api_status():
     confs = list_devices_conf_files()
