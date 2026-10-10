@@ -10,12 +10,30 @@
 两端不再各自硬编码版本号。
 """
 
-APP_VERSION = '6.14.124'
+APP_VERSION = '6.14.126'
 
 # 最新版本在最前；time 精确到秒（YYYY-MM-DD HH:MM:SS）
 # 版本号格式 x.xx.x 自 6.11.0 起强制执行；更早的历史条目保留原始记录，不回溯改写
 # 每条变更一句话 10~20 字，只说改了什么（详细背景见项目 memory 与设计文档）
 CHANGELOG = [
+    {
+        'version': '6.14.126',
+        'time': '2026-10-10 10:55:00',
+        'title': '元素定位器动画页再提速 40 倍：快照四件套设置，写歌页 24s → 4.3s',
+        'changes': [
+            '设置矩阵实验定位真因：写歌等重动画页 dump 慢与等待超时无关，元凶是逐节点遍历动画视图——ignoreUnimportantViews（跳过动画容器等不重要视图）+ simpleBoundsCalculation（快速边界计算）两开关后 18~30s → 0.2~0.5s',
+            'u2 会话建立与每次 dump 前均写入快照四件套（waitForIdle/SelectorTimeout=0 + ignoreUnimportantViews + simpleBoundsCalculation），写歌页端到端⚡刷新 24s → 4.3s 稳定，关键元素完整保留',
+        ],
+    },
+    {
+        'version': '6.14.125',
+        'time': '2026-10-10 10:36:13',
+        'title': '修复元素定位器刷新偶发 40s+：会话快照设置每次 dump 前重申自愈',
+        'changes': [
+            '修复 偶发：快照设置（waitForSelectorTimeout=0）在建会话时一次性写入且不校验，偶发未生效的会话此后所有 dump 退回 9~15s 慢速，叠加 30s 冷却即复现「刷新 40 多秒」',
+            '改为每次 /source 前重申设置（实测 ~10ms 开销可忽略），会话状态异常自愈；写歌页连续 5 次实测 1.5~1.6s 稳定，树与前台页面比对无串台',
+        ],
+    },
     {
         'version': '6.14.124',
         'time': '2026-10-10 10:22:53',
