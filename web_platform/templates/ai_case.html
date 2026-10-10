@@ -10,13 +10,14 @@
 <style>
 /* 页面级样式（.aic- 前缀，token 全部取自平台 style.css 变量，日夜主题自动跟随） */
 .hidden { display: none !important; }
-.aic-main { max-width: 1280px; margin: 0 auto; padding: 26px 22px 60px; }
+.aic-main { flex: 1; min-width: 0; max-width: 1280px; padding: 26px 22px 60px; }
 .aic-head { display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
 .aic-head h1 { font-size: 22px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; }
 .aic-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
 .aic-phase { margin-left: auto; font-size: 12px; color: var(--brand); background: var(--brand-tint);
   border-radius: var(--r-pill); padding: 4px 12px; }
 .aic-grid { display: grid; grid-template-columns: 340px minmax(380px, 1fr) 380px; gap: 16px; align-items: start; }
+.aic-grid .aic-panel { min-width: 0; }   /* 防 grid 项被最小内容宽撑破窄屏 */
 .aic-panel { background: var(--panel); border-radius: var(--r-card); box-shadow: var(--shadow); padding: 18px; }
 .aic-panel > h2 { font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 14px; }
 .aic-panel label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin: 12px 0 5px; }
@@ -25,38 +26,26 @@
   width: 100%; font: inherit; font-size: 13px; color: var(--ink);
   border: 1px solid var(--line); border-radius: var(--r-input); padding: 9px 11px; background: var(--panel2);
 }
-.aic-panel textarea { resize: vertical; min-height: 120px; line-height: 1.55; }
+.aic-panel textarea { resize: vertical; line-height: 1.55; }
+.aic-panel textarea#aicReq { min-height: 120px; }
+.aic-panel textarea.p-fsm { font: 12px/1.7 ui-monospace, Menlo, Consolas, monospace; }
 .aic-radio { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--ink2); }
 .aic-radio .aic-opt { display: flex; align-items: flex-start; gap: 7px; font-weight: 400;
   margin: 0; cursor: pointer; text-align: left; }
 .aic-radio .aic-opt input { width: auto; margin-top: 3px; }
 .aic-radio .aic-opt span { flex: 1; }
-.aic-btn { display: inline-flex; align-items: center; justify-content: center; width: 100%;
-  font-size: 14px; font-weight: 600; padding: 10px; border-radius: var(--r-pill);
+.aic-btn { display: inline-flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 600; padding: 10px 18px; border-radius: var(--r-pill);
   background: var(--brand); color: #fff; margin-top: 14px; transition: background .2s; }
 .aic-btn:hover { background: var(--brand-hover); }
 .aic-btn:disabled { opacity: .4; cursor: not-allowed; }
-.aic-ghost { font-size: 13px; color: var(--bad); background: none; border: 1px solid var(--line);
+.aic-btn.sm { padding: 7px 14px; font-size: 12.5px; margin-top: 0; }
+.aic-ghost { font-size: 12.5px; color: var(--brand); background: none; border: 1px solid var(--line);
   border-radius: var(--r-pill); padding: 6px 14px; margin-top: 12px; }
-.aic-ghost:hover { background: var(--bad-bg); border-color: var(--bad); }
+.aic-ghost:hover { background: var(--brand-tint); border-color: var(--brand); }
+.aic-ghost.danger { color: var(--bad); }
+.aic-ghost.danger:hover { background: var(--bad-bg); border-color: var(--bad); }
 .aic-note { font-size: 12px; color: var(--muted2); margin-top: 8px; }
-.aic-observe { border: 1px solid var(--line-soft); border-radius: 14px; padding: 12px 14px;
-  margin-bottom: 14px; background: var(--panel2); }
-.aic-ob-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-.aic-ob-head h2 { font-size: 13px; margin: 0; font-weight: 600; color: var(--ink); }
-.aic-ob-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
-.aic-ob-body { display: flex; gap: 12px; align-items: flex-start; }
-.aic-screen { width: 186px; min-height: 300px; border: 6px solid #111; border-radius: 18px;
-  background: #fff; overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.aic-screen img { width: 100%; display: block; }
-.aic-shot-empty { font-size: 11.5px; color: var(--muted2); padding: 12px; text-align: center; }
-.aic-ob-side { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.aic-ob-side .aic-btn { width: 100%; margin-top: 0; padding: 8px; font-size: 13px; }
-.aic-ob-side .aic-ghost { margin-top: 0; text-align: center; }
-.aic-ob-side .aic-ghost.danger { color: var(--warn); }
-.aic-hierout { font: 11px/1.7 ui-monospace, Menlo, monospace; background: var(--panel3);
-  border-radius: 10px; padding: 8px 10px; color: var(--muted); max-height: 148px;
-  overflow-y: auto; margin-top: 2px; word-break: break-all; }
 .aic-recent { margin-top: 18px; border-top: 1px solid var(--line-soft); padding-top: 12px; }
 .aic-recent h3 { font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
 .aic-jobrow { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
@@ -104,79 +93,204 @@
 .aic-step .no { font-weight: 700; color: var(--muted2); font-size: 11px; flex-shrink: 0; }
 .aic-step .tt { flex: 1; color: var(--ink); min-width: 0; }
 .aic-empty { font-size: 13px; color: var(--muted2); padding: 6px 2px; }
+/* 设备观察区 */
+.aic-observe { border: 1px solid var(--line-soft); border-radius: 14px; padding: 12px 14px;
+  margin-bottom: 14px; background: var(--panel2); }
+.aic-ob-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.aic-ob-head h2 { font-size: 13px; margin: 0; font-weight: 600; color: var(--ink); }
+.aic-ob-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.aic-ob-body { display: flex; gap: 12px; align-items: flex-start; }
+.aic-screen { width: 186px; min-height: 300px; border: 6px solid #111; border-radius: 18px;
+  background: #fff; overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.aic-screen img { width: 100%; display: block; }
+.aic-shot-empty { font-size: 11.5px; color: var(--muted2); padding: 12px; text-align: center; }
+.aic-ob-side { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.aic-ob-side .aic-btn { width: 100%; margin-top: 0; padding: 8px; font-size: 13px; }
+.aic-ob-side .aic-ghost { margin-top: 0; text-align: center; }
+.aic-ob-side .aic-ghost.danger { color: var(--warn); }
+.aic-hierout { font: 11px/1.7 ui-monospace, Menlo, monospace; background: var(--panel3);
+  border-radius: 10px; padding: 8px 10px; color: var(--muted); max-height: 148px;
+  overflow-y: auto; margin-top: 2px; word-break: break-all; }
+/* 配置中心 */
+.aic-cfg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(430px, 1fr)); gap: 16px; align-items: start; }
+.aic-cfg-grid .aic-panel { min-width: 0; }
+.aic-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink2);
+  margin: 10px 0 2px; cursor: pointer; }
+.aic-check input { width: auto; }
+.aic-cfg-row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.aic-cfg-row .fld { flex: 1; min-width: 130px; }
+.aic-cfg-row .fld label { margin-top: 0; }
+.aic-projrow { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink2);
+  padding: 6px 4px; border-bottom: 1px solid var(--line-soft); }
+.aic-projrow:last-of-type { border-bottom: none; }
+.aic-projrow .pname { font-weight: 600; color: var(--ink); flex-shrink: 0; }
+.aic-projrow .ppkg { flex: 1; min-width: 0; font: 11.5px ui-monospace, Menlo, monospace;
+  color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aic-projrow button { font-size: 11.5px; border-radius: var(--r-pill); padding: 2px 10px;
+  background: var(--panel3); color: var(--muted); flex-shrink: 0; }
+.aic-projrow button:hover { color: var(--bad); background: var(--bad-bg); }
+.aic-projrow button.bind { color: var(--brand); }
+.aic-projrow button.bind:hover { background: var(--brand-tint); }
+.aic-testline { font-size: 12.5px; margin-top: 8px; min-height: 18px; }
 @media (max-width: 1100px) { .aic-grid { grid-template-columns: 1fr; } }
+@media (max-width: 960px) { .aic-cfg-grid { grid-template-columns: 1fr; } }
+@media (max-width: 620px) {
+  .aic-ob-body { flex-direction: column; }
+  .aic-screen { width: 100%; }
+  .aic-ob-side { width: 100%; }
+}
 </style>
 </head>
 <body data-page="ai-case">
 <header class="gnav" id="sidebar"></header>
-<main class="aic-main">
-  <div class="aic-head">
-    <div>
-      <h1>AI 用例生成</h1>
-      <p class="aic-sub">输入需求，AI 结合真实 App 页面生成并验证自动化用例 · 需求没写明的信息 AI 只提问，不编造</p>
+<main class="runlayout">
+  <aside class="subnav" id="subnav">
+    <div class="subnav-label">AI 用例生成</div>
+    <a href="#workbench" data-panel="workbench" class="on">生成工作台</a>
+    <a href="#config" data-panel="config">配置项</a>
+  </aside>
+
+  <div class="aic-main">
+    <div class="aic-head">
+      <div>
+        <h1>AI 用例生成</h1>
+        <p class="aic-sub">输入需求，AI 结合真实 App 页面生成并验证自动化用例 · 需求没写明的信息 AI 只提问，不编造</p>
+      </div>
+      <span class="aic-phase" id="aicPhase">—</span>
     </div>
-    <span class="aic-phase" id="aicPhase">P1 已接入：需求解析 · 状态机 · 事件流</span>
-  </div>
 
-  <div class="aic-grid">
-    <aside class="aic-panel">
-      <h2>① 需求与任务配置</h2>
-      <label for="aicReq">需求描述（自然语言 / 需求文档粘贴）</label>
-      <textarea id="aicReq" placeholder="例：验证「发布歌曲」主流程：从「我的」进入「创作中心」，点击「发布歌曲」，输入歌名《测试之歌A1》、选择分类「流行」后点发布。断言：出现「发布成功」提示；列表新增该歌曲。"></textarea>
-      <label for="aicProject">项目</label>
-      <select id="aicProject"><option value="">（未配置项目）</option></select>
-      <label for="aicPkg">App 包名（取自项目配置或手动填写，AI 不猜测）</label>
-      <input id="aicPkg" placeholder="com.example.app">
-      <label for="aicDevice">设备</label>
-      <select id="aicDevice"></select>
-      <p class="aic-note" id="aicDeviceNote"></p>
-      <label>入口模式</label>
-      <div class="aic-radio" id="aicEntryModes"></div>
-      <button class="aic-btn" id="aicCreate">分析需求</button>
-      <div class="aic-recent">
-        <h3>最近任务（点击恢复）</h3>
-        <div id="aicRecent"><p class="aic-empty">暂无任务</p></div>
-      </div>
-    </aside>
+    <!-- ========== 面板一：生成工作台 ========== -->
+    <section id="panel-workbench">
+      <div class="aic-grid">
+        <aside class="aic-panel">
+          <h2>① 需求与任务配置</h2>
+          <label for="aicReq">需求描述（自然语言 / 需求文档粘贴）</label>
+          <textarea id="aicReq" placeholder="例：验证「发布歌曲」主流程：从「我的」进入「创作中心」，点击「发布歌曲」，填写歌名《测试之歌A1》、选择分类「流行」后点发布。断言：出现「发布成功」提示；列表新增该歌曲。"></textarea>
+          <p class="aic-note" id="aicResolved">目标项目：—（在「配置项 → 项目与设备」中设置默认项目与设备）</p>
+          <label>入口模式</label>
+          <div class="aic-radio" id="aicEntryModes"></div>
+          <button class="aic-btn" id="aicCreate" style="width:100%;justify-content:center">分析需求</button>
+          <div class="aic-recent">
+            <h3>最近任务（点击恢复）</h3>
+            <div id="aicRecent"><p class="aic-empty">暂无任务</p></div>
+          </div>
+        </aside>
 
-    <section class="aic-panel">
-      <h2>② 任务状态与事件流</h2>
-      <div class="aic-observe">
-        <div class="aic-ob-head">
-          <h2>📱 设备观察</h2>
-          <div class="aic-ob-tags">
-            <span class="aic-tag" id="aicObMaestro">Maestro: —</span>
-            <span class="aic-tag" id="aicObDev">设备：—</span>
-            <span class="aic-tag" id="aicObLock">锁：未锁定</span>
-            <span class="aic-tag" id="aicObLimit">上限：—</span>
+        <section class="aic-panel">
+          <h2>② 任务状态与事件流</h2>
+          <div class="aic-observe">
+            <div class="aic-ob-head">
+              <h2>📱 设备观察</h2>
+              <div class="aic-ob-tags">
+                <span class="aic-tag" id="aicObMaestro">Maestro: —</span>
+                <span class="aic-tag" id="aicObDev">设备：—</span>
+                <span class="aic-tag" id="aicObLock">锁：未锁定</span>
+                <span class="aic-tag" id="aicObLimit">上限：—</span>
+              </div>
+            </div>
+            <div class="aic-ob-body">
+              <div class="aic-screen">
+                <img id="aicShot" class="hidden" alt="设备画面">
+                <div class="aic-shot-empty" id="aicShotEmpty">在「配置项」绑定默认设备后，点「刷新画面」</div>
+              </div>
+              <div class="aic-ob-side">
+                <button class="aic-btn" id="aicShotBtn">刷新画面</button>
+                <button class="aic-ghost" id="aicHierBtn">读取层级</button>
+                <button class="aic-ghost" id="aicLockBtn">锁定设备</button>
+                <div class="aic-hierout" id="aicHierOut">层级摘要：—</div>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="aic-ob-body">
-          <div class="aic-screen">
-            <img id="aicShot" class="hidden" alt="设备画面">
-            <div class="aic-shot-empty" id="aicShotEmpty">左侧选择在线设备后，点「刷新画面」</div>
-          </div>
-          <div class="aic-ob-side">
-            <button class="aic-btn" id="aicShotBtn">刷新画面</button>
-            <button class="aic-ghost" id="aicHierBtn">读取层级</button>
-            <button class="aic-ghost" id="aicLockBtn">锁定设备</button>
-            <div class="aic-hierout" id="aicHierOut">层级摘要：—</div>
-          </div>
-        </div>
+          <div class="aic-states" id="aicStates"><p class="aic-empty">尚未创建任务：左侧录入需求后点「分析需求」</p></div>
+          <div class="aic-meta" id="aicMeta"></div>
+          <div id="aicClarify"></div>
+          <div class="aic-console" id="aicEvents"></div>
+          <button class="aic-ghost danger" id="aicCancel" hidden>取消任务</button>
+        </section>
+
+        <aside class="aic-panel">
+          <h2>③ 解析结果与步骤</h2>
+          <div id="aicAnalysis"><p class="aic-empty">解析结果将显示在这里</p></div>
+          <div class="aic-sec"><h3>操作步骤（P3 起映射元素库）</h3><div id="aicSteps"><p class="aic-empty">—</p></div></div>
+          <div class="aic-sec"><h3>断言</h3><div id="aicAsserts"><p class="aic-empty">—</p></div></div>
+        </aside>
       </div>
-      <div class="aic-states" id="aicStates"><p class="aic-empty">尚未创建任务：左侧录入需求后点「分析需求」</p></div>
-      <div class="aic-meta" id="aicMeta"></div>
-      <div id="aicClarify"></div>
-      <div class="aic-console" id="aicEvents"></div>
-      <button class="aic-ghost" id="aicCancel" hidden>取消任务</button>
     </section>
 
-    <aside class="aic-panel">
-      <h2>③ 解析结果与步骤</h2>
-      <div id="aicAnalysis"><p class="aic-empty">解析结果将显示在这里</p></div>
-      <div class="aic-sec"><h3>操作步骤（P3 起映射元素库）</h3><div id="aicSteps"><p class="aic-empty">—</p></div></div>
-      <div class="aic-sec"><h3>断言</h3><div id="aicAsserts"><p class="aic-empty">—</p></div></div>
-    </aside>
+    <!-- ========== 面板二：配置项 ========== -->
+    <section id="panel-config" class="hidden">
+      <div class="aic-cfg-grid">
+
+        <aside class="aic-panel">
+          <h2>📱 项目与设备 <span class="aic-tag" id="aicProjCnt">0 个项目</span></h2>
+          <div id="aicProjList"><p class="aic-empty">还没有绑定项目</p></div>
+          <div class="aic-cfg-row" style="margin-top:10px">
+            <div class="fld"><label>项目名称</label><input id="aicProjName" placeholder="例：云音乐 demo"></div>
+            <div class="fld"><label>App 包名</label><input id="aicProjPkg" placeholder="com.example.app"></div>
+            <button class="aic-btn sm" id="aicProjAdd" style="margin-bottom:1px">添加</button>
+          </div>
+          <label>默认项目（创建任务时自动带出包名）</label>
+          <select id="aicDefProject"></select>
+          <label>默认设备</label>
+          <select id="aicDefDevice"></select>
+          <p class="aic-note" id="aicDeviceNote"></p>
+          <button class="aic-btn" id="aicDefSave" style="width:100%;justify-content:center">保存默认项目与设备</button>
+        </aside>
+
+        <aside class="aic-panel">
+          <h2>🤖 模型配置 <span class="aic-tag" id="aicModelState">未启用</span></h2>
+          <label class="aic-check"><input type="checkbox" id="aicMlEnabled"> 启用模型解析（关闭 = 仅规则解析器）</label>
+          <label>Base URL（GLM / OpenAI 风格 chat completions 地址）</label>
+          <input id="aicMlUrl" placeholder="https://open.bigmodel.cn/api/paas/v4/chat/completions">
+          <label>API Key（服务端保存，回显脱敏；留空=保持不变，输入 __CLEAR__ 清除）</label>
+          <input id="aicMlKey" type="password" placeholder="—">
+          <div class="aic-cfg-row">
+            <div class="fld"><label>模型名</label><input id="aicMlName" placeholder="glm-4.7"></div>
+            <div class="fld" style="max-width:110px"><label>超时（秒）</label><input id="aicMlTimeout" type="number" min="1" max="300" value="20"></div>
+          </div>
+          <div class="aic-cfg-row" style="margin-top:12px">
+            <button class="aic-btn sm" id="aicMlSave">保存配置</button>
+            <button class="aic-ghost" id="aicMlTest" style="margin-top:0">测试连接</button>
+          </div>
+          <div class="aic-testline" id="aicMlTestOut"></div>
+          <p class="aic-note">模型失败会自动回落规则解析器；密钥只保存在服务端 config/ai_case/，接口回显脱敏。</p>
+        </aside>
+
+        <aside class="aic-panel">
+          <h2>📝 提示词配置 <span class="aic-tag" id="aicPromptFlag">默认模板</span></h2>
+          <label>系统提示词（角色 + 铁律 + 输出 JSON 结构）</label>
+          <textarea id="aicPSys" class="p-fsm" rows="10"></textarea>
+          <label>用户提示词模板（占位符：{requirement} 需求原文、{entry_mode} 入口模式）</label>
+          <textarea id="aicPUsr" class="p-fsm" rows="6"></textarea>
+          <div class="aic-cfg-row" style="margin-top:12px">
+            <button class="aic-btn sm" id="aicPSave">保存提示词</button>
+            <button class="aic-ghost" id="aicPReset" style="margin-top:0">恢复默认</button>
+          </div>
+          <p class="aic-note">输出必须是含 goal/steps/assertions/clarifications 的 JSON；解析失败会自动回落规则解析器。</p>
+        </aside>
+
+        <aside class="aic-panel">
+          <h2>🧩 Skill 配置</h2>
+          <label>解析技能</label>
+          <div class="aic-radio" id="aicSkillParser">
+            <label class="aic-opt"><input type="radio" name="skillParser" value="model"><span>模型优先（失败自动回落规则）</span></label>
+            <label class="aic-opt"><input type="radio" name="skillParser" value="rule"><span>仅规则解析器（不调用模型）</span></label>
+          </div>
+          <label class="aic-check"><input type="checkbox" id="aicSkExplore"> 真机探索技能（Maestro MCP，P2+ 生效）</label>
+          <div class="aic-cfg-row">
+            <div class="fld"><label>探索跳数上限</label><input id="aicSkSteps" type="number" min="1" max="200"></div>
+            <div class="fld"><label>时长上限（分钟）</label><input id="aicSkMinutes" type="number" min="1" max="200"></div>
+          </div>
+          <label class="aic-check"><input type="checkbox" id="aicSkSearch"> 元素库检索技能（Platform MCP，P3 生效）</label>
+          <label class="aic-check"><input type="checkbox" id="aicSkCapture"> 缺元素跳转定位器采集联动</label>
+          <label class="aic-check"><input type="checkbox" id="aicSkDry"> 试运行技能（Appium，P4 生效）</label>
+          <label>高风险动作策略（方案铁律，不可修改）</label>
+          <select disabled><option>提交类动作必须人工确认，探索阶段禁止自动提交</option></select>
+          <button class="aic-btn" id="aicSkSave" style="width:100%;justify-content:center">保存 Skill 配置</button>
+        </aside>
+
+      </div>
+    </section>
   </div>
 </main>
 <div id="toast"></div>

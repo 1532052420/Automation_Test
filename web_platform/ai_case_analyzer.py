@@ -11,8 +11,17 @@
 铁律：需求没写明的业务规则不编造；信息不足生成澄清问题（clarifications），
 而不是直接生成已确认状态的正式步骤。
 """
+import json
 import os
 import re
+import time
+
+try:
+    import requests
+except ImportError:      # 平台环境缺 requests 时模型适配层自动停用，规则兜底不受影响
+    requests = None
+
+from web_platform import ai_case_prompts as P
 
 # 高风险业务关键词（方案 8.6：探索阶段默认禁止自动提交，仅标记提醒）
 RISK_WORDS = ('发布', '删除', '支付', '购买', '下单', '发帖', '转账', '提交订单')
@@ -196,50 +205,141 @@ def _rule_analyze(text, entry_mode):
     }
 
 
+def _extract_json(text):
+    """从模型回复中提取 JSON 对象（容忍 ```json 围栏与前后闲话）"""
+    t = (text or '').strip()
+    if t.startswith('```'):
+        t = re.sub(r'^```[a-zA-Z]*\n?', '', t)
+        t = t.rstrip('`').strip()
+    try:
+        return json.loads(t)
+    except ValueError:
+        m = re.search(r'\{.*\}', t, re.S)
+        if m:
+            try:
+                return json.loads(m.group(0))
+            except ValueError:
+                return None
+    return None
+
+
+def _post_chat(cfg, system, user):
+    """GLM/OpenAI 风格 chat completions 调用，返回 (content, latency_ms)"""
+    payload = {
+        'model': cfg.get('model') or 'default',
+        'messages': [{'role': 'system', 'content': system},
+                     {'role': 'user', 'content': user}],
+        'temperature': 0.2,
+    }
+    headers = {'Content-Type': 'application/json'}
+    if cfg.get('api_key'):
+        headers['Authorization'] = 'Bearer ' + cfg['api_key']
+    t0 = time.time()
+    resp = requests.post(cfg['base_url'], json=payload, headers=headers,
+                         timeout=float(cfg.get('timeout') or 20))
+    resp.raise_for_status()
+    data = resp.json()
+    content = ''
+    try:
+        content = data['choices'][0]['message']['content']
+    except Exception:
+        content = ''
+    return content, int((time.time() - t0) * 1000)
+
+
+def post_chat(cfg, system, user):
+    """公开的 chat completions 调用（配置面板「测试连接」复用同一通道）"""
+    return _post_chat(cfg, system, user)
+
+
 def _valid_model_result(data):
     return isinstance(data, dict) and isinstance(data.get('steps'), list) \
         and isinstance(data.get('clarifications'), list)
 
 
-def _call_model(text):
-    """调用模型服务（若配置）。返回 dict 或 None（未配置/失败/输出不合法）。"""
+def _post_custom(text, timeout=20):
+    """旧契约：自定义服务直接 POST {requirement} 返回 {analysis:{...}}（环境变量配置）"""
     url = os.environ.get('AI_CASE_MODEL_URL')
-    if not url:
+    headers = {}
+    key = os.environ.get('AI_CASE_MODEL_KEY')
+    if key:
+        headers['Authorization'] = 'Bearer ' + key
+    payload = {'requirement': text}
+    name = os.environ.get('AI_CASE_MODEL_NAME')
+    if name:
+        payload['model'] = name
+        headers['X-Model-Name'] = name
+    resp = requests.post(url, json=payload, headers=headers,
+                         timeout=float(os.environ.get('AI_CASE_MODEL_TIMEOUT') or timeout))
+    resp.raise_for_status()
+    data = resp.json()
+    if isinstance(data, dict) and isinstance(data.get('analysis'), dict):
+        return data['analysis']
+    return data if isinstance(data, dict) else None
+
+
+def _finalize_model_result(data, name):
+    data.setdefault('clarifications', [])
+    for c in data['clarifications']:
+        c.setdefault('qid', 'q%d' % (len(data['clarifications']) + 1))
+        c.setdefault('question', '')
+        c.setdefault('options', [])
+        c.setdefault('answer', None)
+        c.setdefault('answered_at', None)
+    data.setdefault('risks', [])
+    data.setdefault('notes', [])
+    data.setdefault('preconditions', [])
+    data['analyzer'] = 'model:' + (name or 'custom')
+    data['analyzer_note'] = '模型解析结果，仍需人工确认后才会进入后续阶段'
+    return data
+
+
+def _call_model(text, entry_mode='ai_explore', model_cfg=None, prompts=None):
+    """调用模型解析。优先级：配置面板的模型（chat 格式）→ 环境变量旧契约 → None（走规则兜底）"""
+    if prompts is None:
+        prompts = {}
+    parse_system = prompts.get('parse_system') or P.PARSE_SYSTEM
+    parse_user_tpl = prompts.get('parse_user_template') or P.PARSE_USER_TEMPLATE
+    user_text = parse_user_tpl.format(requirement=text, entry_mode=entry_mode)
+
+    # 路径 1：配置面板启用的模型（GLM/OpenAI chat 格式）
+    if model_cfg and model_cfg.get('enabled') and model_cfg.get('base_url'):
+        try:
+            content, _ = _post_chat(model_cfg, parse_system, user_text)
+            data = _extract_json(content)
+            if not _valid_model_result(data):
+                return None
+            return _finalize_model_result(data, model_cfg.get('model'))
+        except Exception:
+            return None
+
+    # 路径 2：环境变量旧契约（自定义服务）
+    url = os.environ.get('AI_CASE_MODEL_URL')
+    if not url or requests is None:
         return None
     try:
-        import requests
-        headers = {}
-        key = os.environ.get('AI_CASE_MODEL_KEY')
-        if key:
-            headers['Authorization'] = 'Bearer ' + key
-        payload = {'requirement': text}
-        name = os.environ.get('AI_CASE_MODEL_NAME')
-        if name:
-            payload['model'] = name
         timeout = float(os.environ.get('AI_CASE_MODEL_TIMEOUT') or 20)
-        resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
-        resp.raise_for_status()
-        data = resp.json()
-        if isinstance(data, dict) and isinstance(data.get('analysis'), dict):
-            data = data['analysis']
+        data = _post_custom(text, timeout)
         if not _valid_model_result(data):
             return None
-        data.setdefault('clarifications', [])
-        for c in data['clarifications']:
-            c.setdefault('answer', None)
-            c.setdefault('answered_at', None)
-        data['analyzer'] = 'model:' + (name or 'custom')
-        data.setdefault('analyzer_note', '模型解析结果，仍需人工确认后才会进入后续阶段')
-        return data
+        return _finalize_model_result(data, os.environ.get('AI_CASE_MODEL_NAME'))
     except Exception:
         return None
 
 
-def analyze_requirement(text, entry_mode):
-    """解析需求：模型优先，规则兜底。返回 analysis dict（含 clarifications）。"""
-    result = _call_model(text)
-    if result is not None:
-        return result
+def analyze_requirement(text, entry_mode='ai_explore', model_cfg=None,
+                        prompts=None, force_rule=False):
+    """解析需求：模型优先，规则兜底。返回 analysis dict（含 clarifications）。
+
+    model_cfg：配置面板的模型配置（None=未配置，走环境变量或规则）；
+    force_rule：Skill 配置选「仅规则」时强制走规则解析。
+    """
+    if not force_rule:
+        result = _call_model(text, entry_mode, model_cfg, prompts)
+        if result is not None:
+            return result
     result = _rule_analyze(text, entry_mode)
-    result['model_attempted'] = bool(os.environ.get('AI_CASE_MODEL_URL'))
+    result['model_attempted'] = bool(
+        not force_rule and (os.environ.get('AI_CASE_MODEL_URL') or
+                            (model_cfg and model_cfg.get('enabled') and model_cfg.get('base_url'))))
     return result

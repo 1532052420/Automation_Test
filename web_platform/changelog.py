@@ -10,12 +10,35 @@
 两端不再各自硬编码版本号。
 """
 
-APP_VERSION = '6.14.118'
+APP_VERSION = '6.14.120'
 
 # 最新版本在最前；time 精确到秒（YYYY-MM-DD HH:MM:SS）
 # 版本号格式 x.xx.x 自 6.11.0 起强制执行；更早的历史条目保留原始记录，不回溯改写
 # 每条变更一句话 10~20 字，只说改了什么（详细背景见项目 memory 与设计文档）
 CHANGELOG = [
+    {
+        'version': '6.14.120',
+        'time': '2026-10-10 09:34:09',
+        'title': 'AI 用例生成配置中心上线：菜单栏 + 模型/提示词/Skill 配置全部可视化',
+        'changes': [
+            '/ai-case 新增左侧菜单栏（生成工作台/配置项）；项目、App 包名、设备从工作台挪入「配置项 → 项目与设备」（默认项目携带包名，任务创建自动带出）',
+            '模型配置面板：启用开关/Base URL/API Key（服务端保存、回显脱敏、留空不改、__CLEAR__ 清除）/模型名/超时/测试连接；适配 GLM/OpenAI 风格 chat completions，失败自动回落规则解析',
+            '提示词配置面板：系统提示词与用户模板可编辑/恢复默认（默认模板落 ai_case_prompts.py，占位符 {requirement}/{entry_mode}）',
+            'Skill 配置面板：解析技能（模型优先/仅规则）、真机探索开关与上限、元素库检索/采集联动/试运行开关；高风险策略按方案铁律锁定人工确认（接口层也不可改）',
+            '新增 API：model-config/model·test/prompts(+reset)/skills/ai-projects；配置中心测试新增 12 项用例（累计 47 项全过）',
+        ],
+    },
+    {
+        'version': '6.14.119',
+        'time': '2026-10-09 19:25:02',
+        'title': 'AI 用例生成全量测试验收：45 项用例全过，修复证据图 500 等缺陷 5 个',
+        'changes': [
+            '新增测试套件 web_platform/tests/test_ai_case.py（35 项：解析器/任务API/设备观察/锁/设置/证据，全隔离可重复）；live SSE 与 Playwright UI 共 10 项',
+            '修复 严重：证据图接口 send_file(max_age) 在 Flask 1.x 抛 TypeError 致正向获取 500',
+            '修复 次要：取消任务后状态条不显示「已取消」终态红标；375px 窄屏横向溢出；requests 局部导入致模型适配层不可打桩',
+            '测试报告见 docs/ai_case_test_report.md（含缺陷分级与遗留项：test_platform_api 两个既有失败非本模块）',
+        ],
+    },
     {
         'version': '6.14.118',
         'time': '2026-10-09 19:03:39',

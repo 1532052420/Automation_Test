@@ -21,12 +21,13 @@ import time
 
 from flask import Blueprint, Response, jsonify, render_template, request, send_file, stream_with_context
 
-from web_platform.ai_case_analyzer import analyze_requirement
+from web_platform.ai_case_analyzer import analyze_requirement, post_chat
 from web_platform.ai_case_device import (
     EVIDENCE_DIR, LOCK_TTL, acquire_lock, adb_devices, adb_hierarchy, adb_screenshot,
     get_lock, get_settings, release_lock, save_evidence, update_settings,
 )
 from web_platform.ai_case_maestro import friendly_error, get_maestro, maestro_available
+from web_platform.ai_case_prompts import DEFAULTS as PROMPT_DEFAULTS
 from web_platform.yaml_store import YamlStore
 
 bp = Blueprint('ai_case', __name__)
@@ -50,6 +51,89 @@ FLOW_STATUSES = ['需求解析中', '待补充信息', '待探索', '*探索中'
 
 _jobs_store = YamlStore('ai_case_jobs', data_dir=DATA_DIR)
 _projects_store = YamlStore('projects', data_dir=APP_TESTING_DATA_DIR)
+# P2.5 配置中心：模型 / 提示词 / Skill / AI 项目（项目+包名绑定）
+_model_store = YamlStore('ai_case_model', data_dir=DATA_DIR)
+_prompts_store = YamlStore('ai_case_prompts', data_dir=DATA_DIR)
+_skills_store = YamlStore('ai_case_skills', data_dir=DATA_DIR)
+_ai_projects_store = YamlStore('ai_case_projects', data_dir=DATA_DIR)
+
+MODEL_DEFAULTS = {'enabled': False, 'base_url': '', 'api_key': '', 'model': '', 'timeout': 20}
+SKILLS_DEFAULTS = {
+    'parser_mode': 'model',        # model=模型优先（失败回落规则）；rule=仅规则
+    'explore_enabled': True,       # 真机探索技能（Maestro MCP）
+    'element_search_enabled': True,  # 元素库检索技能（Platform MCP，P3 生效）
+    'capture_link_enabled': True,  # 缺元素跳转定位器采集联动
+    'dry_run_enabled': True,       # 试运行技能（Appium，P4 生效）
+    'high_risk_policy': 'manual_confirm',  # 方案 8.6 铁律：只允许人工确认，不开放修改
+    'default_project_id': None,    # 默认项目（携带 App 包名）
+    'default_device': '',          # 默认设备 udid
+}
+
+
+def _single(store, defaults):
+    items = store.list()
+    if items:
+        merged = dict(defaults)
+        merged.update({k: v for k, v in items[0].items() if k in defaults or
+                       k in ('name', 'app_package', 'note', 'customized')})
+        return merged, items[0]
+    return dict(defaults), None
+
+
+def _get_model_cfg():
+    cfg, _row = _single(_model_store, MODEL_DEFAULTS)
+    return cfg
+
+
+def _mask_key(key):
+    if not key:
+        return ''
+    return '已设置（****' + key[-4:] + '）' if len(key) > 4 else '已设置'
+
+
+def _get_prompts():
+    merged = dict(PROMPT_DEFAULTS)
+    row = _prompts_store.list()
+    if row:
+        merged.update({k: v for k, v in row[0].items() if k in PROMPT_DEFAULTS and v})
+        merged['customized'] = True
+    else:
+        merged['customized'] = False
+    return merged
+
+
+def _get_skills():
+    cfg, _row = _single(_skills_store, SKILLS_DEFAULTS)
+    limits = get_settings()
+    cfg['max_steps'] = limits.get('max_steps')
+    cfg['max_minutes'] = limits.get('max_minutes')
+    return cfg
+
+
+def _save_skills(patch):
+    item = _skills_store.list()
+    item = item[0] if item else _skills_store.create(dict(SKILLS_DEFAULTS))
+    changed_limits = {}
+    for k, v in (patch or {}).items():
+        if k in ('max_steps', 'max_minutes'):
+            changed_limits[k] = v
+            continue
+        if k == 'high_risk_policy':
+            continue            # 方案 8.6 铁律：高风险策略锁定为人工确认，接口层也不可改
+        if k == 'parser_mode':
+            if v not in ('model', 'rule'):
+                return None, 'parser_mode 只能是 model 或 rule'
+            item[k] = v
+        elif k == 'default_project_id':
+            item[k] = int(v) if v not in (None, '', 'null') else None
+        elif k in SKILLS_DEFAULTS:
+            item[k] = v
+    _skills_store.update(item['id'], item)
+    if changed_limits:
+        _, err = update_settings(changed_limits)
+        if err:
+            return None, err
+    return _get_skills(), None
 
 
 def _ok(**payload):
@@ -123,10 +207,17 @@ def api_config():
     devices, device_note = _list_adb_devices()
     for d in devices:
         d['lock'] = get_lock(d['udid'])
+    ai_projects = [{'id': p['id'], 'name': p.get('name'), 'app_package': p.get('app_package')}
+                   for p in _ai_projects_store.list()]
+    skills = _get_skills()
+    model = _get_model_cfg()
+    model['api_key'] = _mask_key(model.get('api_key'))
     return _ok(projects=projects, devices=devices, device_note=device_note,
-               model_configured=bool(os.environ.get('AI_CASE_MODEL_URL')),
-               maestro=maestro_available(),
-               settings=get_settings(),
+               ai_projects=ai_projects, model=model, prompts=_get_prompts(),
+               skills=skills, maestro=maestro_available(),
+               model_configured=bool(
+                   os.environ.get('AI_CASE_MODEL_URL') or
+                   (model.get('enabled') and model.get('base_url'))),
                lock_ttl_min=LOCK_TTL // 60,
                entry_modes=[{'value': k, 'label': v} for k, v in ENTRY_MODE_LABELS.items()])
 
@@ -136,33 +227,48 @@ def api_create_job():
     d = request.get_json(force=True, silent=True) or {}
     requirement = (d.get('requirement') or '').strip()
     entry_mode = d.get('entry_mode') or 'ai_explore'
-    app_package = (d.get('app_package') or '').strip()
     if len(requirement) < 5:
         return _bad('需求描述太短：请描述测试场景与断言（至少 5 个字）')
     if entry_mode not in ENTRY_MODES:
         return _bad('入口模式不合法')
-    if not app_package:
-        return _bad('App 包名不能为空（从项目配置读取或手动填写，AI 不猜测包名）')
 
+    # 包名 / 设备 / 项目：显式参数优先，否则取「配置项」里的默认项目与默认设备
+    skills = _get_skills()
+    app_package = (d.get('app_package') or '').strip()
+    device = (d.get('device') or '').strip()
+    project_id = d.get('project_id') or skills.get('default_project_id')
     project_name = None
-    pid = d.get('project_id')
-    if pid:
-        p = _projects_store.get(int(pid))
+    if project_id:
+        try:
+            p = _ai_projects_store.get(int(project_id))
+        except (TypeError, ValueError):
+            p = None
         if p:
             project_name = p.get('name')
+            if not app_package:
+                app_package = (p.get('app_package') or '').strip()
+    if not device:
+        device = skills.get('default_device') or ''
+    if not app_package:
+        return _bad('App 包名未配置：请在「配置项 → 项目与设备」绑定默认项目（含包名），'
+                    '或显式传入 app_package')
 
     job = _jobs_store.create({
         'requirement': requirement,
-        'project_id': pid, 'project_name': project_name,
+        'project_id': project_id, 'project_name': project_name,
         'app_package': app_package,
-        'device': (d.get('device') or '').strip(),
+        'device': device,
         'entry_mode': entry_mode,
         'status': '需求解析中',
         'analysis': None, 'clarifications': [], 'events': [],
     })
     _add_event(job, 'stage', '任务创建（ #%d ），开始解析需求' % job['id'])
 
-    analysis = analyze_requirement(requirement, entry_mode)
+    # Skill 决定解析技能：模型优先 / 仅规则；提示词取配置面板当前值
+    force_rule = skills.get('parser_mode') == 'rule'
+    model_cfg = _get_model_cfg() if not force_rule else None
+    analysis = analyze_requirement(requirement, entry_mode, model_cfg=model_cfg,
+                                   prompts=_get_prompts(), force_rule=force_rule)
     job['analysis'] = analysis
     job['clarifications'] = analysis.get('clarifications') or []
     _add_event(job, 'stage', '需求解析完成（%s）：步骤 %d · 断言 %d · 澄清 %d · 风险 %d' % (
@@ -296,7 +402,9 @@ def api_evidence(udid, fname):
     path = os.path.join(EVIDENCE_DIR, udid, fname)
     if not os.path.exists(path):
         return _bad('截图不存在', 404)
-    return send_file(path, mimetype='image/png', max_age=0)
+    resp = send_file(path, mimetype='image/png')   # Flask 1.x 无 max_age 参数
+    resp.headers['Cache-Control'] = 'no-cache'
+    return resp
 
 
 @bp.route('/api/ai-case/observe/hierarchy', methods=['POST'])
@@ -352,6 +460,151 @@ def api_update_settings():
     if err:
         return _bad(err)
     return _ok(settings=s)
+
+
+# ---------------- P2.5：配置中心（模型 / 提示词 / Skill / AI 项目） ----------------
+
+@bp.route('/api/ai-case/model-config', methods=['GET', 'PUT'])
+def api_model_config():
+    if request.method == 'GET':
+        cfg = _get_model_cfg()
+        cfg['api_key'] = _mask_key(cfg.get('api_key'))
+        return _ok(model=cfg)
+    d = request.get_json(force=True, silent=True) or {}
+    cfg = _get_model_cfg()
+    if 'enabled' in d:
+        cfg['enabled'] = bool(d['enabled'])
+    if 'base_url' in d:
+        cfg['base_url'] = str(d['base_url'] or '').strip()
+    if 'model' in d:
+        cfg['model'] = str(d['model'] or '').strip()
+    if 'timeout' in d:
+        try:
+            t = int(d['timeout'])
+            if not 1 <= t <= 300:
+                return _bad('timeout 必须是 1~300 秒')
+            cfg['timeout'] = t
+        except (TypeError, ValueError):
+            return _bad('timeout 必须是整数秒')
+    if 'api_key' in d:
+        v = str(d['api_key'] or '').strip()
+        if v == '__CLEAR__':
+            cfg['api_key'] = ''
+        elif v:                       # 空串=保持现有密钥不变（回显是脱敏值）
+            cfg['api_key'] = v
+    row = _model_store.list()
+    row = row[0] if row else _model_store.create(dict(MODEL_DEFAULTS))
+    _model_store.update(row['id'], cfg)
+    cfg = _get_model_cfg()
+    cfg['api_key'] = _mask_key(cfg.get('api_key'))
+    return _ok(model=cfg)
+
+
+@bp.route('/api/ai-case/model/test', methods=['POST'])
+def api_model_test():
+    """连通性测试：用已存配置或请求体覆盖配置，发一条最小对话"""
+    d = request.get_json(force=True, silent=True) or {}
+    cfg = _get_model_cfg()
+    for k in ('base_url', 'model'):
+        if d.get(k):
+            cfg[k] = str(d[k]).strip()
+    if d.get('api_key'):
+        cfg['api_key'] = str(d['api_key']).strip()
+    if d.get('timeout'):
+        cfg['timeout'] = d['timeout']
+    if not cfg.get('base_url'):
+        return _bad('Base URL 未配置')
+    try:
+        reply, latency = post_chat(cfg, PROMPT_DEFAULTS['test_system'],
+                                   PROMPT_DEFAULTS['test_user'])
+        return _ok(latency_ms=latency, reply=(reply or '')[:120],
+                   model=cfg.get('model'))
+    except Exception as e:
+        return _bad('模型调用失败：%s' % str(e)[:180], 502)
+
+
+@bp.route('/api/ai-case/prompts', methods=['GET', 'PUT'])
+def api_prompts():
+    if request.method == 'GET':
+        return _ok(prompts=_get_prompts())
+    d = request.get_json(force=True, silent=True) or {}
+    item = _prompts_store.list()
+    item = item[0] if item else _prompts_store.create({})
+    for k in ('parse_system', 'parse_user_template'):
+        if k in d:
+            v = str(d[k] or '').strip()
+            if not v:
+                return _bad('%s 不能为空（可点「恢复默认」）' % k)
+            if len(v) > 20000:
+                return _bad('%s 超长（>20000 字符）' % k)
+            item[k] = v
+    _prompts_store.update(item['id'], item)
+    return _ok(prompts=_get_prompts())
+
+
+@bp.route('/api/ai-case/prompts/reset', methods=['POST'])
+def api_prompts_reset():
+    row = _prompts_store.list()
+    if row:
+        _prompts_store.delete(row[0]['id'])
+    return _ok(prompts=_get_prompts())
+
+
+@bp.route('/api/ai-case/skills', methods=['GET', 'PUT'])
+def api_skills():
+    if request.method == 'GET':
+        return _ok(skills=_get_skills())
+    s, err = _save_skills(request.get_json(force=True, silent=True) or {})
+    if err:
+        return _bad(err)
+    return _ok(skills=s)
+
+
+@bp.route('/api/ai-case/ai-projects', methods=['GET', 'POST'])
+def api_ai_projects():
+    if request.method == 'GET':
+        return _ok(results=[{'id': p['id'], 'name': p.get('name'),
+                             'app_package': p.get('app_package'), 'note': p.get('note')}
+                            for p in _ai_projects_store.list()])
+    d = request.get_json(force=True, silent=True) or {}
+    name = (d.get('name') or '').strip()
+    pkg = (d.get('app_package') or '').strip()
+    if not name:
+        return _bad('项目名称不能为空')
+    if not re.match(r'^[A-Za-z][A-Za-z0-9_.]{3,100}$', pkg):
+        return _bad('App 包名不合法（示例：com.example.app）')
+    if any(x['name'] == name for x in _ai_projects_store.list()):
+        return _bad('项目名称已存在: %s' % name)
+    row = _ai_projects_store.create({'name': name[:60], 'app_package': pkg,
+                                     'note': (d.get('note') or '').strip()[:200]})
+    return _ok(project={'id': row['id'], 'name': name, 'app_package': pkg})
+
+
+@bp.route('/api/ai-case/ai-projects/<int:pid>', methods=['PUT', 'DELETE'])
+def api_ai_project_detail(pid):
+    p = _ai_projects_store.get(pid)
+    if not p:
+        return _bad('项目不存在', 404)
+    if request.method == 'DELETE':
+        _ai_projects_store.delete(pid)
+        skills = _get_skills()
+        if skills.get('default_project_id') == pid:   # 默认项目被删则解绑
+            _save_skills({'default_project_id': None})
+        return _ok(msg='已删除')
+    d = request.get_json(force=True, silent=True) or {}
+    patch = {}
+    if 'name' in d:
+        name = (d['name'] or '').strip()
+        if not name:
+            return _bad('项目名称不能为空')
+        patch['name'] = name[:60]
+    if 'app_package' in d:
+        pkg = (d['app_package'] or '').strip()
+        if not re.match(r'^[A-Za-z][A-Za-z0-9_.]{3,100}$', pkg):
+            return _bad('App 包名不合法（示例：com.example.app）')
+        patch['app_package'] = pkg
+    _ai_projects_store.update(pid, patch)
+    return _ok(project=_ai_projects_store.get(pid))
 
 
 @bp.route('/api/ai-case/jobs/<int:jid>/events')
