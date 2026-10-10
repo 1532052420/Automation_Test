@@ -17,7 +17,7 @@ agent_created: true
 
 唯一依据是 `web_platform/changelog.py` 里 `APP_VERSION` 的**当前值**（递增后的值），不得凭记忆或对话历史推断。
 
-版本号格式为 **`x.xx.x`**（见 version-changelog 铁律 2）：奇偶只看**尾号（修订号，最后一段）**——尾号 % 2 == 0 即双数。
+版本号格式为 **`x.xx.xx`**（见 version-changelog 铁律 2）：奇偶只看**尾号（修订号，最后一段）**——尾号 % 2 == 0 即双数。
 
 | 版本号 | 动作 |
 |---|---|
@@ -37,15 +37,18 @@ env -u PYTHONPATH ./.venv/bin/python -c "from web_platform.changelog import APP_
 1. 读取 `APP_VERSION` 并判定奇偶。
 2. **单数 → 直接跳到第 4 步**（不上传，工作区改动保持未提交状态即可）。
 3. **双数 → 依次执行**（任一步失败立即停下并如实报告，不得谎报成功）：
-   a. 提交本地改动（幂等写法）：
-      ```bash
-      git -C /Users/ouyang/Desktop/AutomationTest add -A
-      git -C /Users/ouyang/Desktop/AutomationTest commit -m "平台 v<版本号>：<changelog 顶部标题>"   # 若报 nothing to commit 则跳过
-      ```
-   b. 先同步远端（**禁止 force**）：
+   a. 提交本地改动（幂等写法）。**按当前任务选料 `git add <本次任务文件>`，禁止 `git add -A`**——
+      工作区常驻不入库内容（2026-10-08 实践确立，近期 6.14.102~104 发版均如此）：
+      `damai_u2/` 抢票独立项目及其在 `web_platform/app.py` 的 `/grab` 挂载、首页入口
+      （用户指定不属于平台版本管理；且目录未跟踪，单独提交挂载会让远端 import 崩）；
+      旧用例/元素文件的未提交删除（另一会话产物，保持不动）；`visual_asserts/` 测试产物截图。
+      commit message：`git commit -m "平台 v<版本号>：<changelog 顶部标题>"`（若报 nothing to commit 则跳过）
+   b. 先同步远端（**禁止 force**）。工作区常有未提交改动，rebase 会被拒——先判祖先关系再决定：
       ```bash
       git -C /Users/ouyang/Desktop/AutomationTest fetch automation_test main
-      git -C /Users/ouyang/Desktop/AutomationTest rebase automation_test/main    # 有冲突则停下报告，不自动解决
+      git -C /Users/ouyang/Desktop/AutomationTest merge-base --is-ancestor automation_test/main HEAD \
+        && echo "本地严格领先，无需变基" \
+        || git -C /Users/ouyang/Desktop/AutomationTest rebase --autostash automation_test/main  # 有冲突则停下报告，不自动解决
       ```
    c. 推送：
       ```bash
