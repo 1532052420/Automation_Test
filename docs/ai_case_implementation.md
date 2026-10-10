@@ -15,7 +15,7 @@
 - Skill 配置面板：解析技能（模型优先 / 仅规则 force_rule）、真机探索开关与上限（与旧 settings 接口同源）、元素库检索 / 采集联动 / 试运行开关（P3/P4 生效位）；高风险策略接口层锁定 manual_confirm（方案 8.6）
 - 新 API：model-config(GET/PUT) / model/test / prompts(GET/PUT/reset) / skills(GET/PUT) / ai-projects(CRUD)
 - 测试：套件扩到 47 项全过（新增配置中心 12 项）；Playwright 8 项（菜单/四卡/配置驱动建任务/窄屏）全过
-- 踩坑记录：前端对 PUT 路由误用 POST 全部 405（已加 putJson）；测试 fake 形参 `json` 遮蔽 json 模块（用 `_json` 别名）
+- 踩坑记录：前端对 PUT 路由误用 POST 全部 405（已加 putJson）；测试 fake 形参 `json` 遮蔽 json 模块（用 `_json` 别名）；**平台通栏布局样式按 `body[data-page]` scoped**（style.css 只对 run/api-test 声明了 `main{max-width:none}`），新菜单页必须在自己的样式里补同款声明 + 用 `.submain`/`.panel[hidden]` 平台结构，否则侧栏会被 1180px 居中限宽顶到页面中间；带 display 的类会盖过 UA `[hidden]`，需作者规则兜底
 
 ### 前置完成项（详见 git 历史 6.14.116~119 与下文）
 - P0 全部（Maestro 2.10.0 / Java 17 / ai_case_service 独立 venv / MCP 探针：握手、工具清单、设备枚举）

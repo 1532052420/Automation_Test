@@ -43,15 +43,15 @@
     return p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
   }
 
-  /* ---------- 菜单栏：面板切换 ---------- */
+  /* ---------- 菜单栏：面板切换（平台约定：.submain .panel[hidden]） ---------- */
   function initPanels() {
     const links = $$('#subnav a[data-panel]');
     links.forEach((a) => {
       a.addEventListener('click', (e) => {
         e.preventDefault();
         links.forEach(x => x.classList.toggle('on', x === a));
-        $('#panel-workbench').classList.toggle('hidden', a.dataset.panel !== 'workbench');
-        $('#panel-config').classList.toggle('hidden', a.dataset.panel !== 'config');
+        $('#panel-workbench').hidden = a.dataset.panel !== 'workbench';
+        $('#panel-config').hidden = a.dataset.panel !== 'config';
         history.replaceState(null, '', a.getAttribute('href'));
       });
     });
@@ -348,6 +348,8 @@
     $('#aicMlTest').addEventListener('click', testModel);
     $('#aicPSave').addEventListener('click', savePrompts);
     $('#aicPReset').addEventListener('click', resetPrompts);
+    $('#aicSkFileSave').addEventListener('click', saveSkillFile);
+    $('#aicSkFileReset').addEventListener('click', resetSkillFile);
     $('#aicSkSave').addEventListener('click', saveSkills);
   }
 
@@ -500,15 +502,58 @@
   }
 
   function renderSkills() {
+    renderSkillFiles();
     const s = CFG.skills || {};
     const r = document.querySelector('input[name="skillParser"][value="' + (s.parser_mode || 'model') + '"]');
     if (r) r.checked = true;
     $('#aicSkExplore').checked = !!s.explore_enabled;
-    $('#aicSkSearch').checked = !!s.element_search_enabled;
-    $('#aicSkCapture').checked = !!s.capture_link_enabled;
-    $('#aicSkDry').checked = !!s.dry_run_enabled;
     $('#aicSkSteps').value = s.max_steps || 15;
     $('#aicSkMinutes').value = s.max_minutes || 5;
+  }
+
+  /* Skill 文件库：skill = 给模型读的 Markdown 指令文件 */
+  let curSkillKey = 'parse';
+  function renderSkillFiles() {
+    const files = CFG.skill_files || [];
+    const box = $('#aicSkTabs');
+    box.innerHTML = '';
+    files.forEach((f) => {
+      const btn = document.createElement('button');
+      btn.className = f.key === curSkillKey ? 'on' : '';
+      btn.innerHTML = esc(f.name) + (f.enabled ? '' : ' <span class="off">停用</span>');
+      btn.addEventListener('click', () => { curSkillKey = f.key; renderSkillFiles(); });
+      box.appendChild(btn);
+    });
+    const f = files.find(x => x.key === curSkillKey) || files[0];
+    if (!f) return;
+    $('#aicSkName').value = f.name;
+    $('#aicSkWhen').value = f.when || '';
+    $('#aicSkContent').value = f.content || '';
+    $('#aicSkFileEnabled').checked = !!f.enabled;
+    const flag = $('#aicSkFlag');
+    flag.textContent = f.customized ? '已自定义' : '内置版';
+    flag.className = 'aic-tag ' + (f.customized ? 'warn' : '');
+  }
+
+  async function saveSkillFile() {
+    const d = await putJson('/api/ai-case/skill-files/' + curSkillKey, {
+      name: $('#aicSkName').value.trim(),
+      when: $('#aicSkWhen').value.trim(),
+      content: $('#aicSkContent').value,
+      enabled: $('#aicSkFileEnabled').checked,
+    });
+    if (!d.ok) return toast(d.msg || '保存失败', false);
+    CFG.skill_files = (CFG.skill_files || []).map(f => (f.key === curSkillKey ? Object.assign({}, f, d.skill) : f));
+    renderSkillFiles(); renderObserveTags();
+    toast('技能文件已保存（对应阶段将注入模型上下文）');
+  }
+
+  async function resetSkillFile() {
+    const d = await postJson('/api/ai-case/skill-files/' + curSkillKey + '/reset', {});
+    if (!d.ok) return toast(d.msg || '重置失败', false);
+    CFG.skill_files = CFG.skill_files.map(f => (f.key === curSkillKey ? Object.assign({}, f, d.skill, { customized: false }) : f));
+    renderSkillFiles(); renderObserveTags();
+    toast('已恢复内置技能文件');
   }
 
   async function saveSkills() {
@@ -516,16 +561,13 @@
     const d = await putJson('/api/ai-case/skills', {
       parser_mode: parser ? parser.value : 'model',
       explore_enabled: $('#aicSkExplore').checked,
-      element_search_enabled: $('#aicSkSearch').checked,
-      capture_link_enabled: $('#aicSkCapture').checked,
-      dry_run_enabled: $('#aicSkDry').checked,
       max_steps: +$('#aicSkSteps').value || 15,
       max_minutes: +$('#aicSkMinutes').value || 5,
     });
     if (!d.ok) return toast(d.msg || '保存失败', false);
     CFG.skills = d.skills;
     renderSkills(); renderPhase(); renderObserveTags();
-    toast('Skill 配置已保存');
+    toast('执行参数已保存');
   }
 
   /* ---------- 自适应缩放占位（面板自适应由 CSS 负责） ---------- */

@@ -28,6 +28,7 @@ from web_platform.ai_case_device import (
 )
 from web_platform.ai_case_maestro import friendly_error, get_maestro, maestro_available
 from web_platform.ai_case_prompts import DEFAULTS as PROMPT_DEFAULTS
+from web_platform.ai_case_skills_default import DEFAULT_SKILLS
 from web_platform.yaml_store import YamlStore
 
 bp = Blueprint('ai_case', __name__)
@@ -56,6 +57,8 @@ _model_store = YamlStore('ai_case_model', data_dir=DATA_DIR)
 _prompts_store = YamlStore('ai_case_prompts', data_dir=DATA_DIR)
 _skills_store = YamlStore('ai_case_skills', data_dir=DATA_DIR)
 _ai_projects_store = YamlStore('ai_case_projects', data_dir=DATA_DIR)
+# Skill 本质是给模型读的 Markdown 文件（名称/触发时机/正文/启用）——文件库存储
+_skill_files_store = YamlStore('ai_case_skill_files', data_dir=DATA_DIR)
 
 MODEL_DEFAULTS = {'enabled': False, 'base_url': '', 'api_key': '', 'model': '', 'timeout': 20}
 SKILLS_DEFAULTS = {
@@ -103,7 +106,12 @@ def _get_prompts():
 
 
 def _get_skills():
+    """执行视图：解析/设备等设置 + 技能启停（启停源自 Skill 文件库）"""
     cfg, _row = _single(_skills_store, SKILLS_DEFAULTS)
+    files = {f['key']: f for f in _get_skill_files()}
+    cfg['explore_enabled'] = files.get('explore', {}).get('enabled', True)
+    cfg['element_search_enabled'] = files.get('mapping', {}).get('enabled', True)
+    cfg['dry_run_enabled'] = files.get('dryrun', {}).get('enabled', True)
     limits = get_settings()
     cfg['max_steps'] = limits.get('max_steps')
     cfg['max_minutes'] = limits.get('max_minutes')
@@ -126,6 +134,12 @@ def _save_skills(patch):
             item[k] = v
         elif k == 'default_project_id':
             item[k] = int(v) if v not in (None, '', 'null') else None
+        elif k in ('explore_enabled', 'element_search_enabled', 'dry_run_enabled'):
+            # 旧开关键 → 映射到对应 Skill 文件的启停
+            key = {'explore_enabled': 'explore',
+                   'element_search_enabled': 'mapping',
+                   'dry_run_enabled': 'dryrun'}[k]
+            _save_skill_file(key, {'enabled': bool(v)})
         elif k in SKILLS_DEFAULTS:
             item[k] = v
     _skills_store.update(item['id'], item)
@@ -134,6 +148,49 @@ def _save_skills(patch):
         if err:
             return None, err
     return _get_skills(), None
+
+
+# ---------------- Skill 文件库（skill = 给模型读的 Markdown 文件） ----------------
+
+def _get_skill_files():
+    """默认技能 + 存储覆盖（按 key 合并）；返回列表保持内置顺序"""
+    overrides = {o['key']: o for o in _skill_files_store.list()}
+    out = []
+    for d in DEFAULT_SKILLS:
+        f = {'key': d['key'], 'name': d['name'], 'when': d['when'],
+             'content': d['content'], 'enabled': d['enabled'], 'customized': False}
+        o = overrides.get(d['key'])
+        if o:
+            f.update({k: v for k, v in o.items() if k in f and v is not None})
+            f['customized'] = True
+        out.append(f)
+    return out
+
+
+def _save_skill_file(key, patch):
+    if key not in {d['key'] for d in DEFAULT_SKILLS}:
+        return None, '未知技能: %s' % key
+    row = None
+    for o in _skill_files_store.list():
+        if o['key'] == key:
+            row = o
+            break
+    if row is None:
+        base = next(d for d in DEFAULT_SKILLS if d['key'] == key)
+        row = _skill_files_store.create({'key': key, 'name': base['name'], 'when': base['when'],
+                                         'content': base['content'], 'enabled': base['enabled']})
+    for k in ('name', 'when', 'content'):
+        if k in (patch or {}):
+            v = str(patch[k] or '').strip()
+            if not v:
+                return None, '%s 不能为空（可恢复默认）' % k
+            if len(v) > 50000:
+                return None, '%s 超长（>50000 字符）' % k
+            row[k] = v
+    if 'enabled' in (patch or {}):
+        row['enabled'] = bool(patch['enabled'])
+    _skill_files_store.update(row['id'], row)
+    return row, None
 
 
 def _ok(**payload):
@@ -214,7 +271,7 @@ def api_config():
     model['api_key'] = _mask_key(model.get('api_key'))
     return _ok(projects=projects, devices=devices, device_note=device_note,
                ai_projects=ai_projects, model=model, prompts=_get_prompts(),
-               skills=skills, maestro=maestro_available(),
+               skills=skills, skill_files=_get_skill_files(), maestro=maestro_available(),
                model_configured=bool(
                    os.environ.get('AI_CASE_MODEL_URL') or
                    (model.get('enabled') and model.get('base_url'))),
@@ -264,11 +321,21 @@ def api_create_job():
     })
     _add_event(job, 'stage', '任务创建（ #%d ），开始解析需求' % job['id'])
 
-    # Skill 决定解析技能：模型优先 / 仅规则；提示词取配置面板当前值
+    # Skill 决定解析技能：模型优先 / 仅规则；提示词取配置面板当前值；
+    # 「需求解析技能」文件正文（若启用）拼进 system——skill 即模型加载的指令文件
     force_rule = skills.get('parser_mode') == 'rule'
     model_cfg = _get_model_cfg() if not force_rule else None
+    prompts = _get_prompts()
+    parse_skill = next((f for f in _get_skill_files() if f['key'] == 'parse'), None)
+    if parse_skill and parse_skill.get('enabled'):
+        prompts = dict(prompts)
+        prompts['parse_system'] = (prompts['parse_system'] +
+                                   '\n\n# 启用技能：' + parse_skill['name'] +
+                                   '\n' + parse_skill['content'])
+        _add_event(job, 'stage', '已加载技能文件「%s」%s' % (
+            parse_skill['name'], '（自定义版）' if parse_skill.get('customized') else '（默认版）'))
     analysis = analyze_requirement(requirement, entry_mode, model_cfg=model_cfg,
-                                   prompts=_get_prompts(), force_rule=force_rule)
+                                   prompts=prompts, force_rule=force_rule)
     job['analysis'] = analysis
     job['clarifications'] = analysis.get('clarifications') or []
     _add_event(job, 'stage', '需求解析完成（%s）：步骤 %d · 断言 %d · 澄清 %d · 风险 %d' % (
@@ -548,6 +615,31 @@ def api_prompts_reset():
     if row:
         _prompts_store.delete(row[0]['id'])
     return _ok(prompts=_get_prompts())
+
+
+@bp.route('/api/ai-case/skill-files', methods=['GET'])
+def api_skill_files():
+    return _ok(results=_get_skill_files())
+
+
+@bp.route('/api/ai-case/skill-files/<key>', methods=['PUT'])
+def api_skill_file_put(key):
+    row, err = _save_skill_file(key, request.get_json(force=True, silent=True) or {})
+    if err:
+        return _bad(err)
+    files = {f['key']: f for f in _get_skill_files()}
+    return _ok(skill=files.get(key))
+
+
+@bp.route('/api/ai-case/skill-files/<key>/reset', methods=['POST'])
+def api_skill_file_reset(key):
+    if key not in {d['key'] for d in DEFAULT_SKILLS}:
+        return _bad('未知技能', 404)
+    for o in _skill_files_store.list():
+        if o['key'] == key:
+            _skill_files_store.delete(o['id'])
+    files = {f['key']: f for f in _get_skill_files()}
+    return _ok(skill=files.get(key))
 
 
 @bp.route('/api/ai-case/skills', methods=['GET', 'PUT'])

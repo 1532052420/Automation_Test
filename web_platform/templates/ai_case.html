@@ -10,7 +10,10 @@
 <style>
 /* 页面级样式（.aic- 前缀，token 全部取自平台 style.css 变量，日夜主题自动跟随） */
 .hidden { display: none !important; }
-.aic-main { flex: 1; min-width: 0; max-width: 1280px; padding: 26px 22px 60px; }
+[hidden] { display: none !important; }   /* .aic-ghost 等带 display 的类会盖过 UA 的 [hidden]，需作者规则兜底 */
+/* 与平台 run/api-test 页一致：通栏布局 + 左侧深色二级菜单（样式作用域按页声明） */
+body[data-page="ai-case"] main { max-width: none; padding-bottom: 28px; }
+.aic-main { flex: 1 1 auto; min-width: 0; padding: 22px 22px 60px; }
 .aic-head { display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
 .aic-head h1 { font-size: 22px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; }
 .aic-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
@@ -111,6 +114,13 @@
 .aic-hierout { font: 11px/1.7 ui-monospace, Menlo, monospace; background: var(--panel3);
   border-radius: 10px; padding: 8px 10px; color: var(--muted); max-height: 148px;
   overflow-y: auto; margin-top: 2px; word-break: break-all; }
+/* Skill 文件库 */
+.aic-sk-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.aic-sk-tabs button { font-size: 12px; padding: 5px 12px; border-radius: var(--r-pill);
+  background: var(--panel3); color: var(--muted); transition: all .2s; }
+.aic-sk-tabs button.on { background: var(--ai); color: #fff; font-weight: 600; }
+.aic-sk-tabs button .off { opacity: .6; }
+.aic-sk-tabs button.on .off { opacity: .85; }
 /* 配置中心 */
 .aic-cfg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(430px, 1fr)); gap: 16px; align-items: start; }
 .aic-cfg-grid .aic-panel { min-width: 0; }
@@ -143,14 +153,21 @@
 </head>
 <body data-page="ai-case">
 <header class="gnav" id="sidebar"></header>
-<main class="runlayout">
-  <aside class="subnav" id="subnav">
-    <div class="subnav-label">AI 用例生成</div>
-    <a href="#workbench" data-panel="workbench" class="on">生成工作台</a>
-    <a href="#config" data-panel="config">配置项</a>
-  </aside>
+<main>
+  <div class="runlayout">
+    <aside class="subnav" id="subnav">
+      <div class="subnav-label">AI 用例生成</div>
+      <a href="#workbench" data-panel="workbench" class="on">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.6 13.8 8.6 18.8 10.4 13.8 12.2 12 17.2 10.2 12.2 5.2 10.4 10.2 8.6Z"/><path d="M18.4 15.2 19.2 17.4 21.4 18.2 19.2 19 18.4 21.2 17.6 19 15.4 18.2 17.6 17.4Z"/></svg>
+        生成工作台
+      </a>
+      <a href="#config" data-panel="config">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.9v2.3M12 18.8v2.3M2.9 12h2.3M18.8 12h2.3M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6"/></svg>
+        配置项
+      </a>
+    </aside>
 
-  <div class="aic-main">
+    <div class="submain">
     <div class="aic-head">
       <div>
         <h1>AI 用例生成</h1>
@@ -160,7 +177,7 @@
     </div>
 
     <!-- ========== 面板一：生成工作台 ========== -->
-    <section id="panel-workbench">
+    <section id="panel-workbench" class="panel">
       <div class="aic-grid">
         <aside class="aic-panel">
           <h2>① 需求与任务配置</h2>
@@ -218,7 +235,7 @@
     </section>
 
     <!-- ========== 面板二：配置项 ========== -->
-    <section id="panel-config" class="hidden">
+    <section id="panel-config" class="panel" hidden>
       <div class="aic-cfg-grid">
 
         <aside class="aic-panel">
@@ -270,27 +287,36 @@
         </aside>
 
         <aside class="aic-panel">
-          <h2>🧩 Skill 配置</h2>
-          <label>解析技能</label>
+          <h2>🧩 Skill 文件库 <span class="aic-tag" id="aicSkFlag">内置版</span></h2>
+          <p class="aic-note" style="margin:0 0 10px">Skill = 给模型读的指令文件（Markdown）。对应阶段自动加载启用技能的正文进模型上下文。</p>
+          <div class="aic-sk-tabs" id="aicSkTabs"></div>
+          <label>技能名称</label><input id="aicSkName">
+          <label>触发时机（何时加载该文件）</label><input id="aicSkWhen">
+          <label>正文（Markdown 指令）</label><textarea id="aicSkContent" class="p-fsm" rows="11"></textarea>
+          <label class="aic-check"><input type="checkbox" id="aicSkFileEnabled"> 启用该技能（对应阶段注入模型上下文）</label>
+          <div class="aic-cfg-row" style="margin-top:12px">
+            <button class="aic-btn sm" id="aicSkFileSave">保存技能文件</button>
+            <button class="aic-ghost" id="aicSkFileReset" style="margin-top:0">恢复默认</button>
+          </div>
+          <hr style="border:none;border-top:1px solid var(--line-soft);margin:16px 0 4px">
+          <label>解析技能模式</label>
           <div class="aic-radio" id="aicSkillParser">
             <label class="aic-opt"><input type="radio" name="skillParser" value="model"><span>模型优先（失败自动回落规则）</span></label>
             <label class="aic-opt"><input type="radio" name="skillParser" value="rule"><span>仅规则解析器（不调用模型）</span></label>
           </div>
-          <label class="aic-check"><input type="checkbox" id="aicSkExplore"> 真机探索技能（Maestro MCP，P2+ 生效）</label>
+          <label class="aic-check"><input type="checkbox" id="aicSkExplore"> 真机探索技能启用（Maestro MCP）</label>
           <div class="aic-cfg-row">
             <div class="fld"><label>探索跳数上限</label><input id="aicSkSteps" type="number" min="1" max="200"></div>
             <div class="fld"><label>时长上限（分钟）</label><input id="aicSkMinutes" type="number" min="1" max="200"></div>
           </div>
-          <label class="aic-check"><input type="checkbox" id="aicSkSearch"> 元素库检索技能（Platform MCP，P3 生效）</label>
-          <label class="aic-check"><input type="checkbox" id="aicSkCapture"> 缺元素跳转定位器采集联动</label>
-          <label class="aic-check"><input type="checkbox" id="aicSkDry"> 试运行技能（Appium，P4 生效）</label>
           <label>高风险动作策略（方案铁律，不可修改）</label>
           <select disabled><option>提交类动作必须人工确认，探索阶段禁止自动提交</option></select>
-          <button class="aic-btn" id="aicSkSave" style="width:100%;justify-content:center">保存 Skill 配置</button>
+          <button class="aic-btn" id="aicSkSave" style="width:100%;justify-content:center">保存执行参数</button>
         </aside>
 
       </div>
     </section>
+    </div><!-- /submain -->
   </div>
 </main>
 <div id="toast"></div>

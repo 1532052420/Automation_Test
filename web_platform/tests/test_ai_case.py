@@ -66,6 +66,7 @@ def client(tmp_path, monkeypatch, fm):
     RT._prompts_store = YamlStore('ai_case_prompts', data_dir=d)
     RT._skills_store = YamlStore('ai_case_skills', data_dir=d)
     RT._ai_projects_store = YamlStore('ai_case_projects', data_dir=d)
+    RT._skill_files_store = YamlStore('ai_case_skill_files', data_dir=d)
     monkeypatch.setattr(DEV._settings_store, 'path', os.path.join(d, 'ai_case_settings.yaml'))
     if not os.path.exists(DEV._settings_store.path):
         DEV._settings_store._write({'meta': {'next_id': 1}, 'items': []})
@@ -482,6 +483,58 @@ class TestConfigAPI(object):
         job = _mk_job(client, req='前置：已登录。点击「登录」。断言：出现「首页」', entry='manual')
         assert job['analysis']['analyzer'] == 'model:glm-test'
         assert job['analysis']['goal'] == '模型目标'
+
+
+# ============================================================
+# Skill 文件库（skill = 给模型读的 Markdown 指令文件）
+# ============================================================
+
+class TestSkillFiles(object):
+    def test_sf_001_默认四个技能文件(self, client):
+        r = client.get('/api/ai-case/skill-files').get_json()
+        keys = [f['key'] for f in r['results']]
+        assert keys == ['parse', 'explore', 'mapping', 'dryrun']
+        assert all(f['customized'] is False and f['enabled'] for f in r['results'])
+        assert any('工作循环' in f['content'] for f in r['results'] if f['key'] == 'explore')
+
+    def test_sf_002_编辑保存与启停联动(self, client):
+        r = client.put('/api/ai-case/skill-files/explore', json={
+            'name': '探索技能·定制版', 'content': '# 定制探索流程', 'enabled': False}).get_json()
+        assert r['ok'] and r['skill']['customized'] is True and r['skill']['enabled'] is False
+        # 启停映射到执行视图
+        skills = client.get('/api/ai-case/skills').get_json()['skills']
+        assert skills['explore_enabled'] is False
+
+    def test_sf_003_恢复默认(self, client):
+        client.put('/api/ai-case/skill-files/parse', json={'content': '临时内容'})
+        r = client.post('/api/ai-case/skill-files/parse/reset', json={}).get_json()
+        assert r['ok'] and r['skill']['customized'] is False
+        assert '需求解析技能' in r['skill']['name'] and '工作步骤' in r['skill']['content']
+
+    def test_sf_004_异常_未知技能与空正文(self, client):
+        assert client.put('/api/ai-case/skill-files/nope', json={'content': 'x'}).status_code == 400
+        r = client.put('/api/ai-case/skill-files/parse', json={'content': ''}).get_json()
+        assert not r['ok']
+
+    def test_sf_005_解析时技能正文注入模型上下文(self, client, monkeypatch):
+        client.put('/api/ai-case/skill-files/parse', json={
+            'content': '独特标记：需求解析专属指令 XYZSKILL'})
+        client.put('/api/ai-case/model-config', json={
+            'enabled': True, 'base_url': 'https://api.fake/chat', 'api_key': 'k', 'model': 'm'})
+        captured = {}
+
+        def _fake_post(url, json=None, headers=None, timeout=None, **kw):
+            captured['messages'] = json['messages']
+            return _FakeResp({'choices': [{'message': {'content': _json.dumps(
+                {'goal': 'g', 'steps': [], 'assertions': [],
+                 'clarifications': [], 'risks': [], 'notes': []})}}]})
+
+        monkeypatch.setattr(AZ.requests, 'post', _fake_post)
+        _mk_job(client, req='前置：已登录。点击「登录」。断言：出现「首页」', entry='manual')
+        system = captured['messages'][0]['content']
+        assert 'XYZSKILL' in system and '启用技能' in system   # Assert：技能正文已注入
+
+
 
 
 # ============================================================
