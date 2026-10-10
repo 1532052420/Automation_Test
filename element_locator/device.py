@@ -310,12 +310,14 @@ def _u2_ensure(serial):
         st['session'] = sid
         st['ok'] = bool(sid)
         if st['ok']:
-            # 快照语义：定位器要的是「截图那一瞬间的元素树」，不等待界面安静。
-            # waitForSelectorTimeout 默认 10000ms 是动画页 /source 慢的元凶
-            # （快哥写歌页实测 9~15s；两项置 0 后 0.03~0.15s 出树，快照随取随有）
+            # 快照语义 + 动画页提速四件套（写歌等重动画页实测 18~30s → 0.2~0.5s 出树）：
+            # waitForIdle/SelectorTimeout=0 不等待界面安静；
+            # ignoreUnimportantViews 跳过动画容器等不重要视图；simpleBoundsCalculation 快速算边界
             _u2_http(serial, 'POST', '/wd/hub/session/%s/appium/settings' % sid,
                      {'settings': {'waitForIdleTimeout': 0,
-                                   'waitForSelectorTimeout': 0}}, timeout=10)
+                                   'waitForSelectorTimeout': 0,
+                                   'ignoreUnimportantViews': True,
+                                   'simpleBoundsCalculation': True}}, timeout=10)
         return bool(sid)
     except Exception:
         return False
@@ -348,6 +350,14 @@ def _dump_via_u2(serial):
     sid = _u2_state(serial).get('session')
     if not sid:
         return None
+    # 每次 /source 前重申快照四件套（实测 ~10ms）：会话级设置若在建会话时偶发未生效，
+    # 该会话所有 dump 都会退回 9~30s 慢速，一旦慢到触发 30s 冷却就坠入
+    # 「系统 dump 秒 Killed → 自愈长链 40s+」——这里每跳重申，彻底自愈此类状态丢失
+    _u2_http(serial, 'POST', '/wd/hub/session/%s/appium/settings' % sid,
+             {'settings': {'waitForIdleTimeout': 0,
+                           'waitForSelectorTimeout': 0,
+                           'ignoreUnimportantViews': True,
+                           'simpleBoundsCalculation': True}}, timeout=5)
     # 超时分两档（快哥 AiCompose 写歌页实测：/source 需 ~15s 才出树，两次 14~15s 稳定成功）：
     # - u2 server 在跑（占着设备 UiAutomation 通道）时，系统 uiautomator dump 会被秒 Killed，
     #   「快速失败切系统通道」无路可退 → 给足 45s 硬等出树，宁可慢不可败；
