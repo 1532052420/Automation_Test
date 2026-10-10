@@ -309,6 +309,13 @@ def _u2_ensure(serial):
             sid = (data.get('value') or {}).get('sessionId')
         st['session'] = sid
         st['ok'] = bool(sid)
+        if st['ok']:
+            # 快照语义：定位器要的是「截图那一瞬间的元素树」，不等待界面安静。
+            # waitForSelectorTimeout 默认 10000ms 是动画页 /source 慢的元凶
+            # （快哥写歌页实测 9~15s；两项置 0 后 0.03~0.15s 出树，快照随取随有）
+            _u2_http(serial, 'POST', '/wd/hub/session/%s/appium/settings' % sid,
+                     {'settings': {'waitForIdleTimeout': 0,
+                                   'waitForSelectorTimeout': 0}}, timeout=10)
         return bool(sid)
     except Exception:
         return False
@@ -341,9 +348,14 @@ def _dump_via_u2(serial):
     sid = _u2_state(serial).get('session')
     if not sid:
         return None
-    # 动画页面 u2 会等 root 节点到默认 ~10s 才超时——收短到 2s：
-    # 抓不到立即返回，让上层马上切系统 dump 通道（实测系统通道 2~3s 可出树）
-    resp = _u2_http(serial, 'GET', '/wd/hub/session/%s/source' % sid, timeout=2.5)
+    # 超时分两档（快哥 AiCompose 写歌页实测：/source 需 ~15s 才出树，两次 14~15s 稳定成功）：
+    # - u2 server 在跑（占着设备 UiAutomation 通道）时，系统 uiautomator dump 会被秒 Killed，
+    #   「快速失败切系统通道」无路可退 → 给足 45s 硬等出树，宁可慢不可败；
+    # - u2 未占通道（系统 dump 可用）→ 维持 2.5s 快失败，立刻切系统通道（正常页 2~3s 出树）。
+    # 失败仍缓存 30s 冷却：同页重试大概率再超时，缓存期内直接跳过 u2。
+    occupied = bool(_u2_server_running(serial))
+    resp = _u2_http(serial, 'GET', '/wd/hub/session/%s/source' % sid,
+                    timeout=45 if occupied else 2.5)
     try:
         xml = json.loads(resp).get('value') or ''
         if isinstance(xml, str) and '<hierarchy' in xml:
