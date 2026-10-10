@@ -114,6 +114,81 @@ def framework_import_check():
     return ok, msg
 
 
+# ---------------- 平台服务管理：实例清点 / 重启 / 关闭 ----------------
+# 背景：平台用 nohup 方式常驻，历史实例（如改过端口的老进程）不会随页面关闭而退出，
+# 叠加运行会互相抢占设备通道并让用户"改了代码不生效"。这里提供一键清点/全清/全清+重启。
+# 关键实现：杀进程的 bash 以独立会话（start_new_session）运行，且先 sleep 再杀——
+# 让 HTTP 响应先回到浏览器，服务随后才自我了断/重启。
+
+_SVC_MARK = 'web_platform/app.py'
+
+
+def _platform_instances():
+    """所有平台服务进程（按命令行含 web_platform/app.py 判定），附监听端口"""
+    out = subprocess.run(['ps', 'axo', 'pid=,lstart=,command='],
+                         capture_output=True, text=True, timeout=10).stdout
+    instances = []
+    for line in out.splitlines():
+        # 以 app.py 结尾才是真服务进程：重启脚本的 bash/包装进程命令行里也含该串，
+        # 但后面还跟着日志重定向等尾巴——用结尾匹配排除，避免清点/重启误伤自己
+        if _SVC_MARK not in line or 'ps axo' in line or not line.rstrip().endswith(_SVC_MARK):
+            continue
+        parts = line.strip().split(None, 6)
+        if len(parts) < 7 or not parts[0].isdigit():
+            continue
+        pid = int(parts[0])
+        ports = []
+        try:
+            lo = subprocess.run(['lsof', '-nP', '-iTCP', '-sTCP:LISTEN', '-a', '-p', str(pid)],
+                                capture_output=True, text=True, timeout=8).stdout
+            ports = re.findall(r':(\d+)\s+\(LISTEN\)', lo)
+        except Exception:
+            pass
+        instances.append({'pid': pid, 'start': ' '.join(parts[1:6]), 'cmd': parts[6],
+                          'ports': ports, 'current': pid == os.getpid()})
+    return instances
+
+
+def _spawn_service_action(restart):
+    """派生独立 bash：先杀全部平台进程（逐个核对命令行防 pid 复用），重启模式再拉起新实例"""
+    pids = [str(i['pid']) for i in _platform_instances()]
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    kill = ''
+    for pid in pids:
+        kill += ("ps -p %s -o args= | grep -q web_platform/app.py && kill %s 2>/dev/null; "
+                 % (pid, pid))
+    wait_free = ("for i in $(seq 1 20); do lsof -nP -iTCP:8080 -sTCP:LISTEN 2>/dev/null "
+                 "| grep -q python || break; sleep 0.3; done; ") if restart else ''
+    start = ("cd %s && nohup %s web_platform/app.py >> /tmp/platform_8080.log 2>&1 &"
+             % (root, sys.executable)) if restart else ''
+    script = 'sleep 0.4; %s %s %s' % (kill, wait_free, start)
+    subprocess.Popen(['bash', '-c', script], start_new_session=True,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return pids
+
+
+@bp.route('/api/service/instances')
+def api_service_instances():
+    return jsonify({'ok': True, 'instances': _platform_instances(),
+                    'current_pid': os.getpid()})
+
+
+@bp.route('/api/service/restart', methods=['POST'])
+def api_service_restart():
+    """结束所有平台服务进程（含历史僵尸实例）→ 拉起全新实例（服务初始化/清脏环境）"""
+    pids = _spawn_service_action(restart=True)
+    return jsonify({'ok': True, 'killing': pids,
+                    'msg': '服务重启中：已通知结束 %d 个进程，全新实例约 3~5 秒后就绪' % len(pids)})
+
+
+@bp.route('/api/service/shutdown', methods=['POST'])
+def api_service_shutdown():
+    """结束所有平台服务进程（页面随之不可用；重启请在终端执行 web_platform/app.py）"""
+    pids = _spawn_service_action(restart=False)
+    return jsonify({'ok': True, 'killing': pids,
+                    'msg': '全部平台服务进程正在结束（%d 个）' % len(pids)})
+
+
 @bp.route('/api/status')
 def api_status():
     confs = list_devices_conf_files()

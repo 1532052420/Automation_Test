@@ -1040,3 +1040,25 @@ html.night #vdbgSim[data-level="bad"]     { color:#F87171; }
 
 /* AI 用例生成首页卡片：最近任务状态行（无任务不展示） */
 .nav-card .ai-card-status { font-size: 12px; color: var(--muted2); margin: 0; }
+
+/* 顶栏服务管理按钮（重启/关闭）：关闭为警示红 */
+.foot .foot-danger { color: var(--bad-text); }
+.foot .foot-danger:hover { background: var(--bad-bg); }
+
+/* 服务操作确认弹窗：按钮居中（确认/取消） */
+.svcmodal .mops { justify-content: center; gap: 14px; margin-top: 6px; }
+.svcmodal .mops button { font-size: 13.5px; font-weight: 600; padding: 8px 26px;
+  border-radius: var(--r-pill); cursor: pointer; border: none; }
+.svcmodal .mops .svc-cancel { background: var(--panel3); color: var(--ink); }
+.svcmodal .mops .svc-cancel:hover { background: #e8e8ed; }
+.svcmodal .mops .svc-ok { background: var(--brand); color: #fff; }
+.svcmodal .mops .svc-ok:hover { background: var(--brand-hover); }
+html.night .svcmodal .mops .svc-cancel { background: rgba(255,255,255,.12); color: #fff; }
+
+/* 首页左下角固定悬浮：关闭服务（仅首页，夜间模式自动跟随主题变量） */
+.svc-fab { position: fixed; left: 22px; bottom: 22px; z-index: 60;
+  font-size: 12.5px; font-weight: 500; padding: 8px 16px; border-radius: var(--r-pill);
+  background: var(--panel); color: var(--bad-text); border: 1px solid var(--line);
+  box-shadow: var(--shadow); cursor: pointer; transition: all .2s; }
+.svc-fab:hover { background: var(--bad-bg); border-color: var(--bad-text); transform: translateY(-1px); }
+html.night .svc-fab { background: rgba(40, 40, 44, .92); }

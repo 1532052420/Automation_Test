@@ -157,17 +157,89 @@ function confirmModal(title, msg, danger) {
 function renderSidebar(active, sub) {
   const nav = $('#sidebar');
   if (!nav) return;
+  // 服务管理按钮只在首页出现（关闭服务为首页左下角固定悬浮，见 mountShutdownFab）
+  const svcBtns = active === '/'
+    ? ('<button class="ghost mini" id="btnSvcRestart">🔄 重启服务</button>')
+    : '';
   PlatformNav.render(nav, active,
     '<div class="foot">' +
     '<span><i class="dot ok" id="dotDevice"></i>设备 <span id="footDevice">…</span></span>' +
     '<span><i class="dot ok" id="dotAppium"></i>Appium <span id="footAppium">…</span></span>' +
     '<span><i class="dot ok" id="dotFramework" title="框架依赖 import 自检"></i>框架 <span id="footFramework">…</span></span>' +
     '<button class="ghost mini" id="btnChangelog" title="查看各版本更新时间与变更内容">更新日志 v<span id="clVer">…</span></button>' +
+    svcBtns +
     '</div>', sub);
   const clBtn = $('#btnChangelog');
   if (clBtn) clBtn.addEventListener('click', showChangelog);
+  const rsBtn = $('#btnSvcRestart');
+  if (rsBtn) rsBtn.addEventListener('click', restartService);
+  if (active === '/') mountShutdownFab();
   pollFootStatus();
   setInterval(pollFootStatus, 10000);
+}
+
+/* 首页左下角固定悬浮：关闭服务（仅首页存在） */
+function mountShutdownFab() {
+  if ($('#svcShutdownFab')) return;
+  const b = document.createElement('button');
+  b.id = 'svcShutdownFab';
+  b.className = 'svc-fab';
+  b.textContent = '⏹ 关闭服务';
+  b.addEventListener('click', shutdownService);
+  document.body.appendChild(b);
+}
+
+/* ---------- 平台服务管理（重启/关闭：清理历史僵尸实例） ---------- */
+/* ---------- 服务操作确认弹窗（居中样式化，替代原生 confirm） ---------- */
+function svcConfirm(title, desc, onOk) {
+  let mask = $('#svcMask');
+  if (mask) mask.remove();
+  mask = document.createElement('div');
+  mask.className = 'mask show';
+  mask.id = 'svcMask';
+  mask.innerHTML =
+    '<div class="modal svcmodal"><h4>' + title + '</h4>' +
+    '<p>' + desc + '</p>' +
+    '<div class="mops mops-center">' +
+    '<button class="svc-ok" id="svcOk">确认</button>' +
+    '<button class="svc-cancel" id="svcCancel">取消</button>' +
+    '</div></div>';
+  document.body.appendChild(mask);
+  $('#svcCancel').addEventListener('click', () => mask.remove());
+  mask.addEventListener('click', (e) => { if (e.target === mask) mask.remove(); });
+  $('#svcOk').addEventListener('click', () => { mask.remove(); onOk(); });
+}
+
+function restartService() {
+  svcConfirm('确认重启平台服务吗？', '结束所有平台进程，初始化平台', restartServiceRun);
+}
+async function restartServiceRun() {
+  const rsBtn = $('#btnSvcRestart');
+  rsBtn.disabled = true; rsBtn.textContent = '🔄 重启中…';
+  try { await postJson('/api/service/restart', {}); } catch (e) { /* 服务自我了断时请求中断属预期 */ }
+  toast('旧进程已通知结束，等待全新实例就绪…');
+  for (let i = 0; i < 24; i++) {
+    await new Promise(r => setTimeout(r, 500));
+    try {
+      const d = await api('/api/changelog');
+      if (d && d.entries) { toast('✓ 服务已重启，全新实例就绪', true); location.reload(); return; }
+    } catch (e) { /* 还没起来，继续等 */ }
+  }
+  rsBtn.disabled = false; rsBtn.textContent = '🔄 重启服务';
+  toast('重启超时：请查看 /tmp/platform_8080.log', false);
+}
+
+function shutdownService() {
+  svcConfirm('确认关闭服务吗？', '关闭服务将无法进入平台', shutdownServiceRun);
+}
+async function shutdownServiceRun() {
+  try { await postJson('/api/service/shutdown', {}); } catch (e) { /* 预期中断 */ }
+  document.body.innerHTML =
+    '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+    'height:100vh;gap:10px;background:#f5f5f7;color:#1d1d1f;font-size:15px">' +
+    '<div style="font-size:40px">⏹</div><h2 style="font-weight:600">平台服务已全部关闭</h2>' +
+    '<p style="color:#6e6e73">重新启动请在终端执行：<code style="background:#e8e8ed;padding:2px 8px;border-radius:6px">' +
+    '.venv/bin/python web_platform/app.py</code></p></div>';
 }
 
 /* 更新顶部面包屑第三级（各页面切面板时调用；导航未渲染时静默跳过） */
