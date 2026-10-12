@@ -594,22 +594,26 @@ body[data-page="index"] main { max-width: none; padding: 0; }
   .cards-container { grid-template-columns: 1fr; gap: 16px; }
 }
 
+/* 玻璃拟态卡片 · 样式来源 Uiverse.io by SteveBloX（尺寸/布局保持框架原样） */
 .nav-card {
-  background: rgba(255, 255, 255, .9);
-  border-radius: 16px; padding: 40px 20px;
+  background: rgba(217, 217, 217, .58);
+  border: 1px solid white;
+  box-shadow: 12px 17px 51px rgba(0, 0, 0, .22);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border-radius: 17px; padding: 40px 20px;
   cursor: pointer; text-decoration: none;
   display: flex; flex-direction: column; align-items: center;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, .05);
-  transition: all .3s ease;               /* 原框架：all .3s ease */
-  will-change: transform;                /* 提升到合成层，悬停动画不掉帧 */
+  transition: all .5s;
+  will-change: transform;
+  user-select: none;
 }
 .nav-card:hover {
-  transform: translateY(-10px);          /* 原框架：上浮 10px */
-  box-shadow: 0 20px 30px rgba(0, 0, 0, .1);
-  background: #fff;
+  border: 1px solid black;
+  transform: scale(1.05);
   text-decoration: none;
 }
-.nav-card:active { transform: translateY(-4px) scale(.99); }
+.nav-card:active { transform: scale(0.95) rotateZ(1.7deg); }
 .nav-card h3 {
   font-size: 1.4rem; font-weight: 600; color: #2c3e50;
   margin: 20px 0 10px; letter-spacing: .5px;
@@ -622,7 +626,7 @@ body[data-page="index"] main { max-width: none; padding: 0; }
   margin-bottom: 6px;
   transition: all .3s ease;
 }
-.nav-card:hover .card-icon { transform: scale(1.1); }   /* 原框架：图标随卡片放大 */
+.nav-card:hover .card-icon { transform: scale(1.08); }   /* 图标随卡片放大 */
 .card-icon .ico { display: block; line-height: 0; }
 
 /* 图标浅底配色：与原框架 card-icon 色板一致 */
@@ -1066,13 +1070,6 @@ html.night #vdbgSim[data-level="bad"]     { color:#F87171; }
 html.night .svcmodal .mops .svc-cancel { background: rgba(255,255,255,.12); color: #fff; }
 
 /* 首页左下角固定悬浮：关闭服务（仅首页，夜间模式自动跟随主题变量） */
-.svc-fab { position: fixed; left: 22px; bottom: 22px; z-index: 60;
-  font-size: 12.5px; font-weight: 500; padding: 8px 16px; border-radius: var(--r-pill);
-  background: var(--panel); color: var(--bad-text); border: 1px solid var(--line);
-  box-shadow: var(--shadow); cursor: pointer; transition: all .2s; }
-.svc-fab:hover { background: var(--bad-bg); border-color: var(--bad-text); transform: translateY(-1px); }
-html.night .svc-fab { background: rgba(40, 40, 44, .92); }
-
 /* ================= 设备连接（SoloPi 无线化）：首页卡片操作区 + 扫码弹窗 ================= */
 /* 首页「设备连接」div 卡内的操作区：扫码连接（弹二维码）+ 连接配置（跳转） */
 .nav-card .card-ops { margin: 16px 0 0; display: flex; gap: 10px; align-items: center; justify-content: center; }
@@ -1216,3 +1213,21 @@ html.night .svc-notice { background: rgba(255, 159, 10, .14); color: #ffb340; bo
   color: #b25000; cursor: pointer; white-space: nowrap; }
 .svc-notice-copy:hover { background: rgba(255, 255, 255, .9); }
 html.night .svc-notice-copy { background: rgba(255, 255, 255, .08); color: #ffb340; }
+
+/* ================= 首页玻璃卡片适配（毛玻璃需背景有色块可糊） ================= */
+/* 首页专属柔光色块背景：不接后端、纯装饰，日间彩色/夜间深色低透明 */
+.home-bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.home-bg i { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .5; }
+.home-bg i:nth-child(1) { width: 420px; height: 420px; left: 4%; top: 4%; background: #7cb8ff; }
+.home-bg i:nth-child(2) { width: 380px; height: 380px; right: 5%; top: 26%; background: #7ce3c0; }
+.home-bg i:nth-child(3) { width: 460px; height: 460px; left: 30%; bottom: -4%; background: #c0a8ff; }
+.home-container, .mockhead-slot { position: relative; z-index: 1; }
+
+/* 夜间：玻璃卡与色块的低亮度形态 */
+html.night .nav-card {
+  background: rgba(255, 255, 255, .06);
+  border-color: rgba(255, 255, 255, .14);
+  box-shadow: 12px 17px 51px rgba(0, 0, 0, .45);
+}
+html.night .nav-card:hover { border-color: #f5f5f7; }
+html.night .home-bg i { opacity: .22; filter: blur(100px); }
