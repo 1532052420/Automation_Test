@@ -131,7 +131,7 @@ def _svc_categories():
     """项目服务的识别规则：kind -> (说明, 命令行正则)。BASE 用运行时仓库根注入。"""
     base = re.escape(BASE_DIR)
     return [
-        ('platform', '平台服务', r'web_platform/app\.py$'),
+        ('platform', '平台服务', r'web_platform/app\.py(\s|$)'),
         ('appium', 'Appium 服务', r'(^|/)appium(\.js)?\s.*--port|node\s.*[/\\]appium(\s|$)'),
         ('adb', 'adb 服务', r'^\S*adb\S* -L tcp:\S*\s+fork-server'),
         ('maestro', 'Maestro MCP', r'maestro\.cli\.AppKt\s+mcp$|(^|/)maestro\s+mcp$'),
@@ -183,21 +183,18 @@ def _project_services():
     return services
 
 
-def _svc_kill_pattern():
-    """全类别合并正则（bash 里逐 pid 复核命令行用）"""
-    return '|'.join('(?:%s)' % pat for _k, _l, pat in _svc_categories())
-
-
 def _spawn_service_action(restart):
     """派生独立 bash：杀全部项目服务（逐 pid 复核命令行防误杀）。
     重启模式只拉回平台本体；Appium/maestro 等默认关闭，按需经卡片开关或 runner 自启。"""
     services = _project_services()
     root = BASE_DIR
-    kill_pat = _svc_kill_pattern()
-    kill = ''
-    for s in services:
-        kill += ("ps -p %d -o args= | grep -Eq '%s' && kill %d 2>/dev/null; "
-                 % (s['pid'], kill_pat, s['pid']))
+    # 2026-10-12 修复：旧实现把 Python 正则 (?:...) 拼进 bash grep -E——BSD grep 报
+    # bad regex 导致 grep 失配、&& kill 全部短路，「重启服务」从未真正杀过进程。
+    # 现在 pid 由 Python 侧 _project_services 逐条核对命令行（Python re 可靠），bash 直接 kill；
+    # 另加端口兜底：8080/4726 的监听者无论命令行长什么样一律清掉（治「端口占用」的本源）。
+    kill = ''.join('kill %d 2>/dev/null; ' % s['pid'] for s in services)
+    kill += ('lsof -ti tcp:8080 2>/dev/null | xargs kill 2>/dev/null; '
+             'lsof -ti tcp:4726 2>/dev/null | xargs kill 2>/dev/null; ')
     wait_free = ("for i in $(seq 1 20); do lsof -nP -iTCP:8080 -sTCP:LISTEN 2>/dev/null "
                  "| grep -q python || break; sleep 0.3; done; ") if restart else ''
     # 2026-10-12 起「所有服务默认关闭」：重启不再复活 Appium（执行用例时 runner 会按需自启）
