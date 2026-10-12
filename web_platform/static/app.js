@@ -524,12 +524,12 @@ function initIndex() {
     el.hidden = false;
   }).catch(() => { /* 状态获取失败不影响首页 */ });
 
-  // 首页各卡片服务状态（固定卡片底部居中）+ 托管服务右上角开关（appui/aicase/connect/escrcpy）
-  // appui→Appium · aicase→Maestro MCP · connect→adb · escrcpy→escrcpy；
+  // 首页各卡片服务状态（固定卡片底部居中）+ 托管服务右上角开关（appui/aicase/escrcpy 可切换）
+  // appui→Appium · aicase→Maestro MCP · escrcpy→escrcpy；connect(adb) 由心跳按需管理（锁定态）；
   // apitest / locator / perf 即平台自身，能打开首页即在运行。
-  // 服务策略（2026-10-12）：默认关闭，按需点开关；所有网页关掉满 5 小时自动关闭。
-  api('/api/home/status').then(d => {
-    if (!d.ok) return;
+  // 服务策略（2026-10-12）：默认关闭，按需点开关（API 内轮询等就绪）；所有网页关掉满 5 小时自动关闭。
+  // 状态行 15s 周期刷新：Appium 等服务启动有延迟，就绪后页面自动跟上真实状态。
+  const refreshHomeSvc = (d) => {
     const set = (el, on) => {
       if (!el) return;
       el.textContent = on ? '服务运行中' : '未运行';
@@ -543,25 +543,23 @@ function initIndex() {
       const sw = document.querySelector('#svcSwitch-' + k);
       if (sw) { sw.hidden = false; sw.classList.toggle('on', !!svc[k]); }
     });
-  }).catch(() => { /* 状态获取失败不影响首页 */ });
-  // 托管开关点击：开/停对应服务（escrcpy 卡整卡点击=启动，开关仍可关闭）
+  };
+  const loadHomeSvc = () => api('/api/home/status').then(d => { if (d.ok) refreshHomeSvc(d); }).catch(() => {});
+  loadHomeSvc();
+  setInterval(loadHomeSvc, 15000);
+  // 托管开关点击：开/停对应服务（API 内已轮询就绪/消失，返回即最终状态）
   document.querySelectorAll('.svc-switch:not(.locked)').forEach(sw => {
     sw.addEventListener('click', async (e) => {
       e.preventDefault(); e.stopPropagation();
       const svc = sw.dataset.svc;
       const turningOn = !sw.classList.contains('on');
       sw.disabled = true;
+      toast(turningOn ? '正在启动并等待就绪…（Appium 约需 10~30 秒）' : '正在停止…');
       const d = await postJson('/api/services/toggle', { svc, on: turningOn }).catch(() => null);
       sw.disabled = false;
       if (!d) return toast('请求失败', false);
       toast(d.msg || (d.ok ? (turningOn ? '已开启' : '已关闭') : '操作失败'), !!d.ok);
-      api('/api/home/status').then(r => {
-        if (!r.ok) return;
-        const on = !!(r.svc || {})[svc];
-        sw.classList.toggle('on', on);
-        const st = document.querySelector(svc === 'escrcpy' ? '#escrcpyStatus' : '#svcStatus-' + svc);
-        if (st) { st.textContent = on ? '服务运行中' : '未运行'; st.classList.toggle('on', on); }
-      }).catch(() => {});
+      loadHomeSvc();
     });
   });
   // 平台自身模块的锁定开关：视觉一致，点击说明原因

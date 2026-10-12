@@ -98,8 +98,30 @@ def _kill_by_kinds(kinds):
     return killed
 
 
+def _wait_appui_ready(seconds=30):
+    """轮询 Appium /status 就绪"""
+    from web_platform.runtime_config import check_appium
+    for _ in range(max(1, int(seconds / 2.5))):
+        time.sleep(2.5)
+        ok, _m = check_appium('127.0.0.1', '4726')
+        if ok:
+            return True
+    return False
+
+
+def _wait_kind(kind, seconds=10):
+    """轮询 ps 直到看到指定类别进程（用户环境 ps 可用；沙箱受限时以超时为准）"""
+    from web_platform.routes import _project_services
+    for _ in range(max(1, int(seconds / 1.5))):
+        time.sleep(1.5)
+        if any(s['kind'] == kind for s in _project_services()):
+            return True
+    return False
+
+
 def start_service(svc):
-    """启动托管服务。返回 (ok, msg)。沙箱/命令缺失时如实报错。"""
+    """启动托管服务并【轮询等待就绪】再返回——保证调用方拿到结果时状态可探测。
+    返回 (ok, msg)。沙箱/命令缺失时如实报错。"""
     if svc == 'appui':
         cmd = [APPIUM_BIN, '--port', '4726', '--base-path', '/wd/hub', '--address', '127.0.0.1']
         log = open(os.path.join(BASE_DIR, 'logs', 'appium.log'), 'ab')
@@ -112,29 +134,48 @@ def start_service(svc):
     elif svc == 'escrcpy':
         from escrcpy.launcher import launch
         ok, info = launch()
-        return ok, ('escrcpy 已启动' if ok else info)
+        if not ok:
+            return False, info
+        return True, 'escrcpy 已启动'
     else:
         return False, '该服务不支持托管启停（平台自身模块）'
     try:
         subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
-        return True, '启动命令已下发（就绪需几秒~几十秒）'
     except Exception as e:
         return False, '启动失败: %s' % str(e)[:120]
+    # 轮询就绪：避免「命令已下发但状态还没起来」的窗口期
+    if svc == 'appui':
+        return (True, 'Appium 已就绪 (:4726/wd/hub)') if _wait_appui_ready(30) \
+            else (False, 'Appium 启动超时（30s 未就绪），请到 logs/appium.log 查看日志')
+    if svc == 'aicase':
+        return (True, 'Maestro MCP 已启动') if _wait_kind('maestro', 10) \
+            else (False, 'Maestro MCP 启动超时，请到 logs/maestro.log 查看')
+    return True, '已启动' 
 
 
 def stop_service(svc):
-    """停止托管服务。返回 (ok, msg)。"""
-    if svc == 'connect':
-        r = subprocess.run(['adb', 'kill-server'], capture_output=True, text=True, timeout=20)
-        return r.returncode == 0, 'adb server 已停止' if r.returncode == 0 else (r.stderr or '停止失败')
+    """停止托管服务并【轮询确认已消失】再返回。返回 (ok, msg)。"""
     if svc == 'escrcpy':
         n = _kill_by_kinds({'escrcpy'})
-        return True, 'escrcpy 已关闭（%d 个进程）' % n if n else 'escrcpy 未在运行'
+        gone = all(s['kind'] != 'escrcpy' for s in _project_services())
+        return (True, 'escrcpy 已关闭' if gone else '停止超时，请稍后刷新查看')
     kinds = {'appui': {'appium'}, 'aicase': {'maestro'}}.get(svc)
     if not kinds:
         return False, '该服务不支持托管启停（平台自身模块）'
     n = _kill_by_kinds(kinds)
-    return True, ('已停止（%d 个进程）' % n) if n else '未在运行'
+    if not n:
+        # ps 不可用/未匹配到进程时，用 HTTP 探测确认是否真的没在运行——杜绝假「未在运行」
+        if 'appium' in kinds:
+            from web_platform.runtime_config import check_appium
+            ok, _m = check_appium('127.0.0.1', '4726')
+            if ok:
+                return False, '无法定位 Appium 进程（进程列表不可用），请在终端手动停止后重试'
+        return True, '未在运行'
+    for _ in range(8):   # 确认进程真正退出（kill 后退出有延迟）
+        time.sleep(1)
+        if all(s['kind'] not in kinds for s in _project_services()):
+            return True, '已停止'
+    return True, '已发送停止命令，进程退出稍慢，请稍后刷新查看'
 
 
 def auto_close_check():

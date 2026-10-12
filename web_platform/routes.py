@@ -265,7 +265,9 @@ def api_services_toggle():
     body = request.get_json(silent=True) or {}
     svc = str(body.get('svc') or '')
     on = bool(body.get('on'))
-    if svc not in ('appui', 'aicase', 'connect', 'escrcpy'):
+    if svc not in ('appui', 'aicase', 'escrcpy'):
+        if svc == 'connect':
+            return jsonify({'ok': False, 'msg': 'adb server 由平台按需自动管理（页面心跳会自动拉起），无需手动开关'})
         return jsonify({'ok': False, 'msg': '该服务不支持托管开关: %s' % svc})
     ok, msg = (service_manager.start_service if on else service_manager.stop_service)(svc)
     return jsonify({'ok': ok, 'msg': msg})
