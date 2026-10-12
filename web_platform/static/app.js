@@ -701,6 +701,23 @@ function onDevTableClick(e) {
   if (b.dataset.inst) return solopiInstall(b.dataset.inst);
 }
 
+/* 连接页内嵌预览文案：与共享扫码弹窗（connect_qr.js）同一份，避免两处漂移 */
+const QR_MODE_NAMES_CT = window.PlatformQR ? window.PlatformQR.MODE_NAMES : {};
+const QR_MODE_STEPS_CT = window.PlatformQR ? window.PlatformQR.MODE_STEPS : {};
+const qrStepsHtml = (mode) =>
+  (QR_MODE_STEPS_CT[mode] || []).map(s => '<li>' + s + '</li>').join('');
+
+function fillQrConnectUi(prefix, d) {
+  const mode = (d.config && d.config.mode) || 'adbwifi';
+  setText('#' + prefix + 'QrMode', QR_MODE_NAMES_CT[mode] || mode);
+  setText('#' + prefix + 'Payload', d.payload || '');
+  setHtml('#' + prefix + 'Steps', qrStepsHtml(mode));
+  const img = $('#' + prefix + 'QrImg');
+  if (img) img.src = '/api/connect/qrcode?ts=' + Date.now();
+  const badge = $('#' + prefix + 'ModeBadge');
+  if (badge) badge.textContent = QR_MODE_NAMES_CT[mode] || mode;
+}
+
 async function initConnect() {
   renderSidebar('/connect');
   document.querySelectorAll('#subnav a').forEach(a => {

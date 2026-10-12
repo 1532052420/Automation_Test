@@ -127,5 +127,5 @@ window.PlatformQR = (function () {
       });
   }
 
-  return { open: open, MODE_NAMES: MODE_NAMES };
+  return { open: open, MODE_NAMES: MODE_NAMES, MODE_STEPS: MODE_STEPS };
 })();
