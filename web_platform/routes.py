@@ -198,6 +198,10 @@ def _spawn_service_action(restart):
     wait_free = ("for i in $(seq 1 20); do lsof -nP -iTCP:8080 -sTCP:LISTEN 2>/dev/null "
                  "| grep -q python || break; sleep 0.3; done; ") if restart else ''
     # 2026-10-12 起「所有服务默认关闭」：重启不再复活 Appium（执行用例时 runner 会按需自启）
+    start = ''
+    if restart:
+        start += ("cd %s && nohup %s web_platform/app.py >> /tmp/platform_8080.log 2>&1 &"
+                  % (root, sys.executable))
     script = 'sleep 0.4; %s %s %s' % (kill, wait_free, start)
     subprocess.Popen(['bash', '-c', script], start_new_session=True,
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

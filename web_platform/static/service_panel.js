@@ -197,7 +197,7 @@
           cp.dataset.bound = '1';
           cp.addEventListener('click', function () {
             var done = function () { cp.textContent = '已复制'; setTimeout(function () { cp.textContent = '复制修复命令'; }, 2000); };
-            var cmd = './run.command restart-platform';
+            var cmd = 'cd /Users/ouyang/Desktop/AutomationTest && ./run.command restart-platform';
             if (navigator.clipboard && navigator.clipboard.writeText) {
               navigator.clipboard.writeText(cmd).then(done, function () { fallbackCopy(cmd); done(); });
             } else { fallbackCopy(cmd); done(); }
