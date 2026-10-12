@@ -1201,3 +1201,9 @@ html.night .svc-item { background: rgba(255, 255, 255, .05); border-color: rgba(
 html.night .svc-item-r1 b { color: #f5f5f7; }
 html.night .svc-btn.ghost { color: #e8e8ed; border-color: rgba(255, 255, 255, .2); }
 html.night .svc-btn.ghost:hover { background: rgba(255, 255, 255, .08); }
+
+/* 服务管理：降级警示条（ps 不可用等） */
+.svc-notice { margin: 0 22px 10px; padding: 9px 14px; border-radius: 10px;
+  background: rgba(255, 149, 0, .12); border: 1px solid rgba(255, 149, 0, .3);
+  color: #b25000; font-size: 12px; line-height: 1.55; }
+html.night .svc-notice { background: rgba(255, 159, 10, .14); color: #ffb340; border-color: rgba(255, 159, 10, .35); }

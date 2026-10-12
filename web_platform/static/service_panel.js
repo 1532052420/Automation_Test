@@ -36,6 +36,7 @@
       '    <button type="button" class="svc-btn ghost" id="svcBtnInspect">🩺 体检</button>' +
       '    <button type="button" class="svc-btn ghost" id="svcBtnClose">✕</button>' +
       '  </div>' +
+      '  <div class="svc-notice" id="svcNotice" hidden></div>' +
       '  <div class="svc-list" id="svcList"></div>' +
       '  <div class="svc-drawer-ft">' +
       '    <button type="button" class="svc-btn danger-ghost" id="svcBtnCleanup">🧹 清理陈旧实例与未登记占用</button>' +
@@ -46,13 +47,58 @@
       '</div>';
     document.body.appendChild(mask);
 
-    fab.addEventListener('click', toggleDrawer);
+    makeDraggable(fab);
     document.getElementById('svcBtnClose').addEventListener('click', closeDrawer);
     mask.addEventListener('click', function (e) { if (e.target === mask) closeDrawer(); });
     document.getElementById('svcBtnInspect').addEventListener('click', function () { refresh(true); });
     document.getElementById('svcBtnCleanup').addEventListener('click', cleanup);
     document.getElementById('svcBtnRestart').addEventListener('click', restartService);
     document.getElementById('svcBtnShutdown').addEventListener('click', shutdownService);
+  }
+
+  function makeDraggable(fab) {
+    var POS_KEY = 'svcFabPos';
+    var drag = null, moved = false;
+    // 恢复上次位置
+    try {
+      var saved = JSON.parse(localStorage.getItem(POS_KEY) || 'null');
+      if (saved && saved.x != null) {
+        fab.style.left = saved.x + 'px';
+        fab.style.top = saved.y + 'px';
+        fab.style.right = 'auto';
+        fab.style.bottom = 'auto';
+      }
+    } catch (e) { /* 忽略 */ }
+    function save() {
+      try { localStorage.setItem(POS_KEY, JSON.stringify({ x: fab.offsetLeft, y: fab.offsetTop })); }
+      catch (e) { /* 忽略 */ }
+    }
+    fab.addEventListener('mousedown', function (e) {
+      if (e.button !== 0) return;
+      drag = { dx: e.clientX - fab.offsetLeft, dy: e.clientY - fab.offsetTop };
+      moved = false;
+      fab.style.right = 'auto';
+      fab.style.bottom = 'auto';
+      fab.style.transition = 'none';
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', function (e) {
+      if (!drag) return;
+      var x = Math.max(4, Math.min(window.innerWidth - fab.offsetWidth - 4, e.clientX - drag.dx));
+      var y = Math.max(4, Math.min(window.innerHeight - fab.offsetHeight - 4, e.clientY - drag.dy));
+      if (Math.abs(e.clientX - (drag.dx + fab.offsetLeft)) > 3 || Math.abs(e.clientY - (drag.dy + fab.offsetTop)) > 3) {
+        moved = true;
+      }
+      fab.style.left = x + 'px';
+      fab.style.top = y + 'px';
+    });
+    document.addEventListener('mouseup', function () {
+      if (!drag) return;
+      drag = null;
+      fab.style.transition = '';
+      if (moved) save();
+      else toggleDrawer();
+    });
   }
 
   function toggleDrawer() {
@@ -117,6 +163,12 @@
     badge.hidden = !n;
     badge.textContent = n || '';
     badge.className = 'svc-fab-badge' + (s.unreg ? ' red' : ' amber');
+    // 降级警示条（ps 不可用等）——提示而非服务行
+    var notice = document.getElementById('svcNotice');
+    if (notice) {
+      if (d.notice) { notice.textContent = d.notice; notice.hidden = false; }
+      else { notice.hidden = true; notice.textContent = ''; }
+    }
   }
 
   function runOp(op, btn) {

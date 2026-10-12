@@ -393,16 +393,16 @@ def inspect_services():
         for port, pid in unreg:
             add('%s :%s' % (_TERM_UNREG, port), 'unreg', '占用端口 %s' % port, [port], pid,
                 '占端口但不在服务清单——可能是旧版本残留或手动启动的程序', ['kill'])
-    elif _port_users():
-        add('未登记占用', 'off', '判定受限', [], None,
-            '进程清单不可用（ps 权限受限），未登记占用判定降级——真实判定请在服务器本机终端查看', [])
+    # ps 不可用：不再伪装成服务行，以 notice 形式提示（前端渲染为顶部警示条）
+    notice = ('进程清单不可用（ps 权限受限），「陈旧实例/未登记占用」判定降级——'
+              '真实判定请在服务器本机终端查看') if not services else None
 
     return {'ok': True, 'services': rows,
             'summary': {'ok': sum(1 for r in rows if r['level'] == 'ok'),
                         'stale': sum(1 for r in rows if r['level'] == 'stale'),
                         'unreg': sum(1 for r in rows if r['level'] == 'unreg'),
                         'off': sum(1 for r in rows if r['level'] == 'off')},
-            'degraded': not services}
+            'degraded': not services, 'notice': notice}
 
 
 def _pgrep_pids(pattern):
