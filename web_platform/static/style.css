@@ -1207,3 +1207,12 @@ html.night .svc-btn.ghost:hover { background: rgba(255, 255, 255, .08); }
   background: rgba(255, 149, 0, .12); border: 1px solid rgba(255, 149, 0, .3);
   color: #b25000; font-size: 12px; line-height: 1.55; }
 html.night .svc-notice { background: rgba(255, 159, 10, .14); color: #ffb340; border-color: rgba(255, 159, 10, .35); }
+
+/* 服务管理：警示条内的复制按钮 */
+.svc-notice { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.svc-notice span { flex: 1 1 auto; }
+.svc-notice-copy { font: inherit; font-size: 11.5px; padding: 3px 12px; border-radius: 980px;
+  border: 1px solid rgba(255, 149, 0, .45); background: rgba(255, 255, 255, .6);
+  color: #b25000; cursor: pointer; white-space: nowrap; }
+.svc-notice-copy:hover { background: rgba(255, 255, 255, .9); }
+html.night .svc-notice-copy { background: rgba(255, 255, 255, .08); color: #ffb340; }

@@ -10,6 +10,17 @@
   var LEVEL_LABEL = { ok: '健康', stale: '陈旧实例', unreg: '未登记占用', off: '已停止' };
   var _timer = null;
 
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) { /* 忽略 */ }
+    document.body.removeChild(ta);
+  }
+
   function esc(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -36,7 +47,7 @@
       '    <button type="button" class="svc-btn ghost" id="svcBtnInspect">🩺 体检</button>' +
       '    <button type="button" class="svc-btn ghost" id="svcBtnClose">✕</button>' +
       '  </div>' +
-      '  <div class="svc-notice" id="svcNotice" hidden></div>' +
+      '  <div class="svc-notice" id="svcNotice" hidden><span id="svcNoticeText"></span><button type="button" class="svc-notice-copy" id="svcNoticeCopy">复制修复命令</button></div>' +
       '  <div class="svc-list" id="svcList"></div>' +
       '  <div class="svc-drawer-ft">' +
       '    <button type="button" class="svc-btn danger-ghost" id="svcBtnCleanup">🧹 清理陈旧实例与未登记占用</button>' +
@@ -50,7 +61,16 @@
     makeDraggable(fab);
     document.getElementById('svcBtnClose').addEventListener('click', closeDrawer);
     mask.addEventListener('click', function (e) { if (e.target === mask) closeDrawer(); });
-    document.getElementById('svcBtnInspect').addEventListener('click', function () { refresh(true); });
+    document.getElementById('svcBtnInspect').addEventListener('click', function () {
+      var b = this;
+      b.disabled = true;
+      b.textContent = '体检中…';
+      fetch('/api/services/inspect', { headers: { 'Content-Type': 'application/json' } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (d.ok) render(d); })
+        .catch(function () { toast('体检失败：请稍后重试', false); })
+        .finally(function () { b.disabled = false; b.textContent = '🩺 体检'; });
+    });
     document.getElementById('svcBtnCleanup').addEventListener('click', cleanup);
     document.getElementById('svcBtnRestart').addEventListener('click', restartService);
     document.getElementById('svcBtnShutdown').addEventListener('click', shutdownService);
@@ -97,7 +117,10 @@
       drag = null;
       fab.style.transition = '';
       if (moved) save();
-      else toggleDrawer();
+    });
+    // click 兜底：真实点击（mousedown→mouseup 未移动）与程序化 click() 都能开抽屉
+    fab.addEventListener('click', function () {
+      if (!moved) toggleDrawer();
     });
   }
 
@@ -166,8 +189,25 @@
     // 降级警示条（ps 不可用等）——提示而非服务行
     var notice = document.getElementById('svcNotice');
     if (notice) {
-      if (d.notice) { notice.textContent = d.notice; notice.hidden = false; }
-      else { notice.hidden = true; notice.textContent = ''; }
+      var ntx = document.getElementById('svcNoticeText');
+      if (d.notice) {
+        if (ntx) ntx.textContent = d.notice;
+        var cp = document.getElementById('svcNoticeCopy');
+        if (cp && !cp.dataset.bound) {
+          cp.dataset.bound = '1';
+          cp.addEventListener('click', function () {
+            var done = function () { cp.textContent = '已复制'; setTimeout(function () { cp.textContent = '复制修复命令'; }, 2000); };
+            var cmd = './run.command restart-platform';
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(cmd).then(done, function () { fallbackCopy(cmd); done(); });
+            } else { fallbackCopy(cmd); done(); }
+          });
+        }
+        notice.hidden = false;
+      } else {
+        if (ntx) ntx.textContent = '';
+        notice.hidden = true;
+      }
     }
   }
 

@@ -149,6 +149,9 @@ def start_service(svc):
         return (True, 'Appium 已就绪 (:4726/wd/hub)') if _wait_appui_ready(30) \
             else (False, 'Appium 启动超时（30s 未就绪），请到 logs/appium.log 查看日志')
     if svc == 'aicase':
+        if not _ps_lines():   # 进程清单不可用：无法轮询确认，如实说明而非误报超时
+            time.sleep(3)
+            return True, 'Maestro MCP 启动命令已下发（运行状态检测受限，请以终端 ps 为准）'
         return (True, 'Maestro MCP 已启动') if _wait_kind('maestro', 10) \
             else (False, 'Maestro MCP 启动超时，请到 logs/maestro.log 查看')
     return True, '已启动' 
