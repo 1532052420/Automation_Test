@@ -13,6 +13,7 @@ window.PlatformNav = (function () {
   var PAGE_NAMES = {
     '/': '首页',
     '/run': 'APP自动化',
+    '/connect': '设备连接',
     '/locator': '元素定位器',
     '/ai-case': 'AI 用例生成',
     '/perf': '性能压测',

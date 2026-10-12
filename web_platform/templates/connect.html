@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自动化测试平台</title>
+<script src="/assets/{{ asset_v }}/theme.js"></script>
+<link rel="stylesheet" href="/assets/{{ asset_v }}/nav.css">
+<link rel="stylesheet" href="/assets/{{ asset_v }}/style.css">
+</head>
+<body data-page="connect">
+<header class="gnav" id="sidebar"></header>
+<main>
+  <div class="pagehead">
+    <h1>设备连接</h1>
+    <span class="sub">SoloPi 无线化 · 扫码连接多设备：平台生成二维码，设备扫码完成无线接入，脱离 USB 线控</span>
+  </div>
+
+  <div class="runlayout">
+    <!-- 左侧二级菜单（深色通栏，图标由 app.js 按 data-icon 注入） -->
+    <aside class="subnav" id="subnav">
+      <div class="subnav-label">设备连接</div>
+      <a href="#settings" data-panel="settings" data-icon="gear" class="on">连接配置</a>
+      <a href="#devices" data-panel="devices" data-icon="target">设备管理</a>
+    </aside>
+
+    <!-- 右侧面板区 -->
+    <div class="submain">
+
+      <!-- 连接配置：配置卡片 + 扫码二维码卡片 -->
+      <section class="panel" id="panel-settings" hidden>
+        <div class="grid2">
+          <div class="card">
+            <div class="cardhead">
+              <h3>连接配置</h3>
+              <span class="pill idle" id="ctModeBadge">加载中…</span>
+            </div>
+            <div class="fields">
+              <div class="field">
+                <label>二维码模式</label>
+                <select id="ctMode">
+                  <option value="adbwifi">ADB 无线调试配对（Android 11+）</option>
+                  <option value="url">平台地址（URL）</option>
+                  <option value="custom">自定义文本</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>主机 IP（留空自动探测）</label>
+                <input type="text" id="ctHost" placeholder="自动探测局域网 IP">
+              </div>
+              <div class="field">
+                <label>平台端口（URL 模式）</label>
+                <input type="text" id="ctPort">
+              </div>
+              <div class="field">
+                <label>配对服务名（adbwifi 模式）</label>
+                <input type="text" id="ctService">
+              </div>
+              <div class="field">
+                <label>配对密码（adbwifi 模式，≥8 位）</label>
+                <input type="text" id="ctPassword">
+              </div>
+              <div class="field wide">
+                <label>自定义二维码文本（支持 {host} {port} 占位符）</label>
+                <input type="text" id="ctCustom">
+              </div>
+            </div>
+            <div class="treebar" style="margin-top:16px">
+              <button class="mini" id="btnCtSave">保存配置</button>
+              <button class="ghost mini" id="btnCtShowModal">大图弹窗</button>
+            </div>
+            <p class="muted" style="font-size:12.5px;margin-top:12px">
+              配置持久化到 <code>config/connect_settings.json</code>；右侧二维码随配置实时生成。
+              SoloPi 组网：主设备在「一机多控」中扫从机二维码添加设备。
+            </p>
+          </div>
+
+          <div class="card">
+            <div class="cardhead">
+              <h3>扫码连接</h3>
+              <span class="muted">内容随左侧配置实时生成</span>
+            </div>
+            <div class="qr-wrap">
+              <img id="ctQrImg" alt="连接二维码" title="设备扫码连接">
+              <div class="qr-side">
+                <span class="pill ok" id="ctQrMode">—</span>
+                <code class="qr-payload" id="ctPayload" title="二维码内容">—</code>
+                <ol class="qr-steps" id="ctSteps"></ol>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 设备管理：在线设备（USB/无线） + 手动无线连接 + SoloPi APK 部署 -->
+      <section class="panel" id="panel-devices" hidden>
+        <div class="card">
+          <div class="cardhead">
+            <h3>在线设备 <span class="muted">· USB 与无线（IP:端口）统一列表</span></h3>
+            <div class="ops" style="margin-left:auto">
+              <button class="ghost mini" id="btnDevRefresh">刷新</button>
+            </div>
+          </div>
+          <div class="tblwrap">
+            <table>
+              <thead><tr>
+                <th>设备序列号</th><th>状态</th><th>连接方式</th><th>型号</th><th style="width:230px">操作</th>
+              </tr></thead>
+              <tbody id="devTbody"></tbody>
+            </table>
+          </div>
+          <div id="devEmpty" class="empty" style="display:none">
+            未检测到设备：请先用 USB 连接一台设备并开启 USB 调试，或完成无线配对
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div class="card">
+            <div class="cardhead"><h3>手动无线连接</h3></div>
+            <p class="muted" style="font-size:13px">
+              前提：设备已开「无线调试」并完成配对，或先用 USB 连接执行过一次
+              <code>adb tcpip 5555</code>（下方设备行内可一键切换）。
+            </p>
+            <div class="treebar" style="margin-top:12px">
+              <input type="text" id="devAddr" placeholder="设备 IP:端口，如 192.168.1.20:5555"
+                     style="flex:1 1 200px;max-width:280px">
+              <button class="mini" id="btnDevConnect">连接</button>
+              <button class="ghost mini" id="btnDevDisconnect">断开</button>
+            </div>
+            <pre class="adb-out" id="adbOut" hidden></pre>
+          </div>
+
+          <div class="card">
+            <div class="cardhead"><h3>SoloPi 部署</h3></div>
+            <p class="muted" style="font-size:13px">
+              APK 放到 <code>tools/solopi/</code> 目录（GitHub alipay/SoloPi Releases 下载），
+              即可一键安装到选中设备；安装后用 SoloPi 录制回放 / 一机多控扫码组网。
+            </p>
+            <div class="treebar" style="margin-top:12px">
+              <select id="devSel" style="max-width:220px"><option value="">（无在线设备）</option></select>
+              <button class="mini" id="btnSolopiInstall">安装 SoloPi</button>
+              <span class="muted" id="solopiHint"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</main>
+<div id="toast"></div>
+<script src="/assets/{{ asset_v }}/nav.js"></script>
+<script src="/assets/{{ asset_v }}/app.js"></script>
+</body>
+</html>

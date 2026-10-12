@@ -1062,3 +1062,39 @@ html.night .svcmodal .mops .svc-cancel { background: rgba(255,255,255,.12); colo
   box-shadow: var(--shadow); cursor: pointer; transition: all .2s; }
 .svc-fab:hover { background: var(--bad-bg); border-color: var(--bad-text); transform: translateY(-1px); }
 html.night .svc-fab { background: rgba(40, 40, 44, .92); }
+
+/* ================= 设备连接（SoloPi 无线化）：首页卡片操作区 + 扫码弹窗 ================= */
+/* 首页「设备连接」div 卡内的操作区：扫码连接（弹二维码）+ 连接配置（跳转） */
+.nav-card .card-ops { margin-top: 16px; display: flex; gap: 10px; align-items: center; }
+html.night .nav-card .card-ops .btn.ghost { color: #a1a1a6; border-color: rgba(255, 255, 255, .16); }
+html.night .nav-card .card-ops .btn.ghost:hover { background: rgba(255, 255, 255, .08); color: #f5f5f7; }
+
+/* 扫码弹窗（首页按钮 / 连接页「大图弹窗」共用）：二维码恒为白底保证可扫 */
+.qrmodal { width: min(600px, 92vw); }
+.qr-wrap { display: flex; gap: 18px; align-items: flex-start; }
+.qr-wrap img {
+  width: 176px; height: 176px; padding: 8px; flex: none; display: block;
+  background: #fff; border: 1px solid var(--line-soft); border-radius: 12px;
+}
+.qr-side { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.qr-side .pill { align-self: flex-start; }
+.qr-payload {
+  display: block; width: 100%;
+  font: 11.5px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  background: var(--panel2); border: 1px solid var(--line-soft); border-radius: 8px;
+  padding: 8px 10px; color: var(--ink2);
+  word-break: break-all; max-height: 84px; overflow: auto;
+}
+.qr-steps { margin: 2px 0 0; padding-left: 20px; font-size: 12.5px; color: var(--muted); line-height: 1.9; }
+@media (max-width: 560px) {
+  .qr-wrap { flex-direction: column; }
+  .qr-wrap img { width: 100%; height: auto; }
+}
+
+/* 设备连接页：adb 命令回显（无线连接 / APK 安装输出） */
+.adb-out {
+  margin: 12px 0 0; padding: 10px 14px; border-radius: 10px;
+  background: var(--dark); color: var(--dark-ink);
+  font: 11.5px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  white-space: pre-wrap; word-break: break-all; max-height: 180px; overflow: auto;
+}

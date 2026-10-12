@@ -42,6 +42,17 @@
         <p class="ai-card-status" id="aiCaseStatus" hidden></p>
       </a>
 
+      <!-- 设备连接（SoloPi 无线化）：卡片进连接页，「扫码连接」直接弹二维码 -->
+      <div class="nav-card" id="cardConnect" data-href="/connect" tabindex="0" role="link" aria-label="设备连接，回车进入">
+        <div class="card-icon icon-cyan"><span class="ico" data-ico="qr"></span></div>
+        <h3>设备连接</h3>
+        <p>SoloPi 无线 · 扫码连接多设备 · adb 无线调试</p>
+        <div class="card-ops">
+          <button class="mini" id="btnQrHome" title="弹出二维码，设备扫码无线连接">扫码连接</button>
+          <a class="btn ghost mini" href="/connect">连接配置</a>
+        </div>
+      </div>
+
       <a class="nav-card" href="#" id="cardEscrcpy" title="">
         <div class="card-icon icon-cyan"><span class="ico" data-ico="screen"></span></div>
         <h3>投屏控制台</h3>

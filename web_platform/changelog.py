@@ -10,7 +10,7 @@
 两端不再各自硬编码版本号。
 """
 
-APP_VERSION = '6.15.00'
+APP_VERSION = '6.15.02'
 
 # 最新版本在最前；time 精确到秒（YYYY-MM-DD HH:MM:SS）
 # 版本号格式 x.xx.xx（主版本 1-2 位 · 次版本固定 2 位 · 修订号固定 2 位，99 进位次版本）
@@ -18,6 +18,26 @@ APP_VERSION = '6.15.00'
 # 旧线历史条目保留原始记录，不回溯改写
 # 每条变更一句话 10~20 字，只说改了什么（详细背景见项目 memory 与设计文档）
 CHANGELOG = [
+    {
+        'version': '6.15.02',
+        'time': '2026-10-12 10:32:41',
+        'title': '新增设备连接（SoloPi 无线化）：首页扫码连接 + 连接配置页',
+        'changes': [
+            '首页新增「设备连接」入口卡片：「扫码连接」按钮一键弹出二维码，设备扫码无线接入，脱 USB 线控',
+            '新增 /connect 页：二级菜单「连接配置 / 设备管理」，连接配置持久化，二维码支持 adbwifi 配对串 / 平台地址 / 自定义文本三种模式',
+            '设备管理：USB/无线设备统一列表、手动 adb connect、一键 tcpip 5555、SoloPi APK（tools/solopi/）一键安装',
+            '新增依赖 qrcode==7.4.2（二维码本地生成，无外链），调研报告见 docs/远程扫码连接设备方案调研.md',
+        ],
+    },
+    {
+        'version': '6.15.01',
+        'time': '2026-10-10 19:29:36',
+        'title': '重启/关闭服务扩展为项目全量服务覆盖：平台+Appium+adb+maestro+报告服务+escrcpy',
+        'changes': [
+            '服务清点扩展为 6 类：平台进程 / Appium / adb server / Maestro MCP / 报告静态服务（http.server×output/runs）/ escrcpy 及子进程；instances 接口返回分类清单（含端口），逐 pid 复核命令行防误杀、排除脚本自身',
+            '重启服务现会复活 Appium（runner 不自启，按被杀时原命令行拉回）；adb/maestro/报告服务按需自愈；实测一键清 7 进程（含 1 天孤儿 maestro、3 个挂 2 天的报告服务）平台 3 秒回归、Appium 就绪',
+        ],
+    },
     {
         'version': '6.15.00',
         'time': '2026-10-10 14:38:26',

@@ -77,12 +77,17 @@ app.register_blueprint(app_testing_bp)
 from web_platform.ai_case_routes import bp as ai_case_bp
 app.register_blueprint(ai_case_bp)
 
+# 设备连接（SoloPi 无线化）：首页「扫码连接」二维码 + 连接配置持久化 + adb 无线管理 + APK 安装
+from web_platform.connect_routes import bp as connect_bp
+app.register_blueprint(connect_bp)
+
 # 元素定位器并入平台（原 8001 独立服务取消）：挂载到 /locator 子路径。
 # DispatcherMiddleware 会剥掉 /locator 前缀并处理 /locator → /locator/ 补斜杠跳转，
 # 定位器自身的路由（/api/*、/static/*）完全不用改；其前端已改为相对路径请求。
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from element_locator.server import app as locator_app
 app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {'/locator': locator_app})
+
 
 
 if __name__ == '__main__':

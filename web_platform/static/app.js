@@ -75,6 +75,11 @@ const ICONS = {
   ai: '<path d="M12 3.6 13.8 8.6 18.8 10.4 13.8 12.2 12 17.2 10.2 12.2 5.2 10.4 10.2 8.6Z"/>'
     + '<path d="M18.4 15.2 19.2 17.4 21.4 18.2 19.2 19 18.4 21.2 17.6 19 15.4 18.2 17.6 17.4Z"/>',
   bolt: '<path d="M13.2 2.8 5.8 13.2h4.9L10.8 21.2 18.2 10.8h-4.9Z"/>',
+  /* 首页「设备连接」与扫码弹窗用：二维码（三定位角 + 数据点，24 网格线性风格） */
+  qr: '<rect x="3.4" y="3.4" width="6.6" height="6.6" rx="1.4"/><path d="M6.7 6.7h.01"/>'
+    + '<rect x="14" y="3.4" width="6.6" height="6.6" rx="1.4"/><path d="M17.3 6.7h.01"/>'
+    + '<rect x="3.4" y="14" width="6.6" height="6.6" rx="1.4"/><path d="M6.7 17.3h.01"/>'
+    + '<path d="M14 14h2.6v2.6H14ZM20.6 14v2.6M20.6 20.6h-2.6M14 20.6v-2.6"/>',
   /* AppUI 编排/套件用：流程（编排）/ 层叠（套件） */
   flow: '<circle cx="5.4" cy="6" r="2.3"/><circle cx="18.6" cy="18" r="2.3"/>'
       + '<path d="M7.7 6.9c6.2 1.5 5.5 7.4 8.8 9.6"/>',
@@ -539,6 +544,233 @@ function initIndex() {
     }
     api('/api/escrcpy/status').catch(() => {});
   });
+
+  // 设备连接卡片（div 卡，样式与 a 卡一致）：点卡片进连接页，「扫码连接」弹二维码
+  const cc = document.querySelector('#cardConnect');
+  if (cc) {
+    cc.addEventListener('click', (e) => {
+      if (e.target.closest('button') || e.target.closest('a')) return;
+      location.href = cc.dataset.href || '/connect';
+    });
+    cc.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.target === cc) location.href = cc.dataset.href || '/connect';
+    });
+  }
+  const qrBtn = document.querySelector('#btnQrHome');
+  if (qrBtn) qrBtn.addEventListener('click', () => openQrConnectModal());
+}
+
+/* ================= 设备连接（SoloPi 无线化）：扫码弹窗（首页/连接页共用） =================
+   二维码由后端 /api/connect/qrcode 按 config/connect_settings.json 生成（PNG），
+   三种模式：adbwifi（Android 11+ 无线调试配对串）/ url（平台地址）/ custom（自定义文本）。 */
+const QR_MODE_NAMES = { adbwifi: 'ADB 无线调试配对', url: '平台地址', custom: '自定义文本' };
+const QR_MODE_STEPS = {
+  adbwifi: ['手机打开 设置 → 开发者选项 → 无线调试（Android 11+）',
+            '点「使用二维码配对设备」，扫描二维码完成配对',
+            '配对成功后到「设备连接 → 设备管理」查看无线设备'],
+  url:     ['用手机相机 / 浏览器扫描二维码',
+            '在手机上打开自动化测试平台',
+            '按页面提示完成设备接入与用例执行'],
+  custom:  ['用手机扫描二维码读取内容',
+            '按自定义内容的指引完成连接'],
+};
+
+function qrStepsHtml(mode) {
+  return (QR_MODE_STEPS[mode] || []).map(s => '<li>' + esc(s) + '</li>').join('');
+}
+
+/* 把 /api/connect/info 的数据填充到扫码 UI（prefix='' 弹窗 / prefix='ct' 连接页） */
+function fillQrConnectUi(prefix, d) {
+  const mode = (d.config && d.config.mode) || 'adbwifi';
+  setText('#' + prefix + 'QrMode', QR_MODE_NAMES[mode] || mode);
+  setText('#' + prefix + 'Payload', d.payload || '');
+  setHtml('#' + prefix + 'Steps', qrStepsHtml(mode));
+  const img = $('#' + prefix + 'QrImg');
+  if (img) img.src = '/api/connect/qrcode?ts=' + Date.now();
+  const badge = $('#' + prefix + 'ModeBadge');
+  if (badge) badge.textContent = QR_MODE_NAMES[mode] || mode;
+}
+
+/* 扫码连接弹窗（自建骨架，弹窗样式复用 .mask/.modal，见 style.css .qrmodal） */
+async function openQrConnectModal() {
+  const d = await api('/api/connect/info');
+  if (!d.ok) return toast(d.msg || '连接配置加载失败', false);
+  let mask = $('#qrMask');
+  if (!mask) {
+    mask = document.createElement('div');
+    mask.className = 'mask';
+    mask.id = 'qrMask';
+    mask.innerHTML =
+      '<div class="modal qrmodal"><h4>扫码连接设备</h4>' +
+      '<div class="qr-wrap"><img id="mQrImg" alt="连接二维码">' +
+      '<div class="qr-side"><span class="pill ok" id="mQrMode">—</span>' +
+      '<code class="qr-payload" id="mPayload" title="二维码内容">—</code>' +
+      '<ol class="qr-steps" id="mSteps"></ol></div></div>' +
+      '<p class="muted" id="qrTip" style="font-size:12.5px;margin-top:14px"></p>' +
+      '<div class="mops"><button class="ghost mini" id="qrRefresh">刷新二维码</button>' +
+      '<a class="btn ghost mini" href="/connect">连接配置</a>' +
+      '<button id="qrClose">关闭</button></div></div>';
+    document.body.appendChild(mask);
+    mask.addEventListener('click', (e) => { if (e.target === mask) mask.classList.remove('show'); });
+    $('#qrClose').addEventListener('click', () => mask.classList.remove('show'));
+    $('#qrRefresh').addEventListener('click', () => {
+      $('#mQrImg').src = '/api/connect/qrcode?ts=' + Date.now();
+    });
+  }
+  fillQrConnectUi('m', d);
+  setHtml('#qrTip', '主机 IP：<b>' + esc(d.detected_host || '-') + '</b>' +
+    ' · SoloPi 组网：主设备「一机多控」扫码添加从机；APK 一键安装见「设备连接 → 设备管理」');
+  mask.classList.add('show');
+}
+
+/* ================= 设备连接页（/connect：连接配置 + 设备管理） ================= */
+const CONNECT_PANELS = ['settings', 'devices'];
+const CONNECT_PANEL_NAMES = { settings: '连接配置', devices: '设备管理' };
+
+function showConnectPanel(name) {
+  if (!CONNECT_PANELS.includes(name)) name = 'settings';
+  CONNECT_PANELS.forEach(p => {
+    const sec = $('#panel-' + p);
+    if (sec) sec.hidden = (p !== name);
+  });
+  document.querySelectorAll('#subnav a').forEach(a =>
+    a.classList.toggle('on', a.dataset.panel === name));
+  setCrumbSub(CONNECT_PANEL_NAMES[name]);
+  if (name === 'devices') loadConnectDevices();
+}
+
+async function loadConnectInfo() {
+  const d = await api('/api/connect/info');
+  if (!d.ok) return toast(d.msg || '连接配置加载失败', false);
+  const c = d.config || {};
+  $('#ctMode').value = c.mode || 'adbwifi';
+  $('#ctHost').value = c.host || '';
+  $('#ctPort').value = c.port;
+  $('#ctService').value = c.service || '';
+  $('#ctPassword').value = c.password || '';
+  $('#ctCustom').value = c.custom || '';
+  fillQrConnectUi('ct', d);
+  const hint = $('#solopiHint');
+  if (hint) {
+    hint.textContent = (d.solopi && d.solopi.apks && d.solopi.apks.length)
+      ? ('已检测到 ' + d.solopi.apks.join('、'))
+      : '未检测到 APK（tools/solopi/ 为空）';
+  }
+}
+
+/* 表单按模式显隐：adbwifi 才要服务名/密码，url 才要端口，custom 才要自定义文本 */
+function applyModeVisibility() {
+  const mode = $('#ctMode').value;
+  const row = (sel, show) => {
+    const el = $(sel);
+    if (el) el.closest('.field').style.display = show ? '' : 'none';
+  };
+  row('#ctService', mode === 'adbwifi');
+  row('#ctPassword', mode === 'adbwifi');
+  row('#ctPort', mode === 'url');
+  row('#ctCustom', mode === 'custom');
+}
+
+async function saveConnectConfig() {
+  const d = await postJson('/api/connect/config', {
+    mode: $('#ctMode').value,
+    host: $('#ctHost').value.trim(),
+    port: $('#ctPort').value.trim(),
+    service: $('#ctService').value.trim(),
+    password: $('#ctPassword').value.trim(),
+    custom: $('#ctCustom').value,
+  });
+  toast(d.msg || (d.ok ? '已保存' : '保存失败'), !!d.ok);
+  if (d.ok) await loadConnectInfo();
+}
+
+async function loadConnectDevices() {
+  const d = await api('/api/connect/devices');
+  const tb = $('#devTbody');
+  if (!tb) return;
+  const list = d.ok ? (d.devices || []) : [];
+  $('#devEmpty').style.display = list.length ? 'none' : '';
+  tb.innerHTML = list.map(dev => {
+    const online = dev.state === 'device';
+    const st = online ? '<span class="pill ok">在线</span>'
+      : '<span class="pill ' + (dev.state === 'unauthorized' ? 'bad' : 'idle') + '">' + esc(dev.state) + '</span>';
+    const way = dev.wireless ? '<span class="pill ok">无线</span>' : '<span class="pill idle">USB</span>';
+    const ops = dev.wireless
+      ? '<button class="mini danger-ghost" data-disc="' + esc(dev.udid) + '">断开</button>'
+      : '<button class="ghost mini" data-tcpip="' + esc(dev.udid) + '">tcpip 5555</button>' +
+        '<button class="ghost mini" data-inst="' + esc(dev.udid) + '">装 SoloPi</button>';
+    return '<tr><td><b>' + esc(dev.udid) + '</b></td><td>' + st + '</td><td>' + way + '</td>' +
+      '<td>' + esc(dev.model || '-') + '</td><td><div class="ops">' + ops + '</div></td></tr>';
+  }).join('');
+  /* SoloPi 安装目标下拉：仅在线设备 */
+  const sel = $('#devSel');
+  if (sel) {
+    const cur = sel.value;
+    sel.innerHTML = list.filter(x => x.state === 'device').map(x =>
+      '<option value="' + esc(x.udid) + '">' + esc(x.udid) + '</option>').join('') ||
+      '<option value="">（无在线设备）</option>';
+    if (cur && [...sel.options].some(o => o.value === cur)) sel.value = cur;
+  }
+}
+
+function showAdbOut(text) {
+  const el = $('#adbOut');
+  if (!el) return;
+  el.hidden = !text;
+  el.textContent = text || '';
+}
+
+async function devAdbAction(body) {
+  const d = await postJson('/api/connect/adb', body);
+  toast(d.msg || (d.ok ? '已完成' : '失败'), !!d.ok);
+  showAdbOut(d.output || d.msg || '');
+  if (d.ok) loadConnectDevices();
+}
+
+async function solopiInstall(udid) {
+  const target = udid || ($('#devSel') || {}).value;
+  if (!target) return toast('请选择要安装的设备', false);
+  toast('正在安装 SoloPi 到 ' + target + '…（包体较大，约十几秒）');
+  const d = await postJson('/api/connect/solopi/install', { udid: target });
+  toast(d.msg || (d.ok ? '已安装' : '安装失败'), !!d.ok);
+  showAdbOut(d.output || d.msg || '');
+  if (d.ok) loadConnectDevices();
+}
+
+function onDevTableClick(e) {
+  const b = e.target.closest('button[data-tcpip],button[data-disc],button[data-inst]');
+  if (!b) return;
+  if (b.dataset.tcpip) return devAdbAction({ action: 'tcpip', udid: b.dataset.tcpip, port: 5555 });
+  if (b.dataset.disc) return devAdbAction({ action: 'disconnect', addr: b.dataset.disc });
+  if (b.dataset.inst) return solopiInstall(b.dataset.inst);
+}
+
+async function initConnect() {
+  renderSidebar('/connect');
+  document.querySelectorAll('#subnav a').forEach(a => {
+    if (a.dataset.icon) a.insertAdjacentHTML('afterbegin', icon(a.dataset.icon, 18));
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      showConnectPanel(a.dataset.panel);
+      history.replaceState(null, '', '#' + a.dataset.panel);
+    });
+  });
+  /* 初始面板：hash 深链优先，默认连接配置 */
+  let start = (location.hash || '').replace('#', '');
+  if (!CONNECT_PANELS.includes(start)) start = 'settings';
+  showConnectPanel(start);
+  $('#ctMode').addEventListener('change', applyModeVisibility);
+  $('#btnCtSave').addEventListener('click', saveConnectConfig);
+  $('#btnCtShowModal').addEventListener('click', () => openQrConnectModal());
+  $('#btnDevRefresh').addEventListener('click', loadConnectDevices);
+  $('#devTbody').addEventListener('click', onDevTableClick);
+  $('#btnDevConnect').addEventListener('click', () =>
+    devAdbAction({ action: 'connect', addr: $('#devAddr').value.trim() }));
+  $('#btnDevDisconnect').addEventListener('click', () =>
+    devAdbAction({ action: 'disconnect', addr: $('#devAddr').value.trim() }));
+  $('#btnSolopiInstall').addEventListener('click', () => solopiInstall());
+  await loadConnectInfo();
+  applyModeVisibility();
 }
 
 /* 统计卡右上角的淡色线性图标：图标定义只在 app.js 一处，模板只声明用哪个（测试报告页用） */
@@ -1462,6 +1694,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const page = document.body.dataset.page;
   if (page === 'index') initIndex();
   else if (page === 'run') initRun();
+  else if (page === 'connect') initConnect();
   else if (page === 'detail') initRunDetail();
   else if (page === 'report') initReport();
   else if (page === 'perf') initPerf();
