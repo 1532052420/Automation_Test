@@ -545,7 +545,7 @@ function initIndex() {
     });
   }).catch(() => { /* 状态获取失败不影响首页 */ });
   // 托管开关点击：开/停对应服务（escrcpy 卡整卡点击=启动，开关仍可关闭）
-  document.querySelectorAll('.svc-switch').forEach(sw => {
+  document.querySelectorAll('.svc-switch:not(.locked)').forEach(sw => {
     sw.addEventListener('click', async (e) => {
       e.preventDefault(); e.stopPropagation();
       const svc = sw.dataset.svc;
@@ -562,6 +562,13 @@ function initIndex() {
         const st = document.querySelector(svc === 'escrcpy' ? '#escrcpyStatus' : '#svcStatus-' + svc);
         if (st) { st.textContent = on ? '服务运行中' : '未运行'; st.classList.toggle('on', on); }
       }).catch(() => {});
+    });
+  });
+  // 平台自身模块的锁定开关：视觉一致，点击说明原因
+  document.querySelectorAll('.svc-switch.locked').forEach(sw => {
+    sw.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      toast(sw.title || '平台自身模块，随平台启停');
     });
   });
   const ecEl = document.querySelector('#escrcpyStatus');

@@ -1133,3 +1133,11 @@ html.night .nav-card .card-ops .btn.ghost:hover { background: rgba(255, 255, 255
 
 /* 设备连接页 · SoloPi 导入：设备导出文件列表 */
 .sp-filelist { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+
+/* 平台自身模块的锁定开关（接口测试/元素定位器/性能压测）：视觉统一但不可操作 */
+.nav-card .svc-switch.locked { cursor: default; opacity: .55; }
+.nav-card .svc-switch.locked:hover { border-color: var(--line); color: var(--muted2); }
+html.night .nav-card .svc-switch.locked:hover { border-color: rgba(255,255,255,.16); color: #a1a1a6; }
+
+/* 首页删除主标题后：卡片网格上移留出等量呼吸空间 */
+.home-container { padding-top: 88px; }

@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>测试平台</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="icon" sizes="32x32" href="/static/favicon-32.png">
+<link rel="shortcut icon" href="/static/favicon.ico">
+
 <script src="/assets/{{ asset_v }}/theme.js"></script>
 <link rel="stylesheet" href="/assets/{{ asset_v }}/nav.css">
 <link rel="stylesheet" href="/assets/{{ asset_v }}/style.css">
@@ -14,7 +18,6 @@
   <!-- 首页布置照抄 testhub_platform/frontend/src/views/Home.vue：
        渐变底 + 居中主标题 + nav-card 网格，悬停上浮 + 图标放大 -->
   <div class="home-container">
-    <h1 class="main-title">自动化测试平台</h1>
 
     <div class="cards-container">
       <a class="nav-card" href="/run">
@@ -29,6 +32,7 @@
         <div class="card-icon icon-green"><span class="ico" data-ico="flask"></span></div>
         <h3>接口测试</h3>
         <p>接口管理 · 自动化套件 · 定时任务 · 环境变量 · Allure 报告</p>
+        <button class="svc-switch locked" id="svcSwitch-apitest" data-svc="apitest" hidden title="接口测试为平台自身模块，随平台启停"><span>⏻</span></button>
         <span class="ai-card-status svc-status" id="svcStatus-apitest" hidden></span>
       </a>
 
@@ -36,6 +40,7 @@
         <div class="card-icon icon-purple"><span class="ico" data-ico="scan"></span></div>
         <h3>元素定位器</h3>
         <p>截图点选采集元素，一键写入元素库</p>
+        <button class="svc-switch locked" id="svcSwitch-locator" data-svc="locator" hidden title="元素定位器为平台子应用，随平台启停"><span>⏻</span></button>
         <span class="ai-card-status svc-status" id="svcStatus-locator" hidden></span>
       </a>
 
@@ -72,6 +77,7 @@
         <div class="card-icon icon-cyan"><span class="ico" data-ico="bolt"></span></div>
         <h3>性能压测</h3>
         <p>HTTP 接口压测，阶梯递增 / 瞬时脉冲双模式</p>
+        <button class="svc-switch locked" id="svcSwitch-perf" data-svc="perf" hidden title="性能压测为平台自身模块，随平台启停"><span>⏻</span></button>
         <span class="ai-card-status svc-status" id="svcStatus-perf" hidden></span>
       </a>
 
