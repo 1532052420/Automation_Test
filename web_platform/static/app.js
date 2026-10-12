@@ -599,69 +599,10 @@ function initIndex() {
   if (qrBtn) qrBtn.addEventListener('click', () => openQrConnectModal());
 }
 
-/* ================= 设备连接（SoloPi 无线化）：扫码弹窗（首页/连接页共用） =================
-   二维码由后端 /api/connect/qrcode 按 config/connect_settings.json 生成（PNG），
-   三种模式：adbwifi（Android 11+ 无线调试配对串）/ url（平台地址）/ custom（自定义文本）。 */
-const QR_MODE_NAMES = { adbwifi: 'ADB 无线调试配对', url: '平台地址', custom: '自定义文本' };
-const QR_MODE_STEPS = {
-  adbwifi: ['⚠️ 请勿用微信/相机扫——此码只认系统入口（扫出来是一串文本属正常）',
-            '手机打开 设置 → 开发者选项 → 无线调试（Android 11+）',
-            '点「使用二维码配对设备」，用系统取景框扫本码完成配对',
-            '不想扫码？USB 插一次设备 → 设备管理点「tcpip 5555」→ 填 IP 连接'],
-  url:     ['✓ 此码可用任意扫码工具（相机 / 微信 / 浏览器）',
-            '扫后在手机上打开自动化测试平台',
-            '按页面提示完成设备接入与用例执行'],
-  custom:  ['用手机扫描二维码读取内容',
-            '按自定义内容的指引完成连接'],
-};
-
-function qrStepsHtml(mode) {
-  return (QR_MODE_STEPS[mode] || []).map(s => '<li>' + esc(s) + '</li>').join('');
-}
-
-/* 把 /api/connect/info 的数据填充到扫码 UI（prefix='' 弹窗 / prefix='ct' 连接页） */
-function fillQrConnectUi(prefix, d) {
-  const mode = (d.config && d.config.mode) || 'adbwifi';
-  setText('#' + prefix + 'QrMode', QR_MODE_NAMES[mode] || mode);
-  setText('#' + prefix + 'Payload', d.payload || '');
-  setHtml('#' + prefix + 'Steps', qrStepsHtml(mode));
-  const img = $('#' + prefix + 'QrImg');
-  if (img) img.src = '/api/connect/qrcode?ts=' + Date.now();
-  const badge = $('#' + prefix + 'ModeBadge');
-  if (badge) badge.textContent = QR_MODE_NAMES[mode] || mode;
-}
-
-/* 扫码连接弹窗（自建骨架，弹窗样式复用 .mask/.modal，见 style.css .qrmodal） */
-async function openQrConnectModal() {
-  const d = await api('/api/connect/info');
-  if (!d.ok) return toast(d.msg || '连接配置加载失败', false);
-  let mask = $('#qrMask');
-  if (!mask) {
-    mask = document.createElement('div');
-    mask.className = 'mask';
-    mask.id = 'qrMask';
-    mask.innerHTML =
-      '<div class="modal qrmodal"><h4>扫码连接设备</h4>' +
-      '<div class="qr-wrap"><img id="mQrImg" alt="连接二维码">' +
-      '<div class="qr-side"><span class="pill ok" id="mQrMode">—</span>' +
-      '<code class="qr-payload" id="mPayload" title="二维码内容">—</code>' +
-      '<ol class="qr-steps" id="mSteps"></ol></div></div>' +
-      '<p class="muted" id="qrTip" style="font-size:12.5px;margin-top:14px"></p>' +
-      '<div class="mops"><button class="ghost mini" id="qrRefresh">刷新二维码</button>' +
-      '<a class="btn ghost mini" href="/connect">连接配置</a>' +
-      '<button id="qrClose">关闭</button></div></div>';
-    document.body.appendChild(mask);
-    mask.addEventListener('click', (e) => { if (e.target === mask) mask.classList.remove('show'); });
-    $('#qrClose').addEventListener('click', () => mask.classList.remove('show'));
-    $('#qrRefresh').addEventListener('click', () => {
-      $('#mQrImg').src = '/api/connect/qrcode?ts=' + Date.now();
-    });
-  }
-  fillQrConnectUi('m', d);
-  setHtml('#qrTip', '主机 IP：<b>' + esc(d.detected_host || '-') + '</b>' +
-    ' · SoloPi 组网：主设备「一机多控」扫码添加从机；APK 一键安装见「设备连接 → 设备管理」');
-  mask.classList.add('show');
-}
+/* ================= 设备连接（SoloPi 无线化）：扫码弹窗 =================
+   弹窗实现已抽到共享模块 /static/connect_qr.js（window.PlatformQR），
+   元素定位器侧栏的「扫码连接」按钮加载同一份，避免两处实现漂移。 */
+const openQrConnectModal = () => window.PlatformQR.open();
 
 /* ================= 设备连接页（/connect：连接配置 + 设备管理） ================= */
 const CONNECT_PANELS = ['settings', 'devices', 'solopi'];

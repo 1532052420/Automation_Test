@@ -34,6 +34,10 @@ try {
     <svg class="bi brand-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.2-6.5-10a6.5 6.5 0 0 1 13 0c0 4.8-6.5 10-6.5 10z"/><circle cx="12" cy="11" r="2.2"/></svg>
     <div class="bt">元素定位器</div>
   </div>
+  <button id="btn-qr-connect" class="btn ghost side-btn" title="弹出二维码：手机扫码无线连接设备（Android 11+ 走系统无线调试配对；连接配置见平台「设备连接」页）">
+    <svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.4" y="3.4" width="6.6" height="6.6" rx="1.4"/><path d="M6.7 6.7h.01"/><rect x="14" y="3.4" width="6.6" height="6.6" rx="1.4"/><path d="M17.3 6.7h.01"/><rect x="3.4" y="14" width="6.6" height="6.6" rx="1.4"/><path d="M6.7 17.3h.01"/><path d="M14 14h2.6v2.6H14ZM20.6 14v2.6M20.6 20.6h-2.6M14 20.6v-2.6"/></svg>
+    <span class="bt-tx">扫码连接</span>
+  </button>
   <button id="btn-tree-diff" class="btn ghost side-btn" title="每次刷新与上一次元素树对比：新增 / 消失（快速发现跳转与弹窗）">
     <svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="6.5" r="2.3"/><circle cx="17.5" cy="17.5" r="2.3"/><path d="M6.5 8.8v3.2a3 3 0 0 0 3 3h4.3"/><path d="M17.5 15.2V12a3 3 0 0 0-3-3h-4.3"/></svg>
     <span class="bt-tx">树对比：开</span>
@@ -341,7 +345,11 @@ try {
 </div>
 <script src="/static/nav.js"></script>
 <script src="/static/theme.js"></script>
+<script src="/static/connect_qr.js"></script>
 <script src="static/index.js?v=118"></script>
+<script>
+  document.getElementById('btn-qr-connect').addEventListener('click', function () { window.PlatformQR.open(); });
+</script>
 <!-- 采集图片放大查看（lightbox） -->
 <div id="va-shot-lightbox" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.82);align-items:center;justify-content:center;cursor:zoom-out">
   <div style="position:relative">
