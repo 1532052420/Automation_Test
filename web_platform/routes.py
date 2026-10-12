@@ -270,6 +270,23 @@ def api_services_toggle():
     return jsonify({'ok': ok, 'msg': msg})
 
 
+@bp.route('/api/services/inspect')
+def api_services_inspect():
+    """服务体检：状态 + 判定（健康/陈旧实例/未登记占用）+ 元数据（pid/端口/启动时间）"""
+    from web_platform import service_manager
+    return jsonify(service_manager.inspect_services())
+
+
+@bp.route('/api/services/cleanup', methods=['POST'])
+def api_services_cleanup():
+    """清理陈旧实例 / 未登记占用（targets: ['stale','unreg'] 或其子集）"""
+    from web_platform import service_manager
+    body = request.get_json(silent=True) or {}
+    targets = [x for x in (body.get('targets') or []) if x in ('stale', 'unreg')] or ['stale', 'unreg']
+    ok, msg = service_manager.cleanup_services(targets)
+    return jsonify({'ok': ok, 'msg': msg})
+
+
 @bp.route('/api/home/status')
 def api_home_status():
     """首页卡片服务状态（一次拉取全部，前端逐卡展示「服务运行中 / 未运行」）：

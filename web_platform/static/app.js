@@ -179,20 +179,8 @@ function renderSidebar(active, sub) {
   if (clBtn) clBtn.addEventListener('click', showChangelog);
   const rsBtn = $('#btnSvcRestart');
   if (rsBtn) rsBtn.addEventListener('click', restartService);
-  if (active === '/') mountShutdownFab();
   pollFootStatus();
   setInterval(pollFootStatus, 10000);
-}
-
-/* 首页左下角固定悬浮：关闭服务（仅首页存在） */
-function mountShutdownFab() {
-  if ($('#svcShutdownFab')) return;
-  const b = document.createElement('button');
-  b.id = 'svcShutdownFab';
-  b.className = 'svc-fab';
-  b.textContent = '⏹ 关闭服务';
-  b.addEventListener('click', shutdownService);
-  document.body.appendChild(b);
 }
 
 /* ---------- 平台服务管理（重启/关闭：清理历史僵尸实例） ---------- */
@@ -233,19 +221,6 @@ async function restartServiceRun() {
   }
   rsBtn.disabled = false; rsBtn.textContent = '🔄 重启服务';
   toast('重启超时：请查看 /tmp/platform_8080.log', false);
-}
-
-function shutdownService() {
-  svcConfirm('确认关闭服务吗？', '关闭服务将无法进入平台', shutdownServiceRun);
-}
-async function shutdownServiceRun() {
-  try { await postJson('/api/service/shutdown', {}); } catch (e) { /* 预期中断 */ }
-  document.body.innerHTML =
-    '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;' +
-    'height:100vh;gap:10px;background:#f5f5f7;color:#1d1d1f;font-size:15px">' +
-    '<div style="font-size:40px">⏹</div><h2 style="font-weight:600">平台服务已全部关闭</h2>' +
-    '<p style="color:#6e6e73">重新启动请在终端执行：<code style="background:#e8e8ed;padding:2px 8px;border-radius:6px">' +
-    '.venv/bin/python web_platform/app.py</code></p></div>';
 }
 
 /* 更新顶部面包屑第三级（各页面切面板时调用；导航未渲染时静默跳过） */

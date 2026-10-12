@@ -1114,3 +1114,90 @@ html.night .nav-card .card-ops .btn.ghost:hover { background: rgba(255, 255, 255
 
 /* 首页删除主标题后：卡片网格上移留出等量呼吸空间 */
 .home-container { padding-top: 88px; }
+
+/* ================= 服务管理（方案 D：悬浮球 + 右侧抽屉） ================= */
+/* 悬浮球：右下角常驻，异常（陈旧/未登记）时右上角红/琥珀角标 */
+.svc-fab {
+  position: fixed; right: 20px; bottom: 20px; z-index: 997;
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 44px; padding: 0 18px 0 15px; border: 0; border-radius: 980px;
+  background: #1d1d1f; color: #f5f5f7; font: inherit; font-size: 13.5px; font-weight: 500;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .28); cursor: pointer;
+  transition: transform .18s ease, background .18s ease;
+}
+.svc-fab:hover { background: #2c2c2e; transform: translateY(-1px); }
+.svc-fab-ic { font-size: 16px; }
+.svc-fab-badge {
+  position: absolute; top: -6px; right: -4px; min-width: 20px; height: 20px; padding: 0 5px;
+  border-radius: 980px; font-size: 11px; font-weight: 600; color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #ff9500; box-shadow: 0 2px 8px rgba(0, 0, 0, .25);
+}
+.svc-fab-badge.red { background: #d70015; }
+html.night .svc-fab { background: rgba(40, 40, 44, .92); color: #f5f5f7; border: 1px solid rgba(255, 255, 255, .12); }
+
+/* 抽屉遮罩 + 右侧面板 */
+.svc-mask { position: fixed; inset: 0; z-index: 998; display: none; background: rgba(0, 0, 0, .28);
+  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+.svc-mask.show { display: block; }
+.svc-drawer {
+  position: absolute; top: 0; right: 0; bottom: 0; width: min(460px, 94vw);
+  background: var(--panel); color: var(--ink2);
+  display: flex; flex-direction: column;
+  box-shadow: -18px 0 56px rgba(0, 0, 0, .18);
+  animation: svcSlideIn .22s cubic-bezier(.22, .9, .3, 1.05);
+}
+@keyframes svcSlideIn { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.svc-drawer-hd { display: flex; align-items: center; gap: 10px; padding: 20px 22px 14px; flex-wrap: wrap; }
+.svc-drawer-hd h3 { font-size: 18px; font-weight: 600; color: var(--ink); }
+.svc-drawer-hd .svc-btn { margin-left: auto; }
+.svc-drawer-hd .svc-btn.ghost + .svc-btn.ghost { margin-left: 0; }
+.svc-badges { display: inline-flex; gap: 6px; }
+.svc-tag { font-size: 11px; padding: 2px 9px; border-radius: 980px; font-weight: 500; }
+.svc-tag.ok { background: rgba(52, 199, 89, .13); color: #1d7a3a; }
+.svc-tag.stale { background: rgba(255, 149, 0, .14); color: #b25000; }
+.svc-tag.unreg { background: rgba(255, 59, 48, .12); color: #d70015; }
+
+/* 抽屉内服务行 */
+.svc-list { flex: 1 1 auto; overflow-y: auto; padding: 4px 22px 14px; }
+.svc-item { border: 1px solid var(--line-soft); border-radius: 12px; padding: 11px 14px; margin-bottom: 9px;
+  background: var(--panel2); }
+.svc-item.lv-stale { border-color: rgba(255, 149, 0, .35); }
+.svc-item.lv-unreg { border-color: rgba(215, 0, 21, .35); }
+.svc-item-r1 { display: flex; align-items: center; gap: 8px; }
+.svc-item-r1 b { font-size: 13.5px; color: var(--ink); }
+.svc-item .svc-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.svc-item .svc-dot.ok { background: #34c759; }
+.svc-item .svc-dot.stale { background: #ff9500; }
+.svc-item .svc-dot.unreg { background: #ff3b30; }
+.svc-item .svc-dot.off { background: #aeaeb2; }
+.svc-item .svc-lv { font-size: 10.5px; padding: 1px 8px; border-radius: 980px; background: var(--panel3); color: var(--muted2); }
+.svc-item.lv-ok .svc-lv { background: rgba(52, 199, 89, .13); color: #1d7a3a; }
+.svc-item.lv-stale .svc-lv { background: rgba(255, 149, 0, .14); color: #b25000; }
+.svc-item.lv-unreg .svc-lv { background: rgba(255, 59, 48, .12); color: #d70015; }
+.svc-item .svc-ops { margin-left: auto; display: inline-flex; gap: 6px; }
+.svc-item-r2 { display: flex; gap: 12px; align-items: baseline; margin-top: 5px; flex-wrap: wrap; }
+.svc-item .svc-st { font-size: 12px; color: var(--muted); }
+.svc-item .svc-meta { font-size: 11.5px; color: var(--muted2); }
+.svc-item .svc-note { font-size: 11.5px; color: var(--muted2); margin-top: 4px; line-height: 1.5; }
+
+/* 抽屉内按钮与底部操作条 */
+.svc-btn { font: inherit; font-size: 13px; font-weight: 500; padding: 7px 16px; border-radius: 980px;
+  border: 0; cursor: pointer; transition: background .18s ease, color .18s ease; white-space: nowrap; }
+.svc-btn.mini { font-size: 12px; padding: 4px 12px; }
+.svc-btn.ghost { background: transparent; color: var(--ink2); border: 1px solid var(--line); }
+.svc-btn.ghost:hover { background: var(--panel3); }
+.svc-btn.danger-ghost { background: transparent; color: #d70015; border: 1px solid rgba(215, 0, 21, .3); }
+.svc-btn.danger-ghost:hover { background: rgba(255, 59, 48, .1); }
+.svc-btn.danger { background: #d70015; color: #fff; }
+.svc-btn.danger:hover { background: #e51325; }
+.svc-btn:disabled { opacity: .5; }
+.svc-drawer-ft { display: flex; align-items: center; gap: 10px; padding: 14px 22px 20px;
+  border-top: 1px solid var(--line-soft); flex-wrap: wrap; }
+.svc-ft-sep { flex: 1 1 auto; }
+html.night .svc-drawer { background: #1d1d1f; color: #e8e8ed; }
+html.night .svc-drawer-hd h3 { color: #f5f5f7; }
+html.night .svc-item { background: rgba(255, 255, 255, .05); border-color: rgba(255, 255, 255, .08); }
+html.night .svc-item-r1 b { color: #f5f5f7; }
+html.night .svc-btn.ghost { color: #e8e8ed; border-color: rgba(255, 255, 255, .2); }
+html.night .svc-btn.ghost:hover { background: rgba(255, 255, 255, .08); }

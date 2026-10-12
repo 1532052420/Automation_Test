@@ -15,6 +15,7 @@
 """
 import json
 import os
+import re
 import subprocess
 import threading
 import time
@@ -156,9 +157,35 @@ def start_service(svc):
 def stop_service(svc):
     """停止托管服务并【轮询确认已消失】再返回。返回 (ok, msg)。"""
     if svc == 'escrcpy':
-        n = _kill_by_kinds({'escrcpy'})
-        gone = all(s['kind'] != 'escrcpy' for s in _project_services())
-        return (True, 'escrcpy 已关闭' if gone else '停止超时，请稍后刷新查看')
+        from escrcpy.launcher import is_running
+        if not is_running():
+            return True, 'escrcpy 未在运行'
+        # pgrep 直取 pid 再 kill（is_running 同款匹配，不依赖 ps 清点）
+        try:
+            pr = subprocess.run(['pgrep', '-f', r'Escrcpy\.app/Contents/MacOS'],
+                                capture_output=True, text=True, timeout=8)
+            for pid in [int(x) for x in pr.stdout.split() if x.isdigit()]:
+                try:
+                    os.kill(pid, 15)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        for _ in range(8):
+            time.sleep(1)
+            if not is_running():
+                return True, 'escrcpy 已关闭'
+        # 仍存活：macOS 桌面 App 标准退出兜底
+        try:
+            subprocess.run(['osascript', '-e', 'tell application "Escrcpy" to quit'],
+                           capture_output=True, timeout=10)
+        except Exception:
+            pass
+        for _ in range(5):
+            time.sleep(1)
+            if not is_running():
+                return True, 'escrcpy 已关闭'
+        return True, '已发送停止命令，请稍后刷新查看'
     kinds = {'appui': {'appium'}, 'aicase': {'maestro'}}.get(svc)
     if not kinds:
         return False, '该服务不支持托管启停（平台自身模块）'
@@ -217,3 +244,200 @@ def start_auto_close_daemon():
     t.start()
     auto_close_check()   # 启动时先查一轮
     return t
+
+
+# ---------------------------------------------------------------- 服务体检与清理
+# 术语（2026-10-12 定稿）：未登记占用 = 占端口但不在服务清单的进程；
+# 陈旧实例 = 启动时间早于当前主实例的同类服务；健康 / 已停止 = 正常运行 / 未运行。
+_TERM_UNREG = '未登记占用'
+_TERM_STALE = '陈旧实例'
+
+_WATCH_PORTS = ['8080', '4726', '4000', '4001', '4002', '4003', '4004', '4005']
+
+
+def _ps_lines():
+    """ps axo pid=,lstart=,command=（沙箱/权限受限时返回 []）"""
+    try:
+        return subprocess.run(['ps', 'axo', 'pid=,lstart=,command='],
+                              capture_output=True, text=True, timeout=10).stdout.splitlines()
+    except Exception:
+        return []
+
+
+def _port_users():
+    """netstat 找监听中的 pid → {port: [pid]}（沙箱可用；不依赖 ps）"""
+    users = {}
+    try:
+        out = subprocess.run(['netstat', '-anv', '-p', 'tcp'], capture_output=True, text=True, timeout=15).stdout
+    except Exception:
+        return users
+    for line in out.splitlines():
+        if 'LISTEN' not in line:
+            continue
+        port_m = re.search(r'\.(%s)\s' % '|'.join(_WATCH_PORTS), line)
+        pid_m = re.search(r'LISTEN\s+\d+\s+\d+\s+\d+\s+\d+\s+(\d+)\s', line)
+        if port_m and pid_m and pid_m.group(1) != '0':
+            users.setdefault(port_m.group(1), []).append(int(pid_m.group(1)))
+    return users
+
+
+def _svc_start_ts():
+    """从 ps 行解析各 pid 启动时间戳"""
+    import datetime
+    ts = {}
+    for line in _ps_lines():
+        parts = line.strip().split(None, 6)
+        if len(parts) < 7 or not parts[0].isdigit():
+            continue
+        pid = int(parts[0])
+        try:
+            dt = datetime.datetime.strptime(' '.join(parts[1:6]), '%a %b %d %H:%M:%S %Y')
+            ts[pid] = dt.timestamp()
+        except Exception:
+            continue
+    return ts
+
+
+def inspect_services():
+    """全量服务体检：状态 + 判定（健康/未登记占用/陈旧实例）+ 元数据。ps 不可用时降级。"""
+    from web_platform.routes import _project_services
+    import datetime
+
+    rows = []
+    now = datetime.datetime.now().timestamp()
+    try:
+        services = _project_services()
+    except Exception:
+        services = []
+    svc_pids = {s['pid'] for s in services}
+    starts = _svc_start_ts()
+    self_pid = os.getpid()
+    self_start = starts.get(self_pid, now)
+
+    def add(name, level, status, ports, pid=None, note='', ops=None, started=None):
+        rows.append({'name': name, 'level': level, 'status': status,
+                     'ports': ports or [], 'pid': pid, 'started': started,
+                     'note': note, 'ops': ops or []})
+
+    # 1) 平台服务（登记类别 platform）：自己=当前主实例，早于自己的=陈旧实例
+    platforms = sorted([s for s in services if s['kind'] == 'platform'],
+                       key=lambda s: starts.get(s['pid'], 0))
+    if not platforms:   # ps 不可用降级：至少报告自己
+        platforms = [{'pid': self_pid, 'cmd': '(当前实例)'}]
+    for s in platforms:
+        pid = s['pid']
+        st = starts.get(pid)
+        started = datetime.datetime.fromtimestamp(st).strftime('%m-%d %H:%M') if st else '—'
+        if pid == self_pid:
+            add('平台服务', 'ok', '运行中', ['8080'], pid, '当前主实例 · v' + _app_version(),
+                ['restart'], started)
+        else:
+            add('平台服务', 'stale', '运行中', ['8080'], pid,
+                _TERM_STALE + '：早于当前实例启动，占用 8080 会导致端口冲突', ['kill'], started)
+
+    # 2) Appium（HTTP 探测）
+    from web_platform.runtime_config import check_appium
+    appium_ok, _m = check_appium('127.0.0.1', '4726')
+    if appium_ok:
+        apid = next((s['pid'] for s in services if s['kind'] == 'appium'), None)
+        add('Appium', 'ok', '运行中', ['4726'], apid, '真机自动化引擎', ['stop'], _started_of(starts, apid))
+    else:
+        add('Appium', 'off', '已停止', ['4726'], None, '执行用例时按需自动拉起', ['start'])
+
+    # 3) Maestro MCP（pgrep）
+    maestro = _pgrep_pids(r'maestro')
+    if maestro:
+        add('Maestro MCP', 'ok', '运行中', [], maestro[0], 'AI 用例生成引擎', ['stop'], _started_of(starts, maestro[0]))
+    else:
+        add('Maestro MCP', 'off', '已停止', [], None, 'AI 用例生成引擎', ['start'])
+
+    # 4) adb（命令探测）
+    r = subprocess.run(['adb', 'devices'], capture_output=True, text=True, timeout=10)
+    if r.returncode == 0:
+        add('adb server', 'ok', '运行中', [], None, '手机通信 · 由平台心跳按需管理', [])
+    else:
+        add('adb server', 'off', '已停止', [], None, '手机通信', ['start'])
+
+    # 5) 报告静态服务（登记类别 report）
+    reports = [s for s in services if s['kind'] == 'report']
+    if reports:
+        stale_n = sum(1 for s in reports if starts.get(s['pid'], now) < self_start - 60)
+        level = 'stale' if stale_n else 'ok'
+        note = ('%s：%d 个实例早于当前版本，建议清理' % (_TERM_STALE, stale_n)) if stale_n \
+            else 'Allure 报告静态服务'
+        add('报告静态服务', level, '运行中 ×%d' % len(reports),
+            sorted({p for s in reports for p in s['ports']}), reports[0]['pid'], note,
+            ['kill_all'] if stale_n else [])
+    else:
+        add('报告静态服务', 'off', '已停止', [], None, '查看报告时按需拉起', [])
+
+    # 6) escrcpy（launcher 检测）
+    try:
+        from escrcpy.launcher import status as esc_status
+        esc = esc_status()
+        if esc.get('running'):
+            add('escrcpy 投屏', 'ok', '运行中', [], None, '桌面投屏 App', ['stop'])
+        else:
+            add('escrcpy 投屏', 'off', esc.get('installed') and '已部署 · 未运行' or '未部署', [], None,
+                '桌面投屏 App（escrcpy/ 目录）', ['start'] if esc.get('installed') else [])
+    except Exception:
+        add('escrcpy 投屏', 'off', '未部署', [], None, 'escrcpy/ 目录缺失', [])
+
+    # 7) 未登记占用：监听中的 pid 不在任何登记服务里（ps 可用才判定，避免误报主实例）
+    if services:
+        unreg = []
+        for port, pids in _port_users().items():
+            for pid in pids:
+                if pid != self_pid and pid not in svc_pids and pid not in [r.get('pid') for r in rows]:
+                    unreg.append((port, pid))
+        for port, pid in unreg:
+            add('%s :%s' % (_TERM_UNREG, port), 'unreg', '占用端口 %s' % port, [port], pid,
+                '占端口但不在服务清单——可能是旧版本残留或手动启动的程序', ['kill'])
+    elif _port_users():
+        add('未登记占用', 'off', '判定受限', [], None,
+            '进程清单不可用（ps 权限受限），未登记占用判定降级——真实判定请在服务器本机终端查看', [])
+
+    return {'ok': True, 'services': rows,
+            'summary': {'ok': sum(1 for r in rows if r['level'] == 'ok'),
+                        'stale': sum(1 for r in rows if r['level'] == 'stale'),
+                        'unreg': sum(1 for r in rows if r['level'] == 'unreg'),
+                        'off': sum(1 for r in rows if r['level'] == 'off')},
+            'degraded': not services}
+
+
+def _pgrep_pids(pattern):
+    try:
+        out = subprocess.run(['pgrep', '-f', pattern], capture_output=True, text=True, timeout=8).stdout
+        return [int(x) for x in out.split() if x.isdigit()]
+    except Exception:
+        return []
+
+
+def _started_of(starts, pid):
+    import datetime
+    st = starts.get(pid) if pid else None
+    return datetime.datetime.fromtimestamp(st).strftime('%m-%d %H:%M') if st else '—'
+
+
+def _app_version():
+    try:
+        from web_platform.changelog import APP_VERSION
+        return APP_VERSION
+    except Exception:
+        return '?'
+
+
+def cleanup_services(targets):
+    """清理：stale=杀陈旧实例 pid；unreg=杀未登记占用 pid。返回 (ok, msg)。"""
+    killed, failed = 0, 0
+    for row in inspect_services()['services']:
+        if row['level'] in ('stale', 'unreg') and row['level'] in targets and row.get('pid'):
+            try:
+                os.kill(row['pid'], 15)
+                killed += 1
+            except Exception:
+                failed += 1
+    if not killed and not failed:
+        return True, '没有需要清理的%s' % ('陈旧实例与未登记占用' if len(targets) > 1 else '目标')
+    return True, '已清理 %d 个进程%s' % (killed, ('，%d 个失败' % failed) if failed else '')
+
