@@ -32,8 +32,7 @@
     fab.id = 'svcFab';
     fab.className = 'svc-fab';
     fab.title = '服务管理：体检 / 清理 / 启停';
-    fab.innerHTML = '<span class="svc-fab-ic">⚙</span><span class="svc-fab-tx">服务</span>' +
-                    '<span class="svc-fab-badge" id="svcFabBadge" hidden></span>';
+    fab.innerHTML = '<span class="svc-fab-ic">⚙</span><span class="svc-fab-tx">服务</span>';
     document.body.appendChild(fab);
 
     var mask = document.createElement('div');
@@ -181,11 +180,6 @@
     if (s.stale) badges.push('<span class="svc-tag stale">陈旧 ' + s.stale + '</span>');
     if (!badges.length) badges.push('<span class="svc-tag ok">全部健康</span>');
     document.getElementById('svcBadges').innerHTML = badges.join('');
-    var badge = document.getElementById('svcFabBadge');
-    var n = (s.unreg || 0) + (s.stale || 0);
-    badge.hidden = !n;
-    badge.textContent = n || '';
-    badge.className = 'svc-fab-badge' + (s.unreg ? ' red' : ' amber');
     // 降级警示条（ps 不可用等）——提示而非服务行
     var notice = document.getElementById('svcNotice');
     if (notice) {
