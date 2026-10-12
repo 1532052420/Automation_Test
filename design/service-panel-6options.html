@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>服务管理 · 6 种首页布局方案对比</title>
+<style>
+:root{
+  --brand:#0071e3; --brand2:#0077ed; --ink:#1d1d1f; --ink2:#3a3a3c; --muted:#6e6e73; --muted2:#86868b;
+  --bg:#f5f5f7; --panel:#fff; --panel2:#fbfbfd; --panel3:#f0f0f2; --line:#d2d2d7; --line-soft:rgba(0,0,0,.07);
+  --ok:#1d7a3a; --ok-bg:rgba(52,199,89,.13); --bad:#d70015; --bad-bg:rgba(255,59,48,.12);
+  --warn:#b25000; --warn-bg:rgba(255,149,0,.14); --idle:#6e6e73; --idle-bg:rgba(110,110,115,.12);
+  --r-card:18px; --r-input:12px; --r-pill:980px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:15px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased;background:#e8e8ed;color:var(--ink2);padding:40px 30px 90px}
+.head{max-width:1280px;margin:0 auto 34px}
+.head h1{font-size:30px;font-weight:600;color:var(--ink);letter-spacing:-.02em}
+.head p{margin-top:8px;color:var(--muted);max-width:80ch}
+.head .legend{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+.tag{display:inline-flex;align-items:center;gap:6px;padding:3px 12px;border-radius:980px;font-size:12px;font-weight:500}
+.tag::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.tag.ok{background:var(--ok-bg);color:var(--ok)}
+.tag.bad{background:var(--bad-bg);color:var(--bad)}
+.tag.warn{background:var(--warn-bg);color:var(--warn)}
+.tag.idle{background:var(--idle-bg);color:var(--idle)}
+.opt{max-width:1280px;margin:0 auto 56px;background:var(--panel);border-radius:22px;
+  box-shadow:0 4px 24px rgba(0,0,0,.06);overflow:hidden}
+.opt-head{display:flex;gap:14px;align-items:baseline;padding:24px 30px 6px;flex-wrap:wrap}
+.opt-head .no{font-size:13px;font-weight:700;color:var(--brand);background:var(--brand-tint,#e8f2ff);
+  padding:3px 12px;border-radius:980px}
+.opt-head h2{font-size:20px;font-weight:600;color:var(--ink);letter-spacing:-.01em}
+.opt-head .pos{font-size:12.5px;color:var(--muted2)}
+.proscons{display:flex;gap:22px;padding:10px 30px 20px;flex-wrap:wrap}
+.proscons div{font-size:12.5px;color:var(--muted)}
+.proscons b{color:var(--ink2);font-weight:600}
+.stage{margin:0 30px 30px;border-radius:16px;overflow:hidden;border:1px solid var(--line-soft);
+  background:linear-gradient(135deg,#f5f7fa 0%,#c3cfe2 100%);position:relative;padding:26px}
+.stage .fake-page{font-size:10px;color:rgba(0,0,0,.35);position:absolute;top:8px;right:12px;letter-spacing:.1em}
+button{font:inherit;cursor:pointer}
+.btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;
+  background:var(--brand);color:#fff;border:0;border-radius:980px;padding:7px 18px;transition:background .18s}
+.btn:hover{background:var(--brand2)}
+.btn.ghost{background:transparent;color:var(--ink2);border:1px solid var(--line)}
+.btn.ghost:hover{background:var(--panel3)}
+.btn.mini{font-size:12px;padding:4px 12px}
+.btn.danger-ghost{background:transparent;color:var(--bad);border:1px solid rgba(215,0,21,.3)}
+.btn.danger-ghost:hover{background:var(--bad-bg)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.dot.ok{background:#34c759}.dot.bad{background:#ff3b30}.dot.idle{background:#aeaeb2}.dot.warn{background:#ff9500}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+
+/* ===== 方案 A：底部状态条 ===== */
+.A-bar{display:flex;align-items:center;gap:14px;background:rgba(29,29,31,.92);color:#e8e8ed;
+  border-radius:14px;padding:10px 18px;backdrop-filter:blur(8px);flex-wrap:wrap}
+.A-bar .label{font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.45);text-transform:uppercase;margin-right:2px}
+.A-chip{display:flex;align-items:center;gap:7px;font-size:12.5px;padding:4px 12px;border-radius:980px;
+  background:rgba(255,255,255,.08)}
+.A-chip .warn-note{color:#ff9f0a;font-size:11px}
+.A-bar .ops{margin-left:auto;display:flex;gap:8px}
+.A-bar .ops .btn{font-size:12px;padding:5px 14px}
+.A-bar .ops .btn.light{background:rgba(255,255,255,.14);color:#fff}
+.A-bar .ops .btn.light:hover{background:rgba(255,255,255,.24)}
+
+/* ===== 方案 B：服务管理卡片 ===== */
+.B-card{background:var(--panel);border-radius:var(--r-card);box-shadow:0 4px 24px rgba(0,0,0,.07);
+  padding:22px 24px;max-width:1080px;margin:0 auto}
+.B-card h3{font-size:17px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.B-card h3 .cnt{font-size:12px;color:var(--muted);font-weight:400}
+.B-row{display:grid;grid-template-columns:170px 110px 1fr 120px 210px;gap:12px;align-items:center;
+  padding:11px 14px;border-radius:12px;border:1px solid var(--line-soft);margin-bottom:8px;background:var(--panel2)}
+.B-row.head{background:transparent;border:0;padding-bottom:2px;font-size:11px;color:var(--muted2);
+  letter-spacing:.05em;text-transform:uppercase}
+.B-row .name{font-weight:600;color:var(--ink);font-size:13.5px;display:flex;gap:8px;align-items:center}
+.B-row .meta{font-size:12px;color:var(--muted)}
+.B-row .ops{display:flex;gap:8px;justify-content:flex-end}
+
+/* ===== 方案 C：深色机房横幅 ===== */
+.C-banner{background:#1d1d1f;border-radius:16px;padding:20px 24px;color:#e8e8ed}
+.C-banner .hd{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.C-banner .hd .t{font-size:13px;font-weight:600;letter-spacing:.06em;color:rgba(255,255,255,.85)}
+.C-banner .hd .btn{font-size:12px;padding:5px 14px;margin-left:auto}
+.C-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+.C-cell{background:rgba(255,255,255,.06);border-radius:12px;padding:14px 14px 12px;border:1px solid rgba(255,255,255,.06)}
+.C-cell .light{width:12px;height:12px;border-radius:50%;margin-bottom:10px}
+.C-cell .light.ok{background:#30d158;box-shadow:0 0 8px rgba(48,209,88,.8)}
+.C-cell .light.off{background:#48484a}
+.C-cell .light.bad{background:#ff453a;box-shadow:0 0 8px rgba(255,69,58,.8)}
+.C-cell .light.warn{background:#ff9f0a;box-shadow:0 0 8px rgba(255,159,10,.8)}
+.C-cell .nm{font-size:13.5px;font-weight:600;color:#f5f5f7}
+.C-cell .sub{font-size:11px;color:rgba(255,255,255,.5);margin-top:3px}
+.C-cell .badge{display:inline-block;margin-top:8px;font-size:10.5px;padding:1px 8px;border-radius:980px}
+.C-cell .badge.ok{background:rgba(48,209,88,.16);color:#30d158}
+.C-cell .badge.bad{background:rgba(255,69,58,.18);color:#ff453a}
+.C-cell .badge.warn{background:rgba(255,159,10,.16);color:#ff9f0a}
+.C-cell .badge.off{background:rgba(255,255,255,.1);color:rgba(255,255,255,.5)}
+
+/* ===== 方案 D：抽屉面板 ===== */
+.D-stage{display:flex;justify-content:flex-end;min-height:330px;position:relative}
+.D-trigger{position:absolute;right:22px;bottom:22px;width:52px;height:52px;border-radius:50%;
+  background:var(--brand);color:#fff;border:0;font-size:13px;font-weight:600;
+  box-shadow:0 8px 24px rgba(0,113,227,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.D-trigger small{font-size:9px;opacity:.85}
+.D-drawer{width:430px;background:var(--panel);border-left:1px solid var(--line-soft);
+  box-shadow:-16px 0 48px rgba(0,0,0,.12);padding:20px 22px;min-height:330px}
+.D-drawer .hd{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.D-drawer .hd h3{font-size:16px;font-weight:600;color:var(--ink)}
+.D-drawer .hd .btn{margin-left:auto;font-size:12px;padding:5px 14px}
+.D-item{border:1px solid var(--line-soft);border-radius:12px;padding:11px 14px;margin-bottom:9px;background:var(--panel2)}
+.D-item .r1{display:flex;align-items:center;gap:8px}
+.D-item .r1 b{font-size:13.5px;color:var(--ink)}
+.D-item .r1 .btn{margin-left:auto}
+.D-item .r2{display:flex;gap:14px;margin-top:6px;font-size:11.5px;color:var(--muted);flex-wrap:wrap}
+
+/* ===== 方案 E：顶部细状态栏 + 模态 ===== */
+.E-bar{display:flex;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line-soft);
+  border-radius:14px;padding:9px 16px;box-shadow:0 2px 10px rgba(0,0,0,.05);max-width:1080px;margin:0 auto}
+.E-bar .t{font-size:12px;color:var(--muted2);margin-right:4px}
+.E-chip{display:flex;align-items:center;gap:7px;font-size:12.5px;padding:5px 13px;border-radius:980px;
+  border:1px solid var(--line-soft);background:var(--panel2);cursor:pointer;color:var(--ink2)}
+.E-chip:hover{border-color:var(--brand);color:var(--brand)}
+.E-chip .flag{font-size:10.5px;padding:0 7px;border-radius:980px}
+.E-chip .flag.bad{background:var(--bad-bg);color:var(--bad)}
+.E-chip .flag.warn{background:var(--warn-bg);color:var(--warn)}
+.E-modal{max-width:520px;margin:26px auto 0;background:var(--panel);border-radius:18px;padding:22px 26px;
+  box-shadow:0 20px 60px rgba(0,0,0,.16);border:1px solid var(--line-soft)}
+.E-modal .hd{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.E-modal .hd h4{font-size:15.5px;color:var(--ink)}
+.E-modal table{width:100%;border-collapse:collapse;font-size:12.5px}
+.E-modal td{padding:7px 4px;border-top:1px solid var(--line-soft);color:var(--ink2)}
+.E-modal td:first-child{color:var(--muted);width:90px}
+.E-modal .ops{display:flex;gap:8px;margin-top:14px;justify-content:flex-end}
+
+/* ===== 方案 F：mini 卡组 ===== */
+.F-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;max-width:1080px;margin:0 auto}
+.F-card{background:var(--panel);border-radius:16px;padding:16px 15px 14px;box-shadow:0 3px 14px rgba(0,0,0,.06);
+  display:flex;flex-direction:column;gap:8px;border:1px solid var(--line-soft);position:relative}
+.F-card .top{display:flex;align-items:center;justify-content:space-between}
+.F-card .nm{font-size:13.5px;font-weight:600;color:var(--ink)}
+.F-card .st{font-size:11.5px;display:flex;align-items:center;gap:6px;color:var(--muted)}
+.F-card .meta{font-size:10.5px;color:var(--muted2);min-height:26px}
+.F-card .badge{align-self:flex-start;font-size:10.5px;padding:1px 8px;border-radius:980px}
+.F-card .badge.ok{background:var(--ok-bg);color:var(--ok)}
+.F-card .badge.bad{background:var(--bad-bg);color:var(--bad)}
+.F-card .badge.warn{background:var(--warn-bg);color:var(--warn)}
+.F-card .badge.off{background:var(--idle-bg);color:var(--idle)}
+.F-card .sw{width:34px;height:19px;border-radius:980px;background:#d2d2d7;position:relative;border:0}
+.F-card .sw::after{content:"";position:absolute;left:2px;top:2px;width:15px;height:15px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.F-card .sw.on{background:#34c759}
+.F-card .sw.on::after{left:auto;right:2px}
+.F-card .sw.lock{background:#e8e8ed;opacity:.6;cursor:default}
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>服务管理 · 6 种首页布局方案</h1>
+  <p>数据源与判定能力（6 个方案通用，选型后实现）：
+     每个服务实时上报 <b>运行状态</b>（端口/进程探测）、<b>pid 与端口</b>、
+     <b>僵尸判定</b>（占端口但命令行无法识别 / 孤儿进程）、
+     <b>旧进程判定</b>（同类服务中启动时间早于当前主实例 / 版本落后），
+     并支持 <b>启动 / 停止 / 一键清理</b> 操作。以下均为静态假数据预览。</p>
+  <div class="legend">
+    <span class="tag ok">运行中·正常</span>
+    <span class="tag warn">旧进程（早于当前版本）</span>
+    <span class="tag bad">僵尸（占端口无法识别）</span>
+    <span class="tag idle">已停止</span>
+  </div>
+</div>
+
+<!-- ============ 方案 A ============ -->
+<div class="opt">
+  <div class="opt-head"><span class="no">方案 A</span><h2>底部服务状态条</h2>
+    <span class="pos">首页最底部 · 常驻细横条</span></div>
+  <div class="proscons">
+    <div><b>优点</b>：极轻量不占首屏；6 类服务一眼扫全；与投屏/重启按钮同区操作顺手</div>
+    <div><b>缺点</b>：僵尸/旧进程的详情放不下，需点「体检详情」二次查看；服务多时横条拥挤</div>
+  </div>
+  <div class="stage"><span class="fake-page">— 首页底部示意 —</span>
+    <div class="A-bar">
+      <span class="label">SERVICES</span>
+      <span class="A-chip"><span class="dot ok"></span>平台服务 <span class="mono">:8080</span></span>
+      <span class="A-chip"><span class="dot idle"></span>Appium <span class="mono">:4726</span></span>
+      <span class="A-chip"><span class="dot ok"></span>adb</span>
+      <span class="A-chip"><span class="dot idle"></span>Maestro MCP</span>
+      <span class="A-chip"><span class="dot warn"></span>报告服务 <span class="warn-note">2 旧进程</span></span>
+      <span class="A-chip"><span class="dot idle"></span>escrcpy</span>
+      <span class="ops">
+        <button class="btn light">🩺 体检详情</button>
+        <button class="btn">🔄 重启服务</button>
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 方案 B ============ -->
+<div class="opt">
+  <div class="opt-head"><span class="no">方案 B</span><h2>「服务管理」独立卡片</h2>
+    <span class="pos">加入首页卡片网格 · 与其他入口卡同等地位</span></div>
+  <div class="proscons">
+    <div><b>优点</b>：零学习成本、与首页风格完全统一；信息密度合适，判定/操作一屏全见</div>
+    <div><b>缺点</b>：卡片高度较大（6 行服务表）；点进详情仍需跳执行页外的区域感</div>
+  </div>
+  <div class="stage"><span class="fake-page">— 首页网格第 8 张卡示意 —</span>
+    <div class="B-card">
+      <h3>🛠 服务管理 <span class="cnt">6 类服务 · 1 僵尸 · 2 旧进程 · 最近体检 14:32</span>
+        <button class="btn mini ghost" style="margin-left:auto">🩺 全量体检</button></h3>
+      <div class="B-row head"><span>服务</span><span>状态</span><span>详情</span><span>判定</span><span style="text-align:right">操作</span></div>
+      <div class="B-row">
+        <span class="name"><span class="dot ok"></span>平台服务</span>
+        <span>运行中</span><span class="meta mono">:8080 · pid 46352 · v6.15.15 · 启动 3.2h</span>
+        <span><span class="tag ok">正常</span></span>
+        <span class="ops"><button class="btn mini ghost">重启</button></span>
+      </div>
+      <div class="B-row">
+        <span class="name"><span class="dot idle"></span>Appium</span>
+        <span>已停止</span><span class="meta mono">:4726 · 执行用例时自动拉起</span>
+        <span><span class="tag idle">已停止</span></span>
+        <span class="ops"><button class="btn mini">启动</button></span>
+      </div>
+      <div class="B-row">
+        <span class="name"><span class="dot ok"></span>adb</span>
+        <span>运行中</span><span class="meta mono">心跳自动管理</span>
+        <span><span class="tag ok">正常</span></span>
+        <span class="ops"><button class="btn mini ghost">重启</button></span>
+      </div>
+      <div class="B-row">
+        <span class="name"><span class="dot idle"></span>Maestro MCP</span>
+        <span>已停止</span><span class="meta mono">AI 用例生成引擎</span>
+        <span><span class="tag idle">已停止</span></span>
+        <span class="ops"><button class="btn mini">启动</button></span>
+      </div>
+      <div class="B-row">
+        <span class="name"><span class="dot warn"></span>报告静态服务</span>
+        <span>运行中 ×3</span><span class="meta mono">:4000/:4001/:4002 · 启动 2 天前</span>
+        <span><span class="tag warn">2 旧进程</span> <span class="tag bad">1 僵尸</span></span>
+        <span class="ops"><button class="btn mini danger-ghost">清理旧进程</button></span>
+      </div>
+      <div class="B-row">
+        <span class="name"><span class="dot idle"></span>escrcpy 投屏</span>
+        <span>已停止</span><span class="meta mono">桌面 App · 点卡片启动</span>
+        <span><span class="tag idle">已停止</span></span>
+        <span class="ops"><span class="meta">—</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 方案 C ============ -->
+<div class="opt">
+  <div class="opt-head"><span class="no">方案 C</span><h2>深色「机房状态板」横幅</h2>
+    <span class="pos">首页顶部通栏 · 类运维监控大屏风格</span></div>
+  <div class="proscons">
+    <div><b>优点</b>：状态灯 + 发光效果，健康/异常一眼扫全；僵尸/旧进程徽章醒目，告警感强</div>
+    <div><b>缺点</b>：深色横幅在浅色首页中较抢眼；单格信息有限，操作仍需进详情</div>
+  </div>
+  <div class="stage"><span class="fake-page">— 首页顶部示意 —</span>
+    <div class="C-banner">
+      <div class="hd">
+        <span class="t">SERVICE BOARD · 服务状态板</span>
+        <span style="font-size:11px;color:rgba(255,255,255,.45)">1 僵尸 · 2 旧进程 · 体检 14:32</span>
+        <button class="btn">🩺 体检与清理</button>
+      </div>
+      <div class="C-grid">
+        <div class="C-cell"><div class="light ok"></div><div class="nm">平台服务</div><div class="sub mono">:8080 · 3.2h</div><span class="badge ok">正常</span></div>
+        <div class="C-cell"><div class="light off"></div><div class="nm">Appium</div><div class="sub mono">:4726 · 未运行</div><span class="badge off">已停止</span></div>
+        <div class="C-cell"><div class="light ok"></div><div class="nm">adb</div><div class="sub">心跳自动管理</div><span class="badge ok">正常</span></div>
+        <div class="C-cell"><div class="light off"></div><div class="nm">Maestro MCP</div><div class="sub">未运行</div><span class="badge off">已停止</span></div>
+        <div class="C-cell"><div class="light warn"></div><div class="nm">报告服务 ×3</div><div class="sub mono">:4000-4002 · 2 天</div><span class="badge warn">2 旧进程</span></div>
+        <div class="C-cell"><div class="light bad"></div><div class="nm">未知占用 :4726</div><div class="sub mono">cmdline 无法识别</div><span class="badge bad">僵尸</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 方案 D ============ -->
+<div class="opt">
+  <div class="opt-head"><span class="no">方案 D</span><h2>右下角悬浮球 + 抽屉面板</h2>
+    <span class="pos">首页右下角 · 点开滑出完整服务面板</span></div>
+  <div class="proscons">
+    <div><b>优点</b>：首页零占用；抽屉内信息最全（pid/端口/启动时长/判定/逐项操作），可滚动</div>
+    <div><b>缺点</b>：服务状态默认不可见，需要点一下；悬浮球与现有「关闭服务」悬浮钮共存需合并设计</div>
+  </div>
+  <div class="stage"><span class="fake-page">— 首页右下角示意 —</span>
+    <div class="D-stage">
+      <button class="D-trigger">⚙︎<small>服务</small></button>
+      <div class="D-drawer">
+        <div class="hd"><h3>服务管理</h3>
+          <span class="tag bad">1 僵尸</span><span class="tag warn">2 旧进程</span>
+          <button class="btn ghost">🩺 体检</button></div>
+        <div class="D-item">
+          <div class="r1"><span class="dot ok"></span><b>平台服务</b>
+            <span class="tag ok">正常</span><button class="btn mini ghost">重启</button></div>
+          <div class="r2"><span class="mono">:8080</span><span>pid 46352</span><span>v6.15.15</span><span>启动 3.2h</span></div>
+        </div>
+        <div class="D-item">
+          <div class="r1"><span class="dot idle"></span><b>Appium</b>
+            <span class="tag idle">已停止</span><button class="btn mini">启动</button></div>
+          <div class="r2"><span class="mono">:4726</span><span>执行用例时自动拉起</span></div>
+        </div>
+        <div class="D-item" style="border-color:rgba(255,149,0,.35)">
+          <div class="r1"><span class="dot warn"></span><b>报告静态服务 ×3</b>
+            <span class="tag warn">2 旧进程</span><button class="btn mini danger-ghost">清理旧进程</button></div>
+          <div class="r2"><span class="mono">:4000-4002</span><span>启动 2 天前</span><span>残留于 6.15.10 版本期</span></div>
+        </div>
+        <div class="D-item" style="border-color:rgba(215,0,21,.35)">
+          <div class="r1"><span class="dot bad"></span><b>未知进程 :4726</b>
+            <span class="tag bad">僵尸</span><button class="btn mini danger-ghost">强制清理</button></div>
+          <div class="r2"><span>占端口但命令行无法识别 · pid 45510</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 方案 E ============ -->
+<div class="opt">
+  <div class="opt-head"><span class="no">方案 E</span><h2>顶部细状态栏 + 点击详情模态</h2>
+    <span class="pos">导航下方一行 chips · 点任一服务弹出详情</span></div>
+  <div class="proscons">
+    <div><b>优点</b>：常显与详情兼顾；异常服务的红色标记出现在顶部，不容易漏；详情模态承载完整操作</div>
+    <div><b>缺点</b>：首屏顶部被占用一行；模态比抽屉多一次弹层</div>
+  </div>
+  <div class="stage"><span class="fake-page">— 导航下方示意 —</span>
+    <div class="E-bar">
+      <span class="t">服务</span>
+      <span class="E-chip"><span class="dot ok"></span>平台 · 运行中</span>
+      <span class="E-chip"><span class="dot idle"></span>Appium · 已停止</span>
+      <span class="E-chip"><span class="dot ok"></span>adb</span>
+      <span class="E-chip"><span class="dot idle"></span>Maestro</span>
+      <span class="E-chip"><span class="dot warn"></span>报告服务 <span class="flag warn">2 旧进程</span></span>
+      <span class="E-chip"><span class="dot bad"></span>:4726 未知 <span class="flag bad">僵尸</span></span>
+    </div>
+    <div class="E-modal">
+      <div class="hd"><span class="dot bad"></span><h4>未知进程 :4726 <span class="tag bad">僵尸</span></h4></div>
+      <table>
+        <tr><td>端口</td><td class="mono">4726（Appium 默认端口，被占用时真机用例无法启动）</td></tr>
+        <tr><td>进程</td><td class="mono">pid 45510</td></tr>
+        <tr><td>命令行</td><td class="mono">（无法识别——这正是僵尸判定依据）</td></tr>
+        <tr><td>启动时间</td><td>2026-10-12 13:40（40 分钟前）</td></tr>
+        <tr><td>建议</td><td>强制清理，释放端口；若为手动启动的合法程序请先确认</td></tr>
+      </table>
+      <div class="ops"><button class="btn ghost">忽略</button><button class="btn danger-ghost">🧹 强制清理</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 方案 F ============ -->
+<div class="opt">
+  <div class="opt-head"><span class="no">方案 F</span><h2>服务 mini 卡组</h2>
+    <span class="pos">首页顶部一排 6 张迷你卡 · 每服务独立一张</span></div>
+  <div class="proscons">
+    <div><b>优点</b>：每个服务独立卡片，开关/标签/操作各就各位；视觉与首页卡片语言一致</div>
+    <div><b>缺点</b>：占首屏一整行高度；mini 卡数量固定 6 张，未来加服务要改布局</div>
+  </div>
+  <div class="stage"><span class="fake-page">— 首页顶部示意 —</span>
+    <div class="F-grid">
+      <div class="F-card"><div class="top"><span class="nm">平台服务</span><button class="sw on" disabled></button></div>
+        <div class="st"><span class="dot ok"></span>运行中</div>
+        <div class="meta mono">:8080 · pid 46352 · v6.15.15</div><span class="badge ok">正常</span></div>
+      <div class="F-card"><div class="top"><span class="nm">Appium</span><button class="sw"></button></div>
+        <div class="st"><span class="dot idle"></span>已停止</div>
+        <div class="meta mono">:4726 · 用例执行时自动拉起</div><span class="badge off">已停止</span></div>
+      <div class="F-card"><div class="top"><span class="nm">adb</span><button class="sw lock" disabled title="由平台心跳自动管理"></button></div>
+        <div class="st"><span class="dot ok"></span>运行中</div>
+        <div class="meta">心跳自动管理</div><span class="badge ok">正常</span></div>
+      <div class="F-card"><div class="top"><span class="nm">Maestro</span><button class="sw"></button></div>
+        <div class="st"><span class="dot idle"></span>已停止</div>
+        <div class="meta">AI 用例生成引擎</div><span class="badge off">已停止</span></div>
+      <div class="F-card"><div class="top"><span class="nm">报告服务</span><button class="sw on" disabled></button></div>
+        <div class="st"><span class="dot warn"></span>运行中 ×3</div>
+        <div class="meta mono">:4000-4002 · 2 天前启动</div><span class="badge warn">2 旧进程</span></div>
+      <div class="F-card" style="border-color:rgba(215,0,21,.35)"><div class="top"><span class="nm">未知 :4726</span>
+        <button class="btn mini danger-ghost" style="padding:2px 9px;font-size:10.5px">清理</button></div>
+        <div class="st"><span class="dot bad"></span>占端口</div>
+        <div class="meta">pid 45510 · cmdline 无法识别</div><span class="badge bad">僵尸</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="head" style="margin-top:-10px">
+  <p><b>选型建议（仅供参考）</b>：想「最省空间 + 详情全」→ D；想「首页风格最统一」→ B；
+     想「告警最醒目」→ C；想「常显 + 可点详情」→ E；A/F 偏轻量展示，判定操作能力最弱。
+     所有方案共用同一套后端体检接口（状态/僵尸/旧进程判定 + 启停/清理操作），切换方案只改前端。</p>
+</div>
+
+</body>
+</html>
