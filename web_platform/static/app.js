@@ -734,7 +734,7 @@ function showAdbOut(text) {
 async function devAdbAction(body) {
   const d = await postJson('/api/connect/adb', body);
   toast(d.msg || (d.ok ? '已完成' : '失败'), !!d.ok);
-  showAdbOut(d.output || d.msg || '');
+  showAdbOut(d.output);   /* 只回显 adb 原始输出；失败原因走 toast，避免两处提示重复 */
   if (d.ok) loadConnectDevices();
 }
 
@@ -744,7 +744,7 @@ async function solopiInstall(udid) {
   toast('正在安装 SoloPi 到 ' + target + '…（包体较大，约十几秒）');
   const d = await postJson('/api/connect/solopi/install', { udid: target });
   toast(d.msg || (d.ok ? '已安装' : '安装失败'), !!d.ok);
-  showAdbOut(d.output || d.msg || '');
+  showAdbOut(d.output);   /* 失败时无 adb 输出，不回显 */
   if (d.ok) loadConnectDevices();
 }
 

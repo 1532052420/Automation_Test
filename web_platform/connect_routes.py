@@ -261,7 +261,8 @@ def api_solopi_install():
         found = sorted(glob.glob(os.path.join(_SOLOPI_APK_DIR, '*.apk')))
         if not found:
             return jsonify({'ok': False, 'msg':
-                            '未找到 SoloPi APK：请将安装包放到 %s/ 目录（GitHub alipay/SoloPi Releases 下载）'
+                            '未检测到 SoloPi APK：请从 GitHub alipay/SoloPi Releases 下载安装包，'
+                            '放入项目 %s/ 目录后重试'
                             % os.path.relpath(_SOLOPI_APK_DIR, BASE_DIR)})
         path = found[0]
     if not os.path.exists(path):
