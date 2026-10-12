@@ -524,9 +524,10 @@ function initIndex() {
     el.hidden = false;
   }).catch(() => { /* 状态获取失败不影响首页 */ });
 
-  // 首页各卡片服务状态（位置与投屏控制台一致：描述文字下方一行小字）
+  // 首页各卡片服务状态（固定卡片底部居中）+ 托管服务右上角开关（appui/aicase/connect/escrcpy）
   // appui→Appium · aicase→Maestro MCP · connect→adb · escrcpy→escrcpy；
-  // apitest / locator / perf 即平台自身，能打开首页即在运行
+  // apitest / locator / perf 即平台自身，能打开首页即在运行。
+  // 服务策略（2026-10-12）：默认关闭，按需点开关；所有网页关掉满 5 小时自动关闭。
   api('/api/home/status').then(d => {
     if (!d.ok) return;
     const set = (el, on) => {
@@ -539,8 +540,30 @@ function initIndex() {
     Object.keys(svc).forEach(k => {
       set(k === 'escrcpy' ? document.querySelector('#escrcpyStatus')
                           : document.querySelector('#svcStatus-' + k), svc[k]);
+      const sw = document.querySelector('#svcSwitch-' + k);
+      if (sw) { sw.hidden = false; sw.classList.toggle('on', !!svc[k]); }
     });
   }).catch(() => { /* 状态获取失败不影响首页 */ });
+  // 托管开关点击：开/停对应服务（escrcpy 卡整卡点击=启动，开关仍可关闭）
+  document.querySelectorAll('.svc-switch').forEach(sw => {
+    sw.addEventListener('click', async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const svc = sw.dataset.svc;
+      const turningOn = !sw.classList.contains('on');
+      sw.disabled = true;
+      const d = await postJson('/api/services/toggle', { svc, on: turningOn }).catch(() => null);
+      sw.disabled = false;
+      if (!d) return toast('请求失败', false);
+      toast(d.msg || (d.ok ? (turningOn ? '已开启' : '已关闭') : '操作失败'), !!d.ok);
+      api('/api/home/status').then(r => {
+        if (!r.ok) return;
+        const on = !!(r.svc || {})[svc];
+        sw.classList.toggle('on', on);
+        const st = document.querySelector(svc === 'escrcpy' ? '#escrcpyStatus' : '#svcStatus-' + svc);
+        if (st) { st.textContent = on ? '服务运行中' : '未运行'; st.classList.toggle('on', on); }
+      }).catch(() => {});
+    });
+  });
   const ecEl = document.querySelector('#escrcpyStatus');
   const ecCard = document.querySelector('#cardEscrcpy');
   if (ecCard) ecCard.addEventListener('click', async (e) => {
@@ -636,8 +659,8 @@ async function openQrConnectModal() {
 }
 
 /* ================= 设备连接页（/connect：连接配置 + 设备管理） ================= */
-const CONNECT_PANELS = ['settings', 'devices'];
-const CONNECT_PANEL_NAMES = { settings: '连接配置', devices: '设备管理' };
+const CONNECT_PANELS = ['settings', 'devices', 'solopi'];
+const CONNECT_PANEL_NAMES = { settings: '连接配置', devices: '设备管理', solopi: 'SoloPi 导入' };
 
 function showConnectPanel(name) {
   if (!CONNECT_PANELS.includes(name)) name = 'settings';
@@ -781,8 +804,95 @@ async function initConnect() {
   $('#btnDevDisconnect').addEventListener('click', () =>
     devAdbAction({ action: 'disconnect', addr: $('#devAddr').value.trim() }));
   $('#btnSolopiInstall').addEventListener('click', () => solopiInstall());
+  initSolopiImport();
   await loadConnectInfo();
   applyModeVisibility();
+}
+
+/* ================= SoloPi 用例导入（拉取/上传 → 预览 → 生成三件套入库） ================= */
+let _spSource = null;   // {localFile} 或 {content}
+
+function initSolopiImport() {
+  const fillDev = async () => {
+    const d = await api('/api/connect/devices');
+    const sel = $('#spDevSel');
+    if (!sel) return;
+    sel.innerHTML = (d.ok ? d.devices : []).filter(x => x.state === 'device').map(x =>
+      '<option value="' + esc(x.udid) + '">' + esc(x.udid) + '</option>').join('') ||
+      '<option value="">（无在线设备）</option>';
+  };
+  fillDev();
+  $('#btnSpPullList').addEventListener('click', async () => {
+    const udid = $('#spDevSel').value;
+    if (!udid) return toast('请先选择在线设备', false);
+    const d = await postJson('/api/solopi/import/pull', { udid });
+    const box = $('#spFileList');
+    if (!d.ok) { box.hidden = true; return toast(d.msg || '拉取失败', false); }
+    if (!(d.files || []).length) { box.hidden = true; return toast('设备导出目录没有 .json 用例（先在 SoloPi 里长按用例 → 导出）', false); }
+    box.hidden = false;
+    box.innerHTML = d.files.map(f =>
+      '<button class="ghost mini" data-file="' + esc(f) + '">📄 ' + esc(f) + '</button>').join('');
+    box.querySelectorAll('[data-file]').forEach(b => b.addEventListener('click', () => {
+      pullSolopiFile(udid, b.dataset.file);
+    }));
+  });
+  $('#spFile').addEventListener('change', (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => parseSolopiJson(String(r.result));
+    r.readAsText(f);
+    e.target.value = '';
+  });
+  $('#btnSpGenerate').addEventListener('click', generateSolopiCase);
+}
+
+async function pullSolopiFile(udid, name) {
+  toast('正在从设备拉取 ' + name + ' …');
+  const d = await postJson('/api/solopi/import/pull_file', { udid, name });
+  if (!d.ok) return toast(d.msg || '拉取失败', false);
+  _spSource = { localFile: d.localFile };
+  renderSolopiPreview(d);
+}
+
+async function parseSolopiJson(content) {
+  const r = await postJson('/api/solopi/import/parse', { content });
+  if (!r.ok) return toast(r.msg || '解析失败', false);
+  _spSource = { content };
+  renderSolopiPreview(r);
+}
+
+function renderSolopiPreview(d) {
+  $('#spPreviewCard').hidden = false;
+  setText('#spMeta', '「' + (d.caseName || '-') + '」· 目标 ' + (d.targetAppPackage || '-') +
+    ' · 共 ' + (d.steps || []).length + ' 步');
+  $('#spCaseId').value = 'solopi_' + new Date().toISOString().slice(5, 10).replace('-', '');
+  $('#spStepsTbody').innerHTML = (d.steps || []).map(s => {
+    const mapped = s.mapped
+      ? '<span class="pill ok">可转换</span>'
+      : '<span class="pill idle">人工改写</span>';
+    const input = s.inputEncrypted
+      ? '<input type="text" data-spidx="' + s.idx + '" placeholder="内容已加密，请填写真实文字">'
+      : (s.action === 'CLICK_AND_INPUT'
+          ? '<input type="text" data-spidx="' + s.idx + '" value="' + esc(s.inputText || '') + '">'
+          : '<span class="muted">—</span>');
+    return '<tr><td>' + (s.idx + 1) + '</td><td>' + esc(s.action) + '</td><td>' + esc(s.control) +
+      '</td><td>' + esc(s.elementName || '—') + '</td><td>' + mapped + '</td><td>' + input + '</td></tr>';
+  }).join('');
+  if ((d.warnings || []).length) toast(d.warnings[0], false);
+}
+
+async function generateSolopiCase() {
+  if (!_spSource) return toast('请先拉取或上传用例 JSON', false);
+  const inputs = {};
+  document.querySelectorAll('#spStepsTbody input[data-spidx]').forEach(i => {
+    inputs[i.dataset.spidx] = i.value;
+  });
+  const body = Object.assign({ caseId: $('#spCaseId').value.trim(), inputs }, _spSource);
+  toast('正在生成三件套并入库…');
+  const d = await postJson('/api/solopi/import/generate', body);
+  setText('#spGenMsg', d.msg || (d.ok ? '完成' : '失败'));
+  toast(d.msg || (d.ok ? '已生成入库' : '生成失败'), !!d.ok);
 }
 
 /* 统计卡右上角的淡色线性图标：图标定义只在 app.js 一处，模板只声明用哪个（测试报告页用） */

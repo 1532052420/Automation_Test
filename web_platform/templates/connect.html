@@ -19,6 +19,7 @@
       <div class="subnav-label">设备连接</div>
       <a href="#settings" data-panel="settings" data-icon="gear" class="on">连接配置</a>
       <a href="#devices" data-panel="devices" data-icon="target">设备管理</a>
+      <a href="#solopi" data-panel="solopi" data-icon="download">SoloPi 导入</a>
     </aside>
 
     <!-- 右侧面板区 -->
@@ -143,6 +144,48 @@
               <span class="muted" id="solopiHint"></span>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- SoloPi 导入：拉取/上传用例 JSON → 步骤映射预览 → 生成三件套入库 -->
+      <section class="panel" id="panel-solopi" hidden>
+        <div class="card">
+          <div class="cardhead">
+            <h3>获取用例 JSON <span class="muted">· 手机 SoloPi 长按用例 → 导出</span></h3>
+          </div>
+          <div class="treebar">
+            <select id="spDevSel" style="max-width:220px"><option value="">（无在线设备）</option></select>
+            <button class="mini" id="btnSpPullList">从设备拉取列表</button>
+            <span class="muted">或</span>
+            <label class="filepick-btn" for="spFile">上传 JSON 文件</label>
+            <input type="file" id="spFile" accept=".json" style="display:none">
+          </div>
+          <div id="spFileList" class="sp-filelist" hidden></div>
+        </div>
+
+        <div class="card" id="spPreviewCard" hidden>
+          <div class="cardhead">
+            <h3>步骤映射预览 <span class="muted" id="spMeta"></span></h3>
+          </div>
+          <div class="tblwrap">
+            <table>
+              <thead><tr>
+                <th style="width:52px">#</th><th style="width:150px">动作</th><th>控件定位</th>
+                <th style="width:170px">元素名</th><th style="width:90px">自动转换</th><th style="width:220px">输入内容</th>
+              </tr></thead>
+              <tbody id="spStepsTbody"></tbody>
+            </table>
+          </div>
+          <div class="treebar" style="margin-top:16px">
+            <span class="muted">用例标识（文件名）</span>
+            <input type="text" id="spCaseId" placeholder="如 kuaige_login" style="max-width:220px">
+            <button class="mini" id="btnSpGenerate">生成三件套并入库</button>
+            <span class="muted" id="spGenMsg"></span>
+          </div>
+          <p class="muted" style="font-size:12.5px;margin-top:10px">
+            生成后自动进入平台用例库（cases/app_ui/android/demoProject/），去「APP自动化 → 执行用例」即可执行。
+            无法自动映射的步骤会在用例中标注 TODO。
+          </p>
         </div>
       </section>
 

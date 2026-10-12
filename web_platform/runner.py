@@ -270,10 +270,21 @@ class ExecutionManager(object):
                 current_capabilities[key] = overrides[key]
 
         # 3. 前置校验
-        # 3.1 Appium 可用
+        # 3.1 Appium 可用；「服务默认关闭」策略下未运行时按需自启，等待就绪（最多 ~40s）
         ok, msg = check_appium(device_info['server_ip'], device_info['server_port'])
         if not ok:
-            return False, 'Appium 不可用(%s:%s)：%s（先执行 ./run.sh start-appium）' % (
+            try:
+                from web_platform.service_manager import start_service
+                start_service('appui')
+            except Exception:
+                pass
+            for _ in range(8):
+                time.sleep(5)
+                ok, msg = check_appium(device_info['server_ip'], device_info['server_port'])
+                if ok:
+                    break
+        if not ok:
+            return False, 'Appium 不可用(%s:%s)：%s（已尝试自动启动仍未就绪，可到首页卡片手动开启）' % (
                 device_info['server_ip'], device_info['server_port'], msg)
         # 3.2 目标设备 adb 在线（含 overrides 覆盖后的最终 udid），并取真实设备型号
         # （conf 的 devices_desc 只是人工起的别名，如 xiaomi；真实品牌型号以 adb 为准，如华为 FGD AL00）

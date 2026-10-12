@@ -189,29 +189,18 @@ def _svc_kill_pattern():
 
 
 def _spawn_service_action(restart):
-    """派生独立 bash：杀全部项目服务（逐 pid 复核命令行防误杀）；
-    重启模式再拉起：平台 + Appium（按被杀时的原命令行复活——runner 不自启 Appium）。
-    adb server 无需复活（任何 adb 命令会自动拉起）；报告服务按需再生成；maestro 按需再生。"""
+    """派生独立 bash：杀全部项目服务（逐 pid 复核命令行防误杀）。
+    重启模式只拉回平台本体；Appium/maestro 等默认关闭，按需经卡片开关或 runner 自启。"""
     services = _project_services()
     root = BASE_DIR
     kill_pat = _svc_kill_pattern()
-    appium_cmds = [s['cmd'] for s in services if s['kind'] == 'appium']
     kill = ''
     for s in services:
         kill += ("ps -p %d -o args= | grep -Eq '%s' && kill %d 2>/dev/null; "
                  % (s['pid'], kill_pat, s['pid']))
     wait_free = ("for i in $(seq 1 20); do lsof -nP -iTCP:8080 -sTCP:LISTEN 2>/dev/null "
                  "| grep -q python || break; sleep 0.3; done; ") if restart else ''
-    start = ''
-    if restart:
-        start += ("cd %s && nohup %s web_platform/app.py >> /tmp/platform_8080.log 2>&1 &"
-                  % (root, sys.executable))
-        seen = []   # Appium 原命令行复活（去重；& 后不能接 &&，用分号续句）
-        for c in appium_cmds:
-            if c not in seen:
-                seen.append(c)
-        for c in seen:
-            start += (" ; cd %s && nohup %s >> logs/appium.log 2>&1 &" % (root, c))
+    # 2026-10-12 起「所有服务默认关闭」：重启不再复活 Appium（执行用例时 runner 会按需自启）
     script = 'sleep 0.4; %s %s %s' % (kill, wait_free, start)
     subprocess.Popen(['bash', '-c', script], start_new_session=True,
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -268,6 +257,20 @@ def api_escrcpy_launch():
     return jsonify({'ok': False, 'msg': info})
 
 
+@bp.route('/api/services/toggle', methods=['POST'])
+def api_services_toggle():
+    """首页卡片右上角开关：手动启停托管服务（appui/aicase/connect/escrcpy）。
+    平台自身模块（apitest/locator/perf）即平台进程，不支持也无需开关。"""
+    from web_platform import service_manager
+    body = request.get_json(silent=True) or {}
+    svc = str(body.get('svc') or '')
+    on = bool(body.get('on'))
+    if svc not in ('appui', 'aicase', 'connect', 'escrcpy'):
+        return jsonify({'ok': False, 'msg': '该服务不支持托管开关: %s' % svc})
+    ok, msg = (service_manager.start_service if on else service_manager.stop_service)(svc)
+    return jsonify({'ok': ok, 'msg': msg})
+
+
 @bp.route('/api/home/status')
 def api_home_status():
     """首页卡片服务状态（一次拉取全部，前端逐卡展示「服务运行中 / 未运行」）：
@@ -291,6 +294,8 @@ def api_home_status():
 
 @bp.route('/api/status')
 def api_status():
+    from web_platform.service_manager import touch_beat
+    touch_beat()   # 页面心跳：pollFootStatus 每 10s 调本接口，作为「平台生态在使用」依据
     confs = list_devices_conf_files()
     adb = adb_devices()
     online = [d for d in adb['devices'] if d['state'] == 'device']

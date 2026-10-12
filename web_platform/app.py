@@ -81,6 +81,10 @@ app.register_blueprint(ai_case_bp)
 from web_platform.connect_routes import bp as connect_bp
 app.register_blueprint(connect_bp)
 
+# 托管服务管理：卡片开关 + 页面心跳 + 5 小时未用自动关闭（2026-10-12「所有服务默认关闭」策略）
+from web_platform.service_manager import start_auto_close_daemon
+start_auto_close_daemon()
+
 # 元素定位器并入平台（原 8001 独立服务取消）：挂载到 /locator 子路径。
 # DispatcherMiddleware 会剥掉 /locator 前缀并处理 /locator → /locator/ 补斜杠跳转，
 # 定位器自身的路由（/api/*、/static/*）完全不用改；其前端已改为相对路径请求。

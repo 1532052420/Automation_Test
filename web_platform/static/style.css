@@ -596,7 +596,7 @@ body[data-page="index"] main { max-width: none; padding: 0; }
 
 .nav-card {
   background: rgba(255, 255, 255, .9);
-  border-radius: 16px; padding: 40px 20px;
+  border-radius: 16px; padding: 40px 20px 20px; /* 底部 20px：服务状态行固定于此 */
   cursor: pointer; text-decoration: none;
   display: flex; flex-direction: column; align-items: center;
   box-shadow: 0 4px 6px rgba(0, 0, 0, .05);
@@ -1045,11 +1045,33 @@ html.night #vdbgSim[data-level="bad"]     { color:#F87171; }
 /* AI 用例生成首页卡片：最近任务状态行（无任务不展示） */
 .nav-card .ai-card-status { font-size: 12px; color: var(--muted2); margin: 0; }
 
-/* 首页卡片服务状态行（所有卡片，位置与投屏控制台一致）：绿=运行中 灰=未运行 */
-.nav-card .svc-status { font-size: 12px; color: var(--muted2); margin: 0; }
+/* 首页卡片服务状态行：固定卡片底部居中（卡片底部预留 20px），绿=运行中 灰=未运行 */
+.nav-card { display: flex; flex-direction: column; align-items: center; }  /* 原有居中列布局，显式声明供 margin-top:auto 生效 */
+.nav-card .svc-status { font-size: 12px; color: var(--muted2); margin: auto 0 0; }  /* margin-top:auto 压底 */
 .nav-card .svc-status.on { color: #1d7a3a; font-weight: 500; }
 html.night .nav-card .svc-status.on { color: #4ade80; }
 
+/* 卡片右上角托管服务开关：运行中=绿色实底，未运行=灰描边；点击启停（appui/aicase/connect/escrcpy） */
+.nav-card .svc-switch {
+  position: absolute; right: 14px; top: 14px; z-index: 2;
+  width: 30px; height: 30px; padding: 0; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 15px; line-height: 1; cursor: pointer;
+  background: var(--panel3); color: var(--muted2);
+  border: 1px solid var(--line); transition: all .18s ease;
+}
+.nav-card { position: relative; }  /* 供开关绝对定位 */
+.nav-card .svc-switch:hover { border-color: var(--brand); color: var(--brand); }
+.nav-card .svc-switch.on { background: var(--ok-bg); color: var(--ok-text); border-color: rgba(52, 199, 89, .4); }
+.nav-card .svc-switch:disabled { opacity: .5; }
+html.night .nav-card .svc-switch { background: rgba(255, 255, 255, .08); color: #a1a1a6; border-color: rgba(255, 255, 255, .16); }
+html.night .nav-card .svc-switch.on { background: rgba(52, 199, 89, .18); color: #4ade80; border-color: rgba(74, 222, 128, .4); }
+
+/* 基线大图查看器关闭按钮（视觉断言管理列表） */
+.va-viewer-close { position: absolute; top: 18px; right: 22px; width: 36px; height: 36px;
+  border-radius: 50%; border: 1px solid rgba(255,255,255,.45); background: rgba(0,0,0,.45);
+  color: #fff; font-size: 18px; line-height: 34px; text-align: center; cursor: pointer; }
+.va-viewer-close:hover { background: rgba(0,0,0,.72); }
 
 /* 顶栏服务管理按钮（重启/关闭）：关闭为警示红 */
 .foot .foot-danger { color: var(--bad-text); }
@@ -1075,7 +1097,7 @@ html.night .svc-fab { background: rgba(40, 40, 44, .92); }
 
 /* ================= 设备连接（SoloPi 无线化）：首页卡片操作区 + 扫码弹窗 ================= */
 /* 首页「设备连接」div 卡内的操作区：扫码连接（弹二维码）+ 连接配置（跳转） */
-.nav-card .card-ops { margin-top: 16px; display: flex; gap: 10px; align-items: center; }
+.nav-card .card-ops { margin: 16px 0 0; display: flex; gap: 10px; align-items: center; justify-content: center; }
 html.night .nav-card .card-ops .btn.ghost { color: #a1a1a6; border-color: rgba(255, 255, 255, .16); }
 html.night .nav-card .card-ops .btn.ghost:hover { background: rgba(255, 255, 255, .08); color: #f5f5f7; }
 
@@ -1108,3 +1130,6 @@ html.night .nav-card .card-ops .btn.ghost:hover { background: rgba(255, 255, 255
   font: 11.5px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   white-space: pre-wrap; word-break: break-all; max-height: 180px; overflow: auto;
 }
+
+/* 设备连接页 · SoloPi 导入：设备导出文件列表 */
+.sp-filelist { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }

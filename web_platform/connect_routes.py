@@ -269,3 +269,240 @@ def api_solopi_install():
         return jsonify({'ok': False, 'msg': 'APK 不存在: %s' % apk})
     ok, out = _run_adb(['-s', udid, 'install', '-r', path], timeout=_INSTALL_TIMEOUT)
     return jsonify({'ok': ok, 'msg': ('SoloPi 已安装到 %s' % udid) if ok else out, 'output': out})
+
+
+# ---------------------------------------------------------------- SoloPi 用例导入
+# 2026-10-12 新增：把手机 SoloPi 录制回放导出的 JSON 转换为平台三件套（元素/页面/用例）
+# 并经 admin_routes.import_case_package 整体入库（两阶段语法校验 + 备份 + 受管路径校验）。
+# schema 要点（实测样本 tools/solopi/samples/）：operationLog 是 JSON 字符串需二次解析；
+# resourceId 分隔符为 `:id/`；operationParam dict/字符串混存；输入 text 默认加密不可还原。
+_SOLOPI_IMPORT_DIR = os.path.join(BASE_DIR, 'tools', 'solopi', 'import')
+_CASES_DIR = 'cases/app_ui/android/demoProject'
+_PAGES_DIR = 'page_objects/app_ui/android/demoProject/pages'
+_ELEMENTS_DIR = 'page_objects/app_ui/android/demoProject/elements'
+
+
+def _pascal_case(case_id):
+    parts = [p for p in re.split(r'[^A-Za-z0-9]+', case_id) if p]
+    return ''.join(p[:1].upper() + p[1:] for p in parts) or 'SolopiCase'
+
+
+def _solopi_parse(content):
+    """解析 SoloPi 导出 JSON → 预览结构。返回 (info, err)"""
+    try:
+        d = json.loads(content)
+    except Exception as e:
+        return None, 'JSON 解析失败: %s' % str(e)[:80]
+    try:
+        log = d.get('operationLog')
+        steps_raw = json.loads(log)['steps'] if isinstance(log, str) else (log or {}).get('steps', [])
+    except Exception as e:
+        return None, 'operationLog 解析失败: %s' % str(e)[:80]
+    if not isinstance(steps_raw, list) or not steps_raw:
+        return None, '用例没有步骤（operationLog.steps 为空）'
+    steps, warnings = [], []
+    for i, s in enumerate(steps_raw):
+        m = s.get('operationMethod') or {}
+        action = str(m.get('actionEnum') or '').strip("'")
+        n = s.get('operationNode') or {}
+        rid, xp, desc = n.get('resourceId', ''), n.get('xpath', ''), n.get('description', '')
+        text = n.get('text', '')
+        p = m.get('operationParam', {})
+        if isinstance(p, str):
+            try:
+                p = json.loads(p)
+            except Exception:
+                p = {}
+        name = rid.split(':id/')[-1] if ':id/' in rid else 'node%d' % i
+        if ':id/' in rid:
+            control, mapped = '%s (ID)' % rid, True
+        elif xp:
+            control, mapped = 'XPATH 兜底', True
+        else:
+            control, mapped = '无控件信息', False
+        input_text, encrypted = '', False
+        if action == 'CLICK_AND_INPUT':
+            raw = p.get('text', '')
+            encrypted = bool(raw) and all(c in '0123456789ABCDEFabcdef' for c in raw)
+            input_text = '' if encrypted else raw
+            if encrypted:
+                warnings.append('步骤%d 的输入内容被 SoloPi 加密，生成后请在用例中填写真实文字' % (i + 1))
+        steps.append({'idx': i, 'action': action, 'control': control,
+                      'elementName': name if mapped else '',
+                      'mapped': mapped and (action in ('CLICK', 'CLICK_AND_INPUT')),
+                      'inputText': input_text, 'inputEncrypted': encrypted,
+                      'note': desc or text})
+    return {'caseName': str(d.get('caseName') or '未命名'), 'caseDesc': str(d.get('caseDesc') or ''),
+            'targetAppPackage': str(d.get('targetAppPackage') or ''),
+            'steps': steps, 'warnings': warnings}, None
+
+
+@bp.route('/api/solopi/import/pull', methods=['POST'])
+def api_solopi_import_pull():
+    """从在线设备拉取 SoloPi 导出目录的用例文件清单（不下载内容，仅列表）"""
+    body = request.get_json(silent=True) or {}
+    udid = str(body.get('udid') or '').strip()
+    if not _UDID_RE.match(udid):
+        return jsonify({'ok': False, 'msg': '设备序列号不合法'})
+    ok, out = _run_adb(['-s', udid, 'shell', 'ls', '/storage/emulated/0/solopi/export/'])
+    if not ok:
+        return jsonify({'ok': False, 'msg': '读取导出目录失败：%s' % out})
+    files = [l.strip() for l in out.splitlines() if l.strip().endswith('.json')]
+    return jsonify({'ok': True, 'files': files})
+
+
+@bp.route('/api/solopi/import/pull_file', methods=['POST'])
+def api_solopi_import_pull_file():
+    """adb pull 指定导出文件到 tools/solopi/import/ 并返回解析预览"""
+    body = request.get_json(silent=True) or {}
+    udid = str(body.get('udid') or '').strip()
+    name = os.path.basename(str(body.get('name') or ''))
+    if not _UDID_RE.match(udid) or not name.endswith('.json'):
+        return jsonify({'ok': False, 'msg': '参数不合法'})
+    os.makedirs(_SOLOPI_IMPORT_DIR, exist_ok=True)
+    local = os.path.join(_SOLOPI_IMPORT_DIR, name)
+    ok, out = _run_adb(['-s', udid, 'pull', '/storage/emulated/0/solopi/export/%s' % name, local],
+                       timeout=60)
+    if not ok or not os.path.exists(local):
+        return jsonify({'ok': False, 'msg': '拉取失败：%s' % out})
+    info, err = _solopi_parse(open(local, encoding='utf-8', errors='replace').read())
+    if err:
+        return jsonify({'ok': False, 'msg': err})
+    info['localFile'] = os.path.relpath(local, BASE_DIR)
+    return jsonify({'ok': True, **info})
+
+
+@bp.route('/api/solopi/import/parse', methods=['POST'])
+def api_solopi_import_parse():
+    """解析上传的 JSON 文本 → 预览（供「上传 JSON」入口）"""
+    body = request.get_json(silent=True) or {}
+    content = str(body.get('content') or '')
+    if len(content) > 2 * 1024 * 1024:
+        return jsonify({'ok': False, 'msg': '文件过大（上限 2MB）'})
+    info, err = _solopi_parse(content)
+    if err:
+        return jsonify({'ok': False, 'msg': err})
+    return jsonify({'ok': True, **info})
+
+
+@bp.route('/api/solopi/import/generate', methods=['POST'])
+def api_solopi_import_generate():
+    """按预览结果生成三件套并整体入库。body: {content 或 localFile, caseId, inputs:{idx:text}}"""
+    from web_platform.admin_routes import import_case_package
+    body = request.get_json(silent=True) or {}
+    content = str(body.get('content') or '')
+    if not content:
+        local = str(body.get('localFile') or '')
+        if local.endswith('.json') and '..' not in local:
+            abs_local = os.path.join(BASE_DIR, local)
+            if os.path.exists(abs_local):
+                content = open(abs_local, encoding='utf-8', errors='replace').read()
+    if not content:
+        return jsonify({'ok': False, 'msg': '缺少用例 JSON（content 或 localFile）'})
+    info, err = _solopi_parse(content)
+    if err:
+        return jsonify({'ok': False, 'msg': err})
+    case_id = re.sub(r'[^A-Za-z0-9_]+', '_', str(body.get('caseId') or '')).strip('_').lower()
+    if not case_id or not re.match(r'^[a-z]', case_id):
+        case_id = 'solopi_%d' % int(time.time())
+    cls = _pascal_case(case_id)
+    inputs = body.get('inputs') or {}
+    pkg = info['targetAppPackage'] or 'com.recordlife.kuaige'
+
+    # 元素抽取（ID 优先，无 id 退回 SoloPi 自带 xpath）
+    elements = {}
+    for st in info['steps']:
+        if not st['mapped'] or st['elementName'] in elements:
+            continue
+        n = json.loads(content)   # 重新取原始节点（预览里没有 xpath 全文）
+        raw = json.loads(n.get('operationLog'))['steps'][st['idx']].get('operationNode') or {}
+        rid, xp = raw.get('resourceId', ''), raw.get('xpath', '')
+        if ':id/' in rid:
+            loc = "Locator_Type.ID, '%s'" % rid
+        elif xp:
+            loc = "Locator_Type.XPATH, '%s'" % xp.replace("'", '')
+        else:
+            continue
+        cn = (raw.get('description') or raw.get('text') or st['elementName']).replace("'", '')[:20]
+        elements[st['elementName']] = (loc, cn)
+
+    # 页面方法 + 用例调用
+    methods, calls, unmapped = [], [], []
+    for st in info['steps']:
+        i, action, el = st['idx'], st['action'], st['elementName']
+        if action == 'BACK':
+            methods.append(("press_back", None, "按返回键", "self.appOperator.press_keycode(4)"))
+            calls.append("        page.press_back()")
+        elif action == 'HANDLE_ALERT':
+            methods.append(("handle_alert_%d" % i, None, "处理系统弹窗（SoloPi 自动关闭动作）",
+                            "self.appOperator.press_keycode(4)  # 也可改配平台弹窗自动关闭规则"))
+            calls.append("        page.handle_alert_%d()" % i)
+        elif action == 'CLICK' and el in elements:
+            methods.append(("click_%s" % el, None, "点击「%s」" % (elements[el][1] or el),
+                            "self.appOperator.click(self._elements.%s)" % el))
+            calls.append("        page.click_%s()" % el)
+        elif action == 'CLICK_AND_INPUT' and el in elements:
+            txt = str((inputs or {}).get(str(i)) or (inputs or {}).get(i) or '<请填写输入内容>').replace("'", '')
+            methods.append(("input_%s" % el, 'text', "输入内容",
+                            "self.appOperator.sendText(self._elements.%s, text)" % el))
+            calls.append("        page.input_%s('%s')" % (el, txt))
+        else:
+            unmapped.append('步骤%d(%s)' % (i + 1, action))
+            calls.append("        # TODO 步骤%d action=%s：无法自动映射，请人工改写" % (i + 1, action))
+    if not methods:
+        return jsonify({'ok': False, 'msg': '没有可自动转换的步骤，请检查 JSON 内容'})
+
+    elem_lines = ["        self.%s = CreateElement.create(%s, wait_type=Wait_By.VISIBILITY_OF, "
+                  "wait_seconds=6, desc='%s')  # %s" % (name, loc, cn, cn)
+                  for name, (loc, cn) in elements.items()]
+    m_lines = []
+    for name, sig, desc, mbody in methods:
+        args = '' if sig is None else ', ' + sig
+        m_lines.append("    def %s(self%s):\n        \"\"\"%s\"\"\"\n        %s" % (name, args, desc, mbody))
+
+    files = [
+        {'dir': _ELEMENTS_DIR, 'name': '%sElements.py' % case_id,
+         'content': "# -*- coding: utf-8 -*-\n"
+                    "# 本文件由「SoloPi 用例导入」自动生成（来源用例：%s · 目标 %s）\n"
+                    "from page_objects.createElement import CreateElement\n"
+                    "from page_objects.app_ui.locator_type import Locator_Type\n"
+                    "from page_objects.app_ui.wait_type import Wait_Type as Wait_By\n\n\n"
+                    "class %sElements:\n    def __init__(self):\n%s\n"
+                    % (info['caseName'], pkg, cls, '\n'.join(elem_lines))},
+        {'dir': _PAGES_DIR, 'name': '%sPage.py' % case_id,
+         'content': "# -*- coding: utf-8 -*-\n# 页面对象（SoloPi 导入自动生成）\n"
+                    "from page_objects.app_ui.android.demoProject.elements.%sElements import %sElements\n\n\n"
+                    "class %sPage:\n\n    def __init__(self, appOperator):\n"
+                    "        self.appOperator = appOperator\n"
+                    "        self._elements = %sElements()\n\n%s\n"
+                    % (case_id, cls, cls, cls, '\n\n'.join(m_lines))},
+        {'dir': _CASES_DIR, 'name': 'test_%s.py' % case_id,
+         'content': (
+             "# -*- coding: utf-8 -*-\n"
+             f"# 用例中文名：{info['caseName']}（SoloPi 录制导入 · {info['caseDesc']}）\n"
+             f"# 目标 App：{pkg} · 原始步骤数：{len(info['steps'])}"
+             + (f"；未自动映射：{'、'.join(unmapped)}" if unmapped else '') + "\n"
+             "import time\nimport allure\n"
+             "from base.app_ui.android.demoProject.app_ui_android_demoProject_client "
+             "import APP_UI_Android_demoProject_Client\n"
+             f"from page_objects.app_ui.android.demoProject.pages.{case_id}Page import {cls}Page\n\n\n"
+             "@allure.parent_suite('快歌APP自动化')\n@allure.suite('solopi_import')\n"
+             f"class Test{cls}:\n\n"
+             "    def setup_class(self):\n"
+             "        self.demoProjectClient = APP_UI_Android_demoProject_Client(is_need_kill_app=False)\n"
+             "        self.appOperator = self.demoProjectClient.appOperator\n"
+             f"        self.appOperator.start_activity('{pkg}', '{pkg}.feature.main.MainActivity')\n"
+             "        time.sleep(3)\n"
+             f"        self.page = {cls}Page(self.appOperator)\n\n"
+             f"    @allure.title('{info['caseName']}：SoloPi 录制回放')\n"
+             f"    def test_{case_id}(self):\n"
+             f"        \"\"\"SoloPi 导入用例：{info['caseDesc']}\"\"\"\n"
+             "        page = self.page\n\n" + '\n'.join(calls) + "\n")},
+    ]
+    result, code = import_case_package(package=case_id, files=files, uploader='solopi-import')
+    if not result.get('ok'):
+        return jsonify({'ok': False, 'msg': result.get('msg') or '入库失败'}), code
+    msg = '已生成并入库 %d 个文件（%s）' % (len(files), '、'.join(f['name'] for f in files))
+    if unmapped:
+        msg += '；%d 步未自动映射已在用例中标注 TODO' % len(unmapped)
+    return jsonify({'ok': True, 'msg': msg, 'files': [f['name'] for f in files]})

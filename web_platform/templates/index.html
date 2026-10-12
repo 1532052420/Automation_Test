@@ -19,6 +19,7 @@
     <div class="cards-container">
       <a class="nav-card" href="/run">
         <div class="card-icon icon-blue"><span class="ico" data-ico="target"></span></div>
+        <button class="svc-switch" id="svcSwitch-appui" data-svc="appui" hidden title="开启/关闭 Appium 服务"><span>⏻</span></button>
         <h3>APP自动化</h3>
         <p>项目管理 · 元素管理 · 设备配置与用例执行</p>
         <span class="ai-card-status svc-status" id="svcStatus-appui" hidden></span>
@@ -40,6 +41,7 @@
 
       <a class="nav-card" href="/ai-case">
         <div class="card-icon icon-indigo"><span class="ico" data-ico="ai"></span></div>
+        <button class="svc-switch" id="svcSwitch-aicase" data-svc="aicase" hidden title="开启/关闭 Maestro MCP 服务"><span>⏻</span></button>
         <h3>AI 用例生成</h3>
         <p>输入需求，AI 结合真实 App 页面生成并验证自动化用例</p>
         <span class="ai-card-status svc-status" id="svcStatus-aicase" hidden></span>
@@ -49,17 +51,18 @@
       <!-- 设备连接（SoloPi 无线化）：卡片进连接页，「扫码连接」直接弹二维码 -->
       <div class="nav-card" id="cardConnect" data-href="/connect" tabindex="0" role="link" aria-label="设备连接，回车进入">
         <div class="card-icon icon-cyan"><span class="ico" data-ico="qr"></span></div>
+        <button class="svc-switch" id="svcSwitch-connect" data-svc="connect" hidden title="开启/关闭 adb 服务"><span>⏻</span></button>
         <h3>设备连接</h3>
         <p>SoloPi 无线 · 扫码连接多设备 · adb 无线调试</p>
         <span class="ai-card-status svc-status" id="svcStatus-connect" hidden></span>
         <div class="card-ops">
           <button class="mini" id="btnQrHome" title="弹出二维码，设备扫码无线连接">扫码连接</button>
-          <a class="btn ghost mini" href="/connect">连接配置</a>
         </div>
       </div>
 
       <a class="nav-card" href="#" id="cardEscrcpy" title="">
         <div class="card-icon icon-cyan"><span class="ico" data-ico="screen"></span></div>
+        <button class="svc-switch" id="svcSwitch-escrcpy" data-svc="escrcpy" hidden title="开启/关闭 escrcpy 投屏"><span>⏻</span></button>
         <h3>投屏控制台</h3>
         <p>escrcpy · 一键拉起真机实时镜像 / 远程控制 / 录屏 / 截图</p>
         <span class="ai-card-status svc-status" id="escrcpyStatus" hidden></span>
