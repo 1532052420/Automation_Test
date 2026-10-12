@@ -117,24 +117,57 @@ def framework_import_check():
 # ---------------- 平台服务管理：实例清点 / 重启 / 关闭 ----------------
 # 背景：平台用 nohup 方式常驻，历史实例（如改过端口的老进程）不会随页面关闭而退出，
 # 叠加运行会互相抢占设备通道并让用户"改了代码不生效"。这里提供一键清点/全清/全清+重启。
+# 覆盖范围（2026-10-10 扩为项目全量服务）：平台进程、Appium、adb server、maestro mcp、
+# 报告静态服务（http.server × output/runs）、escrcpy 桌面应用及其子进程。
 # 关键实现：杀进程的 bash 以独立会话（start_new_session）运行，且先 sleep 再杀——
-# 让 HTTP 响应先回到浏览器，服务随后才自我了断/重启。
+# 让 HTTP 响应先回到浏览器，服务随后才自我了断/重启；每 pid 复核命令行防误杀。
+# （v6.15.04 重建注：6 类服务管理 v6.15.01 实现未曾入库、源文件被覆盖丢失，
+#   本段依据发布行为与留存片段重建，功能语义与 6.15.01 发布说明一致。）
 
 _SVC_MARK = 'web_platform/app.py'
 
 
-def _platform_instances():
-    """所有平台服务进程（按命令行含 web_platform/app.py 判定），附监听端口"""
-    out = subprocess.run(['ps', 'axo', 'pid=,lstart=,command='],
-                         capture_output=True, text=True, timeout=10).stdout
-    instances = []
+def _svc_categories():
+    """项目服务的识别规则：kind -> (说明, 命令行正则)。BASE 用运行时仓库根注入。"""
+    base = re.escape(BASE_DIR)
+    return [
+        ('platform', '平台服务', r'web_platform/app\.py$'),
+        ('appium', 'Appium 服务', r'(^|/)appium(\.js)?\s.*--port|node\s.*[/\\]appium(\s|$)'),
+        ('adb', 'adb 服务', r'^\S*adb\S* -L tcp:\S*\s+fork-server'),
+        ('maestro', 'Maestro MCP', r'maestro\.cli\.AppKt\s+mcp$|(^|/)maestro\s+mcp$'),
+        ('report', '报告静态服务', r'-m\s+http\.server\s+\d+\s+--directory\s+%s/output/runs/' % base),
+        ('escrcpy', 'escrcpy 投屏', '%s/escrcpy/' % base),
+    ]
+
+
+def _match_kind(cmd):
+    for kind, _label, pat in _svc_categories():
+        if re.search(pat, cmd):
+            return kind
+    return None
+
+
+def _project_services():
+    """所有项目相关进程（平台 + Appium + adb + maestro + 报告静态服务 + escrcpy），附监听端口。
+    ps 不可用（权限受限等）时返回空清单并记日志，不让清点/状态接口 500。"""
+    try:
+        out = subprocess.run(['ps', 'axo', 'pid=,lstart=,command='],
+                             capture_output=True, text=True, timeout=10).stdout
+    except Exception as e:
+        print('[services] ps 不可用，服务清点降级为空：%s' % str(e)[:80])
+        return []
+    services = []
     for line in out.splitlines():
-        # 以 app.py 结尾才是真服务进程：重启脚本的 bash/包装进程命令行里也含该串，
-        # 但后面还跟着日志重定向等尾巴——用结尾匹配排除，避免清点/重启误伤自己
-        if _SVC_MARK not in line or 'ps axo' in line or not line.rstrip().endswith(_SVC_MARK):
+        if 'ps axo' in line:
             continue
         parts = line.strip().split(None, 6)
         if len(parts) < 7 or not parts[0].isdigit():
+            continue
+        cmd = parts[6]
+        if cmd.startswith('bash -c'):   # 重启脚本自身文本嵌着匹配串，会自匹配（瞬态），排除
+            continue
+        kind = _match_kind(cmd)
+        if not kind:
             continue
         pid = int(parts[0])
         ports = []
@@ -144,38 +177,57 @@ def _platform_instances():
             ports = re.findall(r':(\d+)\s+\(LISTEN\)', lo)
         except Exception:
             pass
-        instances.append({'pid': pid, 'start': ' '.join(parts[1:6]), 'cmd': parts[6],
-                          'ports': ports, 'current': pid == os.getpid()})
-    return instances
+        label = dict((k, l) for k, l, _p in _svc_categories())[kind]
+        services.append({'pid': pid, 'kind': kind, 'label': label, 'cmd': cmd,
+                         'ports': ports, 'current': pid == os.getpid()})
+    return services
+
+
+def _svc_kill_pattern():
+    """全类别合并正则（bash 里逐 pid 复核命令行用）"""
+    return '|'.join('(?:%s)' % pat for _k, _l, pat in _svc_categories())
 
 
 def _spawn_service_action(restart):
-    """派生独立 bash：先杀全部平台进程（逐个核对命令行防 pid 复用），重启模式再拉起新实例"""
-    pids = [str(i['pid']) for i in _platform_instances()]
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    """派生独立 bash：杀全部项目服务（逐 pid 复核命令行防误杀）；
+    重启模式再拉起：平台 + Appium（按被杀时的原命令行复活——runner 不自启 Appium）。
+    adb server 无需复活（任何 adb 命令会自动拉起）；报告服务按需再生成；maestro 按需再生。"""
+    services = _project_services()
+    root = BASE_DIR
+    kill_pat = _svc_kill_pattern()
+    appium_cmds = [s['cmd'] for s in services if s['kind'] == 'appium']
     kill = ''
-    for pid in pids:
-        kill += ("ps -p %s -o args= | grep -q web_platform/app.py && kill %s 2>/dev/null; "
-                 % (pid, pid))
+    for s in services:
+        kill += ("ps -p %d -o args= | grep -Eq '%s' && kill %d 2>/dev/null; "
+                 % (s['pid'], kill_pat, s['pid']))
     wait_free = ("for i in $(seq 1 20); do lsof -nP -iTCP:8080 -sTCP:LISTEN 2>/dev/null "
                  "| grep -q python || break; sleep 0.3; done; ") if restart else ''
-    start = ("cd %s && nohup %s web_platform/app.py >> /tmp/platform_8080.log 2>&1 &"
-             % (root, sys.executable)) if restart else ''
+    start = ''
+    if restart:
+        start += ("cd %s && nohup %s web_platform/app.py >> /tmp/platform_8080.log 2>&1 &"
+                  % (root, sys.executable))
+        seen = []   # Appium 原命令行复活（去重；& 后不能接 &&，用分号续句）
+        for c in appium_cmds:
+            if c not in seen:
+                seen.append(c)
+        for c in seen:
+            start += (" ; cd %s && nohup %s >> logs/appium.log 2>&1 &" % (root, c))
     script = 'sleep 0.4; %s %s %s' % (kill, wait_free, start)
     subprocess.Popen(['bash', '-c', script], start_new_session=True,
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return pids
+    return [s['pid'] for s in services]
 
 
 @bp.route('/api/service/instances')
 def api_service_instances():
-    return jsonify({'ok': True, 'instances': _platform_instances(),
+    svcs = _project_services()
+    return jsonify({'ok': True, 'instances': svcs, 'services': svcs,
                     'current_pid': os.getpid()})
 
 
 @bp.route('/api/service/restart', methods=['POST'])
 def api_service_restart():
-    """结束所有平台服务进程（含历史僵尸实例）→ 拉起全新实例（服务初始化/清脏环境）"""
+    """结束所有项目服务进程（平台/Appium/adb/maestro/报告服务/escrcpy）→ 拉起全新平台实例"""
     pids = _spawn_service_action(restart=True)
     return jsonify({'ok': True, 'killing': pids,
                     'msg': '服务重启中：已通知结束 %d 个进程，全新实例约 3~5 秒后就绪' % len(pids)})
@@ -183,10 +235,10 @@ def api_service_restart():
 
 @bp.route('/api/service/shutdown', methods=['POST'])
 def api_service_shutdown():
-    """结束所有平台服务进程（页面随之不可用；重启请在终端执行 web_platform/app.py）"""
+    """结束所有项目服务进程（页面随之不可用；重启请在终端执行 web_platform/app.py）"""
     pids = _spawn_service_action(restart=False)
     return jsonify({'ok': True, 'killing': pids,
-                    'msg': '全部平台服务进程正在结束（%d 个）' % len(pids)})
+                    'msg': '全部项目服务进程正在结束（%d 个）' % len(pids)})
 
 
 # ---------------- escrcpy 投屏控制台（独立项目 escrcpy/，Electron 桌面应用） ----------------
@@ -214,6 +266,27 @@ def api_escrcpy_launch():
         return jsonify({'ok': True, 'msg': 'escrcpy 已启动（在本机屏幕/Dock 找到它的窗口）',
                         'app_path': info})
     return jsonify({'ok': False, 'msg': info})
+
+
+@bp.route('/api/home/status')
+def api_home_status():
+    """首页卡片服务状态（一次拉取全部，前端逐卡展示「服务运行中 / 未运行」）：
+    appui→Appium · aicase→Maestro MCP · connect→adb server · escrcpy→escrcpy 桌面应用；
+    apitest / locator / perf 即平台自身，能访问本接口即在运行。"""
+    appium_ok, _msg = check_appium('127.0.0.1', '4726')
+    adb_ok = adb_devices()['ok']
+    maestro = any(s['kind'] == 'maestro' for s in _project_services())
+    escrcpy_running = False
+    try:
+        from escrcpy.launcher import status as _esc_status
+        escrcpy_running = bool(_esc_status().get('running'))
+    except Exception:
+        pass   # 未部署 = 未运行
+    return jsonify({'ok': True, 'svc': {
+        'appui': appium_ok, 'apitest': True, 'locator': True,
+        'aicase': maestro, 'connect': adb_ok, 'escrcpy': escrcpy_running,
+        'perf': True,
+    }})
 
 
 @bp.route('/api/status')

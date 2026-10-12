@@ -69,3 +69,28 @@ Use active voice as default. A CTA says exactly what happens when it is used: "S
 Treat failure and emptiness as moments for direction, not mood. Explain what went wrong and how to fix it, in the interface's voice rather than a person's. Errors don't apologize, and they are never vague about what happened. An empty screen is an invitation to act.
 
 Keep the tone conversational: plain verbs, sentence case, no filler, with tone matched to the brand and the audience. Let each written element do exactly one job.
+
+---
+
+## 本项目适配（AutomationTest · 强制）
+
+> 本节为本项目约定，与上文通用指引冲突时以本节为准。**凡涉及新增页面 / 面板 / 二级菜单 / 列表的任务，交付前必须逐条过下面的自检清单**，并在回复中声明「已按 frontend-design 布局自检清单检查」。
+
+### 硬边界（既有约定）
+
+1. **主题契约**：`web_platform` 与 `element_locator` 统一「日间默认 + `html.night` 夜间覆盖」，颜色一律走 `style.css` 的 CSS 变量（--ink / --panel / --brand…），禁止写死底色（扫码二维码等功能性恒白底除外，需显式注释）。
+2. **不引外部资源**：内网环境，禁止 CDN 字体 / 外链图片 / 在线 JS；二维码等一律本地生成（后端 PNG 或内联 SVG）。
+3. **图标走 icon-generator**：新图标按 icon-generator skill 出 SVG 源文件再导出 PNG；平台首页卡片图标用 app.js `ICONS` 内联 SVG（24 网格线性风格）。
+
+### 新增页面 / 列表布局自检清单（每次必查；2026-10-12 复盘固化）
+
+复用现有骨架时，**新页面的 `data-page` 值必须同步进对应的全局 CSS 选择器**——漏一条就是一次布局事故：
+
+- [ ] **全宽骨架页**（复制 `runlayout + subnav + submain` 的页面，如 /run /api-test /connect）：`body[data-page="xxx"] main` 必须加进 style.css 的「取消 1180px 限宽」规则（`max-width: none; padding-bottom: 28px`）。漏加 → 整个布局被居中限宽，二级菜单悬在页面中间、右侧大片空白（v6.15.03 /connect 页实测事故）。
+- [ ] **页头位置**：全宽骨架页的 `.pagehead` 放在**默认面板内部**（对齐 api-test 页），不要横在 `main` 直下。
+- [ ] **侧栏列表**：`.subnav` 贴左通栏、面板撑满剩余宽度；新增菜单项检查顺序（高频在上、批量/低频类放最后）、当前项 `.on` 高亮、hash 深链可用。
+- [ ] **同容器按钮同尺寸**：`a.btn` 不匹配 `button.mini` 选择器（元素选择器不叠加类），链接版 mini 依赖 `.btn.mini` 规则——新按钮混用 button/a 时必须核对（v6.15.03 首页卡片「扫码连接/连接配置」一大一小事故）。
+- [ ] **状态行位置统一**：首页卡片状态行一律放描述文字下方（对齐 `#escrcpyStatus` 结构），新卡片照抄。
+- [ ] **共享填充函数 id 约定**：共用渲染函数按 `{prefix}XxxId` 取元素时，新接入处先对表 id 命名，避免赋空不显示（v6.15.02 扫码弹窗二维码不加载事故）。
+- [ ] **夜间模式**：新元素在 `html.night` 下过一遍（对比度 / 边框 / 语义色）。
+- [ ] **浏览器实测**：交付前至少截图日间 + 夜间各一张，肉眼确认无「悬空 / 挤压 / 错位 / 居中悬空」。

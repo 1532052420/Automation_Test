@@ -524,13 +524,24 @@ function initIndex() {
     el.hidden = false;
   }).catch(() => { /* 状态获取失败不影响首页 */ });
 
-  // 投屏控制台卡片：显示 escrcpy 状态，点击一键拉起桌面 App
+  // 首页各卡片服务状态（位置与投屏控制台一致：描述文字下方一行小字）
+  // appui→Appium · aicase→Maestro MCP · connect→adb · escrcpy→escrcpy；
+  // apitest / locator / perf 即平台自身，能打开首页即在运行
+  api('/api/home/status').then(d => {
+    if (!d.ok) return;
+    const set = (el, on) => {
+      if (!el) return;
+      el.textContent = on ? '服务运行中' : '未运行';
+      el.classList.toggle('on', !!on);
+      el.hidden = false;
+    };
+    const svc = d.svc || {};
+    Object.keys(svc).forEach(k => {
+      set(k === 'escrcpy' ? document.querySelector('#escrcpyStatus')
+                          : document.querySelector('#svcStatus-' + k), svc[k]);
+    });
+  }).catch(() => { /* 状态获取失败不影响首页 */ });
   const ecEl = document.querySelector('#escrcpyStatus');
-  api('/api/escrcpy/status').then(d => {
-    if (!d.ok || !ecEl) return;
-    ecEl.textContent = d.running ? '运行中' : (d.installed ? '已部署 · 未运行' : '未部署');
-    ecEl.hidden = false;
-  }).catch(() => {});
   const ecCard = document.querySelector('#cardEscrcpy');
   if (ecCard) ecCard.addEventListener('click', async (e) => {
     e.preventDefault();
@@ -540,9 +551,9 @@ function initIndex() {
     catch (err) { return toast('启动请求失败', false); }
     toast(d.ok ? '✓ escrcpy 已启动：在本机屏幕 / Dock 找到它的窗口' : (d.msg || '启动失败'), d.ok);
     if (d.ok && ecEl) {
-      ecEl.textContent = '运行中'; ecEl.hidden = false;
+      ecEl.textContent = '服务运行中'; ecEl.classList.add('on'); ecEl.hidden = false;
     }
-    api('/api/escrcpy/status').catch(() => {});
+    api('/api/home/status').catch(() => {});
   });
 
   // 设备连接卡片（div 卡，样式与 a 卡一致）：点卡片进连接页，「扫码连接」弹二维码

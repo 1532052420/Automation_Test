@@ -11,11 +11,8 @@
 <body data-page="connect">
 <header class="gnav" id="sidebar"></header>
 <main>
-  <div class="pagehead">
-    <h1>设备连接</h1>
-    <span class="sub">SoloPi 无线化 · 扫码连接多设备：平台生成二维码，设备扫码完成无线接入，脱离 USB 线控</span>
-  </div>
-
+  <!-- 布局与 APP自动化/接口测试页一致：全宽通栏（style.css 对 data-page=connect 取消 main 限宽），
+       左侧二级菜单贴左、右侧面板撑满；页头放在默认面板内（对齐 api-test 页模式） -->
   <div class="runlayout">
     <!-- 左侧二级菜单（深色通栏，图标由 app.js 按 data-icon 注入） -->
     <aside class="subnav" id="subnav">
@@ -29,6 +26,10 @@
 
       <!-- 连接配置：配置卡片 + 扫码二维码卡片 -->
       <section class="panel" id="panel-settings" hidden>
+        <div class="pagehead">
+          <h1>设备连接</h1>
+          <span class="sub">SoloPi 无线化 · 扫码连接多设备：平台生成二维码，设备扫码完成无线接入，脱离 USB 线控</span>
+        </div>
         <div class="grid2">
           <div class="card">
             <div class="cardhead">

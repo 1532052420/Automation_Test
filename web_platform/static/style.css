@@ -193,6 +193,9 @@ button.mini.danger-ghost {
 }
 button.mini.danger-ghost:hover { background: var(--bad-bg); border-color: var(--bad-text); color: var(--bad-text); }
 .btn.ghost { text-decoration: none; }
+/* 链接版 mini 按钮统一尺寸：a.btn 不匹配 button.mini 选择器（元素选择器不叠加类），
+   曾致首页卡片「扫码连接」与「连接配置」一大一小 */
+.btn.mini { padding: 5px 13px; font-size: 12.5px; }
 
 /* ================= 表单 ================= */
 select, input[type=text], input[type=password], input[type=search], input[type=number], textarea {
@@ -510,7 +513,8 @@ img.thumb:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); 
    深色通栏侧边栏（参考后台管理控制台布置）：整列撑满内容区高度，
    图标+文字菜单项，当前项蓝色高亮；右侧为对应面板，hash 深链。
    该页取消 1180px 限宽、去掉页头，面板撑满整屏（高度按视口动态撑满）。 */
-body[data-page="run"] main, body[data-page="api-test"] main { max-width: none; padding-bottom: 28px; }
+body[data-page="run"] main, body[data-page="api-test"] main,
+body[data-page="connect"] main { max-width: none; padding-bottom: 28px; }
 .runlayout {
   display: flex; gap: 24px; align-items: stretch;
   min-height: calc(100vh - var(--nav-h) - 70px);
@@ -1040,6 +1044,12 @@ html.night #vdbgSim[data-level="bad"]     { color:#F87171; }
 
 /* AI 用例生成首页卡片：最近任务状态行（无任务不展示） */
 .nav-card .ai-card-status { font-size: 12px; color: var(--muted2); margin: 0; }
+
+/* 首页卡片服务状态行（所有卡片，位置与投屏控制台一致）：绿=运行中 灰=未运行 */
+.nav-card .svc-status { font-size: 12px; color: var(--muted2); margin: 0; }
+.nav-card .svc-status.on { color: #1d7a3a; font-weight: 500; }
+html.night .nav-card .svc-status.on { color: #4ade80; }
+
 
 /* 顶栏服务管理按钮（重启/关闭）：关闭为警示红 */
 .foot .foot-danger { color: var(--bad-text); }
