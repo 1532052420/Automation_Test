@@ -590,7 +590,7 @@ def api_appui_elements_file_delete():
     return jsonify({'ok': ok, 'msg': msg}), (200 if ok else 400)
 
 
-# ---------------- Appium 服务启停（设备配置面板按钮；run.sh 已精简为纯平台入口） ----------------
+# ---------------- Appium 服务启停（设备配置面板按钮；run.command 已精简为纯平台入口） ----------------
 APPIUM_PORT = 4726
 APPIUM_BIN = os.path.expanduser('~/appium2/node_modules/.bin/appium')
 

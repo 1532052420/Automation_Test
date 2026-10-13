@@ -3,7 +3,7 @@
 
 覆盖 APP UI（设备）与 API（接口）两类自动化用例，共用一套执行器。
 启动：.venv/bin/python web_platform/app.py
-入口：./run.sh platform
+入口：./run.command platform
 """
 import os
 import sys

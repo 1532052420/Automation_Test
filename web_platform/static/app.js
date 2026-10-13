@@ -702,23 +702,37 @@ async function solopiInstall(udid) {
 }
 
 function onDevTableClick(e) {
-  tb.querySelectorAll('[data-reconn]').forEach(el => {
-    el.addEventListener('click', async () => {
-      const addr = el.dataset.reconn;
-      await devAdbAction({ action: 'connect', addr: addr });
-      loadConnectDevices();
-    });
-  });
-  tb.querySelectorAll('[data-delrec]').forEach(el => {
-    el.addEventListener('click', async () => {
-      const udid = el.dataset.delrec;
-      if (!confirm('从已保存列表移除 ' + udid + ' 的记录？（不影响设备本身）')) return;
-      await postJson('/api/connect/record/del', { udid: udid });
-      loadConnectDevices();
-    });
-  });
-  const b = e.target.closest('button[data-tcpip],button[data-disc],button[data-inst]');
+  /* 纯事件委托：旧实现把监听挂在 click 处理器内部且引用了未定义的 tb（点击即
+     ReferenceError），设备表所有按钮首点必死。现统一在冒泡层按 data-* 分发。 */
+  const b = e.target.closest('button[data-reconn],button[data-delrec],button[data-tcpip],button[data-disc],button[data-inst]');
   if (!b) return;
+  if (b.dataset.reconn) {
+    toast('正在重连 ' + b.dataset.reconn + '…');
+    return devAdbAction({ action: 'connect', addr: b.dataset.reconn });
+  }
+  if (b.dataset.delrec) {
+    /* 二段确认替代原生 confirm：首点进入待确认态（按钮变字），3 秒内再点执行；结果走平台 toast */
+    if (b.dataset.armed) {
+      const udid = b.dataset.delrec;
+      b.textContent = '移除记录';
+      delete b.dataset.armed;
+      clearTimeout(b._armT);
+      return postJson('/api/connect/record/del', { udid: udid }).then(d => {
+        toast(d.msg || (d.ok ? '已移除 ' + udid + ' 的记录' : '移除失败'), !!d.ok);
+        if (d.ok) loadConnectDevices();
+      }).catch(() => toast('移除失败（网络异常）', false));
+    }
+    b.dataset.armed = '1';
+    b.textContent = '确认移除？';
+    b.classList.add('danger');
+    toast('为防误删，请再点一次「确认移除」；3 秒后自动还原', false);
+    b._armT = setTimeout(() => {
+      b.textContent = '移除记录';
+      delete b.dataset.armed;
+      b.classList.remove('danger');
+    }, 3000);
+    return;
+  }
   if (b.dataset.tcpip) return devAdbAction({ action: 'tcpip', udid: b.dataset.tcpip, port: 5555 });
   if (b.dataset.disc) return devAdbAction({ action: 'disconnect', addr: b.dataset.disc });
   if (b.dataset.inst) return solopiInstall(b.dataset.inst);

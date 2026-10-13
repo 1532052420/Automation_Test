@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>元素定位器 v6.15.30 · 新旧版对比图解</title>
+<style>
+  :root{
+    --ink:#1f2d3d; --sub:#5b6b7b; --line:#e3e8ee; --bg:#f5f7fa; --card:#ffffff;
+    --blue:#2b7de9; --blue-bg:#eaf3fe; --green:#1a9e6e; --green-bg:#e8f7f0;
+    --red:#d9534f; --red-bg:#fdeeed; --orange:#e8890c; --orange-bg:#fdf3e3;
+    --gray-bg:#eef1f5; --mono:'SF Mono',Menlo,Consolas,'Courier New',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--ink);line-height:1.65;padding:32px 20px 80px}
+  .wrap{max-width:1080px;margin:0 auto}
+  header.hero{background:linear-gradient(135deg,#1d3a5f,#2b7de9);color:#fff;border-radius:16px;padding:34px 38px;margin-bottom:26px}
+  .hero h1{font-size:26px;letter-spacing:.5px}
+  .hero p{opacity:.88;margin-top:8px;font-size:14.5px}
+  .badge{display:inline-block;padding:3px 12px;border-radius:20px;font-size:12.5px;font-weight:600;margin-right:8px}
+  .badge.old{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.4)}
+  .badge.new{background:#fff;color:var(--blue)}
+  h2.sec{font-size:19px;margin:42px 0 6px;display:flex;align-items:center;gap:10px}
+  h2.sec .no{background:var(--blue);color:#fff;width:26px;height:26px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;flex:none}
+  .sec-sub{color:var(--sub);font-size:13.5px;margin-bottom:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px 26px;box-shadow:0 1px 3px rgba(16,32,58,.05)}
+
+  /* ---------- 流程对比 ---------- */
+  .flow2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:860px){.flow2{grid-template-columns:1fr}}
+  .flowcol{border-radius:12px;padding:18px 18px 20px;border:1.5px solid var(--line)}
+  .flowcol.old{background:#fafbfc}
+  .flowcol.new{background:var(--blue-bg);border-color:#bcd6f5}
+  .flowcol h3{font-size:15px;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .flowcol.old h3{color:#8a6d3b}
+  .flowcol.new h3{color:var(--blue)}
+  .flowcol .cap{font-size:12.5px;color:var(--sub);margin-bottom:14px}
+  .step{display:flex;gap:10px;align-items:flex-start;position:relative;padding:7px 0}
+  .step .dot{flex:none;width:24px;height:24px;border-radius:50%;color:#fff;font-size:12.5px;display:flex;align-items:center;justify-content:center;font-weight:700;margin-top:2px}
+  .old .step .dot{background:#b3bdc9}
+  .new .step .dot{background:var(--blue)}
+  .step .tx{font-size:13.5px}
+  .step .tx b{font-size:13.5px}
+  .step .tx .d{color:var(--sub);font-size:12.5px}
+  .step:not(:last-child)::before{content:'';position:absolute;left:12px;top:36px;bottom:-8px;width:2px;background:var(--line)}
+  .flowcol.new .step:not(:last-child)::before{background:#c4dcf7}
+
+  /* 文件树对比 */
+  .tree{font-family:var(--mono);font-size:12.8px;background:#1e2833;color:#d7e1ec;border-radius:12px;padding:18px 20px;line-height:1.9;overflow-x:auto}
+  .tree .hd{color:#8fa3b8;font-size:11.5px;letter-spacing:1px;margin-bottom:6px}
+  .dup{background:var(--red);color:#fff;padding:1px 7px;border-radius:5px;font-size:11px;margin-left:6px}
+  .shared{background:var(--green);color:#fff;padding:1px 7px;border-radius:5px;font-size:11px;margin-left:6px}
+  .t-dir{color:#7fc7ff}
+  .t-cm{color:#93a4b5}
+
+  /* 对照表 */
+  table.cmp{width:100%;border-collapse:collapse;font-size:13.5px}
+  table.cmp th{background:var(--gray-bg);padding:10px 14px;text-align:left;font-size:13px}
+  table.cmp td{border-top:1px solid var(--line);padding:11px 14px;vertical-align:top}
+  table.cmp td.old{color:#9a6b32;background:#fffdf7}
+  table.cmp td.new{color:#1c5fae;background:#f6faff}
+  .tag{display:inline-block;font-size:11.5px;padding:1px 9px;border-radius:5px;margin-right:6px;font-weight:600;white-space:nowrap}
+  .tag.del{background:var(--red-bg);color:var(--red)}
+  .tag.add{background:var(--green-bg);color:var(--green)}
+  .tag.mod{background:var(--blue-bg);color:var(--blue)}
+
+  /* 规则卡 */
+  .rules{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media(max-width:860px){.rules{grid-template-columns:1fr}}
+  .rule{border:1.5px solid var(--line);border-radius:12px;padding:18px;background:#fff}
+  .rule .ic{font-size:22px}
+  .rule h4{font-size:14.5px;margin:8px 0 6px}
+  .rule p{font-size:12.8px;color:var(--sub)}
+  .rule.code{margin-top:10px;font-family:var(--mono);font-size:11.8px;background:var(--gray-bg);border-radius:8px;padding:8px 10px;color:var(--ink)}
+
+  /* 三步操作 */
+  .steps3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:860px){.steps3{grid-template-columns:1fr}}
+  .s3{background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:20px;position:relative}
+  .s3 .n{width:30px;height:30px;border-radius:10px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;margin-bottom:10px}
+  .s3 h4{font-size:15px;margin-bottom:8px}
+  .s3 p{font-size:13px;color:var(--sub)}
+  .s3 .mock{margin-top:12px;border:1px solid var(--line);border-radius:9px;overflow:hidden;font-size:12.3px}
+  .s3 .mock .r{padding:7px 11px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:8px;align-items:center;background:#fff}
+  .s3 .mock .r:first-child{border-top:none;background:#f8fafc;color:var(--sub);font-size:11.5px}
+  .sel{border:1px solid var(--blue);color:var(--blue);border-radius:6px;padding:1px 8px;background:var(--blue-bg);white-space:nowrap}
+  .ok{color:var(--green);font-weight:600;white-space:nowrap}
+  .warn{color:var(--orange);font-weight:600;white-space:nowrap}
+
+  .note{background:var(--orange-bg);border:1.5px solid #f3d9a8;border-radius:12px;padding:16px 20px;font-size:13.5px}
+  .note b{color:#9a6b32}
+  .note ul{margin:6px 0 0 20px}
+  .testbar{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  @media(max-width:860px){.testbar{grid-template-columns:repeat(2,1fr)}}
+  .t4{background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:16px;text-align:center}
+  .t4 .v{font-size:24px;font-weight:800;color:var(--green)}
+  .t4 .k{font-size:12.5px;color:var(--sub);margin-top:2px}
+  footer{margin-top:40px;color:var(--sub);font-size:12.5px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>元素定位器 · 用例包改版对比图解</h1>
+  <p>
+    <span class="badge old">原版 ≤ 6.15.29</span>
+    <span class="badge new">现版 6.15.30</span>
+    主题：元素文件从「按用例私有」改为「按页面共享」，查重复用 + 页面复用，从源头消灭重复元素
+  </p>
+</header>
+
+<!-- ============ 1. 一图看懂 ============ -->
+<h2 class="sec"><span class="no">1</span>一图看懂：新建用例的流程变了什么</h2>
+<p class="sec-sub">同样的动作——「选中元素 → 添加测试用例」，两种版本走过的路完全不同：</p>
+<div class="card">
+  <div class="flow2">
+    <div class="flowcol old">
+      <h3>🔲 原版：按用例归档（1 用例 = 1 套三件套）</h3>
+      <div class="cap">元素文件强制随用例新建，无条件锁死</div>
+      <div class="step"><span class="dot">1</span><div class="tx"><b>选中元素，目标用例选「➕ 新建」</b><div class="d">输入用例名，如 search_play</div></div></div>
+      <div class="step"><span class="dot">2</span><div class="tx"><b>元素文件被强制切到「➕ 新建」</b><div class="d">❌ 不允许选已有文件——「写入元素文件」与目标用例必须同态，混搭直接拦下</div></div></div>
+      <div class="step"><span class="dot">3</span><div class="tx"><b>保存 → 生成 1:1:1 三件套</b><div class="d">test_search_play.py ＋ SearchPlayPage.py ＋ SearchPlayElements.py（全新文件）</div></div></div>
+      <div class="step"><span class="dot">4</span><div class="tx"><b>写第二条用例？再抄一遍元素</b><div class="d">搜索按钮、歌曲列表…在新的文件里再存一份</div></div></div>
+    </div>
+    <div class="flowcol new">
+      <h3>🟦 现版：按页面共享（元素1 · 用例多 · 页面操作多）</h3>
+      <div class="cap">新增「页面选择」，元素文件跟随页面，查重自动处理</div>
+      <div class="step"><span class="dot">1</span><div class="tx"><b>选中元素，目标用例选「➕ 新建」</b><div class="d">输入用例名，如 search_collect</div></div></div>
+      <div class="step"><span class="dot">2</span><div class="tx"><b>新增：选择页面</b><div class="d">「➕ 新建页面文件…」或复用已有页面（如 SearchPage.py）——元素文件自动对齐页面绑定的文件</div></div></div>
+      <div class="step"><span class="dot">3</span><div class="tx"><b>保存 → 服务端组装 + 自动查重</b><div class="d">同定位元素已存在 → <b style="color:var(--green)">复用库内原名</b>，不写重复行；同名不同定位 → <b style="color:var(--red)">硬拦</b>（禁止静默覆盖）</div></div></div>
+      <div class="step"><span class="dot">4</span><div class="tx"><b>元素定义只存在一份</b><div class="d">所有用例共享同一个元素文件，改版只改一处</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 2. 同一场景演示 ============ -->
+<h2 class="sec"><span class="no">2</span>直观演示：写完第 2 条用例之后，元素库长什么样</h2>
+<p class="sec-sub">场景：用例 A「搜索歌曲并播放」、用例 B「搜索歌曲并收藏」。两条用例都要点同一个「搜索按钮」。</p>
+<div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+  <div>
+    <div class="tree"><div class="hd">原版 · 用例包入库后</div>
+<span class="t-dir">elements/</span><br>
+├── SearchPlay<b>Elements.py</b><span class="dup">含搜索按钮 ①</span><br>
+├── SearchCollect<b>Elements.py</b><span class="dup">含搜索按钮 ②</span><br>
+└── <span class="t-cm">…第 3 条用例 → 搜索按钮 ③④⑤…</span><br>
+<span class="t-cm" style="display:inline-block;margin-top:8px;border-top:1px dashed #3a4a5a;padding-top:8px">⚠ 同一个按钮存了 N 份：改版要改 N 处，<br>漏一处该用例悄悄跑挂</span></div>
+    <p style="font-size:12.8px;color:var(--sub);margin-top:10px">每条用例自带一套元素 → <b style="color:var(--red)">重复是必然产物</b>，去重永远追不上新增</p>
+  </div>
+  <div>
+    <div class="tree"><div class="hd">现版 · 用例包入库后</div>
+<span class="t-dir">elements/</span><br>
+├── SearchPage<b>Elements.py</b><span class="shared">搜索按钮 · 唯一一份</span><br>
+├── PlayerPage<b>Elements.py</b><br>
+└── CollectPage<b>Elements.py</b><br>
+<span class="t-cm" style="display:inline-block;margin-top:8px;border-top:1px dashed #3a4a5a;padding-top:8px">✓ 用例 A import SearchPage + Player<br>✓ 用例 B import SearchPage + Collect<br>✓ 用例 C 复用 SearchPage → 0 份新增</span></div>
+    <p style="font-size:12.8px;color:var(--sub);margin-top:10px">元素跟页面走，用例只做引用 → <b style="color:var(--green)">重复根本不会产生</b>，无需去重</p>
+  </div>
+</div>
+
+<!-- ============ 3. 界面级差异对照 ============ -->
+<h2 class="sec"><span class="no">3</span>界面上能看到的变化（逐项对照）</h2>
+<div class="card" style="padding:8px 0 4px;overflow-x:auto">
+  <table class="cmp">
+    <tr><th style="width:190px">变化点</th><th>原版（≤ 6.15.29）</th><th>现版（6.15.30）</th></tr>
+    <tr><td><span class="tag add">新增</span>页面选择</td><td class="old">无。新用例的页面文件永远按用例名派生（xxxPage.py 随包新建），只读展示</td><td class="new">弹窗出现「写入页面文件」下拉：➕ 新建页面（默认）／复用已有页面。选已有页面 → 页面方法追加进该文件，新用例 import 它</td></tr>
+    <tr><td><span class="tag mod">改变</span>元素文件锁定</td><td class="old">选「新建用例」→「写入元素文件」被强制切到「➕ 新建」，其他选项点不动</td><td class="new">解除锁定：可保持新建，也可改选<b>已有元素文件</b>（共享）；选中已复用页面时自动对齐其绑定文件</td></tr>
+    <tr><td><span class="tag add">新增</span>保存时查重</td><td class="old">不查重——同名直接覆盖、同定位直接新增（元素文件私有所以无所谓）</td><td class="new">服务端组装时自动查重：同定位 → 回填库内原名（弹窗里元素名自动改，后续步骤继续引用）；同名异定位 → 保存被拦并说明原因</td></tr>
+    <tr><td><span class="tag mod">改变</span>落点预览条</td><td class="old">「将生成并锁死：test_x.py · xPage.py · xElements.py」</td><td class="new">按所选模式实时显示：新页面 → 三个文件名；已有页面 → 「页面方法追加到 XxxPage.py（元素 → xxxElements.py，同定位自动复用原名）」</td></tr>
+    <tr><td><span class="tag mod">改变</span>一键添加默认文件</td><td class="old">默认写 locator_gui_elements.py——没有页面 import 它，元素静默失效</td><td class="new">默认指向被页面引用的「活文件」（如 aaaaElements.py）；写向无人引用的文件时弹确认，明确告知「会静默失效」</td></tr>
+    <tr><td><span class="tag del">删除</span>同态强制规则</td><td class="old">「写入元素文件」与「目标用例」必须同时新建或同时选已有，否则拒绝保存</td><td class="new">规则取消。合法性由服务端统一校验：唯一保留的硬约束是「已有页面的元素必须写进它绑定的文件」（保存前自动对齐）</td></tr>
+  </table>
+</div>
+
+<!-- ============ 4. 查重规则 ============ -->
+<h2 class="sec"><span class="no">4</span>现版的三条查重规则（保存时自动执行）</h2>
+<p class="sec-sub">你输入的元素名只是「提议」，库内已有同定位元素时以库为准：</p>
+<div class="rules">
+  <div class="rule"><div class="ic">♻️</div><h4>同定位 → 复用原名</h4><p>目标元素文件里已有相同「定位方式＋定位值」→ 直接用库内元素名，<b>不写重复行</b>。弹窗里你的名字会被替换成库名，后续步骤自动衔接。</p>
+    <div class="rule code">输入 home_btn_x<br>→ 复用库内 btn_home ✓</div></div>
+  <div class="rule"><div class="ic">📋</div><h4>别处有同定位 → 复用名＋复制行</h4><p>其他元素文件里已有同定位 → 复用它的名字，定义行原样复制进目标文件（保留等待秒数/中文名），页面绑定不受影响。</p>
+    <div class="rule code">SearchElements: search_btn<br>→ 本文件也生成 search_btn<br>&nbsp;&nbsp;(定义一致，名字统一)</div></div>
+  <div class="rule"><div class="ic">⛔</div><h4>同名异定位 → 硬拦</h4><p>目标文件里已有同名元素但定位不同 → <b>拒绝保存</b>。共享元素文件里静默覆盖会牵连其他用例，必须换名。</p>
+    <div class="rule code">⛔ 已有「btn_home」但定位不同<br>——请换一个元素名</div></div>
+</div>
+
+<!-- ============ 5. 三步操作 ============ -->
+<h2 class="sec"><span class="no">5</span>现版操作演示：三步把用例写进共享元素库</h2>
+<div class="steps3">
+  <div class="s3"><div class="n">1</div><h4>选中元素，填用例名</h4><p>点截图选中元素 → 弹窗自动带出定位；目标用例选「➕ 新建」，输入用例名。</p>
+    <div class="mock"><div class="r">目标用例文件</div><div class="r"><span>test_</span><span class="sel">collect_song</span></div>
+      <div class="r"><span>写入页面文件</span><span class="sel">➕ 新建页面文件…</span></div>
+      <div class="r"><span>写入元素文件</span><span class="sel">collectSongElements.py</span></div></div></div>
+  <div class="s3"><div class="n">2</div><h4>选页面：新建 或 复用</h4><p>要挂到已有页面（如搜索页）→ 下拉里选它，元素文件自动对齐；全新流程 → 保持新建。</p>
+    <div class="mock"><div class="r">写入页面文件</div>
+      <div class="r"><span>复用已有页面</span><span class="sel">SearchPage.py</span></div>
+      <div class="r"><span>↳ 元素自动对齐</span><span class="ok">searchElements.py ✓</span></div></div></div>
+  <div class="s3"><div class="n">3</div><h4>保存，查重自动处理</h4><p>点「保存」→ 服务端组装三件套并原子入库；命中已有元素时 toast 直接告诉你复用了谁。</p>
+    <div class="mock"><div class="r">保存结果</div>
+      <div class="r"><span>元素同定位</span><span class="ok">已复用「btn_search」✓</span></div>
+      <div class="r"><span>页面方法</span><span class="ok">追加到 SearchPage.py ✓</span></div>
+      <div class="r"><span>用例文件</span><span class="ok">test_collect_song.py ✓</span></div></div></div>
+</div>
+
+<!-- ============ 6. 测试报告 ============ -->
+<h2 class="sec"><span class="no">6</span>这一版是怎么验证的</h2>
+<div class="testbar">
+  <div class="t4"><div class="v">19/19</div><div class="k">新增组装单元测试（正向/查重/硬拦/异常）</div></div>
+  <div class="t4"><div class="v">180</div><div class="k">全库测试通过（定位器 + 平台）</div></div>
+  <div class="t4"><div class="v">15/15</div><div class="k">Playwright 真浏览器 UI 测试（8081）</div></div>
+  <div class="t4"><div class="v">4 连</div><div class="k">实机冒烟：组装/复用/拦截/脏数据原子防护</div></div>
+</div>
+<div class="note" style="margin-top:18px">
+  <b>⚠️ 使用注意</b>
+  <ul>
+    <li><b>AaaaPage.py 是脏页面</b>：里面有 17 个方法引用了元素库里已不存在的元素（历史遗留），复用该页面保存会被入库校验拦下——先删掉这些失效方法再复用。</li>
+    <li>8080 正式与 8081 测试实例（http://127.0.0.1:8081/locator/）均已加载本版代码；改完平台代码后执行 <code>./run.command restart-platform</code> 生效，8081 测试实例用 <code>WEB_PLATFORM_PORT=8081 ./run.command platform</code> 启动（日志独立在 logs/platform_8081.log）。</li>
+    <li>带下标的定位（如 <code>[2]</code>、<code>instance(1)</code>）语义特殊，查重仍按「完整定位值」精确比对，不会被误合并。</li>
+  </ul>
+</div>
+
+<footer>元素定位器 v6.15.30/31 · 新旧版对比图解 · 生成于 2026-10-13 · 配套代码已推送 GitHub（ae800c2）</footer>
+</div>
+</body>
+</html>

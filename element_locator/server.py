@@ -3,7 +3,7 @@
 App 元素定位器 · Flask 应用（element_locator）
 已并入 Web 执行平台，由 web_platform/app.py 以 DispatcherMiddleware 挂在 /locator 子路径，
 随平台一起启动/停止；不再有独立的 8001 服务。
-访问：cd ~/Desktop/AutomationTest && ./run.sh platform  →  http://127.0.0.1:8080/locator/
+访问：cd ~/Desktop/AutomationTest && ./run.command platform  →  http://127.0.0.1:8080/locator/
 技术方案与配置方法见同目录 技术实现方案.md
 """
 import ast

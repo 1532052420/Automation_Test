@@ -2441,7 +2441,9 @@ async function _doSaveElement(continueMode) {
       showToast(noteMsg ? ('保存成功 · ' + noteMsg.slice(0, 90)) : (continueMode ? '请继续添加用例' : '保存成功'));
       // 本步已随三件套写入 → 切回已有文件模式（回显用例/页面/元素文件），后续步骤走 add_code 追加
       await loadCaseFiles();
-      $('el-case-file').value = 'test_' + tc.base + '.py';
+      const cfSel = $('el-case-file');
+      cfSel.value = 'test_' + tc.base + '.py';
+      if (cfSel.value !== 'test_' + tc.base + '.py') cfSel.value = NEW_FILE_OPT;   // 选项缺失兜底（防下拉空白）
       onCaseFileChange();
       $('modal-mask').style.display = 'none';
       return;

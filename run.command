@@ -2,9 +2,9 @@
 # ============================================================
 # 自动化测试平台 · 启动入口（只保留 Web 平台相关命令）
 # 用法:
-#   ./run.sh platform          启动 Web 执行平台(端口8080,后台)并打开页面
-#   ./run.sh stop-platform     停止 Web 执行平台
-#   ./run.sh restart-platform  重启 Web 执行平台（改完平台代码后让新代码生效）
+#   ./run.command platform          启动 Web 执行平台(端口8080,后台)并打开页面
+#   ./run.command stop-platform     停止 Web 执行平台
+#   ./run.command restart-platform  重启 Web 执行平台（改完平台代码后让新代码生效）
 # ============================================================
 set -e
 cd "$(dirname "$0")"
@@ -85,25 +85,28 @@ case "$1" in
     PLATFORM_URL="http://127.0.0.1:${PLATFORM_PORT}/"
     if platform_up; then
       echo "Web 执行平台已在运行: ${PLATFORM_URL}"
-      echo "  若刚改过平台代码，执行 ./run.sh restart-platform 让新代码生效"
+      echo "  若刚改过平台代码，执行 ./run.command restart-platform 让新代码生效"
     else
       if [ -n "$(port_pids "$PLATFORM_PORT")" ]; then
         echo "✗ 端口 ${PLATFORM_PORT} 已被以下进程占用，但它不是本平台(/api/status 无响应)："
         port_holders "$PLATFORM_PORT"
         echo "  解决办法（二选一）："
-        echo "    ./run.sh stop-platform                       # 结束占用者后再启动"
-        echo "    WEB_PLATFORM_PORT=8081 ./run.sh platform     # 换端口启动"
+        echo "    ./run.command stop-platform                       # 结束占用者后再启动"
+        echo "    WEB_PLATFORM_PORT=8081 ./run.command platform     # 换端口启动"
         exit 1
       fi
       mkdir -p logs
+      # 多实例日志分文件：默认 8080 用 platform.log，其他端口（如 8081 测试实例）用 platform_<端口>.log，避免互相覆盖
+      PLATFORM_LOG=logs/platform.log
+      [ "$PLATFORM_PORT" != 8080 ] && PLATFORM_LOG="logs/platform_${PLATFORM_PORT}.log"
       # stdin 显式关到 /dev/null：nohup 只在 stdin 是终端时才兜底重定向，
       # 从脚本/服务管理器启动时它会继承一个可能已失效的 fd，导致平台派生的
       # pytest 子进程 capture 崩溃（任务秒失败且无日志）
-      nohup .venv/bin/python web_platform/app.py > logs/platform.log 2>&1 < /dev/null &
+      nohup .venv/bin/python web_platform/app.py > "$PLATFORM_LOG" 2>&1 < /dev/null &
       if wait_for platform_up 20; then
-        echo "Web 执行平台已启动: ${PLATFORM_URL}  日志: logs/platform.log"
+        echo "Web 执行平台已启动: ${PLATFORM_URL}  日志: ${PLATFORM_LOG}"
       else
-        report_start_failure logs/platform.log "$PLATFORM_PORT"
+        report_start_failure "$PLATFORM_LOG" "$PLATFORM_PORT"
         exit 1
       fi
     fi
@@ -128,7 +131,7 @@ case "$1" in
     if platform_up; then
       echo "Web 执行平台在运行: http://127.0.0.1:${PLATFORM_PORT}/"
     else
-      echo "Web 执行平台未运行, 先执行: ./run.sh platform"
+      echo "Web 执行平台未运行, 先执行: ./run.command platform"
       if [ -n "$(port_pids "$PLATFORM_PORT")" ]; then
         echo "  但端口 ${PLATFORM_PORT} 已被占用："
         port_holders "$PLATFORM_PORT"
@@ -136,8 +139,8 @@ case "$1" in
     fi
     ;;
   *)
-    echo "用法: ./run.sh {platform|restart-platform|stop-platform|status}"
-    echo "  ./run.sh platform          # 启动 Web 执行平台并打开页面"
-    echo "  ./run.sh restart-platform  # 改完平台代码后重启"
+    echo "用法: ./run.command {platform|restart-platform|stop-platform|status}"
+    echo "  ./run.command platform          # 启动 Web 执行平台并打开页面"
+    echo "  ./run.command restart-platform  # 改完平台代码后重启"
     ;;
 esac
