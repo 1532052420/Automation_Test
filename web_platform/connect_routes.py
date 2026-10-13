@@ -210,6 +210,15 @@ def api_connect_devices():
     d = adb_devices()
     for dev in d.get('devices', []):
         dev['wireless'] = ':' in dev.get('udid', '')
+    live = {dev.get('udid', '') for dev in d.get('devices', [])}
+    # 已保存但当前未连接的设备保留展示（断开不丢数据，方便一键重连）
+    for row in _load_saved_devices():
+        udid = row.get('udid', '')
+        if not udid or udid in live or any(udid in u for u in live):
+            continue
+        d['devices'].append({'udid': udid, 'model': row.get('model', ''),
+                             'state': 'offline', 'wireless': True,
+                             'saved_ip': row.get('ip', '')})
     return jsonify(d)
 
 
@@ -270,6 +279,16 @@ def api_connect_claim():
     return jsonify({'ok': True, 'phone_ip': phone_ip, 'matched': matched})
 
 
+@bp.route('/api/connect/record/del', methods=['POST'])
+def api_connect_record_del():
+    """从已保存列表移除设备记录（不影响设备本身）"""
+    body = request.get_json(silent=True) or {}
+    udid = str(body.get('udid') or '').strip()
+    saved = [x for x in _load_saved_devices() if x.get('udid') != udid]
+    _save_saved_devices(saved)
+    return jsonify({'ok': True, 'msg': '已移除记录 ' + udid})
+
+
 @bp.route('/api/connect/pair', methods=['POST'])
 def api_connect_pair():
     """手机端提交：无线调试的配对码（pair ip:port + 6位码）→ pair 成功后 connect 主端口"""
@@ -308,6 +327,17 @@ def api_connect_adb():
         if not _ADDR_RE.match(addr):
             return jsonify({'ok': False, 'msg': '地址格式应为 IP:端口，如 192.168.1.20:5555'})
         ok, out = _run_adb(['connect', addr])
+        if ok and 'connected' in out.lower():
+            # 连接成功即登记（断开后保留在列表，支持一键重连）
+            saved = _load_saved_devices()
+            ip = addr.split(':')[0]
+            row = next((x for x in saved if x.get('ip') == ip or x.get('udid') == addr), None)
+            if row is None:
+                saved.append({'udid': addr, 'model': '', 'ip': ip,
+                              'added_at': int(time.time()), 'last_seen': int(time.time())})
+            else:
+                row['udid'] = addr; row['ip'] = ip; row['last_seen'] = int(time.time())
+            _save_saved_devices(saved)
         return jsonify({'ok': ok, 'msg': ('已连接 %s' % addr) if ok else out, 'output': out})
     if action == 'disconnect':
         if not _ADDR_RE.match(addr):

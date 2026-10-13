@@ -648,6 +648,14 @@ async function loadConnectDevices() {
   $('#devEmpty').style.display = list.length ? 'none' : '';
   tb.innerHTML = list.map(dev => {
     const online = dev.state === 'device';
+    if (dev.state === 'offline') {
+      /* 已保存但未连接：一键重连（用登记的 IP:端口），断开/掉线不丢记录 */
+      return '<tr><td><b>' + esc(dev.udid) + '</b></td>' +
+        '<td><span class="pill idle">未连接</span></td><td><span class="pill ok">无线</span></td>' +
+        '<td>' + esc(dev.model || '-') + '</td><td><div class="ops">' +
+        '<button class="mini" data-reconn="' + esc(dev.udid) + '">重连</button>' +
+        '<button class="mini danger-ghost" data-delrec="' + esc(dev.udid) + '">移除记录</button></div></td></tr>';
+    }
     const st = online ? '<span class="pill ok">在线</span>'
       : '<span class="pill ' + (dev.state === 'unauthorized' ? 'bad' : 'idle') + '">' + esc(dev.state) + '</span>';
     const way = dev.wireless ? '<span class="pill ok">无线</span>' : '<span class="pill idle">USB</span>';
@@ -694,6 +702,21 @@ async function solopiInstall(udid) {
 }
 
 function onDevTableClick(e) {
+  tb.querySelectorAll('[data-reconn]').forEach(el => {
+    el.addEventListener('click', async () => {
+      const addr = el.dataset.reconn;
+      await devAdbAction({ action: 'connect', addr: addr });
+      loadConnectDevices();
+    });
+  });
+  tb.querySelectorAll('[data-delrec]').forEach(el => {
+    el.addEventListener('click', async () => {
+      const udid = el.dataset.delrec;
+      if (!confirm('从已保存列表移除 ' + udid + ' 的记录？（不影响设备本身）')) return;
+      await postJson('/api/connect/record/del', { udid: udid });
+      loadConnectDevices();
+    });
+  });
   const b = e.target.closest('button[data-tcpip],button[data-disc],button[data-inst]');
   if (!b) return;
   if (b.dataset.tcpip) return devAdbAction({ action: 'tcpip', udid: b.dataset.tcpip, port: 5555 });
