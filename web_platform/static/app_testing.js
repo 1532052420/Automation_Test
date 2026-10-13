@@ -946,6 +946,29 @@ async function runOrchCase() {
 let _fwCases = [];        // 框架用例行 [{node, file, class, method, step_count, case|null}]
 let _mvNode = null;       // 移动到项目弹窗当前操作的框架用例 node
 
+async function saveCaseCreate() {
+  const stem = $('#caseCStem').value.trim();
+  if (!stem) return toast('请填写用例文件名', false);
+  if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(stem)) {
+    return toast('用例文件名需为纯英文（可含数字），且以字母开头', false);
+  }
+  const btn = $('#caseCOk');
+  btn.disabled = true; btn.textContent = '创建中…';
+  try {
+    const d = await postJson('/api/cases/file/create', {
+      stem: stem,
+      cn_name: $('#caseCCnName').value.trim(),
+    });
+    toast(d.msg || (d.ok ? '已创建' : '创建失败'), !!d.ok);
+    if (d.ok) {
+      $('#caseCreateMask').classList.remove('show');
+      await renderCaseList();
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = '确定';
+  }
+}
+
 async function renderCaseList() {
   const [fd, cd] = await Promise.all([
     api(AT_PREFIX + '/api/cases/framework'), api(AT_PREFIX + '/api/cases')]);
@@ -1282,8 +1305,19 @@ async function appTestingInit() {
     $('#clProj').value = '';
     renderCaseList();
   });
-  /* 新建用例：跳转元素定位器（截图点选 → 添加测试用例弹窗在定位器内完成） */
-  $('#btnClNew').addEventListener('click', () => { window.open('/locator', '_blank', 'noopener'); });
+  /* 新建用例：表单弹窗（test_ 前缀写死）；创建后列表与定位器「添加测试用例」即刻可选 */
+  $('#btnClNew').addEventListener('click', () => {
+    $('#caseCStem').value = '';
+    $('#caseCCnName').value = '';
+    $('#caseCreateMask').classList.add('show');
+    $('#caseCStem').focus();
+  });
+  $('#caseCCancel').addEventListener('click', () => $('#caseCreateMask').classList.remove('show'));
+  $('#caseCreateMask').addEventListener('click', (e) => {
+    if (e.target === $('#caseCreateMask')) $('#caseCreateMask').classList.remove('show');
+  });
+  $('#caseCOk').addEventListener('click', saveCaseCreate);
+  $('#caseCStem').addEventListener('keydown', (e) => { if (e.key === 'Enter') saveCaseCreate(); });
 
   /* ---- 步骤编辑（三级页）：布局对照 design/case-step-editor-prototype.html；
      数据 = /api/case/steps 反解（方法体注释 + 调用行），编辑仅当前页预览，写回未接入 ---- */

@@ -9,6 +9,7 @@ GUI 元素定位器 · 元素/操作 追加到用例（「添加到元素库」�
 
 import os
 import re
+import time
 
 import element_library
 
@@ -52,6 +53,47 @@ def list_case_files():
     return sorted(f for f in os.listdir(CASES_DIR)
                   if f.startswith('test_') and f.endswith('.py')
                   and not element_library.is_generated_backup(f))
+
+
+def create_case_file(stem, cn_name=''):
+    """后台「新建用例」：新建框架格式用例文件。stem 纯英文（可含数字/下划线，字母开头），
+    test_ 前缀写死——用户写了也剥掉统一补（防 test_test_x）。
+    骨架 = 类（Test+驼峰 stem）+ setup_class（构造 appOperator）+ test_<stem> 空方法（pass），
+    步骤经定位器「添加测试用例」/平台追加（pass 不挡追加，注释锚点/末尾追加逻辑兼容）。
+    中文名选填，写文件头「# 用例中文名：xxx」（用例管理列表与定位器下拉同源显示）。"""
+    stem = (stem or '').strip()
+    if not re.match(r'^[A-Za-z][A-Za-z0-9_]*$', stem):
+        return {'ok': False,
+                'msg': '用例名需为纯英文（可含数字），且以字母开头，收到：%r' % (stem or '空')}
+    cn_name = (cn_name or '').strip()
+    if '\n' in cn_name or '\r' in cn_name:
+        return {'ok': False, 'msg': '中文名不能包含换行'}
+    stem = re.sub(r'^test_', '', stem, flags=re.IGNORECASE) or stem
+    filename = 'test_' + stem + '.py'
+    path = os.path.join(CASES_DIR, filename)
+    if os.path.exists(path):
+        return {'ok': False, 'msg': '用例文件 %s 已存在' % filename}
+    cls = 'Test' + element_library.to_class_name(stem)
+    lines = ['# -*- coding: utf-8 -*-']
+    if cn_name:
+        lines.append('# 用例中文名：%s' % cn_name)
+    lines += ['# 本文件由 自动化后台「新建用例」创建于 %s' % time.strftime('%Y-%m-%d %H:%M:%S'),
+              'import time',
+              'from base.app_ui.android.demoProject.app_ui_android_demoProject_client'
+              ' import APP_UI_Android_demoProject_Client',
+              '', '',
+              'class %s:' % cls,
+              '',
+              '    def setup_class(self):',
+              '        self.appOperator = APP_UI_Android_demoProject_Client(is_need_kill_app=False).appOperator',
+              '',
+              '    def test_%s(self):' % stem,
+              '        """待添加步骤"""',
+              '        pass', '']
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines))
+    return {'ok': True, 'file': filename,
+            'msg': '已新建用例文件 %s%s' % (filename, ('（中文名：%s）' % cn_name) if cn_name else '')}
 
 
 def list_page_files():

@@ -127,6 +127,7 @@
       <section class="panel" id="panel-elements">
         <div class="card">
           <h3>元素管理 <span class="muted">元素库与元素定位器共用同一份数据，编辑实时生效</span>
+            <button class="mini" id="btnElCreate" style="margin-left:8px">➕ 新增元素</button>
             <button class="ghost mini" id="btnElRefresh" style="margin-left:8px">重置</button></h3>
           <!-- 一级：元素文件列表 -->
           <div id="elFilesView">
@@ -693,6 +694,34 @@
     <div class="mops mt">
       <button class="ghost" id="elMCancel">取消</button>
       <button id="elMSave">保存</button>
+    </div>
+  </div>
+</div>
+<!-- 新增元素文件 弹窗（后台创建，定位器「添加测试用例」即可选到） -->
+<div class="mask" id="elCreateMask">
+  <div class="modal">
+    <h4>➕ 新增元素文件</h4>
+    <div class="fields" style="grid-template-columns:1fr">
+      <div class="field"><label>元素文件名（必填，纯英文可含数字，以字母开头；后缀 Elements 自动补）</label><input type="text" id="elCStem" autocomplete="off" placeholder="如 searchflow → searchflowElements.py"></div>
+      <div class="field"><label>元素文件中文名（选填，列表显示用）</label><input type="text" id="elCCnName" autocomplete="off"></div>
+    </div>
+    <div class="mops mt">
+      <button class="ghost" id="elCCancel">取消</button>
+      <button id="elCOk">确定</button>
+    </div>
+  </div>
+</div>
+<!-- 新建用例 弹窗（后台创建，定位器「添加测试用例」即可选到） -->
+<div class="mask" id="caseCreateMask">
+  <div class="modal">
+    <h4>＋ 新建用例</h4>
+    <div class="fields" style="grid-template-columns:1fr">
+      <div class="field"><label>用例文件名（必填，纯英文可含数字，以字母开头；前缀 test_ 自动补）</label><input type="text" id="caseCStem" autocomplete="off" placeholder="如 loginflow → test_loginflow.py"></div>
+      <div class="field"><label>用例文件中文名（选填，列表显示用）</label><input type="text" id="caseCCnName" autocomplete="off"></div>
+    </div>
+    <div class="mops mt">
+      <button class="ghost" id="caseCCancel">取消</button>
+      <button id="caseCOk">确定</button>
     </div>
   </div>
 </div>

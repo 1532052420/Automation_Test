@@ -549,8 +549,19 @@ def api_appui_elements():
                       if _os.path.isfile(os.path.join(element_manager.ELEMENTS_DIR, f))]
     return jsonify({'ok': True, 'elements': elements,
                     'files': files, 'existing_files': existing_files,
+                    'file_cn_names': element_manager.element_file_cn_names(),
                     'locator_types': element_manager.LOCATOR_TYPES,
                     'wait_types': element_manager.WAIT_TYPES})
+
+
+@bp.route('/api/appui/elements/file/create', methods=['POST'])
+def api_appui_elements_file_create():
+    """新建元素文件（后台「新增元素」按钮）：xxxx → xxxxElements.py（后缀写死），
+    骨架 class + __init__(pass)；中文名选填，写进文件头注释并在列表显示"""
+    from web_platform import element_manager
+    d = request.get_json(silent=True) or {}
+    return jsonify(element_manager.create_element_file(d.get('stem') or '',
+                                                       d.get('cn_name') or ''))
 
 
 @bp.route('/api/appui/elements/save', methods=['POST'])
@@ -726,6 +737,17 @@ def api_devices():
 @bp.route('/api/cases')
 def api_cases():
     return jsonify({'ok': True, 'tree': scan_case_tree()})
+
+
+@bp.route('/api/cases/file/create', methods=['POST'])
+def api_cases_file_create():
+    """新建用例文件（用例管理「＋新建用例」表单）：test_ 前缀写死，
+    骨架 = 类 + setup_class(appOperator) + 空 test 方法；中文名选填写文件头，
+    用例管理列表与定位器「添加测试用例」下拉即刻可选"""
+    from element_locator import case_generator
+    d = request.get_json(silent=True) or {}
+    return jsonify(case_generator.create_case_file(d.get('stem') or '',
+                                                   d.get('cn_name') or ''))
 
 
 @bp.route('/api/cases/cn-name', methods=['POST'])

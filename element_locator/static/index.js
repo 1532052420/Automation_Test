@@ -2542,7 +2542,7 @@ async function _doSaveElement(continueMode) {
     caseFile = $('el-case-file').value;
     methodName = $('el-case-method').value;
     if (!(state.caseFiles || []).some(c => c.file === caseFile)) {
-      showElResult('请选择目标用例文件（新建用例请到自动化后台「用例上传」入库后重开本窗）', false); return;
+      showElResult('请选择目标用例文件（新建用例请到自动化后台「用例管理 → ＋新建用例」，创建后重开本窗即可选到）', false); return;
     }
     if (!methodName) { showElResult('请选择页面操作', false); return; }
   }
