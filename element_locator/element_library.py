@@ -326,6 +326,32 @@ def add_element(filename, name, locator_type, value, wait_type='VISIBILITY_OF', 
             'msg': '元素 %s 已添加到 %s' % (name, filename)}
 
 
+def merge_element_line(content, name, line):
+    """把元素定义行合并进元素文件内容（纯内存操作，不落盘——用例包组装用，
+    产物统一交给 import_case_package 原子入库，享受同一套语法校验与备份）。
+    - 同名元素已存在 → 原样返回（action='kept'，定义以库内为准）
+    - 否则按 add_element 同规则插入：替换 pass / 追加到最后一个元素行后 / __init__ 体首
+    返回 (content, action)；缺 __init__ 返回 (原内容, 'invalid')"""
+    pat = re.compile(r'^[ \t]*self\.%s\s*=.*$' % re.escape(name), re.MULTILINE)
+    if pat.search(content):
+        return content, 'kept'
+    init_m = re.search(r'def __init__\(self\):\n', content)
+    if not init_m:
+        return content, 'invalid'
+    body_start = init_m.end()
+    after = content[body_start:]
+    pass_m = re.search(r'^[ \t]*pass[ \t]*$', after, re.MULTILINE)
+    last_elem = list(re.finditer(r'^[ \t]*self\.%s\s*=.*$' % _NAME_CLS, after, re.MULTILINE))
+    if pass_m:
+        after = re.sub(r'^[ \t]*pass[ \t]*$', line, after, count=1)
+    elif last_elem:
+        idx = last_elem[-1].end()
+        after = after[:idx] + '\n' + line + after[idx:]
+    else:
+        after = line + '\n' + after
+    return content[:body_start] + after, 'inserted'
+
+
 def copy_element(src_file, dst_file, name, elements_dir=None):
     """把元素定义整行从 src 元素文件复制/覆盖到 dst 元素文件（三件套兜底：
     保存时元素不在页面引用的元素文件里 → 自动同步过去，同名覆盖不报错）。

@@ -917,6 +917,319 @@ def append_code_to_method(case_file, method_name, step, gen_page_method=False, i
     return result
 
 
+# ---------------------------------------------------------------------------
+# 新建用例包 · 服务端权威组装（元素按页面组织 + 查重复用，v6.15.30）
+# ---------------------------------------------------------------------------
+def page_elements_map():
+    """所有页面文件 → 其 import 的元素文件名（没 import 元素文件为 ''）。
+    供「新建用例包」选择已有页面时自动对齐元素文件，以及 /api/library 的 referenced 计算。"""
+    out = {}
+    for f in list_page_files():
+        content = _read(os.path.join(PAGES_DIR, f))
+        em = re.search(r'from\s+page_objects\.app_ui\.android\.demoProject\.elements\.(\w+)\s+import', content)
+        out[f] = (em.group(1) + '.py') if em else ''
+    return out
+
+
+def _first_class_of(path, fallback=''):
+    """py 文件里定义的首个类名（页面/元素文件都是单类约定）；读不到回退 fallback"""
+    if os.path.isfile(path):
+        m = re.search(r'^\s*class\s+(\w+)', _read(path), re.MULTILINE)
+        if m:
+            return m.group(1)
+    return fallback
+
+
+def _find_dup_in_content(content, locator_type, value):
+    """元素文件内容里查找相同「定位方式+定位值」的元素名（比对规则与 find_duplicate 一致：
+    文件里存的是转义后的值，比对时同样转义）。返回元素名或 None"""
+    pat = re.compile(
+        r'^\s*self\.(%s)\s*=\s*CreateElement\.create\(\s*'
+        r'Locator_Type\.(\w+)\s*,\s*\'((?:[^\'\\]|\\.)*)\'' % element_library._NAME_CLS,
+        re.MULTILINE)
+    escaped = element_library._escape(value)
+    for m in pat.finditer(content):
+        if m.group(2).upper() == (locator_type or '').upper() and m.group(3) == escaped:
+            return m.group(1)
+    return None
+
+
+def _extract_element_line(path, name):
+    """从元素文件里抽某元素的完整定义行（copy_element 同源逻辑的内存版）"""
+    if not os.path.isfile(path):
+        return ''
+    m = re.search(r'^[ \t]*self\.%s\s*=.*$' % re.escape(name), _read(path), re.MULTILINE)
+    return m.group(0) if m else ''
+
+
+def _norm_pkg_base(base):
+    """用例名规范化：剥 test_ 前缀与 .py 后缀、非法字符转下划线（与前端 newCaseBase 同规则）"""
+    base = re.sub(r'\.py$', '', str(base or '').strip(), flags=re.IGNORECASE)
+    base = re.sub(r'^test_', '', base, flags=re.IGNORECASE)
+    return re.sub(r'[^\w]', '_', base).strip('_')
+
+
+def _norm_elements_filename(name, default_stem):
+    """新建元素文件名规范化：剥 .py、非法字符转 _、保证 Elements 结尾（与前端 pkgElementFileName 同规则）"""
+    raw = re.sub(r'\.py$', '', str(name or '').strip(), flags=re.IGNORECASE)
+    raw = re.sub(r'[^\w]', '_', raw)
+    raw = re.sub(r'_+', '_', raw).strip('_') or default_stem
+    return re.sub(r'elements?$', '', raw, flags=re.IGNORECASE) + 'Elements.py'
+
+
+def _py_class_name(stem):
+    """类名派生 + 数字开头兜底（Python 类名不允许数字开头，如用例名 123login → El123login）"""
+    cls = element_library.to_class_name(stem)
+    return cls if re.match(r'^[A-Za-z_]', cls) else 'El' + cls
+
+
+def assemble_case_package(base, cn_name='', step=None, element=None,
+                          element_file='', element_file_new=True,
+                          page_file='', page_file_new=True,
+                          elements_dir=None, pages_dir=None):
+    """「新建用例包」服务端权威组装：前端只传意图（用例名/步骤/元素/落点选择），
+    三件套文件内容由本函数生成——统一查重与页面复用语义，前端不再自行拼文件。
+
+    元素查重复用（避免重复元素，定义只存在一份）：
+    - 目标元素文件里已有相同「定位方式+定位值」→ 复用库内元素名，不写重复行；
+    - 其他元素文件有同定位 → 复用其元素名，定义行原样复制进目标文件（保持页面静态绑定）；
+    - 目标文件里同名元素但定位不同 → 硬拦（共享元素文件禁止静默覆盖，防牵连其他用例）。
+
+    页面复用（元素1 · 用例多 · 页面操作多）：
+    - 选已有页面 → 页面方法 upsert 进该文件，用例 import 已有页面类；
+    - 新建页面 → 按用例名派生 <base>Page.py 并 import 元素文件。
+
+    产物只含「新建或内容有变化」的文件，交给 import_case_package 原子入库
+    （语法校验 + 覆盖备份一条龙）。纯内存组装不落盘，可离线单测。
+    返回 {'ok', 'msg', 'files', 'element_final', 'reused', 'notes', ...}"""
+    edir = elements_dir or element_library.ELEMENTS_DIR
+    pdir = pages_dir or PAGES_DIR
+    notes = []
+    base = _norm_pkg_base(base)
+    if not base or not re.match(r'^\w+$', base):
+        return {'ok': False, 'msg': '用例名不合法（字母/数字/下划线）'}
+    if step is not None and (not isinstance(step, dict) or step.get('type') not in STEP_TYPES):
+        return {'ok': False, 'msg': '步骤结构不合法'}
+
+    # ---- 落点解析与校验 ----
+    if element_file_new:
+        element_file = _norm_elements_filename(element_file, base + 'Elements')
+    else:
+        element_file = os.path.basename(str(element_file or '').strip())
+        if not re.match(r'^\w+\.py$', element_file) or element_file == element_library.POPUP_FILE:
+            return {'ok': False, 'msg': '元素文件名不合法：%s' % (element_file or '空')}
+    epath = os.path.join(edir, element_file)
+    elem_file_existed = os.path.isfile(epath)
+
+    if page_file_new:
+        page_file = os.path.basename(str(page_file or '').strip() or (base + 'Page.py'))
+        if not re.match(r'^\w+\.py$', page_file):
+            return {'ok': False, 'msg': '页面文件名不合法：%s' % page_file}
+    else:
+        page_file = os.path.basename(str(page_file or '').strip())
+        if not re.match(r'^\w+\.py$', page_file) or not os.path.isfile(os.path.join(pdir, page_file)):
+            return {'ok': False, 'msg': '所选页面文件不存在：%s' % (page_file or '空')}
+
+    # ---- 元素：查重 → 终名 → 定义行（全程内存，不落盘） ----
+    element_final, elem_line, reused, elem_content = '', '', False, None
+    if element:
+        el_name = (element.get('name') or '').strip()
+        lt = (element.get('locator_type') or '').strip().upper()
+        value = (element.get('value') or '').strip()
+        if not element_library.is_valid_element_name(el_name):
+            return {'ok': False, 'msg': '元素名称不合法：%s（字母/中文/下划线开头，非 Python 关键字）'
+                                           % (el_name or '空')}
+        if not lt or not value:
+            return {'ok': False, 'msg': '定位方式/定位值不能为空'}
+        target_content = element_library._ensure_imports(element_library._read(epath)) \
+            if elem_file_existed else None
+        # 1) 目标文件内同定位 → 直接复用库内定义
+        if target_content is not None:
+            hit = _find_dup_in_content(target_content, lt, value)
+            if hit:
+                element_final, reused = hit, True
+                notes.append('元素「%s」与 %s 里「%s」同定位：已复用原定义，不写重复行'
+                             % (el_name, element_file, hit))
+        # 2) 其他文件同定位 → 复用其名，定义行复制进目标文件
+        if not element_final:
+            cross = element_library.find_duplicate(lt, value, elements_dir=edir)
+            if cross and cross['filename'] != element_file:
+                element_final, reused = cross['name'], True
+                elem_line = _extract_element_line(os.path.join(edir, cross['filename']), cross['name'])
+                notes.append('元素与 %s 里「%s」同定位：已复用元素名「%s」，定义行复制到 %s（页面绑定不变）'
+                             % (cross['filename'], cross['name'], cross['name'], element_file))
+            else:
+                element_final = el_name
+        # 3) 终名已在目标文件：同定位=无需写行；异定位=硬拦（禁静默覆盖）
+        if target_content is not None:
+            exist_m = re.search(
+                r'^[ \t]*self\.%s\s*=\s*CreateElement\.create\(\s*Locator_Type\.(\w+)\s*,\s*'
+                r'\'((?:[^\'\\]|\\.)*)\'' % re.escape(element_final),
+                target_content, re.MULTILINE)
+            if exist_m:
+                if exist_m.group(1).upper() == lt and exist_m.group(2) == element_library._escape(value):
+                    elem_line = ''      # 同名同定位 → 定义已在，无需变化
+                else:
+                    return {'ok': False, 'msg': (
+                        '元素文件 %s 里已有同名元素「%s」但定位不同（%s: %s）——'
+                        '共享元素文件禁止静默覆盖，请换一个元素名'
+                        % (element_file, element_final, exist_m.group(1), exist_m.group(2)))}
+        if not elem_line and not reused:
+            # 全库无同定位（或目标为全新文件）→ 按用户输入生成定义行
+            wait_type = (element.get('wait_type') or 'VISIBILITY_OF').strip() or 'VISIBILITY_OF'
+            elem_line = element_library.element_line(
+                element_final, lt, value, wait_type, element.get('wait_seconds'),
+                None, cn_name=(element.get('cn_name') or '').strip() or None)
+        # ---- 目标元素文件内容组装（内存；只有内容有变化才进产物） ----
+        if elem_line:
+            if target_content is None:
+                elem_content = (element_library.HEADER
+                                + 'class %s:\n' % _py_class_name(os.path.splitext(element_file)[0])
+                                + '    def __init__(self):\n' + elem_line + '\n')
+                notes.append('已新建元素文件 %s（%s）' % (element_file, element_final)
+                             if not elem_file_existed else
+                             '元素文件 %s 缺失已重建（%s）' % (element_file, element_final))
+            else:
+                elem_content, action = element_library.merge_element_line(
+                    target_content, element_final, elem_line)
+                if action == 'invalid':
+                    return {'ok': False, 'msg': '元素文件 %s 缺少 __init__ 方法，无法追加元素' % element_file}
+                if action == 'inserted':
+                    notes.append('元素「%s」已追加到 %s' % (element_final, element_file))
+        # 查重复用后统一回填终名：页面方法/用例行必须引用库内真实元素名
+        # （否则页面方法 self._elements.<用户输入名> 指向不存在的元素 → 运行时 AttributeError）
+        if step is not None and element:
+            step = dict(step, element=element_final)
+
+    # ---- 页面方法（后端权威实现，与追加用例路径同一份代码） ----
+    method_block = page_method_code(step) if step else None
+
+    # ---- 页面：新建模板 / 已有 upsert（内存组装） ----
+    page_content = None
+    if page_file_new:
+        page_class = _py_class_name(os.path.splitext(page_file)[0])
+        bind_elements = element is not None or elem_content is not None or elem_file_existed
+        lines = [
+            '# -*- coding: utf-8 -*-',
+            '# 页面对象（用例包：%s）' % base,
+        ]
+        if bind_elements:
+            elem_cls = _py_class_name(os.path.splitext(element_file)[0])
+            lines += [
+                'from page_objects.app_ui.android.demoProject.elements.%s import %s'
+                % (os.path.splitext(element_file)[0], elem_cls),
+                '', '',
+                'class %s:' % page_class,
+                '',
+                '    def __init__(self, appOperator):',
+                '        self.appOperator = appOperator',
+                '        self._elements = %s()' % elem_cls,
+                '',
+            ]
+        else:
+            # 纯特殊操作首步（收起键盘等，无元素）：页面不绑元素文件，后续步骤按需补 import
+            lines += ['', '', 'class %s:' % page_class, '',
+                      '    def __init__(self, appOperator):',
+                      '        self.appOperator = appOperator', '']
+        if method_block:
+            lines += [method_block, '']
+        page_content = '\n'.join(lines)
+        notes.append('已新建页面对象 %s（%s）' % (page_file, page_class))
+    else:
+        ppath = os.path.join(pdir, page_file)
+        pcontent = _read(ppath)
+        page_class = _first_class_of(ppath, '')
+        if not page_class:
+            return {'ok': False, 'msg': '页面文件 %s 里没有类定义，无法追加页面方法' % page_file}
+        if method_block:
+            mname = re.match(r'%sdef (\w+)' % IND, method_block).group(1)
+            exists = set(re.findall(r'^%sdef (\w+)' % IND, pcontent, re.MULTILINE))
+            if mname in exists and mname in TOOL_METHODS:
+                notes.append('页面方法 %s() 已存在于 %s（工具方法不重复生成）' % (mname, page_file))
+            else:
+                em = re.search(r'from\s+page_objects\.app_ui\.android\.demoProject\.elements\.(\w+)\s+import',
+                               pcontent)
+                page_elem_file = (em.group(1) + '.py') if em else ''
+                if element and page_elem_file and element_file != page_elem_file:
+                    return {'ok': False, 'msg': (
+                        '页面 %s 绑定元素文件 %s，元素须写入该文件（保存前会自动对齐）'
+                        % (page_file, page_elem_file))}
+                use_ef = page_elem_file or element_file
+                pcontent = _ensure_elements_import(pcontent, use_ef, _elements_class_of(use_ef))
+                if step and (step.get('type') in PROBE_STEP_TYPES or _asserts_of(step)):
+                    pcontent = _ensure_probe_imports(pcontent)
+                page_content = _upsert_class_method(pcontent, page_class, [method_block])
+                notes.append('页面方法 %s() 已追加到 %s（%s）' % (mname, page_file, page_class))
+        else:
+            notes.append('该步骤无页面方法（%s），用例行即全部内容'
+                         % TYPE_NAMES_CN.get(step.get('type', ''), '自定义'))
+
+    # ---- 用例文件（页面类名用页面文件里的真实类名） ----
+    if not page_file_new:
+        page_class = _first_class_of(os.path.join(pdir, page_file), '')
+        if not page_class:
+            return {'ok': False, 'msg': '页面文件 %s 里没有类定义' % page_file}
+    step_comment = ((step or {}).get('comment') or '').strip() or (step_desc(step) if step else '')
+    first_line = case_step_line(step) if step else 'pass  # 占位'
+    cap_camel = ''.join(p[:1].upper() + p[1:] for p in base.split('_') if p)
+    head = ['# -*- coding: utf-8 -*-']
+    if cn_name:
+        head.append('# 用例中文名：%s' % cn_name)
+    head += [
+        '# 用例包 %s · %s' % (base, step_comment),
+        '# 流程：',
+        '# 1. 拉起快歌主页面',
+        '# 2. %s' % step_comment,
+        'import time',
+        'import allure',
+        'from base.app_ui.android.demoProject.app_ui_android_demoProject_client '
+        'import APP_UI_Android_demoProject_Client',
+        'from page_objects.app_ui.android.demoProject.pages.%s import %s'
+        % (os.path.splitext(page_file)[0], page_class),
+        '', '',
+        "@allure.parent_suite('快歌APP自动化')",
+        "@allure.suite('%s')" % base,
+        'class Test%s:' % cap_camel,
+        '',
+        '    def setup_class(self):',
+        '        # is_need_kill_app=False：绕开 demo 客户端硬编码启动，显式启动被测 App',
+        '        self.demoProjectClient = APP_UI_Android_demoProject_Client(is_need_kill_app=False)',
+        '        self.appOperator = self.demoProjectClient.appOperator',
+        "        self.appOperator.start_activity('com.recordlife.kuaige', "
+        "'com.recordlife.kuaige.feature.main.MainActivity')",
+        '        time.sleep(3)',
+        '        self.page = %s(self.appOperator)' % page_class,
+        '',
+        "    @allure.title('%s')" % step_comment,
+        '    def test_%s(self):' % base,
+        '        """%s"""' % step_comment,
+        '        page = self.page',
+        '',
+        '        # 1. %s' % step_comment,
+        '        %s' % first_line,
+        '',
+        '    def teardown_class(self):',
+        '        self.appOperator.close_app()',
+    ]
+    case_py = '\n'.join(head) + '\n'
+
+    # ---- 产物：只收「新建或内容有变化」的文件（未变化的已有文件不重复入库，避免备份噪声） ----
+    files = [{'dir': CASES_DIR, 'name': 'test_%s.py' % base, 'content': case_py}]
+    if page_content is not None:
+        files.append({'dir': PAGES_DIR, 'name': page_file, 'content': page_content})
+    if elem_content is not None:
+        files.append({'dir': element_library.ELEMENTS_DIR, 'name': element_file, 'content': elem_content})
+    for f in files:
+        try:
+            compile(f['content'], f['name'], 'exec')
+        except SyntaxError as e:
+            return {'ok': False, 'msg': '组装产物语法错误（%s 第 %s 行：%s）——已取消保存'
+                                           % (f['name'], e.lineno, e.msg)}
+    return {'ok': True, 'base': base, 'files': files, 'element_final': element_final,
+            'reused': reused, 'notes': notes,
+            'element_file': element_file, 'page_file': page_file, 'page_class': page_class}
+
+
 if __name__ == '__main__':
     print('现有用例文件:', list_case_files())
     print('现有页面文件:', list_page_files())

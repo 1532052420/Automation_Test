@@ -437,6 +437,15 @@ async function init() {
   });
   // 元素文件名输入：三件派生名回显行实时跟随（留空 = 自动按用例名派生）
   $('el-file-new').addEventListener('input', updatePkgTrio);
+  // 新建用例的页面选择：新建（随包生成）或复用已有页面（页面方法追加进该文件），
+  // 选已有页面时元素文件自动对齐其绑定的元素文件
+  const pageNewSel = $('el-page-new');
+  if (pageNewSel) pageNewSel.addEventListener('change', () => {
+    $('el-page-file').value = isNewPageSel()
+      ? (pkgBase() ? capFirst(pkgBase()) + 'Page.py（随用例包新建）' : '（输入用例名后自动派生）')
+      : pkgPageSelValue();
+    syncNewCaseElFile();
+  });
   // 定位方式切换：从当前元素的定位候选里取该类型的值回填（ID→ID值，XPATH→XPATH值…）
   $('el-type').addEventListener('change', onElTypeChange);
   $('el-op-comment').addEventListener('input', () => { opCommentAuto = false; });
@@ -1567,6 +1576,7 @@ async function loadLibraryFiles() {
   if (!r || !r.ok) return;
   state.eleFiles = r.files || [];
   state.defaultEleFile = r.default || 'locator_gui_elements.py';
+  state.eleReferenced = r.referenced || [];   // 已被页面对象 import 的元素文件（「活文件」）
   // 「➕ 新建…」在最后：选择后显示新建输入行（随用例包一起生成）
   $('el-file').innerHTML = r.files.map(f => '<option value="' + esc(f) + '">' + esc(f) + '</option>').join('')
     + '<option value="' + NEW_FILE_OPT + '">➕ 新建元素文件…</option>';
@@ -1576,6 +1586,7 @@ async function loadPages() {
   if (!r || !r.ok) return;
   state.pages = r.pages || [];
   state.elementsAll = r.elements || {};
+  state.pageElements = r.page_elements || {};   // 页面文件 → 绑定的元素文件（新建用例复用页面时对齐）
 }
 async function openModal() {
   // ⌖ 坐标模式：选了精确坐标即可打开（不需要树里有选中元素）
@@ -1661,6 +1672,7 @@ function resetNewFileInputs() {
   if (fw) { fw.style.display = 'none'; $('el-file-new').value = ''; }
   if (cw) { cw.style.display = 'none'; $('el-case-new').value = ''; }
   const cnInput = $('el-case-cn'); if (cnInput) cnInput.value = '';
+  const psel = $('el-page-new'); if (psel) psel.value = '__new__';   // 页面选择复位为「新建」
 }
 /* 当前是否新建用例（选择器值为 __new__ 或元素文件为 __new__） */
 function isNewCase() { return $('el-case-file').value === NEW_FILE_OPT; }
@@ -2031,69 +2043,11 @@ function onSpecialOpChange() {
   onOpTypeChange();
   onCaseFileChange();
 }
-/* ---- 代码预览：与后端 case_step_line 保持一致（所见即所得） ---- */
-function escQ(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
-function previewLine(step) {
-  const t = step.type, el = step.element || '<元素名>', p = step.param || '';
-  switch (t) {
-    case 'click': return 'page.click_' + el + '()';
-    case 'input': return 'page.input_' + el + "('" + escQ(p) + "')";
-    case 'long_press': return 'page.long_press_' + el + '()';
-    case 'assert_visible': return 'page.assert_' + el + '()';
-    case 'assert_text': return 'page.assert_' + el + "_text('" + escQ(p) + "')";
-    case 'assert_toast': return "page.assert_toast('" + escQ(p) + "')";
-    case 'wait_element': {
-      const n = parseInt(p, 10);
-      return 'page.wait_' + el + (isNaN(n) ? '()' : '(' + n + ')');
-    }
-    case 'assert_gone': return 'page.assert_' + el + '_gone()';
-    case 'if_click': {
-      const n = parseInt(p, 10);
-      return 'page.click_' + el + '_if_visible(' + (isNaN(n) ? '' : n) + ')';
-    }
-    case 'hide_keyboard': return 'page.dismiss_keyboard()';
-    case 'deal_first_launch_dialogs': return 'page.deal_first_launch_dialogs()';
-    case 'screenshot': return "page.wait_and_shot('" + escQ(p) + "')";
-    case 'tap': {
-      const parts = p.split(',').map(x => x.trim()).filter(Boolean);
-      return parts.length >= 2 ? 'page.tap_xy(' + parts[0] + ', ' + parts[1] + ')'
-        : 'page.tap_xy(' + (parts[0] || '0') + ')';
-    }
-    case 'sleep': {
-      const n = parseFloat(p);
-      return 'time.sleep(' + (isNaN(n) ? (p || '1') : n) + ')';
-    }
-    case 'custom': return p || 'page.xxx()';
-    default: return '';
-  }
-}
 /* 目标用例的页面文件（来自 /api/cases 的三件套归属信息） */
 function targetPageInfo() {
   const f = $('el-case-file').value;
   const info = (state.caseFiles || []).find(c => c.file === f && c.page_file);
   return info || null;
-}
-/* ---- 两个实时预览：元素代码 / 页面方法代码（与后端生成规则保持一致） ---- */
-/* 元素栏：将写入元素库的那一行 */
-function elementLinePreview() {
-  const name = $('el-name').value.trim() || '<元素名>';
-  const val = $('el-value').value.trim();
-  const sec = parseInt($('el-wait-sec').value, 10);
-  const cn = $('el-cn-name').value.trim();
-  let line = "self." + name + " = CreateElement.create(Locator_Type." + $('el-type').value
-    + ", '" + escQ(val) + "', wait_type=Wait_By." + $('el-wait').value;
-  if (!isNaN(sec) && sec >= 1) line += ", wait_seconds=" + sec;
-  if (cn) line += ", desc='" + escQ(cn) + "'";
-  line += ')';
-  if (cn) line += '  # ' + cn;
-  return line;
-}
-/* 操作栏：选③时将生成到页面文件的页面方法（镜像后端 page_method_code） */
-function probeBodyLines(el, secondsVar) {
-  return "probe = CreateElement.create(self._elements." + el + ".locator_type,\n"
-    + "                             self._elements." + el + ".locator_value,\n"
-    + "                             wait_type=Wait_By.PRESENCE_OF_ELEMENT_LOCATED,\n"
-    + "                             wait_seconds=" + secondsVar + ")";
 }
 /* ---- 目标用例文件 + 方法（两级联动；③ 时元素文件自动对齐页面引用的元素文件） ---- */
 async function loadCaseFiles() {
@@ -2117,13 +2071,46 @@ async function loadCaseFiles() {
   else if (files.length) sel.value = files[0];
   onCaseFileChange();
 }
+function pkgPageSelValue() { const s = $('el-page-new'); return s ? s.value : '__new__'; }
+function isNewPageSel() { return pkgPageSelValue() === '__new__' || !pkgPageSelValue(); }
 function updatePkgTrio() {
-  /* 新建用例模式：三个文件名全部由用例名派生并锁死，实时回显让锁死关系一眼可见 */
+  /* 新建用例模式：回显三件套落点（新页面=全部随包生成；已有页面=页面方法追加进该文件） */
   const el = $('pkg-trio');
   if (!el) return;
   if (!isNewCase()) { el.textContent = ''; return; }
-  if (!pkgBase()) { el.textContent = '输入用例名后，用例 / 页面 / 元素 三个文件名自动派生并锁死'; return; }
-  el.textContent = '将生成并锁死：test_' + pkgBase() + '.py · ' + pkgPageFileName() + ' · ' + pkgElementFileName();
+  if (!pkgBase()) { el.textContent = '输入用例名后，用例 / 页面 / 元素 文件名自动派生（元素文件可改选已有共享文件）'; return; }
+  if (isNewPageSel()) {
+    el.textContent = '将生成：test_' + pkgBase() + '.py · ' + pkgPageFileName() + ' · '
+      + (isNewElementFile() ? pkgElementFileName() : $('el-file').value);
+  } else {
+    const pe = (state.pageElements || {})[pkgPageSelValue()] || '';
+    el.textContent = '将生成 test_' + pkgBase() + '.py；页面方法追加到 ' + pkgPageSelValue()
+      + (pe ? '（元素 → ' + pe + '，同定位自动复用原名）' : '');
+  }
+}
+/* 新建用例模式下对齐「写入元素文件」：
+   选了已有页面 → 元素文件强制对齐该页面绑定的元素文件（静态绑定，服务端也会校验）；
+   新建页面 → 保留用户选择（默认随包新建，可改选已有共享文件，同定位自动复用原名） */
+function syncNewCaseElFile() {
+  const sel = $('el-file');
+  if (isNewPageSel()) {
+    setElLinkNote(isNewElementFile()
+      ? '🔗 元素将写入新文件 ' + (pkgElementFileName() || '（输入用例名后自动派生）')
+      : '🔗 元素将写入已有文件 ' + sel.value + '（新页面 import 该文件；同定位自动复用原名，不覆盖原定义）');
+    updatePkgTrio();
+    return;
+  }
+  const pe = (state.pageElements || {})[pkgPageSelValue()] || '';
+  if (pe) {
+    if (!Array.from(sel.options).some(o => o.value === pe)) sel.add(new Option(pe, pe));
+    sel.value = pe;
+    $('el-file-new-wrap').style.display = 'none';
+    setElLinkNote('🔗 页面 ' + pkgPageSelValue() + ' 绑定元素文件 ' + pe
+      + '，「写入元素文件」已自动对齐（同定位复用原名，不覆盖原定义）');
+  } else {
+    setElLinkNote('⚠ 页面 ' + pkgPageSelValue() + ' 未绑定元素文件——元素将写入所选文件并由页面补 import');
+  }
+  updatePkgTrio();
 }
 
 function syncElFileNote() {
@@ -2139,21 +2126,34 @@ function syncElFileNote() {
 }
 
 function onCaseFileChange() {
-  // 新建用例：切换到「新建输入模式」——方法/插入位置无意义，页面/元素文件自动派生
+  // 新建用例：切换到「新建输入模式」——方法/插入位置无意义；页面可选新建或复用已有页面，
+  // 元素文件默认随包新建、也可改选已有共享文件（不再强制与用例同态，v6.15.30）
   const newCase = isNewCase();
-  if (newCase && $('el-file').value !== NEW_FILE_OPT) {
-    // 三件套静态绑定要求两个下拉同态：用例切「新建」时元素文件自动跟随（仍可手动改回）
-    $('el-file').value = NEW_FILE_OPT;
-    $('el-file-new-wrap').style.display = '';
-  }
+  const psel = $('el-page-new');
   $('el-case-new-wrap').style.display = newCase ? '' : 'none';
   $('el-case-method').disabled = newCase;
   $('el-insert-pos').disabled = newCase;
-  $('el-page-file').value = newCase ? (newCaseBase() ? capFirst(newCaseBase()) + 'Page.py（随用例包新建）' : '（输入用例名后自动派生）')
-                                    : '';
+  if (psel) psel.style.display = newCase ? '' : 'none';
+  $('el-page-file').style.display = newCase ? 'none' : '';
+  if (newCase) {
+    if (psel) {
+      const cur = psel.value;
+      psel.innerHTML = '<option value="__new__">➕ 新建页面文件…（随用例包生成）</option>'
+        + (state.pages || []).map(p => '<option value="' + esc(p) + '">' + esc(p) + '</option>').join('');
+      psel.value = (cur && cur !== '__new__' && (state.pages || []).indexOf(cur) >= 0) ? cur : '__new__';
+    }
+    $('el-page-file').value = isNewPageSel()
+      ? (pkgBase() ? capFirst(pkgBase()) + 'Page.py（随用例包新建）' : '（输入用例名后自动派生）')
+      : pkgPageSelValue();
+    updatePkgTrio();
+    syncNewCaseElFile();
+    fillCaseHead();
+    renderStepsList([]);
+    return;
+  }
+  $('el-page-file').value = '';
   updatePkgTrio();
   fillCaseHead();
-  if (newCase) { renderStepsList([]); return; }
   const f = $('el-case-file').value;
   const infos = (state.caseFiles || []).filter(c => c.file === f);
   const methods = [];
@@ -2225,9 +2225,6 @@ function onCaseFileChange() {
    用例/页面/元素三个完整文件由前端按框架风格组装，后端 /api/save_case_package
    与平台同进程直调用例管理入库（语法校验、备份、登记一条龙）；
    局域网访问者可选「下载用例包 zip」交由平台「用例管理 → 上传用例包」入库。 */
-function capCamel(s) {  // login_flow -> LoginFlow（类名用）
-  return String(s || '').split('_').filter(Boolean).map(capFirst).join('');
-}
 function pkgBase() { return newCaseBase(); }
 function pkgElementFileName() {
   const raw = ($('el-file-new').value || '').trim().replace(/\.py$/i, '');  // 先剥 .py（过滤会把 . 变 _）
@@ -2240,10 +2237,7 @@ function pkgElementFileName() {
   const norm = stem.replace(/elements?$/i,'') + 'Elements';   // 大小写不敏感归一（防止 xxx_elementsElements.py）
   return norm + '.py';
 }
-function pkgElementClassName() { const f = pkgElementFileName(); return f ? capFirst(f.replace('.py', '')) : ''; }
 function pkgPageFileName() { const b = pkgBase(); return b ? b + 'Page.py' : ''; }   // 小写文件名（与元素文件派生风格统一）；类名仍驼峰
-function pkgPageClassName() { const f = pkgPageFileName(); return f ? capFirst(f.replace('.py', '')) : ''; }
-function pkgCaseFileName() { const b = pkgBase(); return b ? 'test_' + b + '.py' : ''; }
 function pkgStepComment() { return $('el-op-comment').value.trim() || genStepDesc(currentStepObj()); }
 function currentStepObj() {
   const obj = { type: currentOpType(), element: $('el-name').value.trim() || '<元素名>', param: $('el-op-param').value.trim() };
@@ -2252,172 +2246,9 @@ function currentStepObj() {
   }
   return obj;
 }
-/* 与后端 page_method_code 同规则的页面方法块（用例包生成用） */
-function pkgMethodBlock(step) {
-  const t = step.type, el = step.element || '<元素名>';
-  const doc = $('el-op-comment').value.trim() || genStepDesc(step);
-  const p = (step.param || '').trim();
-  let sig = '', body = '';
-  const shotLine = "self.appOperator.get_screenshot('" + escQ('断言·' + doc.slice(0, 40)) + "')";
-  if (t === 'click') sig = 'click_' + el + '(self)';
-  else if (t === 'input') { sig = 'input_' + el + '(self, text)'; body = 'self.appOperator.sendText(self._elements.' + el + ', text)'; }
-  else if (t === 'long_press') { sig = 'long_press_' + el + '(self)'; body = 'self.appOperator.touch_long_press(self._elements.' + el + ', duration_sconds=2)'; }
-  else if (t === 'assert_visible') { sig = 'assert_' + el + '(self)'; body = 'self.appOperator.getElement(self._elements.' + el + ')\n' + shotLine; }
-  else if (t === 'assert_text') { sig = 'assert_' + el + '_text(self, expected)'; body = "assert self.appOperator.getText(self._elements." + el + ") == expected, '" + escQ(doc) + "'\n" + shotLine; }
-  else if (t === 'assert_toast') { sig = 'assert_toast(self, text)'; body = "assert self.appOperator.is_toast_visible(text, wait_seconds=5), '" + escQ(doc) + "'\n" + shotLine; }
-  else if (t === 'wait_element') {
-    const n = parseInt(p, 10); sig = 'wait_' + el + '(self, timeout_seconds=' + (isNaN(n) ? 60 : n) + ')';
-    body = probeBodyLines(el, 'timeout_seconds') + '\nself.appOperator.getElement(probe)';
-  }
-  else if (t === 'assert_gone') {
-    sig = 'assert_' + el + '_gone(self, wait_seconds=2)';
-    body = probeBodyLines(el, 'wait_seconds') + '\ngone = True\ntry:\n    self.appOperator.getElement(probe)\n    gone = False\nexcept Exception:\n    pass\n'
-      + "self.appOperator.assert_true_with_shot('" + escQ(doc) + "', gone,\n"
-      + "                                   '等待' + str(wait_seconds) + '秒内元素仍可见')\n" + shotLine;
-  }
-  else if (t === 'if_click') {
-    const n = parseInt(p, 10); sig = 'click_' + el + '_if_visible(self, timeout_seconds=' + (isNaN(n) ? 3 : n) + ')';
-    body = probeBodyLines(el, 'timeout_seconds') + '\ntry:\n    self.appOperator.click(self.appOperator.getElement(probe))\nexcept Exception:\n    pass';
-  }
-  else if (t === 'hide_keyboard') {
-    sig = 'dismiss_keyboard(self)';
-    body = 'try:\n    if self.appOperator.is_keyboard_shown():\n        self.appOperator.hide_keyboard()\nexcept Exception:\n    self.appOperator.press_keycode(4)\nimport time\ntime.sleep(1)';
-  }
-  else if (t === 'deal_first_launch_dialogs') {
-    /* 首次启动弹窗处理：与后端 page_method_code 同一标准实现（探针自包含，不依赖元素文件） */
-    sig = 'deal_first_launch_dialogs(self)';
-    body = 'import time\n'
-      + 'for _lval, _desc in (\n'
-      + '        ("//*[@text=\'同意并继续\']", \'隐私协议弹窗\'),\n'
-      + '        ("//*[@text=\'允许\']", \'系统权限弹窗\'),\n'
-      + '):\n'
-      + '    probe = CreateElement.create(Locator_Type.XPATH, _lval,\n'
-      + '                                 wait_type=Wait_By.PRESENCE_OF_ELEMENT_LOCATED,\n'
-      + '                                 wait_seconds=2)\n'
-      + '    try:\n'
-      + '        self.appOperator.click(self.appOperator.getElement(probe))\n'
-      + '        time.sleep(1)  # 等弹窗收尾动画，避免点击落到下层页面\n'
-      + '    except Exception:\n'
-      + '        pass  # 该弹窗未出现，跳过';
-  }
-  else if (t === 'screenshot') { sig = 'wait_and_shot(self, tag)'; body = 'import time\ntime.sleep(1)\nself.appOperator.get_screenshot(tag)'; }
-  else if (t === 'sleep' || t === 'custom') return null;   // time.sleep/自定义代码行直入用例，无页面方法（对齐后端 page_method_code）
-  else if (t === 'tap') { sig = 'tap_xy(self, x, y)'; body = 'self.appOperator.tap(x, y)'; }
-  if (t === 'click') body = 'self.appOperator.click(self._elements.' + el + ')';
-  // 四栏改版：④断言栏组合 → 操作段包 try/except 记 failures，断言段逐条全量执行，末尾汇总抛错
-  if (assertState().length && !(step.type === 'sleep' || step.type === 'custom')) {
-    const elFileStem = (function () {
-      try { if (typeof isNewCase === 'function' && isNewCase()) return pkgElementFileName().replace(/\.py$/i, ''); } catch (e) {}
-      return (($('el-file').value || '').replace(/\.py$/i, '')) || 'baselines';
-    })();
-    const afail = (no, kind) => '    ' + 'failures.append(\'' + no + '·' + kind + ': %s\' % str(_e)[:120])';
-    let assertLines = [];
-    assertState().forEach((a, i) => {
-      const no = '断言' + (i + 1);
-      if (a.v === 'exists') {
-        assertLines.push(probeBodyLines(el, String(a.wait == null ? 3 : a.wait)).replace(/PRESENCE_OF_ELEMENT_LOCATED/, 'VISIBILITY_OF'));
-        assertLines.push("self.appOperator.assert_exists_or_record(failures, '" + no + "·存在', probe)");
-      } else if (a.v === 'text') {
-        assertLines.push(probeBodyLines(el, '3').replace(/PRESENCE_OF_ELEMENT_LOCATED/, 'VISIBILITY_OF'));
-        assertLines.push("self.appOperator.assert_text_or_record(failures, '" + no + "·文本', probe, expected='" + escQ(a.text || '') + "')");
-      } else if (a.v === 'toast') {
-        assertLines.push("self.appOperator.assert_toast_or_record(failures, '" + no + "·Toast', '" + escQ(a.toast || '') + "', wait_seconds=5)");
-      } else if (a.v === 'text_page') {
-        assertLines.push("self.appOperator.assert_page_text_or_record(failures, '" + no + "·页面文本', '" + escQ(a.text || '') + "', wait_seconds=5)");
-      } else if (a.v === 'text_page_gone') {
-        assertLines.push("self.appOperator.assert_page_text_gone_or_record(failures, '" + no + "·文案消失', '" + escQ(a.text || '') + "', wait_seconds=5)");
-      } else if (a.v === 'gone') {
-        assertLines.push(probeBodyLines(el, String(a.wait == null ? 2 : a.wait)));
-        assertLines.push("self.appOperator.assert_gone_or_record(failures, '" + no + "·消失', probe, wait_seconds=" + (a.wait == null ? 2 : a.wait) + ")");
-      } else if (a.v === 'visual') {
-        const th = (a.threshold == null ? 0.95 : +a.threshold).toFixed(2);
-        if (a.asset) {
-          // 视觉资产版：与后端 _assert_body_lines 同语义（执行器按资产 config 取实际图，无需元素探针）
-          assertLines.push("self.appOperator.assert_visual_asset_record(failures, '" + no + "·视觉资产', '" + escQ(a.asset) + "', threshold=" + th + ")");
-        } else {
-          assertLines.push(probeBodyLines(el, '3').replace(/PRESENCE_OF_ELEMENT_LOCATED/, 'VISIBILITY_OF'));
-          assertLines.push("self.appOperator.assert_visual_or_record(failures, '" + no + "·视觉', probe,");
-          assertLines.push("                                        baseline='page_objects/app_ui/android/demoProject/elements/baselines/" + elFileStem + '/' + el + ".png', threshold=" + th + ")");
-        }
-      }
-    });
-    body = 'failures = []\ntry:\n' + body.split('\n').map(l => '    ' + l).join('\n')
-      + "\nexcept Exception as _e:\n    self.appOperator.get_screenshot('操作失败')\n    failures.append('主操作: %s' % str(_e)[:120])\n"
-      + assertLines.join('\n')
-      + "\nif failures:\n    raise AssertionError('%d 项断言未通过：\\n%s' % (len(failures), '\\n'.join(failures)))";
-  }
-  return '    def ' + sig + ':\n        """' + doc + '"""\n        ' + body.replace(/\n/g, '\n        ');
-}
-function pkgFiles() {
-  const elemName = $('el-name').value.trim();
-  const elemFile = pkgElementFileName();
-  const elemClass = pkgElementClassName();
-  const pageFile = pkgPageFileName();
-  const pageClass = pkgPageClassName();
-  const base = pkgBase();
-  const elemLine = '        ' + elementLinePreview();
-  const methodBlock = pkgMethodBlock(currentStepObj());
-  const stepComment = pkgStepComment();
-  const elemPy = '# -*- coding: utf-8 -*-\n'
-    + '# 本文件由 GUI 元素定位器自动生成/维护（用例包：' + base + '）\n'
-    + 'from page_objects.createElement import CreateElement\n'
-    + 'from page_objects.app_ui.locator_type import Locator_Type\n'
-    + 'from page_objects.app_ui.wait_type import Wait_Type as Wait_By\n'
-    + '\n\n'
-    + 'class ' + elemClass + ':\n'
-    + '    def __init__(self):\n'
-    + elemLine + '\n';
-  const pagePy = '# -*- coding: utf-8 -*-\n'
-    + '# 页面对象（用例包：' + base + '）\n'
-    + 'from page_objects.app_ui.android.demoProject.elements.' + elemFile.replace('.py', '') + ' import ' + elemClass + '\n'
-    + '\n\n'
-    + 'class ' + pageClass + ':\n'
-    + '\n'
-    + '    def __init__(self, appOperator):\n'
-    + '        self.appOperator = appOperator\n'
-    + '        self._elements = ' + elemClass + '()\n'
-    + '\n'
-    + (methodBlock ? methodBlock + '\n' : '');
-  const cnTitle = ($('el-case-cn').value || '').trim();
-  const casePy = '# -*- coding: utf-8 -*-\n'
-    + (cnTitle ? '# 用例中文名：' + cnTitle + '\n' : '')
-    + '# 用例包 ' + base + ' · ' + stepComment + '\n'
-    + '# 流程：\n'
-    + '# 1. 拉起快歌主页面\n'
-    + '# 2. ' + stepComment + '\n'
-    + 'import time\n'
-    + 'import allure\n'
-    + 'from base.app_ui.android.demoProject.app_ui_android_demoProject_client import APP_UI_Android_demoProject_Client\n'
-    + 'from page_objects.app_ui.android.demoProject.pages.' + pageFile.replace('.py', '') + ' import ' + pageClass + '\n'
-    + '\n\n'
-    + "@allure.parent_suite('快歌APP自动化')\n"
-    + "@allure.suite('" + base + "')\n"
-    + 'class Test' + capCamel(base) + ':\n'
-    + '\n'
-    + '    def setup_class(self):\n'
-    + '        # is_need_kill_app=False：绕开 demo 客户端硬编码启动，显式启动被测 App\n'
-    + '        self.demoProjectClient = APP_UI_Android_demoProject_Client(is_need_kill_app=False)\n'
-    + '        self.appOperator = self.demoProjectClient.appOperator\n'
-    + "        self.appOperator.start_activity('com.recordlife.kuaige', 'com.recordlife.kuaige.feature.main.MainActivity')\n"
-    + '        time.sleep(3)\n'
-    + '        self.page = ' + pageClass + '(self.appOperator)\n'
-    + '\n'
-    + "    @allure.title('" + stepComment + "')\n"
-    + '    def test_' + base + '(self):\n'
-    + '        """' + stepComment + '"""\n'
-    + '        page = self.page\n'
-    + '\n'
-    + '        # 1. ' + stepComment + '\n'
-    + '        ' + previewLine(currentStepObj()) + '\n'
-    + '\n'
-    + '    def teardown_class(self):\n'
-    + '        self.appOperator.close_app()\n';
-  return [
-    { dir: 'cases/app_ui/android/demoProject', name: pkgCaseFileName(), content: casePy },
-    { dir: 'page_objects/app_ui/android/demoProject/pages', name: pageFile, content: pagePy },
-    { dir: 'page_objects/app_ui/android/demoProject/elements', name: elemFile, content: elemPy },
-  ];
-}
+/* 用例包三件套的文件内容由后端 assemble_case_package 权威组装（v6.15.30）：
+   前端只传意图（用例名/步骤/元素/落点选择），查重复用与页面复用统一在后端做，
+   原前端 pkgFiles()/pkgMethodBlock() 双源实现已删除，落点预览走 updatePkgTrio。 */
 /* ---------- 调试（临时用例真跑，v6.14.107） ----------
    当前操作 + 勾选断言 → 服务端临时生成一条单步用例 → 现有 runner 真机执行 → 轮询取临时结果。
    临时数据：用例跑完自动删除；结果只在页面临时展示，不入元素库/不入用例。 */
@@ -2528,19 +2359,8 @@ async function _doSaveElement(continueMode) {
   const special = $('el-op-special').value;   // 特殊操作：不碰元素库，只写用例
   let name = special ? '' : $('el-name').value.trim();
   if (purpose !== 'only') {
-    // 新建状态必须同步（都新建或都选已有）。这是架构约束而非误操作防护：
-    // 三件套是静态绑定——页面对象 import 固定的元素文件、页面方法体固定引用
-    // self._elements.<元素名>。跨组合保存会产生运行时断裂：
-    //  · 新建元素文件 + 已有用例：追加的页面方法引用新元素，但页面 __init__ 仍实例化旧元素类 → AttributeError
-    //  · 新建用例 + 已有元素文件：pkgFiles() 按 base 派生全新元素文件（不读已有文件选择），
-    //    实际不会写入用户选的已有文件 → 与用户预期不符
-    // 提示用弹窗内持久 showElResult（toast 3 秒消失，用户常看不到，表现为「点了保存没反应」）。
-    if (!special && isNewCase() !== isNewElementFile()) {
-      showElResult(
-        '⚠️ 「写入元素文件」与「目标用例文件」的新建状态需一致：要么都「➕ 新建」（一次生成三件套），' +
-        '要么都选已有文件。原因：页面对象与元素文件是静态绑定，混搭会导致新元素不被引用或运行时报错。', false);
-      return;
-    }
+    // v6.15.30：新建用例支持「复用已有元素文件 / 复用已有页面」，不再强制两下拉同态；
+    // 合法性由保存时服务端统一校验（已有页面 → 元素文件必须为其绑定文件，此处自动对齐）
     // 必填字段统一校验（保存失败后弹窗字段可能被重置——缺字段时生成残缺代码
     // def : / Locator_Type. 让后端语法校验兜底，不如在这里明确提示）
     if (!special) {
@@ -2570,25 +2390,60 @@ async function _doSaveElement(continueMode) {
       }
     }
     // 新建用例（填写了自定义文件名）：首次「保存并继续/保存」即三件套（元素+用例+页面，
-    // 已含当前步骤）直接入库——与平台「保存并继续」同语义；之后弹窗回显文件信息，继续录走 add_code 追加
+    // 已含当前步骤）直接入库——v6.15.30 起由服务端权威组装：元素查重复用（同定位复用原名
+    // 不写重复行 / 同名异定位硬拦）+ 页面复用（已有页面方法 upsert、用例 import 已有页面类）
     if (isNewCase()) {
       if (!pkgBase()) { showElResult('请先输入新用例名（test_ 后面的部分）', false); return; }
       if (!special && !name) { showElResult('元素名称不能为空', false); return; }
       if (state.tempCase && state.tempCase.base !== pkgBase()) {
         if (!confirm('上次录制会话是「' + state.tempCase.base + '」。换用例名将切换会话，继续？')) return;
       }
+      // 页面/元素落点：已有页面 → 元素文件强制对齐其绑定文件（与服务端校验同规则）
+      const pageNew = isNewPageSel();
+      const pageFile = pageNew ? pkgPageFileName() : pkgPageSelValue();
+      let elFile = isNewElementFile() ? pkgElementFileName() : $('el-file').value;
+      let elNew = isNewElementFile();
+      if (!pageNew) {
+        const pe = (state.pageElements || {})[pageFile] || '';
+        if (pe && elFile !== pe) { elFile = pe; elNew = false; }
+      }
       const tc = state.tempCase = { base: pkgBase() };
+      const stepObj = currentStepObj();
+      stepObj.comment = pkgStepComment();
+      const waitSec = parseInt($('el-wait-sec').value, 10);
+      const payload = {
+        package: tc.base,
+        assemble: true,
+        cn_name: ($('el-case-cn').value || '').trim(),
+        uploader: special ? 'locator' : name,
+        step: stepObj,
+        element: special ? null : {
+          name: name,
+          locator_type: $('el-type').value,
+          value: $('el-value').value.trim(),
+          wait_type: $('el-wait').value,
+          wait_seconds: (isNaN(waitSec) || waitSec < 1) ? '' : waitSec,
+          cn_name: $('el-cn-name').value.trim(),
+        },
+        element_file: elFile,
+        element_file_new: elNew,
+        page_file: pageFile,
+        page_file_new: pageNew,
+      };
       const r = await fetch('api/save_case_package', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ package: tc.base, files: pkgFiles(), uploader: special ? 'locator' : name }),
+        body: JSON.stringify(payload),
       }).then(x => x.json()).catch(() => null);
-      if (!r || !r.ok) { showElResult('三件套入库失败：' + ((r && r.msg) || '服务异常'), false); return; }
+      if (!r || !r.ok) { showElResult('用例包保存失败：' + ((r && r.msg) || '服务异常'), false); return; }
+      // 查重复用：回填库内元素名，后续步骤继续引用同一元素定义
+      if (r.element_final) $('el-name').value = r.element_final;
+      const noteMsg = (r.notes || []).join('；');
+      showToast(noteMsg ? ('保存成功 · ' + noteMsg.slice(0, 90)) : (continueMode ? '请继续添加用例' : '保存成功'));
       // 本步已随三件套写入 → 切回已有文件模式（回显用例/页面/元素文件），后续步骤走 add_code 追加
       await loadCaseFiles();
-      $('el-case-file').value = pkgCaseFileName();
+      $('el-case-file').value = 'test_' + tc.base + '.py';
       onCaseFileChange();
       $('modal-mask').style.display = 'none';
-      showToast(continueMode ? '请继续添加用例' : '保存成功');
       return;
     }
     // 都选已有文件 → 继续走「元素入库 + 追加用例行」（下方既有流程）
@@ -2608,6 +2463,11 @@ async function _doSaveElement(continueMode) {
   if (!special && name && (state.elementsAll[fname] || []).indexOf(name) >= 0) {
     if (!await uiConfirm('元素库文件 ' + fname + ' 里已有同名元素「' + name + '」，保存将覆盖更新原定义。\n\n' +
       '点「确定」= 覆盖更新\n点「取消」= 不保存')) return;
+  }
+  // 仅元素模式落点防呆（v6.15.30）：写入未被任何页面对象 import 的文件 → 元素静默失效
+  if (purpose === 'only' && name && !(state.eleReferenced || []).includes(fname)) {
+    if (!await uiConfirm('「' + fname + '」没有被任何页面对象 import，元素保存后不会在任何用例中生效（静默失效）。\n\n' +
+      '建议：改用「元素+用例+操作」用途，元素会自动写入目标页面绑定的元素文件。\n仍要保存到该文件？')) return;
   }
   // 按需求：添加测试用例不判断重复——同名直接覆盖、同定位直接新增，元素照常入库
   let r = special ? { ok: true, msg: '' } : await saveElement(true);

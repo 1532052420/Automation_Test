@@ -319,23 +319,18 @@ def test_tmp_device_files_cleanup():
 
 # ---------------------------------------------------------------- 周边脚本
 def test_run_sh_no_dead_branch():
-    """run.sh 不再引用不存在的 run_web_ui_test.py（TC-070）"""
-    content = open(os.path.join(ROOT, 'run.sh'), encoding='utf-8').read()
+    """run.command（原 run.sh）不再引用不存在的 run_web_ui_test.py（TC-070）"""
+    content = open(os.path.join(ROOT, 'run.command'), encoding='utf-8').read()
     assert 'run_web_ui_test' not in content
-    subprocess.run(['bash', '-n', os.path.join(ROOT, 'run.sh')], check=True)
+    subprocess.run(['bash', '-n', os.path.join(ROOT, 'run.command')], check=True)
 
 
 def test_entry_scripts_clean():
-    """统一入口检查（TC-077）：仅保留 自动化执行入口.command + run.sh（定位器已并入平台）"""
-    main = os.path.join(ROOT, '自动化执行入口.command')
-    assert os.path.isfile(main)
-    mcontent = open(main, encoding='utf-8').read()
-    assert 'web_platform/app.py' not in mcontent  # 启动一律走 run.sh
-    assert '8001' not in mcontent                 # 独立定位器端口已取消
-    runsh = os.path.join(ROOT, 'run.sh')
+    """统一入口检查（TC-077）：启动一律走 run.command；定位器已并入平台、无独立端口"""
+    runsh = os.path.join(ROOT, 'run.command')
     rcontent = open(runsh, encoding='utf-8').read()
     assert 'element_locator/server.py' not in rcontent
-    subprocess.run(['bash', '-n', main], check=True)
+    assert '8001' not in rcontent                 # 独立定位器端口已取消
     subprocess.run(['bash', '-n', runsh], check=True)
 
 # ---------------------------------------------------------------- 用例管理（用例包入库）

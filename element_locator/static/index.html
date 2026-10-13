@@ -245,7 +245,8 @@ try {
               <option value="deal_first_launch_dialogs">首次启动弹窗处理（无弹窗自动跳过）</option>
             </select>
           </label>
-          <label id="page-file-label">写入页面文件 <span class="help-icon" data-help="由目标用例决定，自动带出">?</span>
+          <label id="page-file-label">写入页面文件 <span class="help-icon" data-help="由目标用例决定；新建用例时可选复用已有页面">?</span>
+            <select id="el-page-new" style="display:none"></select>
             <input id="el-page-file" type="text" readonly placeholder="选择目标用例后自动带出">
           </label>
         </section>

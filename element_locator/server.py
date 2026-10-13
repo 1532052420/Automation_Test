@@ -184,13 +184,18 @@ def api_refresh():
 @app.route('/api/library')
 def api_library():
     files = element_library.list_element_files()
-    default = element_library.DEFAULT_FILE
+    # 默认元素文件选「活文件」：优先返回已被页面对象 import 的元素文件，
+    # 避免「一键添加」默认写进无人 import 的文件导致元素静默失效（v6.15.30）
+    referenced = sorted({f for f in case_generator.page_elements_map().values() if f})
+    ref_avail = [f for f in referenced if f in files]
+    default = ref_avail[0] if ref_avail else element_library.DEFAULT_FILE
     content = ''
     path = os.path.join(element_library.ELEMENTS_DIR, default)
     if os.path.exists(path):
         with open(path, 'r', encoding='utf-8') as f:
             content = f.read()
-    return jsonify({'ok': True, 'files': files, 'default': default, 'content': content})
+    return jsonify({'ok': True, 'files': files, 'default': default,
+                    'referenced': ref_avail, 'content': content})
 
 
 @app.route('/api/add_element', methods=['POST'])
@@ -279,15 +284,51 @@ def api_cases():
 
 @app.route('/api/save_case_package', methods=['POST'])
 def api_save_case_package():
-    """「保存测试用例包·保存到框架」：三个文件内容入库。
+    """「保存测试用例包·保存到框架」：三件套文件内容入库。
     定位器现以 /locator 子应用挂在测试平台同一进程内，因此直接调用用例管理的入库实现
     （import_case_package），享受与之完全一致的语法校验、覆盖备份与上传人登记——
-    不再需要一个从来不存在的 8090 端点。"""
+    不再需要一个从来不存在的 8090 端点。
+
+    assemble=true（v6.15.30）：服务端权威组装——前端只传意图（用例名/步骤/元素/落点），
+    后端统一做元素查重复用与页面复用，再走同一条入库链路；files[] 旧协议保留兼容。"""
     data = request.get_json(silent=True) or {}
     package = (data.get('package') or '').strip()
+    if not package:
+        return jsonify({'ok': False, 'msg': '缺少包名'})
+    with _save_lock:
+        return _save_case_package_locked(data, package)
+
+
+def _save_case_package_locked(data, package):
+    if data.get('assemble'):
+        r = case_generator.assemble_case_package(
+            package,
+            cn_name=(data.get('cn_name') or '').strip(),
+            step=data.get('step'),
+            element=data.get('element'),
+            element_file=(data.get('element_file') or '').strip(),
+            element_file_new=bool(data.get('element_file_new')),
+            page_file=(data.get('page_file') or '').strip(),
+            page_file_new=bool(data.get('page_file_new')),
+        )
+        if not r.get('ok'):
+            return jsonify({'ok': False, 'msg': r.get('msg', '用例包组装失败')}), 400
+        try:
+            from web_platform.admin_routes import import_case_package
+        except ImportError as e:
+            return jsonify({'ok': False, 'msg': '「保存到框架」需与测试平台运行在同一进程（%s）'
+                                                % str(e)[:80]}), 500
+        payload, status = import_case_package(r['base'], r['files'],
+                                              (data.get('uploader') or 'locator').strip()[:32])
+        if payload.get('ok'):
+            payload['element_final'] = r.get('element_final', '')
+            payload['element_reused'] = r.get('reused', False)
+            payload['notes'] = r.get('notes', [])
+        return jsonify(payload), status
+
     files = data.get('files') or []
-    if not package or not isinstance(files, list) or not files:
-        return jsonify({'ok': False, 'msg': '缺少包名或文件内容'})
+    if not isinstance(files, list) or not files:
+        return jsonify({'ok': False, 'msg': '缺少文件内容'})
     if not all(isinstance(f, dict) and f.get('name') and f.get('content') is not None for f in files):
         return jsonify({'ok': False, 'msg': '文件结构不合法'})
     try:
@@ -475,12 +516,14 @@ def api_delete_popup_rule():
 
 @app.route('/api/pages')
 def api_pages():
-    """列出页面文件 + 各元素文件已定义的元素名（用例步骤下拉用）"""
+    """列出页面文件 + 各元素文件已定义的元素名（用例步骤下拉用）。
+    page_elements：页面文件 → 其绑定的元素文件（新建用例包选已有页面时对齐元素文件）"""
     return jsonify({
         'ok': True,
         'pages': case_generator.list_page_files(),
         'elements': {f: element_library.list_element_names(f)
                      for f in element_library.list_element_files()},
+        'page_elements': case_generator.page_elements_map(),
     })
 
 
