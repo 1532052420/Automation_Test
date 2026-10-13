@@ -1224,3 +1224,15 @@ html.night .nav-card {
 }
 html.night .nav-card:hover { border-color: #f5f5f7; }
 html.night .home-bg i { opacity: .22; filter: blur(100px); }
+
+/* 无线连接断开/成功横幅（顶部提示条） */
+.conn-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 9px 44px; font-size: 13px; font-weight: 500; }
+.conn-banner.warn { background: #fff3e0; color: #b25000; border-bottom: 1px solid rgba(178, 80, 0, .25); }
+.conn-banner.info { background: #e6f4ea; color: #1d7a3a; border-bottom: 1px solid rgba(29, 122, 58, .25); }
+.conn-banner button { position: absolute; right: 14px; border: 0; background: none; font-size: 14px;
+  cursor: pointer; color: inherit; opacity: .6; }
+.conn-banner button:hover { opacity: 1; }
+html.night .conn-banner.warn { background: rgba(255, 149, 0, .14); color: #ffb84d; }
+html.night .conn-banner.info { background: rgba(52, 199, 89, .14); color: #4ade80; }

@@ -767,9 +767,12 @@ async function initConnect() {
       postJson('/api/connect/pair', body).then(function (d) {
         pb.disabled = false;
         var m = document.getElementById('scMsg');
-        m.textContent = d.msg || (d.ok ? '连接成功' : '失败');
+        m.textContent = d.ok ? '✓ 连接成功（' + (d.msg || '') + '）' : (d.msg || '失败');
         m.style.color = d.ok ? 'var(--ok)' : 'var(--bad)';
-        if (d.ok) setTimeout(function () { location.href = '/connect'; }, 1200);
+        if (d.ok) {
+          showConnBanner('✓ 设备已无线连接成功（' + body.ip + ':' + (body.conn_port || '5555') + '）', 'info');
+          setTimeout(function () { location.href = '/connect'; }, 1500);
+        }
       }).catch(function () { pb.disabled = false; show('scMsg', '请求失败'); });
     });
   }
@@ -1788,3 +1791,63 @@ document.addEventListener('DOMContentLoaded', () => {
   else if (page === 'perf') initPerf();
   /* api-test 页已随接口测试模块移除，首页入口为死按钮 */
 });
+
+
+/* ================= 无线连接断开横幅（顶部提示条） =================
+   主动断开：断开操作成功后标记并显示「（用户主动断开）」；
+   意外断开：15s 轮询设备列表，之前在线的无线设备消失 →「（连接意外中断）」。 */
+function showConnBanner(msg, kind) {
+  try { sessionStorage.setItem('connBanner', JSON.stringify({ msg: msg, kind: kind || 'warn' })); } catch (e) {}
+  renderConnBanner();
+}
+function renderConnBanner() {
+  var data = null;
+  try { data = JSON.parse(sessionStorage.getItem('connBanner') || 'null'); } catch (e) {}
+  var old = document.getElementById('connBanner');
+  if (old) old.remove();
+  if (!data) return;
+  var bar = document.createElement('div');
+  bar.id = 'connBanner';
+  bar.className = 'conn-banner ' + (data.kind === 'info' ? 'info' : 'warn');
+  bar.innerHTML = '<span>' + esc(data.msg) + '</span>' +
+    '<button type="button" title="关闭" onclick="this.parentNode.remove();sessionStorage.removeItem(\'connBanner\')">✕</button>';
+  document.body.appendChild(bar);
+}
+
+function _wirelessWatch() {
+  api('/api/connect/devices').then(function (d) {
+    if (!d.ok) return;
+    var now = {};
+    (d.devices || []).forEach(function (x) { if (x.wireless && x.state === 'device') now[x.udid] = 1; });
+    var last = null;
+    try { last = JSON.parse(sessionStorage.getItem('wlanLast') || 'null'); } catch (e) {}
+    if (last && Object.keys(last).length) {
+      Object.keys(last).forEach(function (udid) {
+        if (!now[udid] && !sessionStorage.getItem('wlanGone:' + udid)) {
+          sessionStorage.setItem('wlanGone:' + udid, '1');
+          showConnBanner('无线连接已断开：' + udid + '（连接意外中断）', 'warn');
+        }
+      });
+    }
+    sessionStorage.setItem('wlanLast', JSON.stringify(now));
+  }).catch(function () {});
+}
+setInterval(_wirelessWatch, 15000);
+
+/* ② 断开成功后标记主动断开（覆盖意外中断文案） */
+var _origDevAdb = devAdbAction;
+devAdbAction = function (opt) {
+  return _origDevAdb(opt).then(function (r) {
+    if (opt && opt.action === 'disconnect' && r && r.ok) {
+      showConnBanner('无线连接已断开（用户主动断开）', 'info');
+      var gone = opt.addr || '';
+      if (gone) { try { sessionStorage.setItem('wlanGone:' + gone, '1'); } catch (e) {} }
+    }
+    return r;
+  });
+};
+renderConnBanner();
+_wirelessWatch();
+
+/* ③ 配对连接成功：横幅明确提示「连接成功」 */
+
