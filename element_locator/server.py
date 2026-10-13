@@ -277,9 +277,12 @@ def api_collect_save():
 
 @app.route('/api/cases')
 def api_cases():
-    """列出现有用例文件（新建/追加下拉用）；case_info 含每个文件的方法列表（目标用例两级联动）"""
+    """列出现有用例文件（新建/追加下拉用）；case_info 含每个文件的方法列表（目标用例两级联动）。
+    step_types（v6.15.33）：后端支持的操作类型清单——前端据此启用新操作/多页面 UI，
+    老后端（如未重启的 8080）不返回该字段，前端自动降级为旧交互"""
     return jsonify({'ok': True, 'cases': case_generator.list_case_files(),
-                    'case_info': case_generator.case_files_info()})
+                    'case_info': case_generator.case_files_info(),
+                    'step_types': case_generator.STEP_TYPES})
 
 
 @app.route('/api/save_case_package', methods=['POST'])
@@ -364,6 +367,7 @@ def _add_code_locked():
         step,
         gen_page_method=bool(data.get('gen_page_method')),
         insert_after_step=insert_after,
+        page_file=(data.get('page_file') or '').strip(),
     )
     return jsonify({'ok': r['ok'], 'msg': r.get('msg', ''),
                     'action': r.get('action', ''),
@@ -375,7 +379,8 @@ def _add_code_locked():
                     'page_before': r.get('page_before', ''),
                     'page_file': r.get('page_file', ''),
                     'page_method': r.get('page_method', ''),
-                    'page_content': r.get('page_content', '')})
+                    'page_content': r.get('page_content', ''),
+                    'page_var': r.get('page_var', '')})
 
 
 @app.route('/api/locate_check', methods=['POST'])

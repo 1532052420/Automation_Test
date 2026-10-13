@@ -20,6 +20,7 @@ const state = {
   tempCase: null,         // 录制会话：上次三件套入库的用例（base），重开弹窗时回显
   coordMode: false,       // ⌖ 坐标模式：点截图选精确坐标（不再命中容器节点），用于无障碍盲区（自绘弹层等）
   coordPoint: null,       // 坐标模式下最后选中的点 [x, y]（设备坐标）
+  stepTypes: null,        // 后端 /api/cases 返回的支持操作类型（v6.15.33 能力探测；老后端无此字段 → 隐藏 v2 操作）
 };
 // 右侧教学：搜索时展开所有分类，否则默认收起（点分类标题展开）
 var tutExpandAll = false;
@@ -42,6 +43,17 @@ const STEP_TYPES = [
   { v: 'wait_element', n: '轮询等待出现(慢页面/生成中)', el: true, param: true, ph: '最长等待秒数', group: '长流程·等待与分支', defv: '60' },
   { v: 'if_click', n: '出现才点击(分支弹窗)', el: true, param: true, ph: '探测秒数', group: '长流程·等待与分支', defv: '3' },
   { v: 'custom', n: '自定义代码', el: false, param: true, ph: '代码行', group: '长流程·等待与分支', defv: '' },
+  // v6.15.33 框架原生手势/设备能力（appOperator 直映射）；v2 标记：老后端不放行时隐藏
+  { v: 'swipe_up', n: '上滑', el: true, param: true, ph: '时长ms(默认500)', group: '手势·设备', defv: '500', v2: true },
+  { v: 'swipe_down', n: '下滑', el: true, param: true, ph: '时长ms(默认500)', group: '手势·设备', defv: '500', v2: true },
+  { v: 'swipe_left', n: '左滑', el: true, param: true, ph: '时长ms(默认500)', group: '手势·设备', defv: '500', v2: true },
+  { v: 'swipe_right', n: '右滑', el: true, param: true, ph: '时长ms(默认500)', group: '手势·设备', defv: '500', v2: true },
+  { v: 'drag_to', n: '拖拽到元素', el: true, param: true, ph: '目标元素名(元素库已有)', group: '手势·设备', defv: '', v2: true },
+  { v: 'press_keycode', n: '按键(键码)', el: false, param: true, ph: '键码，4=返回', group: '手势·设备', defv: '4', v2: true },
+  { v: 'background_app', n: '退后台(秒)', el: false, param: true, ph: '秒数，-1=停用', group: '手势·设备', defv: '3', v2: true },
+  { v: 'activate_app', n: '拉起应用', el: false, param: true, ph: '应用包名', group: '手势·设备', defv: '', v2: true },
+  { v: 'toggle_wifi', n: '切换WiFi', el: false, param: false, ph: '', group: '手势·设备', defv: '', v2: true },
+  { v: 'toggle_airplane', n: '切换飞行模式', el: false, param: false, ph: '', group: '手势·设备', defv: '', v2: true },
 ];
 /* 特殊操作：与元素无关的用例级动作，单独下拉（el-op-special）。不写元素库、元素栏禁用；
    选中后只需选目标用例 + 插入位置。deal_first_launch_dialogs 固定前插（见 onCaseFileChange） */
@@ -445,6 +457,26 @@ async function init() {
       ? (pkgBase() ? capFirst(pkgBase()) + 'Page.py（随用例包新建）' : '（输入用例名后自动派生）')
       : pkgPageSelValue();
     syncNewCaseElFile();
+  });
+  // 目标页面切换（已有用例·多页面 v6.15.33）：元素文件对齐所选页面绑定的元素文件
+  const pageFileSel = $('el-page-file');
+  if (pageFileSel) pageFileSel.addEventListener('change', () => {
+    if (isNewCase() || purposeValue() !== 'all') return;
+    const pe = selectedPageElementsFile();
+    const sel = $('el-file');
+    if (pe && !isNewElementFile()) {
+      if (!Array.from(sel.options).some(o => o.value === pe)) sel.add(new Option(pe, pe));
+      sel.value = pe;
+      setElLinkNote('🔗 页面 ' + pageFileSel.value + ' 绑定元素文件 ' + pe + '，「写入元素文件」已自动对齐'
+        + (state.pageElements && !((state.caseFiles || []).filter(c => c.file === $('el-case-file').value)
+            .some(c => (c.page_targets || []).some(t => t.page_file === pageFileSel.value)))
+          ? '；⚠ 这条用例还没用到该页面，点「保存」后自动接进去（自动补 import 和初始化代码），不用手动改用例' : ''));
+    } else if (pe) {
+      setElLinkNote('🔗 页面 ' + pageFileSel.value + ' 绑定元素文件 ' + pe);
+    } else {
+      setElLinkNote('🔗 页面 ' + pageFileSel.value + '（未绑定元素文件，元素将写入所选文件并补 import）');
+    }
+    fillCaseHead();
   });
   // 定位方式切换：从当前元素的定位候选里取该类型的值回填（ID→ID值，XPATH→XPATH值…）
   $('el-type').addEventListener('change', onElTypeChange);
@@ -1577,9 +1609,8 @@ async function loadLibraryFiles() {
   state.eleFiles = r.files || [];
   state.defaultEleFile = r.default || 'locator_gui_elements.py';
   state.eleReferenced = r.referenced || [];   // 已被页面对象 import 的元素文件（「活文件」）
-  // 「➕ 新建…」在最后：选择后显示新建输入行（随用例包一起生成）
-  $('el-file').innerHTML = r.files.map(f => '<option value="' + esc(f) + '">' + esc(f) + '</option>').join('')
-    + '<option value="' + NEW_FILE_OPT + '">➕ 新建元素文件…</option>';
+  // v6.15.33：新建元素文件改到自动化后台（平台用例上传）——弹窗只在已有文件里选
+  $('el-file').innerHTML = r.files.map(f => '<option value="' + esc(f) + '">' + esc(f) + '</option>').join('');
 }
 async function loadPages() {
   const r = await fetch('api/pages').then(r => r.json()).catch(() => null);
@@ -1899,7 +1930,10 @@ async function savePopupRule(continueMode) {
 /* 四栏改版：③操作只留动作类（4 种传统断言移至④栏，组合断言走开关勾选） */
 const OP_HIDDEN = ['assert_visible', 'assert_text', 'assert_toast', 'assert_gone'];
 function visibleOpTypes() {
-  return STEP_TYPES.filter(t => OP_HIDDEN.indexOf(t.v) < 0);
+  // v2 类型（v6.15.33 手势/设备）依赖新后端 /api/cases 的 step_types 放行：
+  // 老后端（未重启实例）不返回该字段 → 隐藏，界面自动降级为旧操作集，互不影响
+  return STEP_TYPES.filter(t => OP_HIDDEN.indexOf(t.v) < 0
+    && (!t.v2 || !state.stepTypes || state.stepTypes.indexOf(t.v) >= 0));
 }
 function opTypeInfo(v) { return stepTypeInfo(v); }
 function opTypeOptions() {
@@ -2054,6 +2088,7 @@ async function loadCaseFiles() {
   const r = await fetch('api/cases').then(r => r.json()).catch(() => null);
   if (!r || !r.ok) return;
   state.caseFiles = r.case_info || [];
+  state.stepTypes = r.step_types || null;   // 能力探测：老后端无此字段 → v2 操作隐藏（v6.15.33）
   const sel = $('el-case-file');
   const cur = sel.value;
   /* 用例文件下拉：有中文名映射的显示「中文名（文件名）」（与平台选择用例同步） */
@@ -2061,13 +2096,11 @@ async function loadCaseFiles() {
   (state.caseFiles || []).forEach(c => { if (c.cn_name && !cnMap[c.file]) cnMap[c.file] = c.cn_name; });
   const files = [];
   (state.caseFiles || []).forEach(c => { if (files.indexOf(c.file) < 0) files.push(c.file); });
-  // 「➕ 新建…」永远在最后：选择后显示 test_ 前缀锁定输入行（保存走「保存测试用例包」）
+  // v6.15.33：新建用例文件改到自动化后台（平台用例上传）——弹窗只在已有用例里选
   sel.innerHTML = files.map(f => '<option value="' + esc(f) + '">' +
-    esc(cnMap[f] ? cnMap[f] + '（' + f + '）' : f) + '</option>').join('')
-    + '<option value="' + NEW_FILE_OPT + '">➕ 新建用例文件…</option>';
-  // 预选优先级：用户处于「新建」模式（含临时用例会话）> 用户已显式选中的有效用例 > 第一个
-  if (cur === NEW_FILE_OPT) sel.value = NEW_FILE_OPT;
-  else if (cur && files.indexOf(cur) >= 0) sel.value = cur;
+    esc(cnMap[f] ? cnMap[f] + '（' + f + '）' : f) + '</option>').join('');
+  // 预选：用户已显式选中的有效用例 > 第一个
+  if (cur && files.indexOf(cur) >= 0) sel.value = cur;
   else if (files.length) sel.value = files[0];
   onCaseFileChange();
 }
@@ -2114,14 +2147,17 @@ function syncNewCaseElFile() {
 }
 
 function syncElFileNote() {
-  /* 手动改「写入元素文件」时如实提示：与页面引用的元素文件不一致 → 保存时会自动同步过去（同名覆盖），
+  /* 手动改「写入元素文件」时如实提示：与所选页面绑定的元素文件不一致 → 保存时会自动同步过去（同名覆盖），
      不再留着上次「已自动对齐」的过期提示让人生疑 */
   const f = $('el-case-file').value;
-  const info = (state.caseFiles || []).filter(c => c.file === f).find(c => c.page_file);
-  if (purposeValue() !== 'all' || isNewElementFile() || !info || !info.elements_file) return;
-  if ($('el-file').value !== info.elements_file) {
-    setElLinkNote('⚠ 「写入元素文件」(' + $('el-file').value + ') 与页面 ' + info.page_file + ' 引用的 ' +
-                  info.elements_file + ' 不一致——保存时会自动把元素同步到 ' + info.elements_file + '（同名覆盖，不影响保存）');
+  const infos = (state.caseFiles || []).filter(c => c.file === f);
+  const info = infos.find(c => c.page_file);
+  if (purposeValue() !== 'all' || isNewElementFile() || !info) return;
+  const pe = selectedPageElementsFile();
+  if (!pe) return;
+  if ($('el-file').value !== pe) {
+    setElLinkNote('⚠ 「写入元素文件」(' + $('el-file').value + ') 与页面 ' + $('el-page-file').value + ' 绑定的 ' +
+                  pe + ' 不一致——保存时会自动把元素同步到 ' + pe + '（同名覆盖，不影响保存）');
   }
 }
 
@@ -2151,7 +2187,7 @@ function onCaseFileChange() {
     renderStepsList([]);
     return;
   }
-  $('el-page-file').value = '';
+  // 页面下拉的清空/重建统一交给下方 targets 块（先取 curPageSel 再重建，保留用户选择）
   updatePkgTrio();
   fillCaseHead();
   const f = $('el-case-file').value;
@@ -2189,34 +2225,72 @@ function onCaseFileChange() {
     }
   }
   renderStepsList(steps);
-  // 三件套联动：写入元素文件 ← 目标用例页面实际引用的元素文件（必须一致）
-  // 写入页面文件 = 目标用例的 self.page 所在文件（只读展示，跟随用例）
+  // 三件套联动：写入元素文件 ← 所选页面绑定的元素文件（必须一致）
+  // 写入页面文件 = 下拉（v6.15.33 多页面）：该用例已实例化的页面（self.page/page2…）任选，
+  // 选未实例化的页面保存时自动挂接（补 import + self.pageN 实例化）；老后端无 page_targets
+  // 时降级为单选项展示，行为与旧版一致
   const p = purposeValue();
   const info = infos.find(c => c.page_file);
   const amb = infos.find(c => (c.page_ambiguous || []).length);
-  $('el-page-file').value = info ? info.page_file : '';
+  const pfsel = $('el-page-file');
+  const targets = [];
+  infos.forEach(c => (c.page_targets || []).forEach(t => {
+    if (!targets.some(x => x.page_file === t.page_file)) targets.push(t);
+  }));
+  // 先取用户当前选中再重建：操作类型切换等路径会重进本函数，不能丢页面选择（E2E 实测教训）
+  const curPageSel = pfsel.value;
+  if (targets.length) {
+    pfsel.innerHTML = targets.map(t => '<option value="' + esc(t.page_file) + '">'
+      + esc(t.page_file + '（self.' + t.var + '）') + '</option>').join('')
+      + (state.pages || []).filter(pf => !targets.some(t => t.page_file === pf))
+        .map(pf => '<option value="' + esc(pf) + '">' + esc(pf + '（用例还没用到·保存自动接入）') + '</option>').join('');
+    if (curPageSel && Array.from(pfsel.options).some(o => o.value === curPageSel)) {
+      pfsel.value = curPageSel;
+    } else {
+      pfsel.value = targets[0].page_file;
+    }
+  } else if (info && info.page_file) {
+    pfsel.innerHTML = '<option value="' + esc(info.page_file) + '">' + esc(info.page_file) + '</option>';
+  } else {
+    pfsel.innerHTML = (state.pages || []).map(pf => '<option value="' + esc(pf) + '">' + esc(pf + '（用例还没用到·保存自动接入）') + '</option>').join('');
+  }
   if (amb) {
     setElLinkNote('⚠ 页面类 ' + amb.page_class + ' 在多个文件里重名：' + amb.page_ambiguous.join('、')
                   + '——归属不唯一，已禁止写入页面方法，请先改名或删除重名文件');
-  } else if (p !== 'only' && !info) {
-    setElLinkNote('⚠ 该用例没有页面对象（self.page），③ 无法生成操作——请换有页面对象的用例，或先补页面文件后重试');
-  } else if (p === 'all' && info && info.elements_file) {
-    if ($('el-file').value !== info.elements_file) {
-      const sel = $('el-file');
-      // 下拉里没有该文件时 set value 会静默失效（提示却说已对齐）——缺选项就先补上
-      if (!Array.from(sel.options).some(o => o.value === info.elements_file)) {
-        sel.add(new Option(info.elements_file, info.elements_file));
+  } else if (p !== 'only' && !targets.length && !info) {
+    setElLinkNote('这条用例还没有任何页面——在「写入页面文件」里选一个，保存时自动接进用例（自动补 import 和初始化代码）');
+  } else if (p === 'all') {
+    const pe = selectedPageElementsFile();
+    if (pe) {
+      if ($('el-file').value !== pe) {
+        const sel = $('el-file');
+        // 下拉里没有该文件时 set value 会静默失效（提示却说已对齐）——缺选项就先补上
+        if (!Array.from(sel.options).some(o => o.value === pe)) {
+          sel.add(new Option(pe, pe));
+        }
+        sel.value = pe;
+        setElLinkNote('🔗 页面 ' + pfsel.value + ' 绑定元素文件 ' + pe + '，「写入元素文件」已自动对齐');
+      } else {
+        setElLinkNote('🔗 三件套去向：页面 ' + pfsel.value + ' ← 元素文件 ' + pe);
       }
-      sel.value = info.elements_file;
-      setElLinkNote('🔗 页面 ' + info.page_file + ' 引用元素文件 ' + info.elements_file + '，「写入元素文件」已自动对齐');
     } else {
-      setElLinkNote('🔗 三件套去向：页面 ' + info.page_file + ' ← 元素文件 ' + info.elements_file);
+      setElLinkNote('🔗 页面 ' + pfsel.value + '（未绑定元素文件，元素将写入所选文件并补 import）');
     }
-  } else if (info) {
-    setElLinkNote('该用例的页面: ' + info.page_file + (info.elements_file ? '（元素: ' + info.elements_file + '）' : ''));
   } else {
     setElLinkNote('');
   }
+}
+/* 所选目标页面（写入页面文件下拉）绑定的元素文件：先查用例已实例化页面（page_targets），
+   再查全局页面→元素映射；都没有返回 '' */
+function selectedPageElementsFile() {
+  const pf = $('el-page-file').value;
+  if (!pf) return '';
+  const cfs = (state.caseFiles || []).filter(c => c.file === $('el-case-file').value);
+  for (let i = 0; i < cfs.length; i++) {
+    const t = (cfs[i].page_targets || []).find(t => t.page_file === pf);
+    if (t) return t.elements_file || '';
+  }
+  return (state.pageElements || {})[pf] || '';
 }
 /* 保存：按「用途」单选分流 —— ① 仅保存到元素库 / ② 保存并追加到目标用例方法 */
 /* 保存：按「保存到哪一步」分流 ① 仅元素 / ② +用例 / ③ +操作；
@@ -2357,6 +2431,9 @@ async function _doSaveElement(continueMode) {
   // 用途③：登记随机弹窗——写规则库，与元素库/用例三件套完全无关
   if (purpose === 'popup') { await savePopupRule(continueMode); return; }
   const special = $('el-op-special').value;   // 特殊操作：不碰元素库，只写用例
+  // v6.15.33 v2 设备操作（按键/前后台/开关）无元素主体：跳过元素名/定位校验与元素入库
+  const _opT0 = $('el-op-type').value;
+  const noElOp = !special && stepTypeInfo(_opT0).v2 && !stepTypeInfo(_opT0).el;
   let name = special ? '' : $('el-name').value.trim();
   if (purpose !== 'only') {
     // v6.15.30：新建用例支持「复用已有元素文件 / 复用已有页面」，不再强制两下拉同态；
@@ -2365,9 +2442,9 @@ async function _doSaveElement(continueMode) {
     // def : / Locator_Type. 让后端语法校验兜底，不如在这里明确提示）
     if (!special) {
       const missing = [];
-      if (!name) missing.push('元素名（左侧点选元素或手填）');
-      if (!$('el-type').value) missing.push('定位方式');
-      if (!$('el-value').value.trim()) missing.push('定位值');
+      if (!noElOp && !name) missing.push('元素名（左侧点选元素或手填）');
+      if (!noElOp && !$('el-type').value) missing.push('定位方式');
+      if (!noElOp && !$('el-value').value.trim()) missing.push('定位值');
       if (!$('el-op-type').value) missing.push('操作类型');
       if (missing.length) {
         showElResult('⚠️ 请补齐必填项：' + missing.join('、'), false);
@@ -2383,6 +2460,15 @@ async function _doSaveElement(continueMode) {
         if (xy.length !== 2 || xy.some(x => x === '' || isNaN(parseFloat(x)))) {
           showElResult('⚠️ 坐标点击参数需为 x,y 数字格式（示例：320,540），收到：' + pVal, false); return;
         }
+      }
+      if ((opT === 'press_keycode' || opT === 'background_app') && pVal && !/^-?\d+$/.test(pVal)) {
+        showElResult('⚠️ 按键码/后台秒数需为整数（示例：4；后台 -1=停用），收到：' + pVal, false); return;
+      }
+      if (opT === 'drag_to' && !pVal) {
+        showElResult('⚠️ 拖拽需填目标元素名（须已保存在元素库）', false); return;
+      }
+      if (opT === 'activate_app' && !pVal) {
+        showElResult('⚠️ 拉起应用需填应用包名（如 com.recordlife.kuaige）', false); return;
       }
       // 自定义代码原样写入用例（不转义），落盘前二次确认
       if (opT === 'custom' && pVal) {
@@ -2456,23 +2542,23 @@ async function _doSaveElement(continueMode) {
     caseFile = $('el-case-file').value;
     methodName = $('el-case-method').value;
     if (!(state.caseFiles || []).some(c => c.file === caseFile)) {
-      showElResult('请选择目标用例文件（或选「➕ 新建用例文件…」一次生成三件套）', false); return;
+      showElResult('请选择目标用例文件（新建用例请到自动化后台「用例上传」入库后重开本窗）', false); return;
     }
     if (!methodName) { showElResult('请选择页面操作', false); return; }
   }
   // 同名（同文件）覆盖确认：防止误覆盖已有元素（特殊操作不碰元素库，整段跳过）
   const fname = $('el-file').value;
-  if (!special && name && (state.elementsAll[fname] || []).indexOf(name) >= 0) {
+  if (!special && !noElOp && name && (state.elementsAll[fname] || []).indexOf(name) >= 0) {
     if (!await uiConfirm('元素库文件 ' + fname + ' 里已有同名元素「' + name + '」，保存将覆盖更新原定义。\n\n' +
       '点「确定」= 覆盖更新\n点「取消」= 不保存')) return;
   }
   // 仅元素模式落点防呆（v6.15.30）：写入未被任何页面对象 import 的文件 → 元素静默失效
-  if (purpose === 'only' && name && !(state.eleReferenced || []).includes(fname)) {
+  if (purpose === 'only' && name && !noElOp && !(state.eleReferenced || []).includes(fname)) {
     if (!await uiConfirm('「' + fname + '」没有被任何页面对象 import，元素保存后不会在任何用例中生效（静默失效）。\n\n' +
       '建议：改用「元素+用例+操作」用途，元素会自动写入目标页面绑定的元素文件。\n仍要保存到该文件？')) return;
   }
   // 按需求：添加测试用例不判断重复——同名直接覆盖、同定位直接新增，元素照常入库
-  let r = special ? { ok: true, msg: '' } : await saveElement(true);
+  let r = (special || noElOp) ? { ok: true, msg: '' } : await saveElement(true);
   if (!r) return;
   if (!r.ok && r.duplicate) {
     // 同定位已有元素：推荐复用（避免同定位多元素条目）；跨文件复用会破坏页面静态绑定，仅提示不自动切
@@ -2496,7 +2582,7 @@ async function _doSaveElement(continueMode) {
   }
   if (!r) return;
   if (!r.ok) { showElResult(r.msg || '元素保存失败', false); return; }
-  let savedName = special ? '' : name;
+  let savedName = (special || noElOp) ? '' : name;
 
   const finishContinue = () => {
     $('modal-mask').style.display = 'none';
@@ -2517,7 +2603,7 @@ async function _doSaveElement(continueMode) {
   const step = {
     type: special || $('el-op-type').value,   // 特殊操作优先（不依赖元素）
     element: savedName,
-    element_file: special ? '' : fname,       // 元素刚保存进的文件（元素不在页面引用文件时后端优先从这复制）
+    element_file: (special || noElOp) ? '' : fname,  // 元素刚保存进的文件（元素不在页面引用文件时后端优先从这复制）
     param: $('el-op-param').value.trim(),
     desc: '',
     comment: $('el-op-comment').value.trim(),        // 操作备注 → 页面方法 docstring
@@ -2535,7 +2621,8 @@ async function _doSaveElement(continueMode) {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ case_file: caseFile, method_name: methodName, step: step,
                            gen_page_method: purpose === 'all' ? 1 : 0,
-                           insert_after_step: insertPos() }),
+                           insert_after_step: insertPos(),
+                           page_file: $('el-page-file').value || '' }),
   }).then(r => r.json()).catch(() => null);
   if (!cr || !cr.ok) {
     showElResult((cr && cr.msg ? cr.msg : '追加用例代码失败：服务异常') + '（元素已保存到元素库）', false);

@@ -245,9 +245,9 @@ try {
               <option value="deal_first_launch_dialogs">首次启动弹窗处理（无弹窗自动跳过）</option>
             </select>
           </label>
-          <label id="page-file-label">写入页面文件 <span class="help-icon" data-help="由目标用例决定；新建用例时可选复用已有页面">?</span>
+          <label id="page-file-label">写入页面文件 <span class="help-icon" data-help="列出这条用例用到的页面，任选其一；也可以选还没用到的页面——保存时自动接进用例（自动补 import 和初始化代码），不用手动改">?</span>
             <select id="el-page-new" style="display:none"></select>
-            <input id="el-page-file" type="text" readonly placeholder="选择目标用例后自动带出">
+            <select id="el-page-file"></select>
           </label>
         </section>
 
@@ -347,7 +347,7 @@ try {
 <script src="/static/nav.js"></script>
 <script src="/static/theme.js"></script>
 <script src="/static/connect_qr.js"></script>
-<script src="static/index.js?v=118"></script>
+<script src="static/index.js?v=121"></script>
 <script>
   document.getElementById('btn-qr-connect').addEventListener('click', function () { window.PlatformQR.open(); });
 </script>

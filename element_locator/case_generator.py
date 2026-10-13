@@ -26,6 +26,10 @@ STEP_TYPES = [
     'assert_toast', 'wait_element', 'assert_gone', 'if_click',
     'screenshot', 'tap', 'sleep', 'hide_keyboard', 'custom',
     'deal_first_launch_dialogs',
+    # v6.15.33：框架原生手势/设备能力（appOperator 直映射），贴合原框架设定
+    'swipe_up', 'swipe_down', 'swipe_left', 'swipe_right',
+    'drag_to', 'press_keycode', 'background_app', 'activate_app',
+    'toggle_wifi', 'toggle_airplane',
 ]
 
 # ④断言栏 · 组合断言类型（操作与断言解耦：一步 = 操作 + 断言组合）
@@ -194,6 +198,16 @@ def step_desc(step):
         'hide_keyboard': '收起键盘',
         'custom': (p or '自定义代码').splitlines()[0],
         'deal_first_launch_dialogs': '首次启动弹窗处理（无弹窗自动跳过）',
+        'swipe_up': '上滑【%s】' % el,
+        'swipe_down': '下滑【%s】' % el,
+        'swipe_left': '左滑【%s】' % el,
+        'swipe_right': '右滑【%s】' % el,
+        'drag_to': '拖拽【%s】到【%s】' % (el, p),
+        'press_keycode': '按下按键（键码%s）' % p,
+        'background_app': '应用退后台%s秒' % p,
+        'activate_app': '拉起应用 %s' % p,
+        'toggle_wifi': '切换WiFi开关',
+        'toggle_airplane': '切换飞行模式开关',
     }.get(t, '未定义步骤') + _asserts_desc_suffix(step)
 
 
@@ -315,6 +329,35 @@ def page_method_code(step):
                 + '    except Exception:\n'
                 + '        pass  # 该弹窗未出现，跳过')
         return _method_block('deal_first_launch_dialogs', desc, [], body)
+    if t in ('swipe_up', 'swipe_down', 'swipe_left', 'swipe_right'):
+        fn = {'swipe_up': 'touch_element_up_slide', 'swipe_down': 'touch_element_down_slide',
+              'swipe_left': 'touch_element_left_slide', 'swipe_right': 'touch_element_right_slide'}[t]
+        try:
+            dur = int(step.get('param'))
+        except (TypeError, ValueError):
+            dur = 500
+        return _method_block('%s_%s' % (t, el), desc, ['duration=%d' % dur],
+                             'self.appOperator.%s(self._elements.%s, duration=duration)' % (fn, el))
+    if t == 'drag_to':
+        dst = (step.get('param') or '').strip()
+        return _method_block('drag_%s_to_%s' % (el, dst), desc, [],
+                             'self.appOperator.touch_a_element_drag_to_another_element('
+                             'self._elements.%s, self._elements.%s)' % (el, dst))
+    if t == 'press_keycode':
+        return _method_block('press_key', desc, ['keycode'],
+                             'self.appOperator.press_keycode(keycode)')
+    if t == 'background_app':
+        return _method_block('background_run', desc, ['seconds'],
+                             'self.appOperator.background_app(seconds)')
+    if t == 'activate_app':
+        return _method_block('activate', desc, ['app_id'],
+                             'self.appOperator.activate_app(app_id)')
+    if t == 'toggle_wifi':
+        return _method_block('toggle_wifi', desc, [],
+                             'self.appOperator.toggle_wifi()')
+    if t == 'toggle_airplane':
+        return _method_block('toggle_airplane_mode', desc, [],
+                             'self.appOperator.toggle_airplane_mode()')
     return None
 
 
@@ -354,50 +397,74 @@ TYPE_NAMES_CN = {
     'if_click': '出现才点击', 'custom': '自定义代码',
     'assert_visible': '断言存在', 'assert_text': '断言文本',
     'assert_toast': '断言Toast', 'assert_gone': '断言消失',
+    'swipe_up': '上滑', 'swipe_down': '下滑', 'swipe_left': '左滑', 'swipe_right': '右滑',
+    'drag_to': '拖拽到元素', 'press_keycode': '按键',
+    'background_app': '退后台', 'activate_app': '拉起应用',
+    'toggle_wifi': '切换WiFi', 'toggle_airplane': '切换飞行模式',
 }
 
 
-def case_step_line(step):
-    """步骤 → 用例里的一行调用；sleep/custom 返回特殊行（非 page.xxx 调用）"""
+def case_step_line(step, var='page'):
+    """步骤 → 用例里的一行调用；sleep/custom 返回特殊行（非 page.xxx 调用）。
+    var=目标页面对象变量名：'page' 走既有局部别名风格 page.xxx()（兼容历史用例），
+    其他（多页面挂接的 page2/page3…）生成 self.<var>.xxx() 直调。"""
     t = step.get('type', '')
     el = step.get('element') or ''
     p = step.get('param') or ''
+    pfx = 'page.' if var == 'page' else 'self.%s.' % var
     if t == 'click':
-        return 'page.click_%s()' % el
+        return '%sclick_%s()' % (pfx, el)
     if t == 'input':
-        return 'page.input_%s(%s)' % (el, _q(p))
+        return '%sinput_%s(%s)' % (pfx, el, _q(p))
     if t == 'long_press':
-        return 'page.long_press_%s()' % el
+        return '%slong_press_%s()' % (pfx, el)
     if t == 'assert_visible':
-        return 'page.assert_%s()' % el
+        return '%sassert_%s()' % (pfx, el)
     if t == 'assert_text':
-        return 'page.assert_%s_text(%s)' % (el, _q(p))
+        return '%sassert_%s_text(%s)' % (pfx, el, _q(p))
     if t == 'assert_toast':
-        return 'page.assert_toast(%s)' % _q(p)
+        return '%sassert_toast(%s)' % (pfx, _q(p))
     if t == 'wait_element':
         # 秒数写进用例行所见即所得；非法输入回落页面方法默认值（不带参）
         try:
-            return 'page.wait_%s(%d)' % (el, int(p))
+            return '%swait_%s(%d)' % (pfx, el, int(p))
         except (TypeError, ValueError):
-            return 'page.wait_%s()' % el
+            return '%swait_%s()' % (pfx, el)
     if t == 'assert_gone':
-        return 'page.assert_%s_gone()' % el
+        return '%sassert_%s_gone()' % (pfx, el)
     if t == 'if_click':
         try:
-            return 'page.click_%s_if_visible(%d)' % (el, int(p))
+            return '%sclick_%s_if_visible(%d)' % (pfx, el, int(p))
         except (TypeError, ValueError):
-            return 'page.click_%s_if_visible()' % el
+            return '%sclick_%s_if_visible()' % (pfx, el)
     if t == 'hide_keyboard':
-        return 'page.dismiss_keyboard()'
+        return '%sdismiss_keyboard()' % pfx
     if t == 'deal_first_launch_dialogs':
-        return 'page.deal_first_launch_dialogs()'
+        return '%sdeal_first_launch_dialogs()' % pfx
     if t == 'screenshot':
-        return 'page.wait_and_shot(%s)' % _q(p)
+        return '%swait_and_shot(%s)' % (pfx, _q(p))
     if t == 'tap':
         parts = [x.strip() for x in p.split(',') if x.strip()]
         if len(parts) >= 2:
-            return 'page.tap_xy(%s, %s)' % (parts[0], parts[1])
-        return 'page.tap_xy(%s)' % (parts[0] if parts else '0')
+            return '%stap_xy(%s, %s)' % (pfx, parts[0], parts[1])
+        return '%stap_xy(%s)' % (pfx, (parts[0] if parts else '0'))
+    if t in ('swipe_up', 'swipe_down', 'swipe_left', 'swipe_right'):
+        try:
+            return '%s%s_%s(%d)' % (pfx, t, el, int(p))
+        except (TypeError, ValueError):
+            return '%s%s_%s()' % (pfx, t, el)
+    if t == 'drag_to':
+        return '%sdrag_%s_to_%s()' % (pfx, el, (p or 'target'))
+    if t == 'press_keycode':
+        return '%spress_key(%s)' % (pfx, int(str(p).strip()))
+    if t == 'background_app':
+        return '%sbackground_run(%s)' % (pfx, int(str(p).strip()))
+    if t == 'activate_app':
+        return '%sactivate(%s)' % (pfx, _q(p))
+    if t == 'toggle_wifi':
+        return '%stoggle_wifi()' % pfx
+    if t == 'toggle_airplane':
+        return '%stoggle_airplane_mode()' % pfx
     if t == 'sleep':
         try:
             return 'time.sleep(%s)' % float(p)
@@ -502,6 +569,80 @@ def _page_class_of(cls_block):
     """类体里 self.page = XxxPage( → 页面类名"""
     m = re.search(r'self\.page\s*=\s*(\w+)\(', cls_block)
     return m.group(1) if m else ''
+
+
+def _page_targets_of(cls_block):
+    """类体里全部页面对象实例化行 self.<var> = XxxPage(...) →
+    [{var, cls, page_file, elements_file}]（按出现顺序）。
+    框架原生允许一个用例挂多个页面（self.page / self.page2 …），v6.15.33 起
+    弹窗按此支持选择目标页面；类名归属歧义的目标剔除（与 resolve_page 同防误写策略）。"""
+    targets = []
+    for m in re.finditer(r'self\.(\w+)\s*=\s*(\w+)\s*\(', cls_block):
+        var, cls = m.group(1), m.group(2)
+        if any(t['cls'] == cls for t in targets):
+            continue
+        page_file, elements_file = resolve_page(cls)
+        if page_file:
+            targets.append({'var': var, 'cls': cls,
+                            'page_file': page_file, 'elements_file': elements_file})
+    return targets
+
+
+def _wire_page_into_class(content, page_file, method_name=''):
+    """把页面挂接进用例类：缺 import 补 import、缺实例化在 setup_class 末尾补
+    self.<var> = <Cls>(self.appOperator)（类里没有任何页面对象时补 self.page）。
+    挂进 method_name 所在类（多类文件不串类；缺省挂第一个类）。
+    返回 (新内容, var)；页面文件不存在返回 ('', '')。"""
+    ppath = os.path.join(PAGES_DIR, page_file)
+    if not os.path.isfile(ppath):
+        return '', ''
+    stem = os.path.splitext(page_file)[0]
+    cls = _first_class_of(ppath)
+    if not cls:
+        return '', ''
+    imp = 'from page_objects.app_ui.android.demoProject.pages.%s import %s' % (stem, cls)
+    if imp not in content:
+        imports = list(re.finditer(r'^(?:from\s+\S+\s+import\s+[^\n]+|import\s+[^\n]+)$',
+                                   content, re.MULTILINE))
+        if imports:
+            pos = imports[-1].end()
+            content = content[:pos] + '\n' + imp + content[pos:]
+        else:
+            content = '# -*- coding: utf-8 -*-\n' + imp + '\n\n' + content
+    blocks = _class_blocks(content)
+    block = None
+    if method_name:
+        for _cls_name, b in blocks:
+            if re.search(r'^%sdef %s\(' % (IND, re.escape(method_name)), b, re.MULTILINE):
+                block = b
+                break
+    if block is None and blocks:
+        block = blocks[0][1]
+    if block is None:
+        return '', ''
+    used = set(re.findall(r'self\.(\w+)\s*=', block))
+    var = 'page' if 'page' not in used else 'page2'
+    n = 2
+    while var in used:
+        n += 1
+        var = 'page%d' % n
+    assign = '%sself.%s = %s(self.appOperator)' % (IND * 2, var, cls)
+    m = re.search(r'^%sdef setup_class\(self\):' % IND, block, re.MULTILINE)
+    if m:
+        tail = block[m.start():]
+        nxt = re.search(r'\n%s(?:def |@)|\nclass ' % IND, tail)
+        body_end = m.start() + (nxt.start() + 1 if nxt else len(tail))
+        seg = block[:body_end].rstrip('\n')
+        rest = block[body_end:].lstrip('\n')
+        # 与下一方法之间补空行，贴合框架 def 间空行风格（setup_class 后还有方法时）
+        sep = '\n\n' if rest.startswith(('%sdef ' % IND, '@')) else '\n'
+        new_block = seg + '\n' + assign + sep + rest
+    else:
+        head = re.search(r'^class\s+\w+[^\n]*\n', block, re.MULTILINE)
+        new_block = (block[:head.end()].rstrip('\n') + '\n\n'
+                     + IND + 'def setup_class(self):\n' + assign + '\n' + block[head.end():].lstrip('\n'))
+    content = content.replace(block, new_block, 1)
+    return content, var
 
 
 def find_page_files(page_class):
@@ -705,7 +846,8 @@ def case_files_info():
                           'cn_name': cn_name,
                           'page_class': page_class, 'page_file': page_file,
                           'elements_file': elements_file,
-                          'page_ambiguous': hits if len(hits) > 1 else []})
+                          'page_ambiguous': hits if len(hits) > 1 else [],
+                          'page_targets': _page_targets_of(block)})
     return infos
 
 
@@ -740,16 +882,19 @@ def _sync_method_docstring(content, method_name):
     return content[:body_start] + new_body + content[body_end:]
 
 
-def append_code_to_method(case_file, method_name, step, gen_page_method=False, insert_after_step=None):
+def append_code_to_method(case_file, method_name, step, gen_page_method=False,
+                          insert_after_step=None, page_file=''):
     """把 step 生成的一行调用代码插入用例文件指定方法体（不破坏文件结构）。
 
     step：统一步骤结构（type/element/param/desc + case_comment 步骤描述）。
     insert_after_step：0/None = 追加到方法末尾；N = 插到第 N 个步骤之后（漏步骤时补插中间）。
     步骤描述 case_comment 缺省时自动生成（如「点击 login_btn」），作为该步在用例里的注释。
-    gen_page_method=True（功能③）时同步把该操作对应的页面方法生成/更新到
-    目标用例 self.page 所引用的页面文件（三件套联动），并校验元素文件归属。
+    gen_page_method=True（功能③）时同步把该操作对应的页面方法生成/更新到目标页面文件。
+    page_file（v6.15.33）：指定目标页面文件——用例已实例化的页面直接命中（调用前缀用
+    对应 self.<var>）；未实例化的页面自动挂接（补 import + setup_class 实例化，var 取
+    page2/page3…）；留空回落该用例 self.page 的既有行为。
     返回 {'ok': bool, 'action': 'appended', 'line':..., 'content':..., 'msg',
-          'page_file':..., 'page_method':..., 'page_content':...}
+          'page_file':..., 'page_method':..., 'page_content':..., 'page_var'}
     """
     if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*\.py$', case_file):
         return {'ok': False, 'msg': '用例文件名不合法'}
@@ -778,15 +923,59 @@ def append_code_to_method(case_file, method_name, step, gen_page_method=False, i
         if not ok_xy:
             return {'ok': False, 'msg': '坐标点击参数需为 x,y 数字格式（示例：320,540），收到：%r'
                                            % (step.get('param') or '')}
-    line = case_step_line(step)
-    if not line:
-        return {'ok': False, 'msg': '该操作类型没有可追加的代码行'}
+    if step.get('type') in ('press_keycode', 'background_app'):
+        try:
+            int(str(step.get('param') or '').strip())
+        except (TypeError, ValueError):
+            return {'ok': False, 'msg': '按键码/后台秒数需为整数（按键示例：4；后台示例：5，-1 为完全停用），收到：%r'
+                                           % (step.get('param') or '')}
+    if step.get('type') == 'drag_to' and not (step.get('param') or '').strip():
+        return {'ok': False, 'msg': '拖拽需要参数：目标元素名（须已保存在元素库）'}
+    if step.get('type') == 'activate_app' and not (step.get('param') or '').strip():
+        return {'ok': False, 'msg': '拉起应用需要参数：应用包名（如 com.recordlife.kuaige）'}
 
     path = os.path.join(CASES_DIR, case_file)
     if not os.path.exists(path):
         return {'ok': False, 'msg': '用例文件 %s 不存在（可在测试平台「APP自动化 → 用例上传」上传，或在 cases/app_ui/android/demoProject/ 下按框架格式创建）' % case_file}
     content = _read(path)
     case_before = content   # 撤销用：写入前快照
+
+    # ---- 目标页面解析（v6.15.33 多页面）：方法所在类 → 已实例化页面；指定页面未实例化则自动挂接 ----
+    def _class_block_of_method(c):
+        for cls_name, block in _class_blocks(c):
+            if re.search(r'^%sdef %s\(' % (IND, re.escape(method_name)), block, re.MULTILINE):
+                return block
+        return None
+
+    block = _class_block_of_method(content)
+    targets = _page_targets_of(block) if block else []
+    target, wired = None, ''
+    want = os.path.basename((page_file or '').strip())
+    if want:
+        target = next((t for t in targets if t['page_file'] == want), None)
+        if target is None:
+            ppath = os.path.join(PAGES_DIR, want)
+            if not os.path.isfile(ppath):
+                return {'ok': False, 'msg': '所选页面文件不存在：%s' % want}
+            cls = _first_class_of(ppath)
+            hits = find_page_files(cls)
+            if len(hits) > 1:
+                return {'ok': False, 'msg': ('页面类 %s 在多个文件里重名（%s），import 归属不唯一，'
+                                             '已中止——请先给重名文件改名' % (cls, '、'.join(hits)))}
+            wired_content, var = _wire_page_into_class(content, want, method_name)
+            if not wired_content:
+                return {'ok': False, 'msg': '页面 %s 自动接入失败（无法定位类或 setup_class）' % want}
+            content = wired_content
+            wired = var
+            target = {'var': var, 'cls': cls, 'page_file': want,
+                      'elements_file': (page_elements_map().get(want) or '')}
+    elif targets:
+        target = next((t for t in targets if t['var'] == 'page'), targets[0])
+    var = target['var'] if target else 'page'
+
+    line = case_step_line(step, var)
+    if not line:
+        return {'ok': False, 'msg': '该操作类型没有可追加的代码行'}
 
     m = re.search(r'^%sdef %s\(self\):' % (IND, re.escape(method_name)), content, re.MULTILINE)
     if not m:
@@ -840,28 +1029,19 @@ def append_code_to_method(case_file, method_name, step, gen_page_method=False, i
     result = {'ok': True, 'action': 'appended', 'line': line, 'content': new_content,
               'case_before': case_before,
               'page_file': '', 'page_method': '', 'page_content': '',
+              'page_var': var,
               'msg': '代码已追加到 %s::%s：%s' % (case_file, method_name, line)}
+    if wired:
+        result['msg'] += '；已自动把 %s 接进用例（补 import，setup_class 里加 self.%s = %s(self.appOperator)）' % (target['cls'], wired, target['cls'])
     if not gen_page_method:
         return result
 
-    # ---- 功能③：三件套联动，同步生成/更新页面操作方法 ----
-    # 1) 目标方法所在类 → 该类使用的页面对象类 → 页面文件 + 其引用的元素文件
-    page_class = ''
-    for cls_name, block in _class_blocks(new_content):
-        if re.search(r'^%sdef %s\(' % (IND, re.escape(method_name)), block, re.MULTILINE):
-            page_class = _page_class_of(block)
-            break
-    hits = find_page_files(page_class)
-    if len(hits) > 1:
-        return {'ok': False, 'case_before': case_before, 'page_file': '',
-                'msg': ('已追加用例行，但页面类 %s 在多个文件里重名（%s），归属不唯一，'
-                        '已中止写入页面方法——请先给重名文件改名或删除，再重试'
-                        % (page_class, '、'.join(hits)))}
-    page_file, elements_file = resolve_page(page_class)
-    if not page_file:
+    # ---- 功能③：三件套联动，同步生成/更新页面操作方法（写入目标页面文件） ----
+    if not target:
         return {'ok': False, 'case_before': case_before, 'page_file': '',
                 'msg': ('已追加用例行，但目标用例没有页面对象（找不到 self.page = XxxPage(...)），'
-                        '无法生成操作方法——请先给该用例补页面对象文件')}
+                        '无法生成操作方法——请在「写入页面文件」下拉选择目标页面后重试')}
+    page_class, page_file, elements_file = target['cls'], target['page_file'], target['elements_file']
 
     method_code = page_method_code(step)
     if not method_code:
@@ -870,9 +1050,16 @@ def append_code_to_method(case_file, method_name, step, gen_page_method=False, i
         result['page_file'] = page_file
         return result
 
-    # 2) 元素必须在页面引用的元素文件里（一个页面只 import 一个元素文件）
-    el_name = step.get('element') or ''
-    if el_name and elements_file and el_name not in element_library.list_element_names(elements_file):
+    # 2) 元素必须在页面引用的元素文件里（一个页面只 import 一个元素文件）；
+    #    drag_to 的目标元素（param）同样要落位到该文件
+    need_names = [step.get('element') or '']
+    if step.get('type') == 'drag_to' and (step.get('param') or '').strip():
+        need_names.append((step.get('param') or '').strip())
+    for el_name in need_names:
+        if not (el_name and elements_file):
+            continue
+        if el_name in element_library.list_element_names(elements_file):
+            continue
         # 元素不在页面引用的元素文件里时不再中断三件套：自动把元素整行从其所在文件
         # 复制/覆盖到目标文件（同名覆盖，用户口径「重复元素覆盖就好了」）；任何文件里都没有才报错
         srcs = [ff for ff in element_library.list_element_files()
