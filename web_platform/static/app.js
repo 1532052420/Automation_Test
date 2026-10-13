@@ -745,6 +745,34 @@ async function initConnect() {
   initSolopiImport();
   await loadConnectInfo();
   applyModeVisibility();
+  /* 手机扫码接入（?scan=1）：登记手机 IP → 匹配已保存设备 → 填配对码完成 adb pair/connect */
+  if (location.search.indexOf('scan=1') >= 0) {
+    var card = document.getElementById('scanCard');
+    if (card) card.scrollIntoView({ behavior: 'smooth' });
+    var show = function (id, txt) { var el = document.getElementById(id); if (el) el.textContent = txt; };
+    api('/api/connect/claim', { method: 'POST' }).then(function (d) {
+      if (!d.ok) return;
+      show('scanPhoneIp', '（本机 IP：' + (d.phone_ip || '未知') + '）');
+      document.getElementById('scanMatch').innerHTML = d.matched
+        ? '✓ 已匹配登记设备：<b class="mono">' + esc(d.matched.udid) + '</b>（' + esc(d.matched.model || '') + '）'
+        : '此 IP 尚无登记设备——请先用 USB 连接一次本平台完成登记，或直接在下方配对。';
+      document.getElementById('scanForm').style.display = 'block';
+      if (d.matched && d.matched.ip) document.getElementById('scIp').value = d.matched.ip;
+    }).catch(function () {});
+    var pb = document.getElementById('scPair');
+    if (pb) pb.addEventListener('click', function () {
+      var body = { ip: $('#scIp').value.trim(), pair_port: $('#scPairPort').value.trim(),
+                   code: $('#scCode').value.trim(), conn_port: $('#scConnPort').value.trim() || '5555' };
+      pb.disabled = true; show('scMsg', '配对中…'); 
+      postJson('/api/connect/pair', body).then(function (d) {
+        pb.disabled = false;
+        var m = document.getElementById('scMsg');
+        m.textContent = d.msg || (d.ok ? '连接成功' : '失败');
+        m.style.color = d.ok ? 'var(--ok)' : 'var(--bad)';
+        if (d.ok) setTimeout(function () { location.href = '/connect'; }, 1200);
+      }).catch(function () { pb.disabled = false; show('scMsg', '请求失败'); });
+    });
+  }
 }
 
 /* ================= SoloPi 用例导入（拉取/上传 → 预览 → 生成三件套入库） ================= */

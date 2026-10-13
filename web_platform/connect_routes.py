@@ -21,6 +21,7 @@ import re
 import socket
 import subprocess
 import threading
+import time
 
 from flask import Blueprint, jsonify, request, send_file
 
@@ -92,8 +93,9 @@ def _payload(cfg):
     if mode == 'custom':
         text = str(cfg.get('custom') or '')
         return text.replace('{host}', host).replace('{port}', str(cfg.get('port', 8080))), host
-    # 默认 adbwifi：Android 官方无线调试配对串（与 Android Studio「二维码配对」同协议）
-    return 'WIFI:T:ADB;S:%s;P:%s;;' % (cfg.get('service', ''), cfg.get('password', '')), host
+    # 默认 adbwifi：手机扫码 → 打开平台连接页（手机浏览器请求源 IP 即手机 IP，
+    # 平台据此外发 adb pair/connect，替代原「静态配对串」（缺平台端配对监听，手机端永远转圈））
+    return 'http://%s:%s/connect?scan=1' % (host, cfg.get('port', 8080)), host
 
 
 def _clean_cfg(cfg):
@@ -209,6 +211,90 @@ def api_connect_devices():
     for dev in d.get('devices', []):
         dev['wireless'] = ':' in dev.get('udid', '')
     return jsonify(d)
+
+
+_DEVICES_JSON = os.path.join(BASE_DIR, 'config', 'demoProject', 'connect_devices.json')
+
+
+def _load_saved_devices():
+    try:
+        return json.load(open(_DEVICES_JSON, encoding='utf-8'))
+    except Exception:
+        return []
+
+
+def _save_saved_devices(lst):
+    os.makedirs(os.path.dirname(_DEVICES_JSON), exist_ok=True)
+    json.dump(lst, open(_DEVICES_JSON, 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
+
+
+def _upsert_usb_devices():
+    """USB 在线设备自动登记（USB 首连即保存连接信息，供扫码/无线免 USB 复用）"""
+    saved = _load_saved_devices()
+    d = adb_devices()
+    changed = False
+    for dev in d.get('devices', []):
+        udid = dev.get('udid', '')
+        if ':' in udid or not udid:      # 无线设备不在此登记
+            continue
+        row = next((x for x in saved if x['udid'] == udid), None)
+        if row is None:
+            saved.append({'udid': udid, 'model': dev.get('model', ''), 'state': dev.get('state', ''),
+                          'ip': '', 'added_at': int(time.time()), 'last_seen': int(time.time())})
+            changed = True
+        elif row.get('last_seen') != int(time.time()):
+            row['state'] = dev.get('state', ''); row['last_seen'] = int(time.time())
+            row['model'] = row.get('model') or dev.get('model', '')
+            changed = True
+    if changed:
+        _save_saved_devices(saved)
+    return saved
+
+
+@bp.route('/api/connect/saved')
+def api_connect_saved():
+    """已保存的设备（USB 首连登记）+ 当前 USB 在线刷新"""
+    saved = _upsert_usb_devices()
+    return jsonify({'ok': True, 'devices': saved})
+
+
+@bp.route('/api/connect/claim', methods=['POST'])
+def api_connect_claim():
+    """手机扫码打开本页后调用：服务端记下手机的局域网 IP，并匹配已保存设备"""
+    phone_ip = request.remote_addr or ''
+    saved = _load_saved_devices()
+    matched = next((x for x in saved if x.get('ip') == phone_ip), None)
+    if matched:
+        matched['last_seen'] = int(time.time())
+        _save_saved_devices(saved)
+    return jsonify({'ok': True, 'phone_ip': phone_ip, 'matched': matched})
+
+
+@bp.route('/api/connect/pair', methods=['POST'])
+def api_connect_pair():
+    """手机端提交：无线调试的配对码（pair ip:port + 6位码）→ pair 成功后 connect 主端口"""
+    body = request.get_json(silent=True) or {}
+    ip = str(body.get('ip') or '').strip()
+    pair_port = str(body.get('pair_port') or '').strip()
+    code = str(body.get('code') or '').strip()
+    conn_port = str(body.get('conn_port') or '5555').strip()
+    if not re.match(r'^\d{1,3}(\.\d{1,3}){3}$', ip):
+        return jsonify({'ok': False, 'msg': 'IP 格式不正确'})
+    if not re.match(r'^\d{4,6}$', pair_port) or not re.match(r'^\d{6}$', code):
+        return jsonify({'ok': False, 'msg': '请填写手机「无线调试 → 使用配对码配对设备」页显示的端口与 6 位配对码'})
+    ok, out = _run_adb(['pair', '%s:%s' % (ip, pair_port), code])
+    if not ok or 'Successfully' not in out and '成功' not in out and 'paired' not in out.lower():
+        return jsonify({'ok': False, 'msg': '配对失败：%s' % out[:120]})
+    ok2, out2 = _run_adb(['connect', '%s:%s' % (ip, conn_port)])
+    saved = _load_saved_devices()
+    row = next((x for x in saved if x.get('ip') == ip), None)
+    if row is None:
+        row = {'udid': '%s:%s' % (ip, conn_port), 'model': '', 'ip': ip,
+               'added_at': int(time.time()), 'last_seen': int(time.time())}
+        saved.append(row)
+    row['ip'] = ip; row['last_seen'] = int(time.time())
+    _save_saved_devices(saved)
+    return jsonify({'ok': ok2, 'msg': ('配对成功，已连接 %s:%s' % (ip, conn_port)) if ok2 else ('配对成功但连接失败：%s' % out2[:100])})
 
 
 @bp.route('/api/connect/adb', methods=['POST'])

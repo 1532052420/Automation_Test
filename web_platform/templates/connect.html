@@ -29,6 +29,27 @@
     <!-- 右侧面板区 -->
     <div class="submain">
 
+      <!-- 手机扫码接入（scan=1 时手机打开本页：登记手机 IP → 填配对码 → 平台 adb pair/connect） -->
+      <section class="panel" id="panel-scan" style="margin-bottom:16px">
+        <div class="card" id="scanCard">
+          <div class="pagehead"><h1>📱 手机扫码接入 <span class="sub" id="scanPhoneIp"></span></h1></div>
+          <div id="scanMatch" style="font-size:13.5px;margin:8px 0 12px"></div>
+          <div id="scanForm" style="display:none">
+            <p style="font-size:13px;color:var(--muted);margin-bottom:10px">
+              在手机上打开 <b>设置 → 开发者选项 → 无线调试 → 使用配对码配对设备</b>，
+              把该页面显示的 <b>IP 地址、端口、6 位配对码</b> 填到下面：</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <input id="scIp" class="input" placeholder="IP（无线调试页显示）" style="height:38px;width:170px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font-size:13px">
+              <input id="scPairPort" class="input" placeholder="配对端口" style="height:38px;width:100px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font-size:13px">
+              <input id="scCode" class="input" placeholder="6 位配对码" maxlength="6" style="height:38px;width:110px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font-size:13px">
+              <input id="scConnPort" class="input" placeholder="连接端口(主页面)" style="height:38px;width:130px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font-size:13px">
+              <button type="button" class="btn" id="scPair">配对并连接</button>
+            </div>
+            <p id="scMsg" style="font-size:12.5px;margin-top:8px;color:var(--muted)"></p>
+          </div>
+        </div>
+      </section>
+
       <!-- 连接配置：配置卡片 + 扫码二维码卡片 -->
       <section class="panel" id="panel-settings" hidden>
         <div class="pagehead">
