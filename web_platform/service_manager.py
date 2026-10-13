@@ -193,14 +193,35 @@ def stop_service(svc):
     if not kinds:
         return False, '该服务不支持托管启停（平台自身模块）'
     n = _kill_by_kinds(kinds)
+    if 'appium' in kinds and not n:
+        # ps 清点杀不到时，pgrep 直取 pid 再杀（Appium 进程 cmdline 含 appium，不依赖 ps 输出格式）
+        try:
+            pr = subprocess.run(['pgrep', '-f', r'homebrew/bin/appium|appium.*--port'],
+                                capture_output=True, text=True, timeout=8)
+            for pid in [int(x) for x in pr.stdout.split() if x.isdigit()]:
+                try:
+                    os.kill(pid, 15)
+                    n += 1
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        for _ in range(10):
+            time.sleep(1)
+            from web_platform.runtime_config import check_appium
+            ok, _m = check_appium('127.0.0.1', '4726')
+            if not ok:
+                n = n or 1
+                break
     if not n:
-        # ps 不可用/未匹配到进程时，用 HTTP 探测确认是否真的没在运行——杜绝假「未在运行」
+        # 仍未匹配到进程时，用 HTTP 探测确认是否真的没在运行——杜绝假「未在运行」
         if 'appium' in kinds:
             from web_platform.runtime_config import check_appium
             ok, _m = check_appium('127.0.0.1', '4726')
             if ok:
                 return False, '无法定位 Appium 进程（进程列表不可用），请在终端手动停止后重试'
         return True, '未在运行'
+    from web_platform.routes import _project_services
     for _ in range(8):   # 确认进程真正退出（kill 后退出有延迟）
         time.sleep(1)
         if all(s['kind'] not in kinds for s in _project_services()):

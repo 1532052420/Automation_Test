@@ -219,15 +219,18 @@ def check_appium(server_ip, server_port):
     返回 (ok, err_msg)"""
     import urllib.request
     url = 'http://%s:%s/wd/hub/status' % (server_ip, server_port)
+    # 本机探测必须绕过系统代理（127.0.0.1 走代理会被拦截，导致就绪/运行判定全部误判）
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     try:
-        with urllib.request.urlopen(url, timeout=3) as resp:
-            body = ujson.loads(resp.read().decode('utf-8', 'ignore'))
+        with opener.open(url, timeout=5) as resp:
+            raw = resp.read().decode('utf-8', 'ignore')
+            body = ujson.loads(raw)
             if body.get('status') == 0:
                 return True, ''
             value = body.get('value') or {}
             if value.get('ready') is True:
                 return True, ''
-            return False, 'Appium /status 未就绪: %s' % body
+            return False, 'Appium /status 未就绪: %s' % raw[:120]
     except Exception as e:
         return False, str(e)
 
