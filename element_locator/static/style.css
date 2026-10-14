@@ -424,6 +424,28 @@ html.night .side .side-btn:hover { background: rgba(255,255,255,.08); color: #ff
 html.night .side .side-btn.on { background: rgba(74,169,255,.16); color: #4aa9ff; font-weight: 600; }
 html.night .side .brand .bt { color: #f3f4f6; }
 html.night .side-foot { border-top-color: #303236; }
+
+/* ---------- 侧栏双模式（v6.15.45）：日间浅色 / 夜间深色，两套文字对比度各自兼容 ----------
+   日间用 html:not(.night) 前缀（特异性压过上方为深色侧栏写的旧日间规则）；夜间沿用上方 html.night 块 */
+html:not(.night) .side { background: #ffffff; color: #1f2937; border: 1px solid #e3e8ee; box-shadow: 0 4px 24px rgba(0, 0, 0, .06); }
+html:not(.night) .side .brand { border-bottom-color: #eef1f5; }
+html:not(.night) .side .brand .brand-ic { opacity: .8; }
+html:not(.night) .side .brand .bt { color: #6b7280; }
+html:not(.night) .side .brand .bt small { color: #9ca3af; }
+html:not(.night) .ver { background: #eff6ff; border: none; color: #1d6fd8; box-shadow: none; }
+html:not(.night) .side-label { color: #94a3b8; }
+html:not(.night) .side .side-btn { color: #374151; }
+html:not(.night) .side .side-btn:hover { background: #f3f4f6; color: #111827; }
+html:not(.night) .side .side-btn.on { background: #eaf3fe; color: #1d6fd8; font-weight: 600; }
+html:not(.night) .side-btn .btn-timer { background: rgba(29, 111, 216, .12); color: #1d6fd8; }
+html:not(.night) .side-foot { border-top-color: #eef1f5; }
+html:not(.night) .side-foot .dev-info { color: #4b5563; }
+html:not(.night) .hdr-select { color: #374151; background: #f3f4f6; border-color: #e3e8ee; }
+html:not(.night) .hdr-select:hover, html:not(.night) .hdr-select:focus { background: #eef2f7; border-color: #c6d4e4; }
+html:not(.night) .side-toggle { background: #ffffff; color: #374151; border-color: #e3e8ee; }
+html:not(.night) .side-toggle:hover { background: #f3f4f6; color: #111827; }
+html.night .side-toggle { background: #0b0b0c; border-color: rgba(255, 255, 255, .1); color: #cbd5e1; }
+html.night .side-toggle:hover { background: #17181b; color: #fff; }
 html.night .col { background: #1b1c1f; }
 html.night .col-title { background: #232428; border-bottom-color: #303236; color: #f3f4f6; }
 html.night .col-title .hint, html.night .hint { color: #9ca3af; }
@@ -1037,6 +1059,7 @@ html.night input::placeholder, html.night textarea::placeholder { color: #9aa3af
   transition: left .2s ease, background .15s, color .15s; }
 .side-toggle:hover { color: #fff; background: #26272b; }
 .side-toggle .st-ic { display: block; transition: transform .2s ease; }
+.side-toggle .st-ic svg { width: 17px; height: 17px; display: block; }
 body.side-collapsed .side-toggle { left: 56px; }
 body.side-collapsed .side-toggle .st-ic { transform: scaleX(-1); }
 /* 收起态 = 56px 图标栏：功能 icon 保留可点击（快捷执行/开关），文字与设备区隐藏。

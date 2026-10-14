@@ -543,6 +543,14 @@ body[data-page="connect"] main { max-width: none; padding-bottom: 28px; }
 .subnav a.on svg { opacity: 1; }
 .subnav a:hover { background: rgba(255, 255, 255, .08); color: #fff; }
 .subnav a.on { background: rgba(74, 169, 255, .16); color: #4aa9ff; font-weight: 600; }
+
+/* 菜单栏双模式（v6.15.46）：日间浅色 / 夜间深色（原两模式同为近黑底，肉眼无区分） */
+html:not(.night) .subnav { background: #ffffff; border: 1px solid var(--line); box-shadow: 0 2px 12px rgba(0, 0, 0, .05); }
+html:not(.night) .subnav .subnav-label { color: #94a3b8; border-bottom-color: #eef1f5; }
+html:not(.night) .subnav a { color: #374151; }
+html:not(.night) .subnav a svg { opacity: .8; }
+html:not(.night) .subnav a:hover { background: #f3f4f6; color: #111827; }
+html:not(.night) .subnav a.on { background: #eaf3fe; color: #1d6fd8; }
 @media (max-width: 900px) {
   .runlayout { flex-direction: column; min-height: 0; }
   .subnav { flex-direction: row; flex-wrap: wrap; width: 100%; flex: none; }
