@@ -70,6 +70,24 @@ def video_duration_ms(path):
         return 0
 
 
+def video_resolution(path):
+    """ffprobe 获取录屏真实分辨率，返回 {'width','height'} 或 None。
+
+    渲染器 iG 以首个 uiContext.size 作为全局画布尺寸——录屏分辨率
+    就是回放画布的权威来源。"""
+    try:
+        probe = subprocess.run([FFPROBE, '-v', 'error', '-select_streams', 'v:0',
+                                '-show_entries', 'stream=width,height',
+                                '-of', 'csv=p=0', path],
+                               capture_output=True, text=True, timeout=30)
+        parts = (probe.stdout.strip() or '').split(',')
+        if len(parts) >= 2 and parts[0].strip().isdigit() and parts[1].strip().isdigit():
+            return {'width': int(parts[0]), 'height': int(parts[1]), 'dpr': 1}
+    except Exception:
+        pass
+    return None
+
+
 def frame_datauri(video, offset_ms):
     try:
         r = subprocess.run([FFMPEG, '-ss', '%.3f' % (offset_ms / 1000.0), '-i', video,
@@ -118,14 +136,46 @@ def step_to_action(name):
     return 'Tap'
 
 
-def png_size(datauri):
+def quoted_text(name):
+    """从步骤名抽「」内的实际输入值，如 输入「su7」 → su7。"""
+    m = re.search(r'[「"]([^」"]{1,200})[」"]', name or '')
+    return m.group(1) if m else (name or '')
+
+
+def image_size(datauri):
+    """从 dataURI 解析图片真实像素尺寸。
+
+    坑史：旧版 png_size() 用 PNG IHDR 结构去解 JPEG 字节，解出
+    width=8 亿像素的天文数字，渲染器画布直接爆炸（replay 全废）。
+    JPEG 需扫 SOF0/1/2 标记段取宽高，PNG 读 IHDR，两者不可混用。"""
     try:
-        import struct
-        raw = base64.b64decode(datauri.split(',', 1)[1][:64] + '==')
-        w, h = struct.unpack('>II', raw[16:24])
-        return {'width': w, 'height': h, 'dpr': 3}
+        raw = base64.b64decode(datauri.split(',', 1)[1][:65536])
+        if raw[:8] == b'\x89PNG\r\n\x1a\n':
+            import struct
+            w, h = struct.unpack('>II', raw[16:24])
+            if 0 < w < 100000 and 0 < h < 100000:
+                return {'width': w, 'height': h, 'dpr': 1}
+        if raw[:2] == b'\xff\xd8':
+            import struct
+            i = 2
+            while i + 9 < len(raw):
+                if raw[i] != 0xFF:
+                    i += 1
+                    continue
+                marker = raw[i + 1]
+                if marker in (0xC0, 0xC1, 0xC2, 0xC3):
+                    h, w = struct.unpack('>HH', raw[i + 5:i + 9])
+                    if 0 < w < 100000 and 0 < h < 100000:
+                        return {'width': w, 'height': h, 'dpr': 1}
+                    break
+                if marker in (0xD8, 0x01) or 0xD0 <= marker <= 0xD7:
+                    i += 2
+                else:
+                    seg_len = struct.unpack('>H', raw[i + 2:i + 4])[0]
+                    i += 2 + seg_len
     except Exception:
-        return {'width': 1080, 'height': 2400, 'dpr': 3}
+        pass
+    return None
 
 
 def build_data(run_id, meta, results, run_dir):
@@ -143,7 +193,10 @@ def build_data(run_id, meta, results, run_dir):
         videos = find_case_videos(node, meta.get('udid'))
         v0 = videos[0] if videos else None
         v_dur = video_duration_ms(v0) if v0 else 0
+        v_res = video_resolution(v0) if v0 else None
         desc = str(res.get('description') or '')
+        # 回放画布尺寸：录屏分辨率优先；无录屏时回落首个能解析出尺寸的截图。
+        case_size = dict(v_res) if v_res else None
 
         def frames_for(ws, we, want):
             """时间窗内从录屏取 want 帧 dataURI（窗口均分）。"""
@@ -162,13 +215,18 @@ def build_data(run_id, meta, results, run_dir):
                     out.append((int(case_start + ts), d))
             return out
 
-        # 1) 用例级 Plan 任务（组头）
+        # 1) 用例级 Plan 任务（组头）——结构与官方 Planning/Plan 一致：
+        #    param{userInstruction,imagesIncludeCount} + log{rawResponse} +
+        #    output{actions,more_actions_needed_by_instruction,log,yamlFlow} + cache{hit}
         pf = frames_for(case_start, case_stop, 2) if v0 else []
-        rec_plan = [{'type': 'screenshot', 'ts': ts, 'screenshot': d, 'timing': 'after-calling'}
+        rec_plan = [{'type': 'screenshot', 'ts': ts, 'screenshot': d, 'timing': 'after-calling',
+                     'description': case_name}
                     for ts, d in pf]
-        uc_plan = {'size': None, 'screenshotBase64': rec_plan[-1]['screenshot']} if rec_plan else None
-        if uc_plan and uc_plan['screenshotBase64'].startswith('data:image/jpeg'):
-            uc_plan['size'] = None
+        uc_plan = ({'size': dict(case_size), 'screenshotBase64': rec_plan[-1]['screenshot']}
+                   if rec_plan else None)
+        if uc_plan and not case_size:
+            case_size = image_size(uc_plan['screenshotBase64'])
+            uc_plan['size'] = dict(case_size) if case_size else None
         tasks.append({
             'status': 'finished' if status == 'passed' else 'failed',
             'type': 'Planning', 'subType': 'Plan',
@@ -207,18 +265,24 @@ def build_data(run_id, meta, results, run_dir):
                 main_shot = rec[-1]['screenshot'] if rec else None
             else:
                 rec = ([{'type': 'screenshot', 'ts': s_end, 'screenshot': main_shot,
-                         'timing': 'after-calling'}] if main_shot else [])
+                         'timing': 'after-calling', 'description': st.get('name', '')}
+                       ] if main_shot else [])
             m = re.search(r'\[id:([^\]]+)\]', st.get('name', ''))
             locate = {'description': st.get('name', '')}
             if m:
                 locate.update({'value': m.group(1), 'type': 'id'})
+            # 官方 Input 任务 param 带 value（实际输入内容）
+            param = {'locate': locate}
+            if sub == 'Input':
+                param['value'] = quoted_text(st.get('name', ''))
+            step_size = (image_size(main_shot) if main_shot else None) or (dict(case_size) if case_size else None)
             tasks.append({
                 'status': 'finished' if (st.get('status') in (None, 'passed', 'finished')) else 'failed',
                 'type': 'Action Space', 'subType': sub,
-                'param': {'locate': locate},
+                'param': param,
                 'subTask': True,
                 'timing': {'start': s_start, 'end': s_end, 'cost': s_end - s_start},
-                'uiContext': ({'size': png_size(main_shot), 'screenshotBase64': main_shot}
+                'uiContext': ({'size': step_size, 'screenshotBase64': main_shot}
                               if main_shot else None),
                 'recorder': rec,
             })
@@ -232,32 +296,33 @@ def build_data(run_id, meta, results, run_dir):
                     d = b64_image(os.path.join(ATT, att.get('source', '')))
                     if d:
                         fail_shots.append(d)
-            fail_vids = [v for v in videos if '_failure' in os.path.basename(v)]
             fr = frames_for(case_stop - 1000, case_stop + 500, 3) if v0 else []
             rec = [{'type': 'screenshot', 'ts': ts, 'screenshot': d, 'timing': 'after-calling'}
                    for ts, d in fr]
             main_shot = fail_shots[0] if fail_shots else (rec[-1]['screenshot'] if rec else None)
-            assert_task = {
+            assert_size = (image_size(main_shot) if main_shot else None) or (dict(case_size) if case_size else None)
+            # 官方 Print_Assert_Result 结构：param{condition, thought, result:bool}
+            # + status:'failed' + errorMessage；无 output 字段（原自创的
+            # expect/actual/assertion 结构渲染器不消费，已删）。
+            for r in rec:
+                r.setdefault('description', '断言失败')
+            tasks.append({
                 'status': 'failed', 'type': 'Action Space', 'subType': 'Print_Assert_Result',
-                'param': {'result': 'failed', 'expect': '', 'actual': reason[:200]},
+                'param': {'condition': case_name, 'thought': reason[:200] or '断言未通过',
+                          'result': False},
                 'subTask': True,
+                'errorMessage': reason[:500] or '断言未通过',
                 'timing': {'start': case_stop, 'end': case_stop, 'cost': 0},
-                'uiContext': ({'size': png_size(main_shot), 'screenshotBase64': main_shot}
+                'uiContext': ({'size': assert_size, 'screenshotBase64': main_shot}
                               if main_shot else None),
-                'output': {'assertion': {'type': 'assertion', 'status': 'failed',
-                                         'expected': '', 'actual': reason[:200],
-                                         'message': reason[:500]},
-                           'log': reason[:300]},
                 'recorder': rec,
-            }
-            if fail_vids:
-                assert_task['video'] = 'file://' + fail_vids[0]
-            tasks.append(assert_task)
+            })
 
     return {
         'sdkVersion': '1.0.3',
         'groupName': 'AutomationTest Report',
         'groupDescription': run_id,
+        'deviceType': 'android',
         'executions': [{'logTime': int(time.time() * 1000),
                         'name': 'Action - %s · %s (%s)' % (meta.get('device_model') or '',
                                                            run_id, meta.get('status') or ''),
