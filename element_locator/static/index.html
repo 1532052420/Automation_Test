@@ -237,8 +237,8 @@ try {
                 <option value="ELEMENT_TO_BE_CLICKABLE">元素可点击后再操作（适合按钮）</option>
               </select>
             </label>
-            <label>等待时间(秒) <span class="help-icon" data-help="最多等待秒数，默认 6">?</span>
-              <input id="el-wait-sec" type="number" min="1" max="600" step="1" value="6">
+            <label>等待时间(秒) <span class="help-icon" data-help="最多等待秒数，默认 2；加载慢的元素可单独调大">?</span>
+              <input id="el-wait-sec" type="number" min="1" max="600" step="1" value="2">
             </label>
           </div>
           <label>写入元素文件 <span class="help-icon" data-help="②时自动对齐页面引用的元素文件">?</span>
@@ -346,7 +346,7 @@ try {
 <script src="/static/nav.js"></script>
 <script src="/static/theme.js"></script>
 <script src="/static/connect_qr.js"></script>
-<script src="static/index.js?v=124"></script>
+<script src="static/index.js?v=126"></script>
 <script>
   document.getElementById('btn-qr-connect').addEventListener('click', function () { window.PlatformQR.open(); });
 </script>

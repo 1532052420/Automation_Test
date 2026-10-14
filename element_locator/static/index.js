@@ -438,6 +438,12 @@ async function init() {
   $('el-op-param').addEventListener('input', () => { paramAuto = false; followStepDesc(); });
   $('el-op-comment').addEventListener('input', () => { renderStepsList(currentSteps()); });
   $('el-case-file').addEventListener('change', onCaseFileChange);
+  // 切换用例方法：插入位置/步骤列表按新方法重建（此前残留上一方法的步骤——真 bug，v6.15.40 修复）
+  $('el-case-method').addEventListener('change', () => {
+    const steps = currentSteps();
+    renderInsertPos(steps, false);
+    renderStepsList(steps);
+  });
   // 新建文件输入联动：元素文件切「新建」显隐输入行；用例名输入实时派生页面/元素文件名
   $('el-file').addEventListener('change', () => {
     $('el-file-new-wrap').style.display = isNewElementFile() ? '' : 'none';
@@ -1640,7 +1646,7 @@ async function openModal() {
     .map(t => '<option value="' + t + '"' + (t === loc.type ? ' selected' : '') + '>' + t + '</option>').join('');
   $('el-value').value = loc.value;
   // 等待时间：每次打开弹窗恢复框架默认 30（上一个元素的设置不串扰）
-  $('el-wait-sec').value = 6;
+  $('el-wait-sec').value = 2;
   $('el-result').className = 'el-result'; $('el-result').textContent = '';
   $('el-content').textContent = '';
   // 写入文件默认定位器自己的元素库文件（避免误写进框架自带文件；② 会在选目标用例后自动对齐）
@@ -1741,6 +1747,32 @@ function currentSteps() {
   if (!f || !method) return [];
   const info = (state.caseFiles || []).find(c => c.file === f && (c.method_steps || {})[method]);
   return info ? (info.method_steps[method] || []) : [];
+}
+/* 用例方法/插入位置联动：按所选方法重建插入位置选项。
+   preservePos=true（用例重入，如同用例切操作类型）保留已选位置；
+   false（切换用例方法）重置为末尾——不同方法的步骤序列不同，位置语义不延续（v6.15.40） */
+function renderInsertPos(steps, preservePos) {
+  const posSel = $('el-insert-pos');
+  const curPos = posSel.value;
+  if (currentOpType() === 'deal_first_launch_dialogs') {
+    // 首启弹窗只能出现在所有操作之前：锁定「最前」，不允许选其他插入位置
+    posSel.innerHTML = '<option value="front">最前（放在第 1 步之前）</option>';
+    posSel.value = 'front';
+    posSel.disabled = true;
+  } else {
+    posSel.disabled = false;
+    let posOpts = '<option value="0">末尾（成为第 ' + (steps.length + 1) + ' 步）</option>';
+    for (let i = 1; i <= steps.length; i++) {
+      posOpts += '<option value="' + i + '">第 ' + i + ' 步之后 · ' + esc(String(steps[i - 1]).slice(0, 12)) + '</option>';
+    }
+    posSel.innerHTML = posOpts;
+    if (preservePos && curPos !== '' && curPos !== null && parseInt(curPos, 10) <= steps.length) {
+      posSel.value = curPos;
+    } else {
+      posSel.value = '0';
+      if (preservePos && curPos !== '' && curPos !== null && curPos !== '0') showToast('原插入位置超出当前方法步骤数，已改为末尾');
+    }
+  }
 }
 function insertPos() {
   if ($('el-insert-pos').value === 'front') return 'front';   // 第 1 步之前（首启弹窗类操作锁定）
@@ -2202,27 +2234,7 @@ function onCaseFileChange() {
   const selMethod = mSel.value;
   const stepsInfo = infos.find(c => (c.method_steps || {})[selMethod]);
   const steps = (stepsInfo && stepsInfo.method_steps[selMethod]) || [];
-  const posSel = $('el-insert-pos');
-  const curPos = posSel.value;
-  if (currentOpType() === 'deal_first_launch_dialogs') {
-    // 首启弹窗只能出现在所有操作之前：锁定「最前」，不允许选其他插入位置
-    posSel.innerHTML = '<option value="front">最前（放在第 1 步之前）</option>';
-    posSel.value = 'front';
-    posSel.disabled = true;
-  } else {
-    posSel.disabled = false;
-    let posOpts = '<option value="0">末尾（成为第 ' + (steps.length + 1) + ' 步）</option>';
-    for (let i = 1; i <= steps.length; i++) {
-      posOpts += '<option value="' + i + '">第 ' + i + ' 步之后 · ' + esc(String(steps[i - 1]).slice(0, 12)) + '</option>';
-    }
-    posSel.innerHTML = posOpts;
-    if (curPos !== '' && curPos !== null && parseInt(curPos, 10) <= steps.length) {
-      posSel.value = curPos;
-    } else {
-      posSel.value = '0';
-      if (curPos !== '' && curPos !== null && curPos !== '0') showToast('原插入位置超出当前方法步骤数，已改为末尾');
-    }
-  }
+  renderInsertPos(steps, true);
   renderStepsList(steps);
   // 三件套联动：写入元素文件 ← 所选页面绑定的元素文件（必须一致）
   // 写入页面文件 = 下拉（v6.15.33 多页面）：该用例已实例化的页面（self.page/page2…）任选，
@@ -2899,12 +2911,12 @@ function fillCaseHead() {
   $('ac-cn').textContent = cn ? '（' + cn + '）' : '';
   $('ac-loc').textContent = (typeSel.value || '') + ' · ' + ($('el-value').value || '—');
   const parts = [
-    '元素 → ' + ($('el-file').value || '—'),
     '用例行 → ' + ($('el-case-file').value === NEW_FILE_OPT ? '新建 ' + ($('el-case-new').value || '?') : ($('el-case-file').value || '—')),
     '页面方法 → ' + ($('el-page-file').value || '选择用例后带出'),
+    '元素 → ' + ($('el-file').value || '—'),
   ];
   const bar = $('tri-bar');
-  bar.textContent = '🛡 三件套一次完成：' + parts.join(' · ');
+  bar.textContent = '🛡 点保存后三件一起写入：' + parts.join(' · ');
   bar.style.display = purposeValue() === 'popup' ? 'none' : '';
 }
 
