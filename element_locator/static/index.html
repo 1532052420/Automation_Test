@@ -24,7 +24,7 @@ try {
 } catch (e) { /* 隐私模式等场景忽略 */ }
 </script>
 <link rel="stylesheet" href="/static/nav.css">
-<link rel="stylesheet" href="static/style.css?v=101">
+<link rel="stylesheet" href="static/style.css?v=103">
 </head>
 <body>
 <header class="gnav" id="gnav"></header>
@@ -100,9 +100,8 @@ try {
     <div class="col-title">元素 / 坐标</div>
     <div class="toolbar">
       <input id="tree-search" type="text" placeholder="搜索元素：text / resource-id / class（回车定位）">
-      <button id="btn-tree-search" class="btn small" title="定位到匹配元素并高亮">🔍</button>
     </div>
-    <div id="tree" class="tree"></div>
+    <div id="tree" class="tree" data-empty="⚡ 点击顶部「刷新」，获取手机画面与元素树"></div>
   </section>
 
   <!-- 右：选中元素（原「操作教学」栏位改造；定高不随字段增减变化） -->
@@ -169,9 +168,7 @@ try {
           <label>操作类型 <span class="help-icon" data-help="动作类单选；断言用下方开关开启后勾选">?</span>
             <div id="op-grid" class="op-grid"></div>
           </label>
-          <label>全部操作类型 <span class="hint" style="font-weight:400">（动作类；组合断言用下方开关开启后勾选）</span>
-            <select id="el-op-type"></select>
-          </label>
+          <select id="el-op-type" style="display:none"></select>
           <label id="el-op-param-wrap">操作参数 <span class="help-icon" data-help="输入内容/期望文本/坐标/秒数">?</span>
             <input id="el-op-param" type="text" placeholder="输入内容 / 期望文本 / toast文本 / 坐标(x,y) / 秒数">
           </label>
@@ -208,8 +205,14 @@ try {
         <!-- 第三栏：元素 -->
         <section class="flow-col" id="col-element">
           <div class="col-head">元素 <span class="hint">三件套之源，全库共享</span></div>
+          <label>写入元素文件 <span class="help-icon" data-help="②时自动对齐页面引用的元素文件">?</span>
+            <select id="el-file"></select>
+            <span id="el-file-new-wrap" style="display:none;margin-top:6px">
+              <input id="el-file-new" type="text" placeholder="新元素文件名，如: loginFlow（后缀自动补）">
+              <span class="hint" style="font-size:11px">结尾自动补 Elements（固定不可省略）、.py 后缀自动添加</span>
+            </span>
+          </label>
           <div id="col-el-anchor" class="anchor-card">
-            <div class="ac-head">已选元素 · 元素定位 <span class="hint">来源：元素树点选 / 坐标选中</span></div>
             <div class="ac-main"><b id="ac-name">—</b> <span class="hint" id="ac-cn"></span></div>
             <code class="ac-loc" id="ac-loc">—</code>
           </div>
@@ -241,13 +244,6 @@ try {
               <input id="el-wait-sec" type="number" min="1" max="600" step="1" value="2">
             </label>
           </div>
-          <label>写入元素文件 <span class="help-icon" data-help="②时自动对齐页面引用的元素文件">?</span>
-            <select id="el-file"></select>
-            <span id="el-file-new-wrap" style="display:none;margin-top:6px">
-              <input id="el-file-new" type="text" placeholder="新元素文件名，如: loginFlow（后缀自动补）">
-              <span class="hint" style="font-size:11px">结尾自动补 Elements（固定不可省略）、.py 后缀自动添加</span>
-            </span>
-          </label>
         </section>
 
         <!-- 弹窗规则栏：用途③（登记随机弹窗）专用，与三件套流程互斥显示 -->
@@ -346,7 +342,7 @@ try {
 <script src="/static/nav.js"></script>
 <script src="/static/theme.js"></script>
 <script src="/static/connect_qr.js"></script>
-<script src="static/index.js?v=126"></script>
+<script src="static/index.js?v=127"></script>
 <script>
   document.getElementById('btn-qr-connect').addEventListener('click', function () { window.PlatformQR.open(); });
 </script>
