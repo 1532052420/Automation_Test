@@ -10,7 +10,7 @@
 两端不再各自硬编码版本号。
 """
 
-APP_VERSION = '6.15.48'
+APP_VERSION = '6.15.50'
 
 # 最新版本在最前；time 精确到秒（YYYY-MM-DD HH:MM:SS）
 # 版本号格式 x.xx.xx（主版本 1-2 位 · 次版本固定 2 位 · 修订号固定 2 位，99 进位次版本）
@@ -18,6 +18,28 @@ APP_VERSION = '6.15.48'
 # 旧线历史条目保留原始记录，不回溯改写
 # 每条变更一句话 10~20 字，只说改了什么（详细背景见项目 memory 与设计文档）
 CHANGELOG = [
+    {
+        'version': '6.15.50',
+        'time': '2026-10-14 15:47:00',
+        'title': '在线报告完整复刻官方三段式：计划/定位/执行每步可回放',
+        'changes': [
+            '复刻 每步骤按官方三段式生成：计划(Plan)→定位(Locate)→执行(Tap/Input)，时间窗连续衔接，每个计划点开即有 Replay',
+            '复刻 Locate 任务官方结构 param{prompt,bbox} + output.element{rect,center} + hitBy，坐标来自执行时元素真实位置',
+            '功能 执行框架 click/sendText 将元素实际坐标写入 allure 附件（element_rect），报告定位高亮框数据源',
+            '修复 任务时间窗改为按步骤三段连续分布，Record 轨道刻度铺满用例真实时长',
+            '移除 Open in Playground 按钮（壳注入 CSS 隐藏，覆盖启用/禁用两态）',
+        ],
+    },
+    {
+        'version': '6.15.49',
+        'time': '2026-10-14 15:25:00',
+        'title': '在线报告去 Playground 按钮；顶部版本号改用平台版本线',
+        'changes': [
+            '移除 任务详情 Open in Playground 按钮（渲染壳修改，项目内壳 design/midscene-ref/su7-full.html）',
+            '版本 报告顶部版本号由官方壳 1.0.3 改为平台版本号（sdkVersion 读 changelog APP_VERSION），报告改动随版本递增可查',
+            '对齐 报告壳入库项目 design/midscene-ref/，生成优先用项目壳不再依赖 ~/Downloads',
+        ],
+    },
     {
         'version': '6.15.48',
         'time': '2026-10-14 15:09:59',

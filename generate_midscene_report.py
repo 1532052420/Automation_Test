@@ -23,11 +23,22 @@ import time
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 VIDEO_EVIDENCE_DIR = os.path.join(BASE_DIR, 'output', 'video_evidence')
 SHELL_CANDIDATES = [
-    os.path.expanduser('~/Downloads/su7-full.html'),
     os.path.join(BASE_DIR, 'design', 'midscene-ref', 'su7-full.html'),
+    os.path.expanduser('~/Downloads/su7-full.html'),
 ]
 FFMPEG = 'ffmpeg'
 FFPROBE = 'ffprobe'
+
+
+def report_version():
+    """报告版本号 = 平台版本号（web_platform/changelog.py 唯一数据源）。
+
+    报告顶部展示 v<该值>；报告相关改动随平台版本号一起递增，
+    不再展示官方壳的 sdkVersion 1.0.3。正则提取避免 import 副作用。"""
+    m = re.search(r"APP_VERSION\s*=\s*'([\d.]+)'",
+                  open(os.path.join(BASE_DIR, 'web_platform', 'changelog.py'),
+                       encoding='utf-8').read())
+    return m.group(1) if m else 'unknown'
 
 
 def find_shell():
@@ -215,32 +226,9 @@ def build_data(run_id, meta, results, run_dir):
                     out.append((int(case_start + ts), d))
             return out
 
-        # 1) 用例级 Plan 任务（组头）——结构与官方 Planning/Plan 一致：
-        #    param{userInstruction,imagesIncludeCount} + log{rawResponse} +
-        #    output{actions,more_actions_needed_by_instruction,log,yamlFlow} + cache{hit}
-        pf = frames_for(case_start, case_stop, 2) if v0 else []
-        rec_plan = [{'type': 'screenshot', 'ts': ts, 'screenshot': d, 'timing': 'after-calling',
-                     'description': case_name}
-                    for ts, d in pf]
-        uc_plan = ({'size': dict(case_size), 'screenshotBase64': rec_plan[-1]['screenshot']}
-                   if rec_plan else None)
-        if uc_plan and not case_size:
-            case_size = image_size(uc_plan['screenshotBase64'])
-            uc_plan['size'] = dict(case_size) if case_size else None
-        tasks.append({
-            'status': 'finished' if status == 'passed' else 'failed',
-            'type': 'Planning', 'subType': 'Plan',
-            'param': {'userInstruction': case_name, 'imagesIncludeCount': len(pf)},
-            'timing': {'start': case_start, 'end': case_stop, 'cost': case_stop - case_start},
-            'uiContext': uc_plan,
-            'log': {'rawResponse': desc or case_name},
-            'output': {'actions': [], 'more_actions_needed_by_instruction': True,
-                       'log': desc or case_name, 'yamlFlow': []},
-            'recorder': rec_plan,
-            'cache': {'hit': False},
-        })
-
-        # 2) 操作步骤 → Action Space（allure steps 常无 time：按步骤数均分用例时间窗，帧时间轴才能连续铺满）
+        # 每个步骤 → 官方三段式任务（与 su7 任务序列一致）：
+        #   Planning/Plan（计划组头）→ Planning/Locate（元素定位）→ Action Space/动作（执行）
+        # 每个步骤的 Plan 点开即有 Replay（渲染器按「到下一个 Plan 之间」生成回放帧）。
         steps = res.get('steps') or []
         n_steps = max(1, len(steps))
         win = (case_stop - case_start) / n_steps
@@ -248,43 +236,121 @@ def build_data(run_id, meta, results, run_dir):
             st_time = st.get('time') or {}
             s_start = int(st_time.get('start') or (case_start + si * win))
             s_end = int(st_time.get('stop') or st_time.get('end') or (case_start + (si + 1) * win))
-            sub = step_to_action(st.get('name', ''))
+            raw_name = st.get('name', '')
+            sub = step_to_action(raw_name)
+            m = re.search(r'\[id:([^\]]+)\]', raw_name)
+            desc_clean = re.sub(r'\s*\[[^\]]*\]\s*', ' ', raw_name).strip() or raw_name
+            locate = {'description': raw_name}
+            if m:
+                locate.update({'value': m.group(1), 'type': 'id'})
+            # 元素真实坐标：执行框架 click/sendText 写入的 element_rect 附件（官方高亮框数据源）
+            el_rect = el_center = None
+            for att in st.get('attachments', []) or []:
+                if att.get('name') == 'element_rect' and (att.get('type') or '').startswith('application/json'):
+                    try:
+                        meta_r = json.load(open(os.path.join(ATT, att.get('source', '')), encoding='utf-8'))
+                        el_rect = meta_r.get('rect')
+                        el_center = meta_r.get('center')
+                    except Exception:
+                        pass
+            if el_rect and el_center:
+                locate['rect'] = el_rect
+                locate['center'] = el_center
+            # 官方 Input 任务 param 带 value（实际输入内容）
+            action_param = {'locate': locate}
+            if sub == 'Input':
+                action_param['value'] = quoted_text(raw_name)
+            # yamlFlow 官方键名：aiTap/aiInput/aiClearInput/aiSwipe/aiLongPress
+            yf = {({**{'Tap': 'aiTap', 'Input': 'aiInput', 'ClearInput': 'aiClearInput',
+                      'Swipe': 'aiSwipe', 'LongPress': 'aiLongPress'}}.get(sub, 'aiTap')): ''}
+            if sub == 'Input':
+                yf['value'] = action_param.get('value', '')
+            yf['locate'] = desc_clean
+
+            # 帧来源：录屏抽帧优先；无录屏回落步骤附件截图
             shots = []
             for att in st.get('attachments', []) or []:
                 if (att.get('type') or '').startswith('image/'):
                     d = b64_image(os.path.join(ATT, att.get('source', '')))
                     if d:
                         shots.append(d)
-            main_shot = shots[0] if shots else None
-            rec = []
-            if not main_shot and v0:
-                want = max(2, int((s_end - s_start) / 700) or 1)
-                fr = frames_for(s_start, s_end, want)
-                rec = [{'type': 'screenshot', 'ts': ts, 'screenshot': d, 'timing': 'after-calling'}
-                       for ts, d in fr]
-                main_shot = rec[-1]['screenshot'] if rec else None
-            else:
-                rec = ([{'type': 'screenshot', 'ts': s_end, 'screenshot': main_shot,
-                         'timing': 'after-calling', 'description': st.get('name', '')}
-                       ] if main_shot else [])
-            m = re.search(r'\[id:([^\]]+)\]', st.get('name', ''))
-            locate = {'description': st.get('name', '')}
-            if m:
-                locate.update({'value': m.group(1), 'type': 'id'})
-            # 官方 Input 任务 param 带 value（实际输入内容）
-            param = {'locate': locate}
-            if sub == 'Input':
-                param['value'] = quoted_text(st.get('name', ''))
-            step_size = (image_size(main_shot) if main_shot else None) or (dict(case_size) if case_size else None)
+            fr = frames_for(s_start, s_end, max(3, int((s_end - s_start) / 700) or 1)) if v0 else []
+            if not fr and shots:
+                fr = [((2 * s_start + s_end) // 3, shots[0])]
+            fr_plan, fr_loc, fr_act = fr[:1], fr[1:2], fr[2:]
+
+            def _rec(frames):
+                return [{'type': 'screenshot', 'ts': ts, 'screenshot': d,
+                         'timing': 'after-calling', 'description': desc_clean}
+                        for ts, d in frames]
+
+            # 时间窗三段连续衔接（官方模式：Plan → Locate(极短) → Action）
+            p_end = s_start + max(200, int((s_end - s_start) * 0.25))
+            l_end = p_end + min(200, max(1, s_end - p_end - 200))
+            st_status = 'finished' if (st.get('status') in (None, 'passed', 'finished')) else 'failed'
+
+            def _uc(frames, fallback_shot):
+                shot = frames[-1][1] if frames else fallback_shot
+                if not shot:
+                    return None
+                sz = image_size(shot) or (dict(case_size) if case_size else None)
+                if sz is None and shot:
+                    sz = image_size(shot)
+                return {'size': sz, 'screenshotBase64': shot} if sz else None
+
+            # ① Plan（计划组头：下发动作）
+            uc_p = _uc(fr_plan, shots[0] if shots else None)
+            if uc_p and not case_size:
+                case_size = image_size(uc_p['screenshotBase64'])
             tasks.append({
-                'status': 'finished' if (st.get('status') in (None, 'passed', 'finished')) else 'failed',
-                'type': 'Action Space', 'subType': sub,
-                'param': param,
+                'status': st_status,
+                'type': 'Planning', 'subType': 'Plan',
+                'param': {'userInstruction': desc_clean, 'imagesIncludeCount': len(fr_plan)},
+                'timing': {'start': s_start, 'end': p_end, 'cost': p_end - s_start},
+                'uiContext': uc_p,
+                'log': {'rawResponse': json.dumps(
+                    {'log': desc_clean, 'more_actions_needed_by_instruction': si < len(steps) - 1},
+                    ensure_ascii=False)},
+                'output': {'actions': ([{'type': sub, 'param': action_param}]
+                                       if st_status == 'finished' else []),
+                           'more_actions_needed_by_instruction': si < len(steps) - 1,
+                           'log': desc_clean, 'yamlFlow': [yf]},
+                'recorder': _rec(fr_plan),
+                'cache': {'hit': False},
+            })
+
+            # ② Locate（元素定位；有坐标带高亮框，element=null 亦为官方合法形态）
+            has_el = bool(el_rect and el_center)
+            bbox = ([el_rect['left'], el_rect['top'],
+                     el_rect['left'] + el_rect['width'], el_rect['top'] + el_rect['height']]
+                    if has_el else None)
+            tasks.append({
+                'status': st_status,
+                'type': 'Planning', 'subType': 'Locate',
                 'subTask': True,
-                'timing': {'start': s_start, 'end': s_end, 'cost': s_end - s_start},
-                'uiContext': ({'size': step_size, 'screenshotBase64': main_shot}
-                              if main_shot else None),
-                'recorder': rec,
+                'param': ({'prompt': desc_clean, 'bbox': bbox} if has_el
+                          else {'prompt': desc_clean}),
+                'thought': '',
+                'timing': {'start': p_end, 'end': l_end, 'cost': l_end - p_end},
+                'uiContext': _uc(fr_loc, shots[0] if shots else None),
+                'output': {'element': ({'rect': el_rect, 'center': el_center,
+                                        'description': desc_clean} if has_el else None)},
+                'hitBy': {'from': 'Plan', 'context': ({'bbox': bbox} if has_el else {})},
+                'recorder': _rec(fr_loc),
+            })
+
+            # ③ Action（执行动作）
+            main_shot = fr_act[-1][1] if fr_act else (shots[0] if shots else None)
+            tasks.append({
+                'status': st_status,
+                'type': 'Action Space', 'subType': sub,
+                'param': action_param,
+                'subTask': True,
+                'timing': {'start': l_end, 'end': s_end, 'cost': s_end - l_end},
+                'uiContext': _uc(fr_act, shots[0] if shots else None),
+                'recorder': _rec(fr_act) if fr_act else (
+                    [{'type': 'screenshot', 'ts': s_end, 'screenshot': main_shot,
+                      'timing': 'after-calling', 'description': desc_clean}] if main_shot else []),
             })
 
         # 3) 失败：断言任务（含失败截图/录屏/原因）
@@ -319,7 +385,7 @@ def build_data(run_id, meta, results, run_dir):
             })
 
     return {
-        'sdkVersion': '1.0.3',
+        'sdkVersion': report_version(),
         'groupName': 'AutomationTest Report',
         'groupDescription': run_id,
         'deviceType': 'android',

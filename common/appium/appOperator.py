@@ -129,6 +129,26 @@ class AppOperator:
         locator_value=getattr(element,'locator_value','')
         return '[%s:%s]'%(locator_type,locator_value)
 
+    def _attach_element_rect(self,webElement,desc):
+        """把元素实际坐标写入 allure 附件（JSON，name=element_rect）。
+
+        在线报告（Midscene 壳）Locate 任务的高亮框/指针动画数据源：
+        生成报告时读步骤 attachments 里 name=element_rect 的 JSON，
+        填入官方协议 output.element{rect,center,description} 与 param.bbox。
+        坐标系 = 屏幕坐标（uiautomator2 element.rect），与真机截图一致。"""
+        try:
+            import json as _json
+            r=webElement.rect
+            payload=_json.dumps({
+                'rect':{'left':int(r['x']),'top':int(r['y']),
+                        'width':int(r['width']),'height':int(r['height'])},
+                'center':[int(r['x']+r['width']/2),int(r['y']+r['height']/2)],
+                'description':desc,
+            },ensure_ascii=False)
+            allure.attach(payload,name='element_rect',type='application/json')
+        except Exception:
+            pass
+
     def click(self,element):
         desc=self._element_desc(element)
         step_no=_next_action_step_no()
@@ -138,6 +158,7 @@ class AppOperator:
                 self.popup.scan()   # 操作入口先扫一次随机弹窗（兜住上一步延迟弹出的）
                 webElement=self._change_element_to_webElement_type(element)
                 if webElement:
+                    self._attach_element_rect(webElement,desc)
                     try:
                         webElement.click()
                     except StaleElementReferenceException:
@@ -178,6 +199,7 @@ class AppOperator:
                 self.popup.scan()   # 操作入口先扫一次随机弹窗
                 webElement=self._change_element_to_webElement_type(element)
                 if webElement:
+                    self._attach_element_rect(webElement,desc)
                     webElement.clear()
                     webElement.send_keys(text)
                 _log_action_result(step_no, '输入文本',
