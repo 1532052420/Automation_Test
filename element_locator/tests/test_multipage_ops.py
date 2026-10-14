@@ -237,3 +237,110 @@ def test_page_file_not_exist_blocked(mp_env):
     r = _append(mp_env, {'type': 'toggle_wifi', 'element': '', 'param': ''},
                 page_file='NopePage.py')
     assert not r['ok'] and '不存在' in r['msg']
+
+
+# ---------------- 后台「新增元素文件」接口（v6.15.35） ----------------
+def test_backend_create_element_file(tmp_path, monkeypatch):
+    import importlib
+    em = importlib.import_module('web_platform.element_manager')
+    edir = str(tmp_path / 'elements')
+    os.makedirs(edir)
+    monkeypatch.setattr(em, 'ELEMENTS_DIR', edir)
+    # 正向：自动补 Elements 后缀 + 中文名写文件头
+    r = em.create_element_file('searchflow', cn_name='搜索流程')
+    assert r['ok'] and r['file'] == 'searchflowElements.py', r
+    txt = open(os.path.join(edir, 'searchflowElements.py'), encoding='utf-8').read()
+    assert 'class SearchflowElements:' in txt
+    assert '# 元素文件中文名：搜索流程' in txt
+    assert 'def __init__(self):' in txt and 'pass' in txt
+    compile(txt, r['file'], 'exec')
+    # 用户已写 Elements 后缀 → 不产生 xxxElementsElements
+    r2 = em.create_element_file('orderElements')
+    assert r2['ok'] and r2['file'] == 'orderElements.py', r2
+    # 中文名回读
+    cn = em.element_file_cn_names()
+    assert cn.get('searchflowElements.py') == '搜索流程'
+    # 异常：数字开头 / 重名 / 占用弹窗规则库名
+    assert not em.create_element_file('9abc')['ok']
+    assert not em.create_element_file('searchflow')['ok']
+    assert not em.create_element_file('popup')['ok']
+    assert not em.create_element_file('中文')['ok']
+
+
+# ---------------- 后台「新建用例」接口（v6.15.36） ----------------
+def test_backend_create_case_file(tmp_path, monkeypatch):
+    cdir, pdir, edir = str(tmp_path / 'cases'), str(tmp_path / 'pages'), str(tmp_path / 'elements')
+    for d in (cdir, pdir, edir):
+        os.makedirs(d)
+    monkeypatch.setattr(cg, 'CASES_DIR', cdir)
+    monkeypatch.setattr(cg, 'PAGES_DIR', pdir)
+    monkeypatch.setattr(el, 'ELEMENTS_DIR', edir)
+    # 正向：三件套同建——用例含页面绑定、页面绑元素、元素空骨架，全部可编译
+    r = cg.create_case_file('loginflow', cn_name='登录流程')
+    assert r['ok'] and r['file'] == 'test_loginflow.py', r
+    assert r['created'] == ['loginflowElements.py', 'loginflowPage.py', 'test_loginflow.py'], r
+    txt = open(os.path.join(cdir, 'test_loginflow.py'), encoding='utf-8').read()
+    assert '# 用例中文名：登录流程' in txt
+    assert 'class TestLoginflow:' in txt
+    assert 'from page_objects.app_ui.android.demoProject.pages.loginflowPage import LoginflowPage' in txt
+    assert 'self.page = LoginflowPage(self.appOperator)' in txt
+    assert 'def test_loginflow(self):' in txt
+    compile(txt, r['file'], 'exec')
+    page_txt = open(os.path.join(pdir, 'loginflowPage.py'), encoding='utf-8').read()
+    assert 'from page_objects.app_ui.android.demoProject.elements.loginflowElements import LoginflowElements' in page_txt
+    assert 'self._elements = LoginflowElements()' in page_txt
+    compile(page_txt, 'loginflowPage.py', 'exec')
+    compile(open(os.path.join(edir, 'loginflowElements.py'), encoding='utf-8').read(), 'e', 'exec')
+    # 用户自带 test_ 前缀 → 不产生 test_test_x
+    r2 = cg.create_case_file('test_order')
+    assert r2['ok'] and r2['file'] == 'test_order.py', r2
+    # 下拉数据源可见（list_case_files）
+    assert 'test_loginflow.py' in cg.list_case_files()
+    # 异常：数字开头 / 用例重名（页面元素未改动）
+    assert not cg.create_case_file('9abc')['ok']
+    n_before = len(os.listdir(cdir))
+    assert not cg.create_case_file('loginflow')['ok']
+    assert len(os.listdir(cdir)) == n_before
+    assert not cg.create_case_file('中文')['ok']
+
+
+def test_backend_create_case_reuse_existing_page(tmp_path, monkeypatch):
+    """页面已存在 → 不重建直接绑定复用；页面已有元素绑定以页面为准"""
+    cdir, pdir, edir = str(tmp_path / 'cases'), str(tmp_path / 'pages'), str(tmp_path / 'elements')
+    for d in (cdir, pdir, edir):
+        os.makedirs(d)
+    open(os.path.join(pdir, 'OldPage.py'), 'w', encoding='utf-8').write(
+        '# -*- coding: utf-8 -*-\n'
+        'from page_objects.app_ui.android.demoProject.elements.oldElements import OldElements\n'
+        '\n\nclass OldPage:\n'
+        '    def __init__(self, appOperator):\n'
+        '        self.appOperator = appOperator\n'
+        '        self._elements = OldElements()\n')
+    open(os.path.join(edir, 'oldElements.py'), 'w', encoding='utf-8').write(
+        '# -*- coding: utf-8 -*-\nclass OldElements:\n    def __init__(self):\n        pass\n')
+    monkeypatch.setattr(cg, 'CASES_DIR', cdir)
+    monkeypatch.setattr(cg, 'PAGES_DIR', pdir)
+    monkeypatch.setattr(el, 'ELEMENTS_DIR', edir)
+    r = cg.create_case_file('mycase', page_file='OldPage')
+    assert r['ok'], r
+    assert r['created'] == ['test_mycase.py'], r          # 只新建用例，页面/元素都复用
+    assert '复用已有 页面 OldPage.py' in r['msg'], r       # 文案与实际动作一致（E2E 抓过说谎文案）
+    assert r['reused'].get('page') == 'OldPage.py'
+    txt = open(os.path.join(cdir, 'test_mycase.py'), encoding='utf-8').read()
+    assert 'from page_objects.app_ui.android.demoProject.pages.OldPage import OldPage' in txt
+    assert 'self.page = OldPage(self.appOperator)' in txt
+    compile(txt, 'test_mycase.py', 'exec')
+
+
+def test_backend_create_case_user_suffix_normalized(tmp_path, monkeypatch):
+    """用户自带 Page/Elements 后缀 → 剥掉统一重补（防 xxxPagePage/xxxElementsElements）"""
+    cdir, pdir, edir = str(tmp_path / 'cases'), str(tmp_path / 'pages'), str(tmp_path / 'elements')
+    for d in (cdir, pdir, edir):
+        os.makedirs(d)
+    monkeypatch.setattr(cg, 'CASES_DIR', cdir)
+    monkeypatch.setattr(cg, 'PAGES_DIR', pdir)
+    monkeypatch.setattr(el, 'ELEMENTS_DIR', edir)
+    r = cg.create_case_file('pay', page_file='payPage', element_file='payElements')
+    assert r['ok'], r
+    assert os.path.isfile(os.path.join(pdir, 'payPage.py')), r
+    assert os.path.isfile(os.path.join(edir, 'payElements.py')), r

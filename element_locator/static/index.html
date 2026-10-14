@@ -130,21 +130,84 @@ try {
 <!-- 添加测试用例 弹窗（横向三栏：元素 → 用例 → 操作） -->
 <div id="modal-mask" class="modal-mask" style="display:none">
   <div class="modal modal-flow">
-    <div class="modal-title">➕ 添加测试用例 <span class="hint">按「元素 → 用例 → 操作」流程走：选下方用途决定走到哪一步；点字段旁「?」看说明</span></div>
+    <div class="modal-title">➕ 添加测试用例 <span class="hint">按「用例 → 操作 → 元素」流程走（与框架代码层次一致：用例调页面、页面引元素）；点字段旁「?」看说明</span></div>
     <div class="seg-strip">
       <span class="seg-title">保存到哪一步</span>
       <div class="seg-group" role="radiogroup" aria-label="保存到哪一步">
-        <label class="seg" title="只把元素写入元素库，不生成用例"><input type="radio" name="el-purpose" value="only" checked><span class="seg-txt">仅元素</span></label>
-        <label class="seg" title="三件套一次完成并入库（推荐）"><input type="radio" name="el-purpose" value="all"><span class="seg-txt">元素 + 用例 + 操作</span><span class="badge">推荐</span></label>
+        <label class="seg" title="三件套一次完成并入库（元素文件的创建与编辑在自动化后台）"><input type="radio" name="el-purpose" value="all" checked><span class="seg-txt">元素 + 用例 + 操作</span><span class="badge">推荐</span></label>
         <label class="seg" title="登记为随机弹窗自动关闭规则，建议配锚点防误关"><input type="radio" name="el-purpose" value="popup"><span class="seg-txt">登记随机弹窗</span></label>
       </div>
     </div>
     <div class="modal-body">
 
       <div class="flow-cols">
-        <!-- 第一栏：元素 -->
+        <!-- 第一栏：用例 -->
+        <section class="flow-col" id="col-case">
+          <div class="col-head">用例 <span class="hint">这步操作追加到哪条用例</span></div>
+          <label>目标用例文件 <span class="help-icon" data-help="操作追加到的用例文件">?</span>
+            <select id="el-case-file"></select>
+            <span id="el-case-new-wrap" style="display:none;margin-top:6px">
+              <span class="hint" style="font-size:12px;font-weight:600">test_</span><input id="el-case-new" type="text" placeholder="如: login_flow" style="width:calc(100% - 40px)">
+              <span class="hint" style="font-size:11px">最终文件名 test_&lt;输入&gt;.py（前缀固定不可改）</span>
+              <input id="el-case-cn" type="text" placeholder="用例中文名（可选，显示在平台选择用例列表）" style="width:100%;margin-top:6px">
+              <div id="pkg-trio" class="hint" style="font-size:11px;color:#409eff;margin-top:4px;word-break:break-all"></div>
+            </span>
+          </label>
+          <label>用例方法 <span class="help-icon" data-help="追加到用例文件里的哪个测试方法末尾（方法在目标用例文件里，不是文件）">?</span>
+            <select id="el-case-method"></select>
+          </label>
+          <label>插入位置 <span class="help-icon" data-help="插到末尾或第 N 步之后">?</span>
+            <select id="el-insert-pos"></select>
+          </label>
+          <div id="el-steps-list" class="steps-list"></div>
+          <div id="el-link-note" class="bind-note" style="display:none"></div>
+        </section>
+
+        <!-- 第二栏：操作 -->
+        <section class="flow-col" id="col-op">
+          <div class="col-head">操作 <span class="hint">动作单选 + 断言可多选</span></div>
+          <label>操作类型 <span class="help-icon" data-help="动作类单选；断言用下方开关开启后勾选">?</span>
+            <div id="op-grid" class="op-grid"></div>
+          </label>
+          <label>全部操作类型 <span class="hint" style="font-weight:400">（动作类；组合断言用下方开关开启后勾选）</span>
+            <select id="el-op-type"></select>
+          </label>
+          <label id="el-op-param-wrap">操作参数 <span class="help-icon" data-help="输入内容/期望文本/坐标/秒数">?</span>
+            <input id="el-op-param" type="text" placeholder="输入内容 / 期望文本 / toast文本 / 坐标(x,y) / 秒数">
+          </label>
+          <label>步骤描述 <span class="help-icon" data-help="自动按操作类型+中文名生成，可改">?</span>
+            <input id="el-op-comment" type="text" placeholder="留空=自动生成（可不填）">
+          </label>
+          <!-- 断言开关：开启=保存用例时同时写入勾选的断言；关闭=仅保存操作 -->
+          <div class="as-switch-row">
+            <label class="as-switch" title="开启后可勾选断言，与操作一起保存">
+              <input type="checkbox" id="asToggle"><span class="slider"></span>
+            </label>
+            <span class="as-switch-name">断言</span>
+            <span class="as-switch-hint" id="asSwitchHint">开启后勾选断言，保存用例时一并写入</span>
+          </div>
+          <div id="asArea" style="display:none">
+            <div id="asLabel" class="as-grid-label">断言 <span class="as-tag">可多选 · 组合执行</span><span class="as-tag new">含视觉断言</span>
+              <span class="as-grid-hint">失败不中断 · 逐条截图 · 汇总报错</span></div>
+            <div id="asGrid" class="as-grid"></div>
+          </div>
+          <div id="op-note" class="op-note"></div>
+          <label>特殊操作 <span class="help-icon" data-help="与元素无关的用例级动作；选中时断言不可用">?</span>
+            <select id="el-op-special">
+              <option value="">无（使用上方操作类型）</option>
+              <option value="hide_keyboard">收起键盘（键盘在才收，否则不动）</option>
+              <option value="deal_first_launch_dialogs">首次启动弹窗处理（无弹窗自动跳过）</option>
+            </select>
+          </label>
+          <label id="page-file-label">写入页面文件 <span class="help-icon" data-help="列出这条用例用到的页面，任选其一；也可以选还没用到的页面——保存时自动接进用例（自动补 import 和初始化代码），不用手动改">?</span>
+            <select id="el-page-new" style="display:none"></select>
+            <select id="el-page-file"></select>
+          </label>
+        </section>
+
+        <!-- 第三栏：元素 -->
         <section class="flow-col" id="col-element">
-          <div class="col-head">元素 <span class="hint">入库必需</span></div>
+          <div class="col-head">元素 <span class="hint">三件套之源，全库共享</span></div>
           <div id="col-el-anchor" class="anchor-card">
             <div class="ac-head">已选元素 · 元素定位 <span class="hint">来源：元素树点选 / 坐标选中</span></div>
             <div class="ac-main"><b id="ac-name">—</b> <span class="hint" id="ac-cn"></span></div>
@@ -184,70 +247,6 @@ try {
               <input id="el-file-new" type="text" placeholder="新元素文件名，如: loginFlow（后缀自动补）">
               <span class="hint" style="font-size:11px">结尾自动补 Elements（固定不可省略）、.py 后缀自动添加</span>
             </span>
-          </label>
-        </section>
-
-        <!-- 第二栏：用例 -->
-        <section class="flow-col" id="col-case">
-          <div class="col-head">用例 <span class="hint">这步操作追加到哪条用例</span></div>
-          <label>目标用例文件 <span class="help-icon" data-help="操作追加到的用例文件">?</span>
-            <select id="el-case-file"></select>
-            <span id="el-case-new-wrap" style="display:none;margin-top:6px">
-              <span class="hint" style="font-size:12px;font-weight:600">test_</span><input id="el-case-new" type="text" placeholder="如: login_flow" style="width:calc(100% - 40px)">
-              <span class="hint" style="font-size:11px">最终文件名 test_&lt;输入&gt;.py（前缀固定不可改）</span>
-              <input id="el-case-cn" type="text" placeholder="用例中文名（可选，显示在平台选择用例列表）" style="width:100%;margin-top:6px">
-              <div id="pkg-trio" class="hint" style="font-size:11px;color:#409eff;margin-top:4px;word-break:break-all"></div>
-            </span>
-          </label>
-          <label>页面操作 <span class="help-icon" data-help="追加到哪个测试方法末尾">?</span>
-            <select id="el-case-method"></select>
-          </label>
-          <label>插入位置 <span class="help-icon" data-help="插到末尾或第 N 步之后">?</span>
-            <select id="el-insert-pos"></select>
-          </label>
-          <div id="el-steps-list" class="steps-list"></div>
-          <div id="el-link-note" class="bind-note" style="display:none"></div>
-        </section>
-
-        <!-- 第三栏：操作 -->
-        <section class="flow-col" id="col-op">
-          <div class="col-head">操作 <span class="hint">动作单选 + 断言可多选</span></div>
-          <label>操作类型 <span class="help-icon" data-help="动作类单选；断言用下方开关开启后勾选">?</span>
-            <div id="op-grid" class="op-grid"></div>
-          </label>
-          <label>全部操作类型 <span class="hint" style="font-weight:400">（动作类；组合断言用下方开关开启后勾选）</span>
-            <select id="el-op-type"></select>
-          </label>
-          <label id="el-op-param-wrap">操作参数 <span class="help-icon" data-help="输入内容/期望文本/坐标/秒数">?</span>
-            <input id="el-op-param" type="text" placeholder="输入内容 / 期望文本 / toast文本 / 坐标(x,y) / 秒数">
-          </label>
-          <label>步骤描述 <span class="help-icon" data-help="自动按操作类型+中文名生成，可改">?</span>
-            <input id="el-op-comment" type="text" placeholder="留空=自动生成（可不填）">
-          </label>
-          <!-- 断言开关：开启=保存用例时同时写入勾选的断言；关闭=仅保存操作 -->
-          <div class="as-switch-row">
-            <label class="as-switch" title="开启后可勾选断言，与操作一起保存">
-              <input type="checkbox" id="asToggle"><span class="slider"></span>
-            </label>
-            <span class="as-switch-name">断言</span>
-            <span class="as-switch-hint" id="asSwitchHint">开启后勾选断言，保存用例时一并写入</span>
-          </div>
-          <div id="asArea" style="display:none">
-            <div id="asLabel" class="as-grid-label">断言 <span class="as-tag">可多选 · 组合执行</span><span class="as-tag new">含视觉断言</span>
-              <span class="as-grid-hint">失败不中断 · 逐条截图 · 汇总报错</span></div>
-            <div id="asGrid" class="as-grid"></div>
-          </div>
-          <div id="op-note" class="op-note"></div>
-          <label>特殊操作 <span class="help-icon" data-help="与元素无关的用例级动作；选中时断言不可用">?</span>
-            <select id="el-op-special">
-              <option value="">无（使用上方操作类型）</option>
-              <option value="hide_keyboard">收起键盘（键盘在才收，否则不动）</option>
-              <option value="deal_first_launch_dialogs">首次启动弹窗处理（无弹窗自动跳过）</option>
-            </select>
-          </label>
-          <label id="page-file-label">写入页面文件 <span class="help-icon" data-help="列出这条用例用到的页面，任选其一；也可以选还没用到的页面——保存时自动接进用例（自动补 import 和初始化代码），不用手动改">?</span>
-            <select id="el-page-new" style="display:none"></select>
-            <select id="el-page-file"></select>
           </label>
         </section>
 
@@ -347,7 +346,7 @@ try {
 <script src="/static/nav.js"></script>
 <script src="/static/theme.js"></script>
 <script src="/static/connect_qr.js"></script>
-<script src="static/index.js?v=121"></script>
+<script src="static/index.js?v=124"></script>
 <script>
   document.getElementById('btn-qr-connect').addEventListener('click', function () { window.PlatformQR.open(); });
 </script>

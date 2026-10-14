@@ -55,12 +55,18 @@ def list_case_files():
                   and not element_library.is_generated_backup(f))
 
 
-def create_case_file(stem, cn_name=''):
-    """后台「新建用例」：新建框架格式用例文件。stem 纯英文（可含数字/下划线，字母开头），
-    test_ 前缀写死——用户写了也剥掉统一补（防 test_test_x）。
-    骨架 = 类（Test+驼峰 stem）+ setup_class（构造 appOperator）+ test_<stem> 空方法（pass），
-    步骤经定位器「添加测试用例」/平台追加（pass 不挡追加，注释锚点/末尾追加逻辑兼容）。
-    中文名选填，写文件头「# 用例中文名：xxx」（用例管理列表与定位器下拉同源显示）。"""
+def create_case_file(stem, cn_name='', page_file='', element_file=''):
+    """后台「新建用例」：三件套同建（对齐框架用例包原生创建模型）。
+
+    stem 纯英文（可含数字/下划线，字母开头），test_ 前缀写死（用户写了也剥掉统一补）。
+    page_file：留空自动派生 <stem>Page.py；可自定义（Page 后缀写死，写了也剥掉重补）。
+               已存在 → 不重建直接绑定复用（页面按屏幕共享）。
+    element_file：留空自动派生 <stem>Elements.py；可自定义（Elements 后缀写死）。
+               已存在 → 复用。popupElements.py 保留名硬拦。
+    中文名选填，写用例文件头「# 用例中文名：xxx」。
+    产物绑定齐全：用例 import 页面并实例化 self.page；页面 import 元素类并装配
+    self._elements——出生即成链，定位器打开即可录。
+    返回 {'ok', 'file', 'msg', 'created': [...], 'reused': {...}}"""
     stem = (stem or '').strip()
     if not re.match(r'^[A-Za-z][A-Za-z0-9_]*$', stem):
         return {'ok': False,
@@ -69,10 +75,77 @@ def create_case_file(stem, cn_name=''):
     if '\n' in cn_name or '\r' in cn_name:
         return {'ok': False, 'msg': '中文名不能包含换行'}
     stem = re.sub(r'^test_', '', stem, flags=re.IGNORECASE) or stem
+    created, reused = [], {}
+    page_bind_cls = None   # 页面为已有文件时，绑定元素类以页面既有 import 为準
+
+    # ---- 先定页面（元素的归属跟着页面走：页面复用时以其已有绑定为準） ----
+    page_file = os.path.basename(str(page_file or '').strip())
+    page_file = re.sub(r'\.py$', '', page_file, flags=re.IGNORECASE) or (stem + 'Page')
+    page_file = re.sub(r'page$', '', page_file, flags=re.IGNORECASE) or page_file
+    page_file += 'Page.py'
+    if not re.match(r'^\w+\.py$', page_file):
+        return {'ok': False, 'msg': '页面文件名不合法：%s' % page_file}
+    ppath = os.path.join(PAGES_DIR, page_file)
+    if os.path.exists(ppath):
+        reused['page'] = page_file
+        page_cls = _first_class_of(ppath) or _py_class_name(os.path.splitext(page_file)[0])
+        # 已有页面绑定的元素文件与本次不一致时，以页面已有绑定为准（页面找元素，import 哪个是哪个）
+        em = re.search(r'from\s+page_objects\.app_ui\.android\.demoProject\.elements\.(\w+)\s+import',
+                       _read(ppath))
+        if em:
+            element_file = em.group(1) + '.py'   # 覆盖入参：跟随页面既有绑定
+            page_bind_cls = _elements_class_of(element_file) or _py_class_name(
+                os.path.splitext(element_file)[0])
+    else:
+        page_cls = _py_class_name(os.path.splitext(page_file)[0])
+
+    # ---- 再定元素：入参/派生（页面复用且带绑定时已被覆盖为其绑定） ----
+    element_file = _norm_elements_filename(element_file, stem + 'Elements')
+    if element_file == 'popupElements.py':
+        return {'ok': False, 'msg': 'popupElements.py 是弹窗规则库专管文件，不能占用该名字'}
+    epath = os.path.join(element_library.ELEMENTS_DIR, element_file)
+    if os.path.exists(epath):
+        reused['elements'] = element_file
+        elem_cls = _elements_class_of(element_file) or _py_class_name(
+            os.path.splitext(element_file)[0])
+    else:
+        elem_cls = _py_class_name(os.path.splitext(element_file)[0])
+        with open(epath, 'w', encoding='utf-8') as f:
+            f.write('\n'.join([
+                '# -*- coding: utf-8 -*-',
+                '# 本文件由 自动化后台「新建用例」创建于 %s' % time.strftime('%Y-%m-%d %H:%M:%S'),
+                'from page_objects.createElement import CreateElement',
+                'from page_objects.app_ui.locator_type import Locator_Type',
+                'from page_objects.app_ui.wait_type import Wait_Type as Wait_By',
+                '', '',
+                'class %s:' % elem_cls,
+                '    def __init__(self):',
+                '        pass', '']))
+        created.append(element_file)
+
+    # ---- 页面落盘（复用则跳过；新建时绑定上一步定下的元素） ----
+    if 'page' not in reused:
+        if page_bind_cls is None:
+            page_bind_cls = elem_cls
+        with open(ppath, 'w', encoding='utf-8') as f:
+            f.write('\n'.join([
+                '# -*- coding: utf-8 -*-',
+                '# 页面对象（用例包：%s）' % stem,
+                'from page_objects.app_ui.android.demoProject.elements.%s import %s'
+                % (os.path.splitext(element_file)[0], page_bind_cls),
+                '', '',
+                'class %s:' % page_cls,
+                '',
+                '    def __init__(self, appOperator):',
+                '        self.appOperator = appOperator',
+                '        self._elements = %s()' % page_bind_cls, '']))
+        created.append(page_file)
+
+    # ---- 用例文件：骨架 + 页面 import + setup_class 实例化（出生即绑定） ----
     filename = 'test_' + stem + '.py'
     path = os.path.join(CASES_DIR, filename)
     if os.path.exists(path):
-        return {'ok': False, 'msg': '用例文件 %s 已存在' % filename}
+        return {'ok': False, 'msg': '用例文件 %s 已存在（页面/元素未改动）' % filename}
     cls = 'Test' + element_library.to_class_name(stem)
     lines = ['# -*- coding: utf-8 -*-']
     if cn_name:
@@ -81,19 +154,30 @@ def create_case_file(stem, cn_name=''):
               'import time',
               'from base.app_ui.android.demoProject.app_ui_android_demoProject_client'
               ' import APP_UI_Android_demoProject_Client',
+              'from page_objects.app_ui.android.demoProject.pages.%s import %s'
+              % (os.path.splitext(page_file)[0], page_cls),
               '', '',
               'class %s:' % cls,
               '',
               '    def setup_class(self):',
               '        self.appOperator = APP_UI_Android_demoProject_Client(is_need_kill_app=False).appOperator',
+              '        self.page = %s(self.appOperator)' % page_cls,
               '',
               '    def test_%s(self):' % stem,
               '        """待添加步骤"""',
               '        pass', '']
     with open(path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
-    return {'ok': True, 'file': filename,
-            'msg': '已新建用例文件 %s%s' % (filename, ('（中文名：%s）' % cn_name) if cn_name else '')}
+    created.append(filename)
+
+    parts = []
+    parts.append('已新建用例 %s（含页面绑定 self.page）' % filename)
+    parts.append('%s页面 %s%s' % ('新建 ' if page_file in created else '复用已有 ',
+                                  page_file, '（绑定元素 %s）' % element_file))
+    parts.append('%s元素 %s' % ('新建 ' if element_file in created else '复用已有 ',
+                                element_file))
+    return {'ok': True, 'file': filename, 'created': created, 'reused': reused,
+            'msg': '；'.join(parts)}
 
 
 def list_page_files():

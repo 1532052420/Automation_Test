@@ -958,6 +958,8 @@ async function saveCaseCreate() {
     const d = await postJson('/api/cases/file/create', {
       stem: stem,
       cn_name: $('#caseCCnName').value.trim(),
+      page_file: $('#caseCPage').value.trim(),
+      element_file: $('#caseCElement').value,
     });
     toast(d.msg || (d.ok ? '已创建' : '创建失败'), !!d.ok);
     if (d.ok) {
@@ -1306,11 +1308,18 @@ async function appTestingInit() {
     renderCaseList();
   });
   /* 新建用例：表单弹窗（test_ 前缀写死）；创建后列表与定位器「添加测试用例」即刻可选 */
-  $('#btnClNew').addEventListener('click', () => {
+  $('#btnClNew').addEventListener('click', async () => {
     $('#caseCStem').value = '';
     $('#caseCCnName').value = '';
+    $('#caseCPage').value = '';
+    const sel = $('#caseCElement');
+    sel.innerHTML = '<option value="">自动派生（同名 Elements.py，已存在则复用）</option>';
     $('#caseCreateMask').classList.add('show');
     $('#caseCStem').focus();
+    try {
+      const d = await api('/api/appui/elements');
+      (d.existing_files || []).forEach(f => sel.add(new Option(f + '（复用已有）', f)));
+    } catch (_) {}   // 元素文件列表拉取失败不阻塞：保留自动派生选项
   });
   $('#caseCCancel').addEventListener('click', () => $('#caseCreateMask').classList.remove('show'));
   $('#caseCreateMask').addEventListener('click', (e) => {

@@ -1647,7 +1647,7 @@ async function openModal() {
   resetNewFileInputs();
   $('el-file').value = state.defaultEleFile || 'locator_gui_elements.py';
   // 用途默认：直接选②（三件套一次完成：选已有用例或新建都可以）
-  document.querySelector('input[name="el-purpose"][value="only"]').checked = true;
+  document.querySelector('input[name="el-purpose"][value="all"]').checked = true;
   onPurposeChange();   // 栏位显示复位（上次若用了用途③，弹窗栏要藏回、三件套栏恢复）
   $('el-op-type').innerHTML = opTypeOptions();
   $('el-op-type').value = 'click';
@@ -1728,7 +1728,7 @@ function newCaseFileName() {
 /* 用途（①仅元素 / ②+用例 / ③+操作 三件套）：决定流程走到哪一栏 */
 function purposeValue() {
   const r = document.querySelector('input[name="el-purpose"]:checked');
-  return r ? r.value : 'only';
+  return r ? r.value : 'all';
 }
 function setElLinkNote(msg) {
   const el = $('el-link-note');
@@ -1750,7 +1750,7 @@ function newStepNo() { const p = insertPos(); if (p === 'front') return 1; retur
 function renderStepsList(steps) {
   const box = $('el-steps-list');
   if (!box) return;
-  if (purposeValue() === 'only' || !$('el-case-method').value) { box.innerHTML = ''; box.style.display = 'none'; return; }
+  if (!$('el-case-method').value) { box.innerHTML = ''; box.style.display = 'none'; return; }
   box.style.display = '';
   const pos = insertPos();
   const newNo = pos === 'front' ? 1 : (pos > 0 ? pos + 1 : steps.length + 1);
@@ -1808,9 +1808,9 @@ function onPurposeChange() {
   syncSegClasses();
   let p = purposeValue();
   const tb = $('tri-bar');
-  if (tb) tb.style.display = (p === 'only' || p === 'popup') ? 'none' : '';   // 仅元素/弹窗规则库：无三件套落点
+  if (tb) tb.style.display = p === 'popup' ? 'none' : '';   // 弹窗规则库：无三件套落点
   // 特殊操作必须写用例（不写元素库），用途不允许停在「仅元素」
-  if (p === 'only' && $('el-op-special').value) {
+  if (false && $('el-op-special').value) {   // 旧「仅元素」互斥已随该用途移除
     document.querySelector('input[name="el-purpose"][value="all"]').checked = true;
     p = 'all';
   }
@@ -1819,13 +1819,12 @@ function onPurposeChange() {
   ['col-element', 'col-case', 'col-op'].forEach(id => {
     $(id).style.display = popup ? 'none' : '';
   });
-  // 仅元素 = 只走①栏：②③熄灭禁点；①元素栏必须保持可交互（dim 带 pointer-events:none，不能加到①上）
+  // 用途 = 元素+用例+操作（all）或登记随机弹窗（popup）；popup 只亮①栏
   $('col-element').classList.remove('dim');
-  $('col-case').classList.toggle('dim', !popup && p === 'only');
-  $('col-op').classList.toggle('dim', !popup && p === 'only');
+  $('col-case').classList.toggle('dim', popup);
+  $('col-op').classList.toggle('dim', popup);
   if (popup) { ppPrefill(); loadPopupRules(); return; }
-  if (p !== 'only') { onOpTypeChange(); onCaseFileChange(); }
-  else { renderStepsList([]); updateOpNote(); }
+  onOpTypeChange(); onCaseFileChange();
 }
 
 /* ---- 用途③：登记随机弹窗（写 popupElements.py 规则库，不进普通元素库） ---- */
@@ -2237,8 +2236,10 @@ function onCaseFileChange() {
   infos.forEach(c => (c.page_targets || []).forEach(t => {
     if (!targets.some(x => x.page_file === t.page_file)) targets.push(t);
   }));
-  // 先取用户当前选中再重建：操作类型切换等路径会重进本函数，不能丢页面选择（E2E 实测教训）
-  const curPageSel = pfsel.value;
+  // 先取用户当前选中再重建：同用例内的重入（切操作类型等）保留页面选择；
+  // 切换目标用例则重置——旧选择属于旧用例的页面，不能带过来（E2E 两次实测教训）
+  const curPageSel = (state._pageSelCase === f) ? pfsel.value : '';
+  state._pageSelCase = f;
   if (targets.length) {
     pfsel.innerHTML = targets.map(t => '<option value="' + esc(t.page_file) + '">'
       + esc(t.page_file + '（self.' + t.var + '）') + '</option>').join('')
@@ -2257,7 +2258,7 @@ function onCaseFileChange() {
   if (amb) {
     setElLinkNote('⚠ 页面类 ' + amb.page_class + ' 在多个文件里重名：' + amb.page_ambiguous.join('、')
                   + '——归属不唯一，已禁止写入页面方法，请先改名或删除重名文件');
-  } else if (p !== 'only' && !targets.length && !info) {
+  } else if (!targets.length && !info) {
     setElLinkNote('这条用例还没有任何页面——在「写入页面文件」里选一个，保存时自动接进用例（自动补 import 和初始化代码）');
   } else if (p === 'all') {
     const pe = selectedPageElementsFile();
@@ -2435,7 +2436,7 @@ async function _doSaveElement(continueMode) {
   const _opT0 = $('el-op-type').value;
   const noElOp = !special && stepTypeInfo(_opT0).v2 && !stepTypeInfo(_opT0).el;
   let name = special ? '' : $('el-name').value.trim();
-  if (purpose !== 'only') {
+  if (purpose === 'all') {   // popup 已在入口分流；旧「仅元素」用途已移除
     // v6.15.30：新建用例支持「复用已有元素文件 / 复用已有页面」，不再强制两下拉同态；
     // 合法性由保存时服务端统一校验（已有页面 → 元素文件必须为其绑定文件，此处自动对齐）
     // 必填字段统一校验（保存失败后弹窗字段可能被重置——缺字段时生成残缺代码
@@ -2538,7 +2539,7 @@ async function _doSaveElement(continueMode) {
   }
   // 选②：前置校验用例栏（保存元素前就拦住，避免元素入库了代码却追加不了）
   let caseFile = '', methodName = '';
-  if (purpose !== 'only') {
+  if (purpose === 'all') {
     caseFile = $('el-case-file').value;
     methodName = $('el-case-method').value;
     if (!(state.caseFiles || []).some(c => c.file === caseFile)) {
@@ -2553,7 +2554,7 @@ async function _doSaveElement(continueMode) {
       '点「确定」= 覆盖更新\n点「取消」= 不保存')) return;
   }
   // 仅元素模式落点防呆（v6.15.30）：写入未被任何页面对象 import 的文件 → 元素静默失效
-  if (purpose === 'only' && name && !noElOp && !(state.eleReferenced || []).includes(fname)) {
+  if (false && name && !noElOp && !(state.eleReferenced || []).includes(fname)) {   // 旧「仅元素」防呆已随该用途移除
     if (!await uiConfirm('「' + fname + '」没有被任何页面对象 import，元素保存后不会在任何用例中生效（静默失效）。\n\n' +
       '建议：改用「元素+用例+操作」用途，元素会自动写入目标页面绑定的元素文件。\n仍要保存到该文件？')) return;
   }
@@ -2592,13 +2593,6 @@ async function _doSaveElement(continueMode) {
     setTimeout(() => { loadPages(); loadLibraryFiles(); loadCaseFiles(); }, 260);
   };
 
-  if (purpose === 'only') {
-    if (r.content) $('el-content').textContent = r.content;
-    showElResult(r.msg + ' —— 已保存到元素库', true);
-    if (continueMode) finishContinue();
-    else { showToast('保存成功'); setTimeout(() => { $('modal-mask').style.display = 'none'; }, 600); }
-    return;
-  }
   // purpose ②/③：追加一步代码到目标用例方法体末尾（③ 同时生成/更新页面方法）
   const step = {
     type: special || $('el-op-type').value,   // 特殊操作优先（不依赖元素）
@@ -2911,7 +2905,7 @@ function fillCaseHead() {
   ];
   const bar = $('tri-bar');
   bar.textContent = '🛡 三件套一次完成：' + parts.join(' · ');
-  bar.style.display = purposeValue() === 'only' ? 'none' : '';
+  bar.style.display = purposeValue() === 'popup' ? 'none' : '';
 }
 
 /* 字段名高亮 3 秒（新字段出现时引导视线，之后恢复正常样式） */

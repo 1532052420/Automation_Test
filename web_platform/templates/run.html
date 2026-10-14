@@ -718,6 +718,8 @@
     <div class="fields" style="grid-template-columns:1fr">
       <div class="field"><label>用例文件名（必填，纯英文可含数字，以字母开头；前缀 test_ 自动补）</label><input type="text" id="caseCStem" autocomplete="off" placeholder="如 loginflow → test_loginflow.py"></div>
       <div class="field"><label>用例文件中文名（选填，列表显示用）</label><input type="text" id="caseCCnName" autocomplete="off"></div>
+      <div class="field"><label>页面文件名（选填，留空自动派生；后缀 Page 自动补；已存在则直接复用）</label><input type="text" id="caseCPage" autocomplete="off" placeholder="留空 = settingsflowPage.py 这种自动派生"></div>
+      <div class="field"><label>绑定元素文件（留空自动派生同名 Elements；已存在则复用；也可下拉选已有）</label><select id="caseCElement"><option value="">自动派生（同名 Elements.py，已存在则复用）</option></select></div>
     </div>
     <div class="mops mt">
       <button class="ghost" id="caseCCancel">取消</button>

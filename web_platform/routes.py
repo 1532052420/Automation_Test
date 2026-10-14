@@ -741,13 +741,16 @@ def api_cases():
 
 @bp.route('/api/cases/file/create', methods=['POST'])
 def api_cases_file_create():
-    """新建用例文件（用例管理「＋新建用例」表单）：test_ 前缀写死，
-    骨架 = 类 + setup_class(appOperator) + 空 test 方法；中文名选填写文件头，
-    用例管理列表与定位器「添加测试用例」下拉即刻可选"""
+    """新建用例文件（用例管理「＋新建用例」表单）：三件套同建——
+    test_ 前缀写死；页面留空自动派生 <用例名>Page.py（可自定义，Page 后缀写死）；
+    元素留空自动派生 <用例名>Elements.py（可下拉复用已有）；均已存在则直接绑定复用。
+    产物出生即成链：用例 import 页面并 self.page 实例化，页面 import 元素类"""
     from element_locator import case_generator
     d = request.get_json(silent=True) or {}
     return jsonify(case_generator.create_case_file(d.get('stem') or '',
-                                                   d.get('cn_name') or ''))
+                                                   d.get('cn_name') or '',
+                                                   page_file=d.get('page_file') or '',
+                                                   element_file=d.get('element_file') or ''))
 
 
 @bp.route('/api/cases/cn-name', methods=['POST'])
