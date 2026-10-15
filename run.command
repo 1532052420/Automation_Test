@@ -148,8 +148,12 @@ case "$1" in
     fi
     ;;
   *)
+    # 双击 .command 文件 = 无参数运行；默认直接启动平台，别只打印用法让窗口一闪而过
+    echo "未指定命令，默认启动 Web 执行平台（双击启动入口）"
     echo "用法: ./run.command {platform|restart-platform|stop-platform|status}"
     echo "  ./run.command platform          # 启动 Web 执行平台并打开页面"
     echo "  ./run.command restart-platform  # 改完平台代码后重启"
+    echo ""
+    "$0" platform
     ;;
 esac
