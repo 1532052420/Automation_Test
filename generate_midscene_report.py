@@ -82,7 +82,43 @@ def frame_datauri(video, offset_ms):
     return None
 
 
-def find_case_videos(node, udid):
+def parse_recording_log(v0):
+    """解析录屏会话目录的 recording.log，返回 {'start': 起录 epoch 秒, 'span': 墙钟跨度秒}。
+    log 行时间只有当日时分秒，日期取视频文件 mtime 所在日；解析失败返回 None。"""
+    log = os.path.join(os.path.dirname(v0), 'recording.log')
+    if not os.path.isfile(log):
+        return None
+    try:
+        text = open(log, encoding='utf-8', errors='ignore').read()
+        tods = re.findall(r'\[(\d{2}:\d{2}:\d{2}\.\d{3})\]', text)
+        if not tods:
+            return None
+        stop_tod = None
+        for line in text.splitlines():
+            if '录制已停止' in line:
+                m = re.search(r'\[(\d{2}:\d{2}:\d{2}\.\d{3})\]', line)
+                if m:
+                    stop_tod = m.group(1)
+                break
+        if not stop_tod:
+            stop_tod = tods[-1]
+        date = time.strftime('%Y-%m-%d', time.localtime(os.path.getmtime(v0)))
+
+        def epoch_ms(tod):
+            base = time.mktime(time.strptime(date + ' ' + tod[:8], '%Y-%m-%d %H:%M:%S'))
+            return (base + float(tod[9:]) / 1000) * 1000
+
+        start_ms = epoch_ms(tods[0])
+        stop_ms = epoch_ms(stop_tod)
+        span = (stop_ms - start_ms) / 1000
+        if not 0 < span < 3600:
+            return None
+        return {'start': start_ms, 'span': span}
+    except Exception:
+        return None
+
+
+def find_case_videos(node, udid, near_epoch=None):
     if not node:
         return []
     prefix = node.replace('/', '__').replace('::', '__') + '__' + (udid or '')
@@ -91,7 +127,10 @@ def find_case_videos(node, udid):
         for f in glob.glob(os.path.join(VIDEO_EVIDENCE_DIR, sub, '**', '*.mp4'), recursive=True):
             if os.path.basename(f).startswith(prefix):
                 hits.append(f)
-    hits.sort(key=lambda f: -os.path.getmtime(f))
+    # 同一用例可能有多份历史会话录屏：取 mtime 最接近用例结束的（±30 分钟内），防跨 run 错拿
+    near = near_epoch if near_epoch else (hits and max(os.path.getmtime(f) for f in hits) or 0)
+    hits = [f for f in hits if abs(os.path.getmtime(f) - near) <= 1800]
+    hits.sort(key=lambda f: abs(os.path.getmtime(f) - near))
     return hits
 
 
@@ -181,9 +220,18 @@ def build_data(run_id, meta, results, run_dir):
         case_stop = res.get('stop') or case_start
         run_start = case_start if run_start is None else min(run_start, case_start)
         node = node_of(meta, res)
-        videos = find_case_videos(node, meta.get('udid'))
+        videos = find_case_videos(node, meta.get('udid'), near_epoch=(res.get('stop') or 0) / 1000)
         v0 = videos[0] if videos else None
         v_dur = video_duration_ms(v0) if v0 else 0
+        # 回放/抽帧时间映射（2026-10-15 修正）：录屏起点 ≠ 用例起点（录制含启动 App 等前置，
+        # 且 adb 录屏墙钟跨度 ≠ 视频容器时长）。以 recording.log 的录制起点为原点、
+        # 视频时长/墙钟跨度为伸缩系数换算；无日志时退回旧假设（用例开始=视频零点）。
+        rec = parse_recording_log(v0) if v0 else None
+        if rec and v_dur:
+            v_origin_ms = rec['start']                    # epoch ms：视频零点
+            v_scale = (v_dur / 1000.0) / rec['span']      # 视频秒 / 墙钟秒
+        else:
+            v_origin_ms, v_scale = case_start, 1.0
         n_tasks_before = len(tasks)
         rel_video = link_case_video(run_dir, v0, case_no)
         desc = str(res.get('description') or '')
@@ -204,12 +252,13 @@ def build_data(run_id, meta, results, run_dir):
         use_cn = bool(doc_steps) and len(doc_steps) == max(1, len(steps))
 
         def frames_for(ws, we, want):
-            """时间窗内从录屏取 want 帧 dataURI（窗口均分）。"""
+            """时间窗内从录屏取 want 帧 dataURI（窗口均分）。ws/we 为 epoch ms，
+            经录制起点原点 + 伸缩系数换算为视频内时间。"""
             out = []
             if not v0 or v_dur <= 0:
                 return out
-            ra = max(0, ws - case_start)
-            rb = max(0, min(v_dur, we - case_start))
+            ra = max(0, (ws / 1000.0 - v_origin_ms / 1000.0) * v_scale * 1000)
+            rb = max(0, min(v_dur, (we / 1000.0 - v_origin_ms / 1000.0) * v_scale * 1000))
             if rb <= ra:
                 ra, rb = 0, min(v_dur, 1000)
             n = max(1, min(want, int((rb - ra) / 200) or 1))
@@ -314,10 +363,12 @@ def build_data(run_id, meta, results, run_dir):
             tasks.append(assert_task)
 
         # 录屏回放定位（自定义扩展字段，官方渲染器忽略）：_atVideo = 报告目录内的录屏相对地址，
-        # _atT0 = 录屏零点对应的 epoch ms（= 用例开始），供注入脚本换算「步骤开始前 2 秒」的起点
+        # _atT0 = 视频零点对应的 epoch ms（= 录制起点），_atScale = 视频秒/墙钟秒伸缩系数，
+        # 供注入脚本换算「步骤开始前 2 秒」的真实起播位置
         for t in tasks[n_tasks_before:]:
             t['_atVideo'] = rel_video
-            t['_atT0'] = case_start
+            t['_atT0'] = v_origin_ms
+            t['_atScale'] = v_scale
 
     return {
         'sdkVersion': '1.0.3',
@@ -402,7 +453,7 @@ REPLAY_JS = r'''
       if (!panel.classList.contains('at-replaying')) panel.classList.add('at-replaying');
     }
 
-    function play(task, label) {
+    function play(task, label, fullVideo) {
       if (!task || !task._atVideo) {
         box.style.display = 'none';
         var p = document.querySelector('.detail-panel');
@@ -411,8 +462,10 @@ REPLAY_JS = r'''
       }
       ensureUI();
       [80, 300, 900, 2000].forEach(function (d) { setTimeout(ensureUI, d); });
-      var from = Math.max(0, (task.timing.start - task._atT0) / 1000 - 2);  // 步骤开始前 2 秒：留缓冲看清上下文
-      var to = (task.timing.end - task._atT0) / 1000;
+      var k = task._atScale || 1;
+      // 用例头（Plan）= 整个操作全程：从 0 播到视频自然结束
+      var from = fullVideo ? 0 : Math.max(0, (task.timing.start - task._atT0) / 1000 * k - 2);
+      var to = fullVideo ? Infinity : (task.timing.end - task._atT0) / 1000 * k;
       var startPlay = function () {
         curEnd = to;
         tip.textContent = '▶ 录屏回放 · ' + label + ' · 从开始前 2 秒播放';
@@ -441,7 +494,7 @@ REPLAY_JS = r'''
       var isPlan = t.type === 'Planning';
       var label = isPlan ? '整个操作（用例全程）'
         : ((t.param && t.param.locate && t.param.locate.description) || t.subType || ('步骤 ' + i));
-      play(t, label);
+      play(t, label, isPlan);
     }, true);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
