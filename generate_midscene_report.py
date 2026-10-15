@@ -463,12 +463,16 @@ REPLAY_JS = r'''
       ensureUI();
       [80, 300, 900, 2000].forEach(function (d) { setTimeout(ensureUI, d); });
       var k = task._atScale || 1;
-      // 用例头（Plan）= 整个操作全程：从 0 播到视频自然结束
-      var from = fullVideo ? 0 : Math.max(0, (task.timing.start - task._atT0) / 1000 * k - 2);
-      var to = fullVideo ? Infinity : (task.timing.end - task._atT0) / 1000 * k;
+      // 用例头（Plan）= 整个操作全程：从 0 播到视频自然结束。
+      // 步骤：操作（点按/输入）发生在步骤窗口末尾（前面大都是 AI 规划耗时）——
+      // 以步骤结束点为中心，前 2 秒起播、结束后再放 2 秒，避免干等规划或戛然而止
+      var endV = (task.timing.end - task._atT0) / 1000 * k;
+      var from = fullVideo ? 0 : Math.max(0, endV - 2);
+      var to = fullVideo ? Infinity : endV + 2;
       var startPlay = function () {
         curEnd = to;
-        tip.textContent = '▶ 录屏回放 · ' + label + ' · 从开始前 2 秒播放';
+        tip.textContent = fullVideo ? '▶ 录屏回放 · ' + label + ' · 用例全程'
+          : '▶ 录屏回放 · ' + label + ' · 操作前后各留 2 秒';
         box.style.display = 'block';
         video.play().catch(function () {});
       };
