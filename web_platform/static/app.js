@@ -1123,6 +1123,7 @@ function initRunPanels() {
    数据源与元素定位器、执行框架同一份元素库（page_objects/.../elements/*.py）；
    编辑/复制走后端 /api/appui/elements/save，写回复用定位器同一套行生成逻辑。 */
 let _elements = [], _elFiles = [], _elExistingFiles = [], _elTypes = [], _elWaits = [];
+let _elCnNames = {};     // 文件名 -> 中文名（文件头「# 元素文件中文名：」，后端解析回读）
 let _elModalMode = 'edit', _elModalOrig = null;
 let _elMgrFile = null;   // null = 元素文件列表视图；非空 = 已进入该文件（元素列表视图）
 
@@ -1134,6 +1135,7 @@ async function loadElements() {
   _elExistingFiles = d.existing_files || _elFiles;   // 磁盘上真实存在的文件（默认落点不存在时不显示）
   _elTypes = d.locator_types || ['ID', 'XPATH'];
   _elWaits = d.wait_types || ['VISIBILITY_OF'];
+  _elCnNames = d.file_cn_names || {};
   renderElMgr();
 }
 
@@ -1153,7 +1155,9 @@ function renderElMgr() {
 function renderElementFiles() {
   /* 只显示磁盘上真实存在的文件；默认落点不存在时不显示幽灵行 */
   const rows = _elExistingFiles.map(f =>
-    '<tr><td><b>' + esc(f) + '</b></td><td><div class="ops">' +
+    '<tr><td><b>' + esc(f) + '</b>' +
+    (_elCnNames[f] ? ' <span class="muted">' + esc(_elCnNames[f]) + '</span>' : '') +
+    '</td><td><div class="ops">' +
     '<button class="ghost mini" data-act="open" data-file="' + esc(f) + '">编辑</button>' +
     '<button class="mini danger-ghost" data-act="delfile" data-file="' + esc(f) + '">删除</button>' +
     '</div></td></tr>').join('') +
@@ -1344,6 +1348,28 @@ function startRename(name, file, btn) {
   inp.addEventListener('blur', () => { if (!done) commit(); });
 }
 
+/* ➕新增元素文件：弹窗表单创建骨架文件（落盘后列表与定位器写入文件下拉即刻可选） */
+async function saveElCreate() {
+  const stem = $('#elCStem').value.trim();
+  if (!stem) return toast('请填写元素文件名', false);
+  const btn = $('#elCOk');
+  btn.disabled = true; btn.textContent = '创建中…';
+  try {
+    const d = await postJson('/api/appui/elements/file/create', {
+      stem: stem,
+      cn_name: $('#elCCnName').value.trim(),
+    });
+    toast(d.msg || (d.ok ? '已创建' : '创建失败'), !!d.ok);
+    if (d.ok) {
+      $('#elCreateMask').classList.remove('show');
+      _elMgrFile = null;
+      loadElements();
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = '确定';
+  }
+}
+
 function initElementsPanel() {
   $('#btnElRefresh').addEventListener('click', () => {
     /* 重置：清空搜索词并回到文件列表视图 */
@@ -1351,6 +1377,18 @@ function initElementsPanel() {
     _elMgrFile = null;
     loadElements();
   });
+  $('#btnElCreate').addEventListener('click', () => {
+    $('#elCStem').value = '';
+    $('#elCCnName').value = '';
+    $('#elCreateMask').classList.add('show');
+    $('#elCStem').focus();
+  });
+  $('#elCCancel').addEventListener('click', () => $('#elCreateMask').classList.remove('show'));
+  $('#elCreateMask').addEventListener('click', (e) => {
+    if (e.target === $('#elCreateMask')) $('#elCreateMask').classList.remove('show');
+  });
+  $('#elCOk').addEventListener('click', saveElCreate);
+  $('#elCStem').addEventListener('keydown', (e) => { if (e.key === 'Enter') saveElCreate(); });
   $('#elSearch').addEventListener('input', () => { _elPage = 1; renderElements(); });
   $('#elTbody').addEventListener('click', onElTableClick);
   $('#elFilesTbody').addEventListener('click', onElFilesClick);

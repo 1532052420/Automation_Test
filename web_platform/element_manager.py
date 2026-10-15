@@ -21,7 +21,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:      # 允许 `python web_platform/element_manager.py` 独立运行
     sys.path.insert(0, BASE_DIR)
 
-from element_locator.element_library import add_element, is_valid_element_name
+from element_locator.element_library import add_element, is_valid_element_name, to_class_name
 
 ELEMENTS_DIR = os.path.join(BASE_DIR, 'page_objects', 'app_ui', 'android', 'demoProject', 'elements')
 POPUP_FILE = 'popupElements.py'          # 随机弹窗规则库，不进普通元素管理（popup_rules 专管）
@@ -182,6 +182,67 @@ def delete_file(filename):
     except OSError as e:
         return False, '删除失败：%s' % e
     return True, '元素文件 %s 已删除' % filename
+
+
+# 元素文件中文名：文件头「# 元素文件中文名：xxx」，与用例中文名同一映射方案
+_CN_HEADER_RE = re.compile(r'^#\s*元素文件中文名[：:]\s*(.+?)\s*$', re.MULTILINE)
+
+
+def element_file_cn_names():
+    """元素文件中文名映射：读各文件头「# 元素文件中文名：xxx」。
+    返回 {文件名: 中文名}，未写中文名的文件不进映射。"""
+    names = {}
+    for fname in list_element_files() + [POPUP_FILE]:
+        path = os.path.join(ELEMENTS_DIR, fname)
+        if not os.path.isfile(path):
+            continue
+        m = _CN_HEADER_RE.search(_read(path))
+        if m:
+            names[fname] = m.group(1)
+    return names
+
+
+def create_element_file(stem, cn_name=''):
+    """后台「新增元素」：骨架元素文件落盘（class + __init__ pass 占位，后续元素写入自动替换）。
+    文件名与 case_generator 同规则：剥 .py / Elements 结尾重补；popupElements.py 保留名硬拦。
+    中文名选填，写文件头「# 元素文件中文名：xxx」。返回 {'ok', 'file', 'msg'}"""
+    stem = (stem or '').strip()
+    stem = re.sub(r'\.py$', '', stem, flags=re.IGNORECASE)   # 写了 .py 也剥掉统一校验归一
+    if not re.match(r'^[A-Za-z][A-Za-z0-9_]*$', stem):
+        return {'ok': False,
+                'msg': '文件名需为纯英文（可含数字），且以字母开头，收到：%r' % (stem or '空')}
+    cn_name = (cn_name or '').strip()[:60]
+    base = re.sub(r'\.py$', '', stem, flags=re.IGNORECASE)
+    base = re.sub(r'elements?$', '', base, flags=re.IGNORECASE)
+    if not base:
+        return {'ok': False, 'msg': '文件名不合法：%s' % stem}
+    fname = base + 'Elements.py'
+    if fname == POPUP_FILE:
+        return {'ok': False, 'msg': 'popupElements.py 是弹窗规则库专管文件，不能占用该名字'}
+    path = os.path.join(ELEMENTS_DIR, fname)
+    if os.path.exists(path):
+        return {'ok': False, 'msg': '%s 已存在' % fname}
+    cls = to_class_name(fname)
+    if not re.match(r'^[A-Za-z_]', cls):
+        cls = 'El' + cls   # 类名不允许数字开头（与 case_generator._py_class_name 同兜底）
+    head = ['# -*- coding: utf-8 -*-']
+    if cn_name:
+        head.append('# 元素文件中文名：%s' % cn_name)
+    head += ['# 本文件由 自动化后台「新增元素」创建于 %s' % time.strftime('%Y-%m-%d %H:%M:%S'),
+             'from page_objects.createElement import CreateElement',
+             'from page_objects.app_ui.locator_type import Locator_Type',
+             'from page_objects.app_ui.wait_type import Wait_Type as Wait_By',
+             '', '',
+             'class %s:' % cls,
+             '    def __init__(self):',
+             '        pass', '']
+    try:
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(head))
+    except OSError as e:
+        return {'ok': False, 'msg': '创建失败：%s' % e}
+    return {'ok': True, 'file': fname,
+            'msg': '已创建 %s%s' % (fname, ('（%s）' % cn_name) if cn_name else '')}
 
 
 def save_element(filename, name, locator_type, value, wait_type='VISIBILITY_OF',
