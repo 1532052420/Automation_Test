@@ -69,3 +69,32 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();
+
+/* 【裸奔自愈】极端情况下（重启窗口期加载、浏览器缓存残片）页面 HTML 渲染了但 CSS
+   没加载成功，整页无样式。这里在 load 后检测：字体仍为浏览器默认 serif（Times）
+   即判定裸奔 → 自动带 _style_bust 参数换缓存标记重载一次；sessionStorage 防循环
+   （重试过仍裸奔说明是环境问题，不再无限刷新）。 */
+(function () {
+  function styleOk() {
+    try {
+      if (!document.styleSheets.length) return false;
+      var probe = document.querySelector('h1, h2, h3, .brand, .card, a');
+      if (!probe) return true;
+      var f = (getComputedStyle(probe).fontFamily || '').trim();
+      return !/^(times|georgia|serif)/i.test(f);
+    } catch (e) { return true; }
+  }
+  window.addEventListener('load', function () {
+    setTimeout(function () {
+      if (styleOk()) {
+        try { sessionStorage.removeItem('_style_bust'); } catch (e) {}
+        return;
+      }
+      var busted = false;
+      try { busted = sessionStorage.getItem('_style_bust') === '1'; } catch (e) {}
+      if (busted) return;
+      try { sessionStorage.setItem('_style_bust', '1'); } catch (e) {}
+      location.replace(location.pathname + '?_style_bust=' + Date.now() + location.hash);
+    }, 400);
+  });
+})();
