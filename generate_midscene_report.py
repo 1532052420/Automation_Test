@@ -128,9 +128,28 @@ def png_size(datauri):
         return {'width': 1080, 'height': 2400, 'dpr': 3}
 
 
+def load_registry_desc():
+    """用例登记库（config/app_testing/cases.yaml）的 node → description（「操作步骤」字段）。
+    读取失败不致命——报告生成退回 allure description（docstring）。"""
+    try:
+        import yaml
+        p = os.path.join(BASE_DIR, 'config', 'app_testing', 'cases.yaml')
+        doc = yaml.safe_load(open(p, encoding='utf-8')) or {}
+        return {it.get('node'): (it.get('description') or '').strip()
+                for it in doc.get('items') or [] if it.get('node')}
+    except Exception:
+        return {}
+
+
+def split_doc_steps(desc):
+    """「步骤A → 步骤B」拆成中文步骤列表（弹窗 openStepFlowModal 同款规则）。"""
+    return [s.strip() for s in (desc or '').split('→') if s.strip()]
+
+
 def build_data(run_id, meta, results, run_dir):
     """平台 Allure 数据 → Midscene 原版报告 schema。"""
     ATT = os.path.join(run_dir, 'allure-results')
+    registry = load_registry_desc()
     run_start = None
     tasks = []
     for res in sorted(results, key=lambda r: r.get('start') or 0):
@@ -144,6 +163,11 @@ def build_data(run_id, meta, results, run_dir):
         v0 = videos[0] if videos else None
         v_dur = video_duration_ms(v0) if v0 else 0
         desc = str(res.get('description') or '')
+        # 中文步骤名（v6.15.54）：左侧任务列表显示「操作步骤」字段的中文参数。
+        # 来源：用例登记 description 优先，allure description（方法 docstring）兜底；
+        # 仅当与 allure 步骤数一一对应时逐条映射，数量对不上则保持英文动作词（宁缺勿错）。
+        doc_steps = split_doc_steps(registry.get(node) or desc)
+        use_cn = bool(doc_steps) and len(doc_steps) == max(1, len(res.get('steps') or []))
 
         def frames_for(ws, we, want):
             """时间窗内从录屏取 want 帧 dataURI（窗口均分）。"""
@@ -162,35 +186,37 @@ def build_data(run_id, meta, results, run_dir):
                     out.append((int(case_start + ts), d))
             return out
 
-        # 1) 用例级 Plan 任务（组头）
-        pf = frames_for(case_start, case_stop, 2) if v0 else []
-        rec_plan = [{'type': 'screenshot', 'ts': ts, 'screenshot': d, 'timing': 'after-calling'}
-                    for ts, d in pf]
-        uc_plan = {'size': None, 'screenshotBase64': rec_plan[-1]['screenshot']} if rec_plan else None
-        if uc_plan and uc_plan['screenshotBase64'].startswith('data:image/jpeg'):
-            uc_plan['size'] = None
+        # 1) 用例级 Plan 任务（组头）——只保留标题/时间/状态，不再抽视频帧
+        #    （v6.15.53：去掉组头顶部的视频帧截图，报告更清爽、体积更小）
         tasks.append({
             'status': 'finished' if status == 'passed' else 'failed',
             'type': 'Planning', 'subType': 'Plan',
-            'param': {'userInstruction': case_name, 'imagesIncludeCount': len(pf)},
+            'param': {'userInstruction': case_name, 'imagesIncludeCount': 0},
             'timing': {'start': case_start, 'end': case_stop, 'cost': case_stop - case_start},
-            'uiContext': uc_plan,
+            'uiContext': None,
             'log': {'rawResponse': desc or case_name},
             'output': {'actions': [], 'more_actions_needed_by_instruction': True,
-                       'log': desc or case_name, 'yamlFlow': []},
-            'recorder': rec_plan,
+                       'log': case_name, 'yamlFlow': []},
+            'recorder': [],
             'cache': {'hit': False},
         })
 
-        # 2) 操作步骤 → Action Space（allure steps 常无 time：按步骤数均分用例时间窗，帧时间轴才能连续铺满）
+        # 2) 操作步骤 → Action Space
+        #    时间（v6.15.53）：allure-pytest 2.7.0 的 step 时间是顶层 start/stop
+        #    （attrs asdict 扁平序列化，无 time 子对象）——直接读取真实时间戳；
+        #    仅当缺失时才退化为按步骤数均分用例时间窗。
         steps = res.get('steps') or []
         n_steps = max(1, len(steps))
         win = (case_stop - case_start) / n_steps
         for si, st in enumerate(steps):
             st_time = st.get('time') or {}
-            s_start = int(st_time.get('start') or (case_start + si * win))
-            s_end = int(st_time.get('stop') or st_time.get('end') or (case_start + (si + 1) * win))
+            s_start = int(st_time.get('start') or st.get('start') or (case_start + si * win))
+            s_end = int(st_time.get('stop') or st_time.get('end') or st.get('stop')
+                        or (case_start + (si + 1) * win))
+            if s_end < s_start:
+                s_end = s_start
             sub = step_to_action(st.get('name', ''))
+            cn = doc_steps[si] if (use_cn and si < len(doc_steps)) else ''
             shots = []
             for att in st.get('attachments', []) or []:
                 if (att.get('type') or '').startswith('image/'):
@@ -209,12 +235,12 @@ def build_data(run_id, meta, results, run_dir):
                 rec = ([{'type': 'screenshot', 'ts': s_end, 'screenshot': main_shot,
                          'timing': 'after-calling'}] if main_shot else [])
             m = re.search(r'\[id:([^\]]+)\]', st.get('name', ''))
-            locate = {'description': st.get('name', '')}
+            locate = {'description': cn or st.get('name', '')}
             if m:
                 locate.update({'value': m.group(1), 'type': 'id'})
             tasks.append({
                 'status': 'finished' if (st.get('status') in (None, 'passed', 'finished')) else 'failed',
-                'type': 'Action Space', 'subType': sub,
+                'type': 'Action Space', 'subType': cn or sub,
                 'param': {'locate': locate},
                 'subTask': True,
                 'timing': {'start': s_start, 'end': s_end, 'cost': s_end - s_start},
