@@ -186,16 +186,36 @@ def split_doc_steps(desc):
 
 
 def link_case_video(run_dir, v0, case_no):
-    """把用例录屏以相对软链放进报告目录（http.server/file:// 均可访问）。
-    软链避免 mp4 双份落盘；失败（如跨盘）退回复制。返回供 HTML 引用的文件名或 None。"""
+    """把用例录屏压缩转码后放进报告目录（用户反馈原片太大：1440x3168 原片 25s ≈ 7.4MB）。
+    高度压到 1280（宽等比）、CRF 28、去音轨、faststart 便于边下边播；25s ≈ 1~2MB。
+    转码失败退回相对软链原片（不阻断报告生成）。返回供 HTML 引用的文件名或 None。"""
     if not v0:
         return None
     rep_dir = os.path.join(run_dir, 'report')
     os.makedirs(rep_dir, exist_ok=True)
-    link = os.path.join(rep_dir, 'recording_%d.mp4' % case_no)
+    # 文件名带录屏 mtime 戳：重新生成时 URL 变化，绕开浏览器启发式缓存拿旧片
+    link = os.path.join(rep_dir, 'recording_%d_%d.mp4' % (case_no, int(os.path.getmtime(v0))))
+    for old in glob.glob(os.path.join(rep_dir, 'recording_*.mp4')) + \
+               glob.glob(os.path.join(rep_dir, 'recording_*.mp4.tmp.mp4')):
+        try:
+            os.remove(old)
+        except OSError:
+            pass
+    tmp = link + '.tmp.mp4'
     try:
         if os.path.lexists(link):
             os.remove(link)
+        r = subprocess.run([FFMPEG, '-y', '-i', v0, '-vf', 'scale=-2:1280', '-c:v', 'libx264',
+                            '-crf', '28', '-preset', 'fast', '-an', '-movflags', '+faststart', tmp],
+                           capture_output=True, timeout=300)
+        if r.returncode == 0 and os.path.isfile(tmp) and os.path.getsize(tmp) > 0:
+            os.replace(tmp, link)
+            return os.path.basename(link)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    try:
+        if os.path.isfile(tmp):
+            os.remove(tmp)
         os.symlink(os.path.relpath(v0, rep_dir), link)
         return os.path.basename(link)
     except OSError:
@@ -326,6 +346,9 @@ def build_data(run_id, meta, results, run_dir):
                 'param': {'locate': locate},
                 'subTask': True,
                 'timing': {'start': s_start, 'end': s_end, 'cost': s_end - s_start},
+                # 全程耗时含 AI 规划等待（数据源无规划/操作分段），向用户说明时间口径
+                'log': {'rawResponse': '步骤全程 %.1fs（含 AI 规划等待）；实际操作集中在窗口末尾 2~4 秒，回放已自动对准'
+                                        % ((s_end - s_start) / 1000.0)},
                 'uiContext': ({'size': png_size(main_shot), 'screenshotBase64': main_shot}
                               if main_shot else None),
                 'recorder': rec,
@@ -441,7 +464,11 @@ REPLAY_JS = r'''
 
     var curEnd = Infinity;
     video.addEventListener('timeupdate', function () {
-      if (curEnd < Infinity && video.currentTime >= curEnd) video.pause();
+      // 到步骤结束点自动暂停；暂停后即解除限制——手动点播放可继续看完，不会被再次按住
+      if (curEnd < Infinity && video.currentTime >= curEnd) {
+        video.pause();
+        curEnd = Infinity;
+      }
     });
 
     function ensureUI() {
