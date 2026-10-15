@@ -1,0 +1,9 @@
+meta:
+  next_id: 2
+items:
+- scope: explore
+  max_steps: 15
+  max_minutes: 5
+  id: 1
+  created_at: 1791544806
+  updated_at: 1791596010

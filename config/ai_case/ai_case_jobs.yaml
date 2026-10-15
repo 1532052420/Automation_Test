@@ -1,0 +1,256 @@
+meta:
+  next_id: 5
+items:
+- requirement: 前置：已登录。点击「登录」。断言：出现「首页」
+  project_id: null
+  project_name: null
+  app_package: com.demo
+  device: ''
+  entry_mode: manual
+  status: 已取消
+  analysis:
+    goal: 模型目标
+    steps:
+    - sid: S1
+      action: click
+      target: 登录
+    assertions: []
+    clarifications: []
+    risks: []
+    notes: []
+    preconditions: []
+    analyzer: model:glm-test
+    analyzer_note: 模型解析结果，仍需人工确认后才会进入后续阶段
+  clarifications: []
+  events:
+  - t: 1791595514
+    type: stage
+    msg: '任务创建（ #1 ），开始解析需求'
+  - t: 1791595514
+    type: stage
+    msg: 需求解析完成（model:glm-test）：步骤 1 · 断言 0 · 澄清 0 · 风险 0
+  - t: 1791595514
+    type: stage
+    msg: 信息齐备，进入「待探索」（P2 接入 Maestro MCP 真机探索）
+  - t: 1791596598
+    type: stage
+    msg: 任务已取消（已生成内容保留，可重开查看）
+  id: 1
+  created_at: 1791595514
+  updated_at: 1791596598
+- requirement: 验证「发布歌曲」主流程：从「我的」进入「创作中心」，点击「发布歌曲」，输入歌名《测试之歌A1》，选择分类「流行」，点击发布。断言：出现「发布成功」提示；列表新增该歌曲。
+  project_id: 1
+  project_name: 云音乐 demo
+  app_package: com.netease.cloudmusic.demo
+  device: ''
+  entry_mode: ai_explore
+  status: 已取消
+  analysis:
+    goal: 「发布歌曲」主流程：从「我的」进入「创作中心」，点击「发布歌曲」，输入歌名《测试之歌A1》，选择分类「流行」，点击发布
+    entry_path:
+    - 我的
+    - 创作中心
+    preconditions: []
+    steps:
+    - sid: S1
+      action: launch
+      target: App
+      value: null
+      raw: （推断）进入需求场景前先启动应用
+      source: inferred
+    - sid: S2
+      action: click
+      target: 创作中心
+      value: null
+      raw: 验证「发布歌曲」主流程：从「我的」进入「创作中心」
+      source: requirement
+    - sid: S3
+      action: click
+      target: 发布歌曲
+      value: null
+      raw: 点击「发布歌曲」
+      source: requirement
+    - sid: S4
+      action: input
+      target: 歌名
+      value: 测试之歌A1
+      raw: 输入歌名《测试之歌A1》
+      source: requirement
+    - sid: S5
+      action: select
+      target: 流行
+      value: null
+      raw: 选择分类「流行」
+      source: requirement
+    - sid: S6
+      action: click
+      target: 发布
+      value: null
+      raw: 点击发布
+      source: requirement
+    assertions:
+    - type: text_contains
+      target: 发布成功
+      raw: 断言：出现「发布成功」提示
+    - type: list_added
+      target: 列表新增该歌曲
+      raw: 列表新增该歌曲
+    clarifications: &id001
+    - qid: precond
+      question: 需求未写明前置条件（登录账号 / 测试环境），如何处理？
+      options:
+      - 设备上已登录测试账号，直接继续
+      - 探索前我先在设备上手动登录
+      - 无账号前置，跳过
+      answer: null
+      answered_at: null
+    risks:
+    - level: high
+      word: 发布
+      clause: 验证「发布歌曲」主流程：从「我的」进入「创作中心」
+      note: 疑似业务写入动作：探索/试运行阶段不自动提交，需人工确认（方案 8.6）
+    - level: high
+      word: 发布
+      clause: 点击「发布歌曲」
+      note: 疑似业务写入动作：探索/试运行阶段不自动提交，需人工确认（方案 8.6）
+    - level: high
+      word: 发布
+      clause: 点击发布
+      note: 疑似业务写入动作：探索/试运行阶段不自动提交，需人工确认（方案 8.6）
+    notes: []
+    analyzer: rule-fallback
+    analyzer_note: 规则解析器 v0（未接模型）：仅做关键词结构化，结果需人工确认
+    model_attempted: true
+  clarifications: *id001
+  events:
+  - t: 1791595977
+    type: stage
+    msg: '任务创建（ #2 ），开始解析需求'
+  - t: 1791595977
+    type: stage
+    msg: 需求解析完成（rule-fallback）：步骤 6 · 断言 2 · 澄清 1 · 风险 3
+  - t: 1791595977
+    type: clarification
+    msg: 存在待澄清问题，等待人工确认（AI 不擅自编造缺失信息）
+  - t: 1791595979
+    type: stage
+    msg: 任务已取消（已生成内容保留，可重开查看）
+  id: 2
+  created_at: 1791595977
+  updated_at: 1791595979
+- requirement: 前置：已登录。点击「登录」。断言：出现「首页」
+  project_id: 1
+  project_name: 云音乐 demo
+  app_package: com.netease.cloudmusic.demo
+  device: ''
+  entry_mode: ai_explore
+  status: 已取消
+  analysis:
+    goal: 前置：已登录
+    entry_path: null
+    preconditions:
+    - 前置：已登录
+    steps:
+    - sid: S1
+      action: launch
+      target: App
+      value: null
+      raw: （推断）进入需求场景前先启动应用
+      source: inferred
+    - sid: S2
+      action: click
+      target: 登录
+      value: null
+      raw: 点击「登录」
+      source: requirement
+    assertions:
+    - type: text_contains
+      target: 首页
+      raw: 断言：出现「首页」
+    clarifications: &id002
+    - qid: entry
+      question: 需求未写明入口路径，如何确定探索起点？
+      options:
+      - 我手动打开页面后设为入口
+      - 从设备当前页面开始
+      - AI 从应用首页自动探索
+      answer: null
+      answered_at: null
+    risks: []
+    notes: []
+    analyzer: rule-fallback
+    analyzer_note: 规则解析器 v0（未接模型）：仅做关键词结构化，结果需人工确认
+    model_attempted: false
+  clarifications: *id002
+  events:
+  - t: 1791596943
+    type: stage
+    msg: '任务创建（ #3 ），开始解析需求'
+  - t: 1791596943
+    type: stage
+    msg: 需求解析完成（rule-fallback）：步骤 2 · 断言 1 · 澄清 1 · 风险 0
+  - t: 1791596943
+    type: clarification
+    msg: 存在待澄清问题，等待人工确认（AI 不擅自编造缺失信息）
+  - t: 1791596945
+    type: stage
+    msg: 任务已取消（已生成内容保留，可重开查看）
+  id: 3
+  created_at: 1791596943
+  updated_at: 1791596945
+- requirement: 打开云音乐搜索周杰伦的歌并播放第一首，断言播放页出现
+  project_id: 1
+  project_name: 云音乐 demo
+  app_package: com.netease.cloudmusic.demo
+  device: ''
+  entry_mode: ai_explore
+  status: 待补充信息
+  analysis:
+    goal: ''
+    entry_path: null
+    preconditions: []
+    steps: []
+    assertions:
+    - type: text_contains
+      target: 断言播放页出现
+      raw: 断言播放页出现
+    clarifications: &id003
+    - qid: entry
+      question: 需求未写明入口路径，如何确定探索起点？
+      options:
+      - 我手动打开页面后设为入口
+      - 从设备当前页面开始
+      - AI 从应用首页自动探索
+      answer: null
+      answered_at: null
+    - qid: precond
+      question: 需求未写明前置条件（登录账号 / 测试环境），如何处理？
+      options:
+      - 设备上已登录测试账号，直接继续
+      - 探索前我先在设备上手动登录
+      - 无账号前置，跳过
+      answer: null
+      answered_at: null
+    risks: []
+    notes:
+    - 未能从需求中识别出操作步骤：请用「点击／输入／选择／断言：…」等动宾句式描述
+    analyzer: rule-fallback
+    analyzer_note: 规则解析器 v0（未接模型）：仅做关键词结构化，结果需人工确认
+    model_attempted: false
+  clarifications: *id003
+  events:
+  - t: 1791799831
+    type: stage
+    msg: '任务创建（ #4 ），开始解析需求'
+  - t: 1791799831
+    type: stage
+    msg: 已加载技能文件「需求解析技能」（默认版）
+  - t: 1791799831
+    type: stage
+    msg: 需求解析完成（rule-fallback）：步骤 0 · 断言 1 · 澄清 2 · 风险 0
+  - t: 1791799831
+    type: clarification
+    msg: 存在待澄清问题，等待人工确认（AI 不擅自编造缺失信息）
+  id: 4
+  created_at: 1791799831
+  updated_at: 1791799831

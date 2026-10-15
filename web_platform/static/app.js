@@ -1633,7 +1633,7 @@ async function loadReportList() {
     '<td><div class="ops">' +
     '<button class="ghost mini" onclick="showRunDetail(\'' + esc(r.run_id) + '\')">详情</button>' +
     '<button class="ghost mini" onclick="openReportFor(\'' + esc(r.run_id) + '\', this)">打开报告</button>' +
-    '<button class="ghost mini" onclick="openMidsceneFor(\'' + esc(r.run_id) + '\', this)" title="Midscene 风格在线回放报告：视频帧时间轴 + 失败证据">在线报告</button>' +
+    '<button class="ghost mini" onclick="openMidsceneFor(\'' + esc(r.run_id) + '\', this)" title="Midscene 风格在线回放报告：视频帧时间轴 + 失败证据">生成在线报告</button>' +
     '<button class="mini danger-ghost" onclick="deleteRunFor(\'' + esc(r.run_id) + '\')">删除数据</button>' +
     '</div></td></tr>').join('');
   renderPager('#reportPager', _reportPage, pages, (p) => { _reportPage = p; loadReportList(); }, runs.length);
@@ -1649,16 +1649,52 @@ function inReportFor(runId) {
    按钮级的 disabled 挡不住重建出来的新按钮。
    后端等报告服务就绪才返回，返回后只 window.open 一次（不会双开） */
 let _openReportLockUntil = 0;
+/* 在线报告生成状态：run_id -> true（生成中）。生成中重复点击 toast 提示 */
+const _reportGenerating = {};
+let _reportUrlByRun = {};   // run_id -> 最终报告 URL（横幅点击跳转用）
+
 async function openMidsceneFor(runId, btn) {
-  if (btn) { btn.disabled = true; btn.textContent = '打开中…'; }
+  // 生成中：按钮不可点击（disabled 持续），重复点击 toast 提示
+  if (_reportGenerating[runId]) return toast('报告生成中，请稍候…');
+  _reportGenerating[runId] = true;
+  if (btn) { btn.disabled = true; btn.textContent = '报告生成中'; btn.classList.add('loading'); }
   try {
-    toast('正在生成/打开 ' + runId + ' 的回放报告…');
     const d = await postJson('/api/run/' + runId + '/midscene/open', {});
-    if (d.ok) { toast(d.reused ? '回放报告已就绪: ' + d.url : '回放报告已生成并打开: ' + d.url); window.open(d.url, '_blank'); }
-    else toast('打开失败: ' + (d.msg || ''), false);
+    if (d.ok) {
+      _reportUrlByRun[runId] = d.url;
+      showReportBanner(runId, d.url);          // 全局横幅：已生成，点击跳转
+    } else {
+      toast('生成失败: ' + (d.msg || ''), false);
+    }
+  } catch (e) {
+    toast('生成失败: 服务异常', false);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '回放'; }
+    _reportGenerating[runId] = false;
+    if (btn) { btn.disabled = false; btn.textContent = '生成在线报告'; btn.classList.remove('loading'); }
   }
+}
+
+/* 全局横幅：在线报告已生成，点击跳转；显示 3 秒后消失。
+   位置：平台所有页面全局（挂在 body），页面中间顶部，顶部预留 60px */
+let _reportBannerTimer = null;
+function showReportBanner(runId, url) {
+  let b = document.getElementById('reportReadyBanner');
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'reportReadyBanner';
+    b.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:9999;' +
+      'background:#1a9e6e;color:#fff;padding:10px 22px;border-radius:8px;font-size:14px;' +
+      'box-shadow:0 4px 18px rgba(0,0,0,.25);cursor:pointer;display:flex;align-items:center;gap:10px;';
+    document.body.appendChild(b);
+  }
+  b.innerHTML = '✅ 在线报告已生成（' + esc(runId) + '）· <u>点击打开</u>';
+  b.onclick = function () {
+    window.open(url, '_blank');
+    b.style.display = 'none';
+  };
+  b.style.display = 'flex';
+  clearTimeout(_reportBannerTimer);
+  _reportBannerTimer = setTimeout(function () { b.style.display = 'none'; }, 3000);
 }
 
 async function openReportFor(runId, btn) {

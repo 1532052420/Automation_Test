@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>内容评分规则 · 布局一（经典文档风）</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #fff; color: #333; padding: 36px 20px; }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  .sec-title { font-size: 15px; font-weight: 600; color: #333; margin: 30px 0 14px; }
+  .sec-title:first-of-type { margin-top: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { border: 1px solid #d0d3d9; padding: 12px 10px; text-align: center; }
+  th { background: #f2f3f5; font-weight: 600; color: #333; }
+  td.left { text-align: center; }
+  .td-lines { line-height: 2; }
+  tr.total td { font-weight: 600; background: #fafbfc; }
+  .formula { margin-top: 16px; font-size: 14px; color: #333; }
+  .formula b { color: #1a56c4; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="sec-title">内容基础分（上限合计 97 分）</div>
+  <div style="font-weight:600; margin: 4px 0 10px;">一、各维度权重</div>
+  <table>
+    <tr><th style="width:24%">内容维度</th><th>分 数</th><th style="width:22%">上限分数</th></tr>
+    <tr><td>文字</td><td class="td-lines">0-10个字符=5分<br>11-50个字符=10分<br>51-100个字符=20分<br>101-150个字符=30分<br>151-200个字符=40分<br>200个字符以上=50分</td><td>50分</td></tr>
+    <tr><td>图片</td><td>一张图片=5分</td><td>45分</td></tr>
+    <tr><td>歌曲</td><td>一首歌曲=2分</td><td>2</td></tr>
+    <tr class="total"><td>合计</td><td>累计加分</td><td>累计加分</td></tr>
+  </table>
+
+  <div class="sec-title">时间衰减系数（基于动态发布时间）</div>
+  <div style="font-weight:600; margin: 4px 0 10px;">加入时间衰减系数</div>
+  <table>
+    <tr><th>动态发布时间</th><th style="width:38%">时间系数</th></tr>
+    <tr><td>0～24小时</td><td>1.0</td></tr>
+    <tr><td>&gt;24～48小时</td><td>0.8</td></tr>
+    <tr><td>&gt;48～72小时</td><td>0.6</td></tr>
+    <tr><td>&gt;3～7天</td><td>0.4</td></tr>
+    <tr><td>&gt;7天以上</td><td>0.2</td></tr>
+  </table>
+  <div class="formula">动态最终得分 = <b>内容基础分</b> × <b>时间系数</b></div>
+</div>
+</body>
+</html>

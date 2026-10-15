@@ -1,0 +1,9 @@
+{
+  "mode": "adbwifi",
+  "host": "",
+  "port": "8080",
+  "adb_port": 5555,
+  "service": "AutomationTest",
+  "password": "11223344",
+  "custom": "http://{host}:{port}/connect"
+}

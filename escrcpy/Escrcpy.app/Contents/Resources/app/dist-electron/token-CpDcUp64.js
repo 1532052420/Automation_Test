@@ -1,0 +1,41 @@
+import { t as e } from "./chunk-KszRVpJ5.js";
+import { n as t, t as n } from "./main.js";
+//#region ../node_modules/.pnpm/@vercel+oidc@3.2.0/node_modules/@vercel/oidc/dist/token.js
+var r = /* @__PURE__ */ e(((e, r) => {
+	var i = Object.defineProperty, a = Object.getOwnPropertyDescriptor, o = Object.getOwnPropertyNames, s = Object.prototype.hasOwnProperty, c = (e, t) => {
+		for (var n in t) i(e, n, {
+			get: t[n],
+			enumerable: !0
+		});
+	}, l = (e, t, n, r) => {
+		if (t && typeof t == "object" || typeof t == "function") for (let c of o(t)) !s.call(e, c) && c !== n && i(e, c, {
+			get: () => t[c],
+			enumerable: !(r = a(t, c)) || r.enumerable
+		});
+		return e;
+	}, u = (e) => l(i({}, "__esModule", { value: !0 }), e), d = {};
+	c(d, { refreshToken: () => m }), r.exports = u(d);
+	var f = t(), p = n();
+	async function m(e) {
+		let t = e?.project, n = e?.team;
+		if (!t && !n) {
+			let e = (0, p.findProjectInfo)();
+			t = e.projectId, n = e.teamId;
+		} else if (!t || !n) {
+			let e = (0, p.findProjectInfo)();
+			t ??= e.projectId, n ??= e.teamId;
+		}
+		if (!t) throw new f.VercelOidcTokenError("Failed to refresh OIDC token: No project specified. Try re-linking your project with `vc link`");
+		let r = (0, p.loadToken)(t);
+		if (!r || (0, p.isExpired)((0, p.getTokenPayload)(r.token), e?.expirationBufferMs)) {
+			let i = await (0, p.getVercelToken)({ expirationBufferMs: e?.expirationBufferMs });
+			if (r = await (0, p.getVercelOidcToken)(i, t, n), !r) throw new f.VercelOidcTokenError("Failed to refresh OIDC token");
+			(0, p.saveToken)(r, t);
+		}
+		process.env.VERCEL_OIDC_TOKEN = r.token;
+	}
+	0 && (r.exports = { refreshToken: m });
+}));
+//#endregion
+export default r();
+export {};

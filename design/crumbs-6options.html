@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>面包屑导航 · 6 种样式方案对比</title>
+<style>
+:root{
+  --brand:#0071e3; --brand2:#0077ed; --ink:#1d1d1f; --ink2:#3a3a3c; --muted:#6e6e73; --muted2:#86868b;
+  --bg:#f5f5f7; --panel:#fff; --panel2:#fbfbfd; --panel3:#f0f0f2; --line:#d2d2d7; --line-soft:rgba(0,0,0,.07);
+  --r-card:18px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:15px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased;background:#e8e8ed;color:var(--ink2);padding:40px 30px 80px}
+.head{max-width:1100px;margin:0 auto 30px}
+.head h1{font-size:26px;font-weight:600;color:var(--ink);letter-spacing:-.02em}
+.head p{margin-top:6px;color:var(--muted);max-width:80ch}
+.opt{max-width:1100px;margin:0 auto 40px;background:var(--panel);border-radius:20px;
+  box-shadow:0 4px 24px rgba(0,0,0,.06);overflow:hidden}
+.opt-head{display:flex;gap:12px;align-items:baseline;padding:22px 26px 4px;flex-wrap:wrap}
+.opt-head .no{font-size:12.5px;font-weight:700;color:var(--brand);background:#e8f2ff;padding:3px 12px;border-radius:980px}
+.opt-head h2{font-size:18px;font-weight:600;color:var(--ink)}
+.opt-head .pos{font-size:12.5px;color:var(--muted2)}
+.proscons{display:flex;gap:20px;padding:8px 26px 16px;flex-wrap:wrap}
+.proscons div{font-size:12.5px;color:var(--muted)}
+.proscons b{color:var(--ink2);font-weight:600}
+.stage{margin:0 26px 26px;border-radius:14px;overflow:hidden;border:1px solid var(--line-soft);background:var(--bg)}
+
+/* 模拟页面头（每个方案共用）：顶栏 + 面包屑行 */
+.mock-head{display:flex;align-items:center;gap:10px;padding:12px 22px;background:var(--panel);
+  border-bottom:1px solid var(--line-soft)}
+.mock-head .brand{display:flex;align-items:center;gap:9px;font-size:14.5px;font-weight:600;color:var(--ink)}
+.mock-head .brand .logo{width:26px;height:26px;border-radius:7px;background:var(--brand);color:#fff;
+  display:inline-flex;align-items:center;justify-content:center;font-size:13px}
+.mock-head .crumbs{margin-left:6px}
+.mock-body{padding:26px 22px;background:var(--panel2);min-height:70px;color:var(--muted2);font-size:12.5px}
+
+/* ---------- 方案 A：胶囊分段 ---------- */
+.A-crumbs{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.A-crumbs .seg{font-size:12.5px;padding:3px 12px;border-radius:980px;color:var(--muted);background:var(--panel3);
+  transition:all .15s}
+.A-crumbs .seg:hover{color:var(--brand);background:#e8f2ff}
+.A-crumbs .sep{color:var(--muted2);font-size:11px}
+.A-crumbs .seg.cur{background:var(--brand);color:#fff;font-weight:500;cursor:default}
+
+/* ---------- 方案 B：细线大字号 ---------- */
+.B-head{border-bottom:1px solid var(--line);padding-bottom:0}
+.B-crumbs{display:flex;align-items:center;gap:8px;font-size:14px;padding:10px 22px;background:var(--panel)}
+.B-crumbs a{color:var(--muted);text-decoration:none;transition:color .15s}
+.B-crumbs a:hover{color:var(--brand);text-decoration:underline}
+.B-crumbs .sep{color:var(--muted2);font-size:12px}
+.B-crumbs .cur{color:var(--ink);font-weight:600}
+
+/* ---------- 方案 C：图标化 ---------- */
+.C-crumbs{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.C-crumbs .seg{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);
+  padding:3px 11px 3px 8px;border-radius:980px;text-decoration:none;transition:all .15s}
+.C-crumbs .seg:hover{background:#e8f2ff;color:var(--brand)}
+.C-crumbs .seg svg{width:13px;height:13px;flex:none}
+.C-crumbs .sep{color:var(--muted2);font-size:11px;margin:0 2px}
+.C-crumbs .seg.cur{background:rgba(0,113,227,.1);color:var(--brand);font-weight:500;cursor:default}
+
+/* ---------- 方案 D：大号箭头 ---------- */
+.D-crumbs{display:flex;align-items:center;gap:2px;font-size:15px}
+.D-crumbs a{color:var(--muted);text-decoration:none;padding:2px 6px;border-radius:8px;transition:all .15s}
+.D-crumbs a:hover{color:var(--brand);background:#e8f2ff}
+.D-crumbs .sep{color:var(--muted2);margin:0 2px;font-size:13px}
+.D-crumbs .cur{color:var(--brand);font-weight:600;padding:2px 6px}
+
+/* ---------- 方案 E：返回式 ---------- */
+.E-crumbs{display:flex;align-items:center;gap:12px}
+.E-crumbs .back{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:var(--muted);
+  text-decoration:none;padding:4px 12px;border-radius:980px;border:1px solid var(--line-soft);
+  background:var(--panel2);transition:all .15s}
+.E-crumbs .back:hover{color:var(--brand);border-color:var(--brand)}
+.E-crumbs .path{font-size:12.5px;color:var(--muted2)}
+.E-crumbs .cur{font-size:15px;font-weight:600;color:var(--ink)}
+
+/* ---------- 方案 F：深色反白条 ---------- */
+.F-head{background:#1d1d1f;border-bottom:0}
+.F-head .brand{color:#f5f5f7}
+.F-crumbs{display:flex;align-items:center;gap:7px;font-size:12.5px}
+.F-crumbs a{color:rgba(255,255,255,.55);text-decoration:none;transition:color .15s}
+.F-crumbs a:hover{color:#fff}
+.F-crumbs .sep{color:rgba(255,255,255,.3);font-size:11px}
+.F-crumbs .cur{color:#fff;font-weight:500;padding:2px 10px;border-radius:980px;background:rgba(255,255,255,.14)}
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>面包屑导航 · 6 种样式方案</h1>
+  <p>位置：页面顶部导航栏（品牌标识右侧）。假数据 = 截图中的真实路径：自动化测试平台 / 首页 / APP自动化 / 断言管理。
+     所有方案均保持「一级可点、末级为当前页」的交互语义，仅视觉与信息密度不同。</p>
+</div>
+
+<!-- ============ A ============ -->
+<div class="opt">
+  <div class="opt-head"><span class="no">方案 A</span><h2>胶囊分段面包屑</h2>
+    <span class="pos">当前页=品牌蓝实心胶囊，前面各级淡灰胶囊</span></div>
+  <div class="proscons">
+    <div><b>优点</b>：层级边界最清晰，当前页一眼锁定；与平台 pill 组件语言一致</div>
+    <div><b>缺点</b>：层级多时占宽度；彩色胶囊略抢眼</div>
+  </div>
+  <div class="stage">
+    <div class="mock-head">
+      <div class="brand"><span class="logo">✓</span>自动化测试平台</div>
+      <nav class="crumbs A-crumbs">
+        <a class="seg" href="#">首页</a><span class="sep">›</span>
+        <a class="seg" href="#">APP自动化</a><span class="sep">›</span>
+        <span class="seg cur">断言管理</span>
+      </nav>
+    </div>
+    <div class="mock-body">（页面内容区）</div>
+  </div>
+</div>
+
+<!-- ============ B ============ -->
+<div class="opt">
+  <div class="opt-head"><span class="no">方案 B</span><h2>细线大字号面包屑</h2>
+    <span class="pos">顶部整行 + 底部分隔细线，末级加粗深色</span></div>
+  <div class="proscons">
+    <div><b>优点</b>：经典稳重、可读性最好；与内容区有明确分隔，结构感强</div>
+    <div><b>缺点</b>：传统感强，与平台圆角胶囊风格略异</div>
+  </div>
+  <div class="stage">
+    <div class="mock-head B-head" style="padding-bottom:0;border-bottom:0">
+      <div class="brand"><span class="logo">✓</span>自动化测试平台</div>
+    </div>
+    <nav class="B-crumbs">
+      <a href="#">首页</a><span class="sep">›</span>
+      <a href="#">APP自动化</a><span class="sep">›</span>
+      <span class="cur">断言管理</span>
+    </nav>
+    <div class="mock-body" style="background:var(--panel)">（页面内容区）</div>
+  </div>
+</div>
+
+<!-- ============ C ============ -->
+<div class="opt">
+  <div class="opt-head"><span class="no">方案 C</span><h2>图标化胶囊面包屑</h2>
+    <span class="pos">每级带线性小图标，末级=品牌蓝淡底胶囊</span></div>
+  <div class="proscons">
+    <div><b>优点</b>：图标辅助识别层级属性（首页/模块/功能），信息最丰富</div>
+    <div><b>缺点</b>：略繁琐；图标语义需维护映射</div>
+  </div>
+  <div class="stage">
+    <div class="mock-head">
+      <div class="brand"><span class="logo">✓</span>自动化测试平台</div>
+      <nav class="crumbs C-crumbs">
+        <a class="seg" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.8V20h13V9.8"/></svg>首页</a><span class="sep">›</span>
+        <a class="seg" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".6" fill="currentColor"/></svg>APP自动化</a><span class="sep">›</span>
+        <span class="seg cur"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7.5h15M4.5 12h15M4.5 16.5h9"/></svg>断言管理</span>
+      </nav>
+    </div>
+    <div class="mock-body">（页面内容区）</div>
+  </div>
+</div>
+
+<!-- ============ D ============ -->
+<div class="opt">
+  <div class="opt-head"><span class="no">方案 D</span><h2>大号箭头面包屑</h2>
+    <span class="pos">15px 字号，末级品牌蓝加粗，hover 淡蓝底</span></div>
+  <div class="proscons">
+    <div><b>优点</b>：可读性显著提升；改动最小（只调字号/颜色），与现结构完全兼容</div>
+    <div><b>缺点</b>：视觉新意有限；层级多时偏长</div>
+  </div>
+  <div class="stage">
+    <div class="mock-head">
+      <div class="brand"><span class="logo">✓</span>自动化测试平台</div>
+      <nav class="crumbs D-crumbs">
+        <a href="#">首页</a><span class="sep">›</span>
+        <a href="#">APP自动化</a><span class="sep">›</span>
+        <span class="cur">断言管理</span>
+      </nav>
+    </div>
+    <div class="mock-body">（页面内容区）</div>
+  </div>
+</div>
+
+<!-- ============ E ============ -->
+<div class="opt">
+  <div class="opt-head"><span class="no">方案 E</span><h2>返回式面包屑</h2>
+    <span class="pos">「‹ 返回上级」按钮 + 当前页大标题，完整路径缩小旁置</span></div>
+  <div class="proscons">
+    <div><b>优点</b>：当前页最突出（可兼作页标题）；返回操作最顺手；路径深也不乱</div>
+    <div><b>缺点</b>：跳转非相邻层级需多点一次；与侧栏菜单选中态略有重复</div>
+  </div>
+  <div class="stage">
+    <div class="mock-head">
+      <div class="brand"><span class="logo">✓</span>自动化测试平台</div>
+      <nav class="crumbs E-crumbs">
+        <a class="back" href="#"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg>返回 APP自动化</a>
+        <span class="path">首页 / APP自动化</span>
+        <span class="cur">断言管理</span>
+      </nav>
+    </div>
+    <div class="mock-body">（页面内容区）</div>
+  </div>
+</div>
+
+<!-- ============ F ============ -->
+<div class="opt">
+  <div class="opt-head"><span class="no">方案 F</span><h2>深色反白导航条</h2>
+    <span class="pos">整条深色底白字，末级淡白胶囊，运维控制台风格</span></div>
+  <div class="proscons">
+    <div><b>优点</b>：导航区与内容区分隔最强，品牌感突出；与服务状态板（深色）语言统一</div>
+    <div><b>缺点</b>：深色条在浅色页面中较抢眼；与整体 Apple 浅色风差异最大</div>
+  </div>
+  <div class="stage">
+    <div class="mock-head F-head">
+      <div class="brand"><span class="logo">✓</span>自动化测试平台</div>
+      <nav class="crumbs F-crumbs">
+        <a href="#">首页</a><span class="sep">›</span>
+        <a href="#">APP自动化</a><span class="sep">›</span>
+        <span class="cur">断言管理</span>
+      </nav>
+    </div>
+    <div class="mock-body">（页面内容区）</div>
+  </div>
+</div>
+
+<div class="head" style="margin-top:-8px">
+  <p><b>选型建议（仅供参考）</b>：想要平台风格最统一、改动最小 → <b>D</b>（仅调字号/颜色）或 <b>A</b>（胶囊分段）；
+     信息密度与识别度优先 → <b>C</b>；当前页要能当页标题用 → <b>E</b>；导航区要最强分隔 → <b>F</b>；
+     <b>B</b> 偏传统后台风。所有方案都只改共用 nav.css + render 输出，不影响页面结构。</p>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,1 @@
+var e=`escrcpy`,t=`3.3.1`,n=`https://github.com/viarotel-org/escrcpy`;export{e as n,t as r,n as t};

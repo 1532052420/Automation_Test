@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>手机实时投屏工具对比 · Top 5</title>
+<style>
+:root { color-scheme: light;
+  --brand:#0071e3; --ink:#1d1d1f; --ink2:#3a3a3c; --muted:#6e6e73; --muted2:#86868b;
+  --bg:#f5f5f7; --panel:#fff; --panel2:#fbfbfd; --panel3:#f0f0f2; --line:#d2d2d7; --line-soft:rgba(0,0,0,.07);
+  --ok:#1d7a3a; --ok-bg:rgba(52,199,89,.13); --warn:#b25000; --warn-bg:rgba(255,149,0,.14);
+  --bad:#d70015; --bad-bg:rgba(255,59,48,.12); --ai:#8944ab; --ai-bg:rgba(175,82,222,.13);
+  --r-card:18px; --r-pill:980px; --shadow:0 4px 24px rgba(0,0,0,.06);
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font:15px/1.6 -apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased; background:var(--bg); color:var(--ink2); }
+.wrap { max-width:1240px; margin:0 auto; padding:30px 22px 70px; }
+h1 { font-size:26px; font-weight:700; color:var(--ink); letter-spacing:-.02em; }
+.sub { color:var(--muted); font-size:14px; margin-top:6px; }
+.tagline { margin:14px 0 0; font-size:13.5px; color:var(--ink2);
+  background:var(--panel); border-radius:14px; padding:12px 16px; box-shadow:var(--shadow); }
+.tagline b.ai { color:var(--ai); }
+
+/* 评分卡 */
+.rank { display:grid; grid-template-columns:repeat(auto-fit, minmax(185px, 1fr)); gap:14px; margin:22px 0 8px; }
+.rank-card { background:var(--panel); border-radius:var(--r-card); box-shadow:var(--shadow);
+  padding:18px 16px; position:relative; }
+.rank-card.top1 { border:2px solid var(--brand); }
+.rank-no { position:absolute; top:-11px; left:14px; background:var(--brand); color:#fff;
+  font-size:11px; font-weight:700; border-radius:var(--r-pill); padding:2px 10px; }
+.rank-card:not(.top1) .rank-no { background:var(--panel3); color:var(--muted); }
+.rank-card h3 { font-size:16px; color:var(--ink); letter-spacing:-.01em; margin:4px 0 2px; }
+.rank-card .meta { font-size:11.5px; color:var(--muted2); margin-bottom:8px; }
+.score { font-size:30px; font-weight:700; color:var(--brand); letter-spacing:-.03em; }
+.score small { font-size:12px; color:var(--muted2); font-weight:500; }
+.bar { height:6px; background:var(--panel3); border-radius:var(--r-pill); overflow:hidden; margin:8px 0 10px; }
+.bar i { display:block; height:100%; background:linear-gradient(90deg,#0071e3,#4aa9ff); border-radius:var(--r-pill); }
+.subscore { font-size:11px; color:var(--muted); line-height:1.9; }
+.subscore b { color:var(--ink2); font-weight:600; }
+.lic { display:inline-block; font-size:10.5px; background:var(--panel3); color:var(--muted);
+  border-radius:var(--r-pill); padding:1px 8px; margin-top:6px; }
+
+/* 方法说明 */
+.method { font-size:12.5px; color:var(--muted); margin:10px 0 30px; }
+.method code { background:var(--panel3); border-radius:6px; padding:1px 7px; font-size:11.5px; }
+
+/* 功能矩阵 */
+h2 { font-size:20px; font-weight:700; color:var(--ink); letter-spacing:-.01em; margin:34px 0 6px; }
+.matrix-wrap { background:var(--panel); border-radius:var(--r-card); box-shadow:var(--shadow);
+  padding:6px 6px 2px; overflow-x:auto; }
+table.matrix { width:100%; border-collapse:collapse; font-size:13px; min-width:1080px; }
+.matrix th { font-size:12px; color:var(--muted); font-weight:600; text-align:center;
+  padding:12px 8px 10px; border-bottom:2px solid var(--line); white-space:nowrap; }
+.matrix th:first-child { text-align:left; padding-left:14px; width:190px; }
+.matrix th .stars { display:block; font-size:10.5px; color:var(--muted2); font-weight:500; }
+.matrix td { padding:9px 8px; border-bottom:1px solid var(--line-soft); text-align:center;
+  vertical-align:middle; color:var(--ink2); }
+.matrix td:first-child { text-align:left; padding-left:14px; color:var(--ink); font-weight:500; }
+.matrix tr:last-child td { border-bottom:none; }
+.matrix tr:hover td { background:var(--panel2); }
+.yes { color:var(--ok); font-weight:700; }
+.no { color:var(--bad); opacity:.55; font-weight:700; }
+.part { color:var(--warn); font-weight:600; }
+.note { display:block; font-size:10.5px; color:var(--muted2); font-weight:400; margin-top:1px; }
+.yes .note, .part .note { color:var(--muted2); }
+
+/* 工具详卡 */
+.tools { display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:16px; margin-top:16px; }
+.tool { background:var(--panel); border-radius:var(--r-card); box-shadow:var(--shadow); padding:20px; }
+.tool h3 { font-size:16px; color:var(--ink); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.tool h3 a { font-size:11.5px; font-weight:500; }
+.tool .pos { font-size:12.5px; color:var(--muted); margin:6px 0 10px; }
+.tool .pos b { color:var(--ok); }
+.tool ul { list-style:none; font-size:13px; display:flex; flex-direction:column; gap:5px; }
+.tool ul li::before { content:'·'; color:var(--brand); font-weight:700; margin-right:6px; }
+.tool .caution { margin-top:10px; font-size:12px; color:var(--warn); background:var(--warn-bg);
+  border-radius:10px; padding:7px 11px; }
+
+.legend { display:flex; gap:18px; font-size:12.5px; color:var(--muted); margin:12px 2px 10px; flex-wrap:wrap; }
+@media (max-width:900px) { .rank { grid-template-columns:1fr 1fr; } }
+@media (max-width:560px) { .rank { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>手机实时投屏工具对比 · GitHub Top 5</h1>
+  <p class="sub">数据截至 2026-10-10 · 来源 GitHub API（星数/提交时间/协作者比） · 按你给的权重打分：最多人用 50% + 最多好评 35% + 近期维护 15%</p>
+
+  <div class="rank">
+    <div class="rank-card top1">
+      <span class="rank-no">🥇 综合第 1</span>
+      <h3>scrcpy</h3>
+      <div class="meta">Genymobile · Apache-2.0</div>
+      <div class="score">91.4<small> /100</small></div>
+      <div class="bar"><i style="width:91%"></i></div>
+      <div class="subscore">使用度 <b>50.0</b> · 好评度 <b>26.7</b> · 维护 <b>14.7</b><br>151,719★ · 最近提交 10-08（2 天前）</div>
+      <span class="lic">命令行 · 极致性能</span>
+    </div>
+    <div class="rank-card">
+      <span class="rank-no">🥈 综合第 2</span>
+      <h3>escrcpy</h3>
+      <div class="meta">viarotel-org · MIT</div>
+      <div class="score">89.4<small> /100</small></div>
+      <div class="bar"><i style="width:89%"></i></div>
+      <div class="subscore">使用度 <b>39.4</b> · 好评度 <b>35.0</b> · 维护 <b>15.0</b><br>12,007★ · 最近提交 10-10（今天）</div>
+      <span class="lic">图形界面 · scrcpy 全功能封装</span>
+    </div>
+    <div class="rank-card">
+      <span class="rank-no">🥉 综合第 3</span>
+      <h3>QtScrcpy</h3>
+      <div class="meta">barry-ran · Apache-2.0</div>
+      <div class="score">76.6<small> /100</small></div>
+      <div class="bar"><i style="width:77%"></i></div>
+      <div class="subscore">使用度 <b>43.5</b> · 好评度 <b>20.8</b> · 维护 <b>12.3</b><br>32,325★ · 最近提交 09-24（16 天前）</div>
+      <span class="lic">图形界面 · 群控/按键映射</span>
+    </div>
+    <div class="rank-card">
+      <span class="rank-no">第 4</span>
+      <h3>ya-webadb (Tango)</h3>
+      <div class="meta">yume-chan · MIT</div>
+      <div class="score">67.5<small> /100</small></div>
+      <div class="bar"><i style="width:68%"></i></div>
+      <div class="subscore">使用度 <b>33.9</b> · 好评度 <b>18.8</b> · 维护 <b>14.8</b><br>3,239★ · 最近提交 10-09（1 天前）</div>
+      <span class="lic">纯浏览器 · 零安装</span>
+    </div>
+    <div class="rank-card">
+      <span class="rank-no">第 5</span>
+      <h3>DeviceFarmer/stf</h3>
+      <div class="meta">DeviceFarmer · Apache-2.0</div>
+      <div class="score">67.0<small> /100</small></div>
+      <div class="bar"><i style="width:67%"></i></div>
+      <div class="subscore">使用度 <b>35.3</b> · 好评度 <b>18.0</b> · 维护 <b>13.7</b><br>4,593★ · 最近提交 10-02（8 天前）</div>
+      <span class="lic">设备农场 · 多人共享平台</span>
+    </div>
+    <div class="rank-card">
+      <span class="rank-no" style="background:var(--warn)">⑥ 已归档</span>
+      <h3>Sonic（云真机平台）</h3>
+      <div class="meta">SonicCloudOrg · AGPL-3.0</div>
+      <div class="score" style="color:var(--muted2)">40.8<small> /100</small></div>
+      <div class="bar"><i style="width:41%;background:#b25000"></i></div>
+      <div class="subscore">使用度 <b>32.3</b> · 好评度 <b>8.5</b> · 维护 <b>0</b><br>2,208★ · <b style="color:var(--warn)">已归档（2025-03 起停止维护）</b></div>
+      <span class="lic">国产云真机 · 多人团队</span>
+    </div>
+  </div>
+  <p class="method">
+    评分口径：<b>使用度</b> = 星数取对数归一（151,719★ 与 3,239★ 直接线性比会把后者压成 0 分，对数更公平），×50%；
+    <b>好评度</b> = 星数/协作者数（纯使用者占比越高说明"用的人多、改的人少"，即口碑好），归一后 ×35%；
+    <b>近期维护</b> = 距最近提交天数，90 天线性衰减 ×15%。GitHub 没有评分体系，好评度用该比值作代理指标——已在页面明示口径。
+    淘汰说明：ws-scrcpy（2,576★）星数未进前五。Sonic（2,208★）已归档停止维护，按需求仍加入对比并以橙色标注，评分中维护项记 0 分。
+  </p>
+
+  <h2>功能全景矩阵</h2>
+  <div class="legend">
+    <span><b class="yes">✓</b> 支持</span>
+    <span><b class="part">△</b> 部分支持 / 需变通</span>
+    <span><b class="no">✗</b> 不支持</span>
+    <span>灰字为限制条件</span>
+  </div>
+  <div class="matrix-wrap">
+    <table class="matrix">
+      <thead><tr>
+        <th>功能</th>
+        <th>scrcpy<span class="stars">151,719★</span></th>
+        <th>escrcpy<span class="stars">12,007★</span></th>
+        <th>QtScrcpy<span class="stars">32,325★</span></th>
+        <th>ya-webadb<span class="stars">3,239★</span></th>
+        <th>stf<span class="stars">4,593★</span></th>
+        <th>Sonic<span class="stars">2,208★ · 已归档</span></th>
+      </tr></thead>
+      <tbody>
+        <tr><td>实时屏幕镜像</td><td class="yes">✓<span class="note">高帧率低延迟标杆</span></td><td class="yes">✓<span class="note">scrcpy 核心</span></td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓<span class="note">浏览器内</span></td><td class="yes">✓<span class="note">浏览器实时</span></td></tr>
+        <tr><td>鼠标键盘远程控制</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓<span class="note">含多点触控</span></td><td class="yes">✓</td></tr>
+        <tr><td>屏幕录制</td><td class="yes">✓<span class="note">--record MP4/MKV</span></td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓<span class="note">WebM</span></td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td>截图</td><td class="part">△<span class="note">无内置，配 adb screencap</span></td><td class="yes">✓<span class="note">控制栏一键</span></td><td class="yes">✓<span class="note">内置按钮</span></td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td>音频转发（电脑出声）</td><td class="yes">✓<span class="note">Android 11+</span></td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓<span class="note">Android 11+</span></td><td class="no">✗</td><td class="no">✗</td></tr>
+        <tr><td>多设备同时接入</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓<span class="note">免费版 ≤10 屏</span></td><td class="yes">✓</td><td class="yes">✓<span class="note">农场级</span></td><td class="yes">✓<span class="note">农场级</span></td></tr>
+        <tr><td>无线 WiFi 连接</td><td class="yes">✓</td><td class="yes">✓<span class="note">局域网自动发现</span></td><td class="yes">✓</td><td class="part">△<span class="note">浏览器限制，主要走 USB</span></td><td class="yes">✓</td><td class="yes">✓<span class="note">云真机天然联网</span></td></tr>
+        <tr><td>免 Root</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td>浏览器直接用（零安装）</td><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td><td class="yes">✓<span class="note">Chromium 系</span></td><td class="yes">✓<span class="note">需部署服务端</span></td><td class="yes">✓<span class="note">核心</span></td></tr>
+        <tr><td>图形界面（无需命令行）</td><td class="no">✗<span class="note">纯命令行</span></td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td>剪贴板双向同步</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td>APK 安装 / 文件推送</td><td class="yes">✓<span class="note">拖拽 APK</span></td><td class="yes">✓<span class="note">批量</span></td><td class="yes">✓</td><td class="yes">✓<span class="note">文件管理器</span></td><td class="yes">✓<span class="note">拖拽+文件管理器</span></td><td class="yes">✓</td></tr>
+        <tr><td>摄像头镜像（当摄像头用）</td><td class="yes">✓<span class="note">Android 12+</span></td><td class="part">△<span class="note">随 scrcpy 内核</span></td><td class="no">✗</td><td class="part">△</td><td class="no">✗</td><td class="no">✗</td></tr>
+        <tr><td>OTG 模式（不投屏纯控制）</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td></tr>
+        <tr><td>熄屏继续投屏</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">✗</td><td class="no">✗</td></tr>
+        <tr><td>键盘映射 / 游戏按键</td><td class="part">△<span class="note">无可视化配置</span></td><td class="yes">✓<span class="note">触控/摇杆/滑动可视化</span></td><td class="yes">✓<span class="note">游戏映射</span></td><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td></tr>
+        <tr><td>群控（一台控多台）</td><td class="no">✗</td><td class="yes">✓<span class="note">广播输入+批量截图</span></td><td class="yes">✓</td><td class="part">△<span class="note">可自行集成</span></td><td class="part">△<span class="note">多设备并管非群控</span></td><td class="no">✗</td></tr>
+        <tr><td>多用户设备农场 / 租借管理</td><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td><td class="yes">✓<span class="note">核心能力+REST API</span></td><td class="yes">✓<span class="note">核心 + 团队管理</span></td></tr>
+        <tr><td>AI 助手 / 自动化编排</td><td class="no">✗</td><td class="yes">✓<span class="note">Copilot(MCP)+图像识别脚本</span></td><td class="no">✗</td><td class="part">△<span class="note">开源库可集成</span></td><td class="no">✗</td><td class="yes">✓<span class="note">内置自动化 + Appium + 文字识别</span></td></tr>
+        <tr><td>远程 ADB / 终端</td><td class="no">✗</td><td class="yes">✓</td><td class="no">✗</td><td class="yes">✓</td><td class="yes">✓<span class="note">adb connect/shell</span></td><td class="part">△</td></tr>
+        <tr><td>中文界面</td><td class="no">✗<span class="note">英文</span></td><td class="yes">✓</td><td class="yes">✓</td><td class="part">△</td><td class="no">✗</td><td class="yes">✓<span class="note">国产项目</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>五个工具各自是什么、适合谁</h2>
+  <div class="tools">
+    <div class="tool">
+      <h3>scrcpy <a href="https://github.com/Genymobile/scrcpy" target="_blank" rel="noopener">GitHub ↗</a></h3>
+      <p class="pos">适合谁：<b>追求极致性能与稳定、习惯命令行的人</b>。所有 scrcpy 系工具的内核，行业事实标准。</p>
+      <ul>
+        <li>USB 投屏延迟业内最低，1080p 高帧率，性能开销极小</li>
+        <li>录屏 / 音频转发 / 摄像头镜像 / OTG / 熄屏投屏全都有</li>
+        <li>无图形界面——所有操作靠命令行参数</li>
+        <li>没有内置截图键，需自己配 adb screencap 命令</li>
+      </ul>
+    </div>
+    <div class="tool">
+      <h3>escrcpy <a href="https://github.com/viarotel-org/escrcpy" target="_blank" rel="noopener">GitHub ↗</a></h3>
+      <p class="pos">适合谁：<b>想要 scrcpy 全部性能又要图形界面、还想尝鲜 AI 自动化的人</b>。综合体验最均衡。</p>
+      <ul>
+        <li>scrcpy 图形化封装：内置窗口镜像 + 控制栏（旋转/截图/App/文件/终端）</li>
+        <li>键盘映射可视化配置、多设备同步控制、批量截图/装 APK</li>
+        <li>Copilot AI 助手（MCP 协议）+ 可视化自动化编排（图像识别）</li>
+        <li>无线连接局域网自动发现、中文界面、今天还在提交</li>
+      </ul>
+      <div class="caution">注意：部分高级功能（EscrcpyX 扩展）为付费项，基础功能免费。</div>
+    </div>
+    <div class="tool">
+      <h3>QtScrcpy <a href="https://github.com/barry-ran/QtScrcpy" target="_blank" rel="noopener">GitHub ↗</a></h3>
+      <p class="pos">适合谁：<b>游戏多开、群控、自定义按键映射的玩家</b>。老牌 Qt 实现，中文界面。</p>
+      <ul>
+        <li>USB/网络 镜像+控制，免 root，内置截图/录屏按钮</li>
+        <li>群控：一台电脑同时控制多台手机；自定义按键映射玩手游</li>
+        <li>自定义 IP 连接、无线、剪贴板、APK 安装</li>
+      </ul>
+      <div class="caution">注意：作者主力已转向商业版 QuickMirror（免费版限制 ≤10 屏）；更新频率略降。</div>
+    </div>
+    <div class="tool">
+      <h3>ya-webadb (Tango) <a href="https://github.com/yume-chan/ya-webadb" target="_blank" rel="noopener">GitHub ↗</a></h3>
+      <p class="pos">适合谁：<b>不想在电脑装任何软件、手边有 Chrome 的人</b>。打开网页插线即用。</p>
+      <ul>
+        <li>纯浏览器 ADB 实现（WebUSB）：无需安装、无后台进程</li>
+        <li>实时镜像 + 控制 + 截图 + 录屏 + 文件管理器 + 终端</li>
+        <li>同时是开源 TypeScript 库（npm），可集成进自己的网页/平台</li>
+      </ul>
+      <div class="caution">注意：仅 Chromium 系浏览器；无线连接受浏览器限制，主要走 USB。</div>
+    </div>
+    <div class="tool">
+      <h3>DeviceFarmer/stf <a href="https://github.com/DeviceFarmer/stf" target="_blank" rel="noopener">GitHub ↗</a></h3>
+      <p class="pos">适合谁：<b>团队/测试实验室——多人在网页上共享一排真机</b>。设备农场平台，不是单人工具。</p>
+      <ul>
+        <li>浏览器实时画面 + 远程控制任意接入设备，多点触控</li>
+        <li>多用户账号体系：设备预约/占用/释放，REST API 管理设备</li>
+        <li>截图、录屏、APK 拖装、文件管理器、远程 adb、反向端口转发</li>
+        <li>与本平台思路最像：改造成"网页上看真机 + 自动化"的基础最好</li>
+      </ul>
+      <div class="caution">注意：需要部署服务端（Docker 较方便）；音频转发不支持。</div>
+    </div>
+    <div class="tool">
+      <h3>Sonic 云真机平台 <a href="https://github.com/SonicCloudOrg/sonic-server" target="_blank" rel="noopener">GitHub ↗</a></h3>
+      <p class="pos">适合谁：<b>想要国产、界面现代、开箱即用的团队云真机平台</b>。与 stf 定位相同，但中文生态与自动化能力更强。</p>
+      <ul>
+        <li>浏览器实时画面 + 远程控制，截图/录屏，文件管理</li>
+        <li>内置自动化（可跑 Appium / uiautomator2 / Sonic 脚本）+ 文字识别</li>
+        <li>多用户/团队/设备分组管理，插件生态（Jenkins 等）</li>
+        <li>中文界面与中文社区（曾经的国产明星项目）</li>
+      </ul>
+      <div class="caution">注意：<b>2025 年 3 月起仓库已归档、停止维护</b>——安全更新与新机型适配不再有保障，生产环境慎选。</div>
+    </div>
+  </div>
+
+  <h2>一句话选型</h2>
+  <div class="tagline">
+    <b>单人调试追求性能</b> → scrcpy（能接受命令行）或 escrcpy（要界面）；<br>
+    <b>游戏/多开群控</b> → QtScrcpy；<b>零安装、临时救急</b> → ya-webadb；<br>
+    <b>团队共享多台真机、多人远程用</b> → stf（持续维护）或 Sonic（界面现代、国产中文生态，但已停止维护，需自行承担安全与适配风险）。<br>
+    <span style="color:var(--muted2);font-size:12px">结合本平台（自动化测试平台）：若想把"实时画面 + 远程控制"集成进来，stf 的多用户设备管理模型最贴近，scrcpy 协议的性能最好，ya-webadb 的浏览器方案部署成本最低。</span>
+  </div>
+</div>
+</body>
+</html>

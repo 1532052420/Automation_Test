@@ -1,0 +1,4 @@
+owner: viarotel-org
+repo: escrcpy
+provider: github
+updaterCacheDirName: escrcpy-updater

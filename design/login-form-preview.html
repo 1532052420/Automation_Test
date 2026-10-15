@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录表单组件预览 · Uiverse by micaelgomestavares</title>
+<style>
+/* ===== 页面展示环境（非组件本身） ===== */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 40px 20px;
+  background: linear-gradient(135deg, #1d1d1f 0%, #3a3a3c 100%);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+.page-note { color: rgba(255,255,255,.6); font-size: 13px; text-align: center; margin-bottom: 26px; line-height: 1.7; }
+.page-note b { color: #fff; }
+
+/* ============================================================
+   组件 CSS（Uiverse.io by micaelgomestavares · 原版样式）
+   ============================================================ */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background-color: #ffffff;
+  padding: 30px;
+  width: 450px;
+  border-radius: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+.form h2 { color: #151717; font-weight: 700; font-size: 22px; margin-bottom: 8px; }
+::placeholder {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+.form button {
+  align-self: flex-end;
+}
+.flex-column { display: flex; flex-direction: column; }
+.flex-column > label {
+  color: #151717;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.inputForm {
+  border: 1.5px solid #ecedec;
+  border-radius: 10px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  padding-left: 10px;
+  transition: 0.2s ease-in-out;
+  background-color: #fff;
+}
+.inputForm svg { flex: none; width: 20px; height: 20px; stroke: #9e9e9e; }
+.inputForm:focus-within { border: 1.5px solid #2d79f3; }
+.inputForm:focus-within svg { stroke: #2d79f3; }
+.input {
+  margin-left: 10px;
+  border-radius: 10px;
+  border: none;
+  width: 85%;
+  height: 100%;
+  font-size: 14.5px;
+  outline: none;
+}
+.input:focus { outline: none; }
+.flex-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+}
+.flex-row > div { display: flex; align-items: center; gap: 7px; }
+.flex-row > div > label {
+  font-size: 14px;
+  color: black;
+  font-weight: 400;
+  cursor: pointer;
+}
+.flex-row input[type="checkbox"] { width: 15px; height: 15px; accent-color: #2d79f3; cursor: pointer; }
+.span {
+  font-size: 14px;
+  margin-left: 5px;
+  color: #2d79f3;
+  font-weight: 500;
+  cursor: pointer;
+}
+.span:hover { text-decoration: underline; }
+.button-submit {
+  margin: 20px 0 10px 0;
+  background-color: #151717;
+  border: none;
+  color: white;
+  font-size: 15px;
+  font-weight: 500;
+  border-radius: 10px;
+  height: 50px;
+  width: 100%;
+  cursor: pointer;
+  transition: background .2s ease;
+}
+.button-submit:hover { background-color: #252727; }
+.button-submit:active { transform: scale(.985); }
+.p {
+  text-align: center;
+  color: black;
+  font-size: 14px;
+  margin: 5px 0;
+}
+.p .span { margin-left: 5px; }
+.btn {
+  margin-top: 10px;
+  width: 100%;
+  height: 50px;
+  border-radius: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: 500;
+  gap: 10px;
+  border: 1px solid #ededef;
+  background-color: white;
+  cursor: pointer;
+  transition: 0.2s ease-in-out;
+  font-family: inherit;
+  font-size: 14.5px;
+  color: #151717;
+}
+.btn:hover { border: 1px solid #2d79f3; }
+.btn svg { width: 20px; height: 20px; flex: none; }
+
+/* 错误提示（JS 交互补充） */
+.err-tip { color: #d70015; font-size: 12.5px; min-height: 16px; margin-top: 4px; }
+
+/* 成功态遮罩 */
+.success-mask {
+  position: absolute; inset: 0; z-index: 5; display: none;
+  align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+  background: rgba(255,255,255,.94); border-radius: 20px;
+}
+.success-mask.show { display: flex; }
+.success-mask .big { font-size: 44px; }
+.success-mask .t1 { font-size: 17px; font-weight: 600; color: #151717; }
+.success-mask .t2 { font-size: 13px; color: #6e6e73; }
+.form-wrap { position: relative; }
+</style>
+</head>
+<body>
+
+<div class="page-note">
+  <b>登录表单组件</b> · 来源 Uiverse.io by micaelgomestavares<br>
+  上：完整组件预览（含 JS 交互：空值校验 / 提交成功态 / 按钮 hover）· 下：JS 交互逻辑说明
+</div>
+
+<div class="form-wrap">
+<form class="form" id="loginForm" novalidate>
+  <h2>欢迎回来</h2>
+
+  <div class="flex-column">
+    <label>邮箱 <span style="color:#d70015">*</span></label>
+    <div class="inputForm">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="m3 6.5 9 6.5 9-6.5"/>
+      </svg>
+      <input type="email" class="input" id="email" placeholder="请输入邮箱" autocomplete="off">
+    </div>
+    <div class="err-tip" id="errEmail"></div>
+  </div>
+
+  <div class="flex-column">
+    <label>密码 <span style="color:#d70015">*</span></label>
+    <div class="inputForm">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="10.5" width="16" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.2" fill="currentColor" stroke="none"/>
+      </svg>
+      <input type="password" class="input" id="password" placeholder="请输入密码">
+    </div>
+    <div class="err-tip" id="errPwd"></div>
+  </div>
+
+  <div class="flex-row">
+    <div>
+      <input type="checkbox" id="remember"><label for="remember">记住我</label>
+    </div>
+    <span class="span" id="forgot">忘记密码？</span>
+  </div>
+
+  <button type="submit" class="button-submit" id="submitBtn">登录</button>
+
+  <p class="p">还没有账号？<span class="span" id="register">注册</span></p>
+
+  <div class="flex-row" style="justify-content:center; margin-top: 4px">
+    <span style="height:1px;flex:1;background:#ecedec"></span>
+    <span style="font-size:12.5px;color:#9e9e9e">或者使用以下方式登录</span>
+    <span style="height:1px;flex:1;background:#ecedec"></span>
+  </div>
+
+  <button type="button" class="btn" id="btnGoogle">
+    <svg viewBox="0 0 24 24">
+      <path fill="#4285F4" d="M23.5 12.3c0-.9-.1-1.5-.3-2.2H12v4.3h6.5c-.1 1.1-.8 2.7-2.4 3.8l3.7 2.9c2.3-2.1 3.7-5.2 3.7-8.8z"/>
+      <path fill="#34A853" d="M12 24c3.2 0 6-1.1 7.9-2.9l-3.7-2.9c-1 .7-2.4 1.2-4.2 1.2-3.2 0-6-2.1-6.9-5.1L1.2 17.2C3.1 21.2 7.2 24 12 24z"/>
+      <path fill="#FBBC05" d="M5.1 14.3c-.3-.8-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.2 6.8C.4 8.4 0 10.2 0 12s.4 3.6 1.2 5.2l3.9-2.9z"/>
+      <path fill="#EA4335" d="M12 4.7c1.8 0 3.4.6 4.6 1.8l3.4-3.4C18 1.1 15.2 0 12 0 7.2 0 3.1 2.8 1.2 6.8l3.9 2.9C6 6.7 8.8 4.7 12 4.7z"/>
+    </svg>
+    使用 Google 登录
+  </button>
+
+  <button type="button" class="btn" id="btnApple">
+    <svg viewBox="0 0 24 24" fill="#000">
+      <path d="M17.05 12.53c-.03-2.89 2.36-4.28 2.47-4.35-1.35-1.97-3.44-2.24-4.18-2.27-1.78-.18-3.47 1.05-4.37 1.05-.9 0-2.29-1.02-3.77-.99-1.94.03-3.72 1.13-4.72 2.86-2.01 3.49-.51 8.66 1.45 11.5.96 1.39 2.1 2.95 3.6 2.89 1.45-.06 2-.93 3.75-.93s2.24.93 3.77.9c1.56-.03 2.54-1.41 3.5-2.81 1.1-1.6 1.55-3.16 1.58-3.24-.04-.02-3.04-1.17-3.08-4.61zM14.16 4.03c.8-.97 1.34-2.32 1.19-3.66-1.15.05-2.55.77-3.38 1.73-.74.86-1.39 2.23-1.22 3.55 1.29.1 2.6-.65 3.41-1.62z"/>
+    </svg>
+    使用 Apple 登录
+  </button>
+
+  <div class="success-mask" id="successMask">
+    <div class="big">✓</div>
+    <div class="t1">登录成功</div>
+    <div class="t2" id="successWho"></div>
+  </div>
+</form>
+</div>
+
+<div class="page-note" style="margin-top: 30px; max-width: 640px">
+  <b>JS 交互逻辑</b>：① 提交时校验邮箱格式与密码长度（≤6 位提示过短），错误实时清空；
+  ② 校验通过 → 按钮进入「登录中…」加载态（800ms 模拟请求）→ 显示成功遮罩；
+  ③ Google / Apple / 注册 / 忘记密码 按钮预留接口（点击有 toast 反馈，接入真实 OAuth 时替换）。
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var form = document.getElementById('loginForm');
+  var email = document.getElementById('email');
+  var pwd = document.getElementById('password');
+  var errE = document.getElementById('errEmail');
+  var errP = document.getElementById('errPwd');
+  var submitBtn = document.getElementById('submitBtn');
+
+  email.addEventListener('input', function () { errE.textContent = ''; });
+  pwd.addEventListener('input', function () { errP.textContent = ''; });
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var v = email.value.trim(), p = pwd.value;
+    if (!v) return errE.textContent = '请输入邮箱';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return errE.textContent = '邮箱格式不正确';
+    if (!p) return errP.textContent = '请输入密码';
+    if (p.length < 6) return errP.textContent = '密码至少 6 位';
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = '登录中…';
+    setTimeout(function () {                 /* 模拟请求：接入真实接口时替换 */
+      submitBtn.disabled = false;
+      submitBtn.textContent = '登录';
+      document.getElementById('successWho').textContent = v + ' · 记住我：' + (document.getElementById('remember').checked ? '开' : '关');
+      document.getElementById('successMask').classList.add('show');
+    }, 800);
+  });
+
+  [['btnGoogle', 'Google'], ['btnApple', 'Apple']].forEach(function (pair) {
+    document.getElementById(pair[0]).addEventListener('click', function () {
+      toast('「' + pair[1] + ' 登录」按钮预留，待接入 OAuth');
+    });
+  });
+  document.getElementById('register').addEventListener('click', function () {
+    toast('「注册」入口预留');
+  });
+  document.getElementById('forgot').addEventListener('click', function () {
+    toast('「忘记密码」流程预留');
+  });
+
+  function toast(msg) {
+    var t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = 'position:fixed;left:50%;bottom:36px;transform:translateX(-50%);' +
+      'background:rgba(255,255,255,.95);color:#151717;font-size:13px;padding:10px 22px;' +
+      'border-radius:980px;box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:99;';
+    document.body.appendChild(t);
+    setTimeout(function () { t.remove(); }, 2400);
+  }
+})();
+</script>
+</body>
+</html>

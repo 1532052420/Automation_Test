@@ -1,0 +1,9 @@
+meta:
+  next_id: 2
+items:
+- name: 云音乐 demo
+  app_package: com.netease.cloudmusic.demo
+  note: ''
+  id: 1
+  created_at: 1791595833
+  updated_at: 1791595833

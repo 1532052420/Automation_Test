@@ -1,0 +1,11 @@
+meta:
+  next_id: 2
+items:
+- enabled: false
+  base_url: https://api.fake/chat
+  api_key: sk-test-abcd99
+  model: glm-test
+  timeout: 20
+  id: 1
+  created_at: 1791595972
+  updated_at: 1791596010

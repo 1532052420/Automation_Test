@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>三个文件，一条链 · 用例/页面/元素 一次说清</title>
+<style>
+  :root{
+    --ink:#1f2d3d; --sub:#5b6b7b; --line:#e3e8ee; --bg:#f5f7fa; --card:#ffffff;
+    --blue:#2b7de9; --blue-bg:#eaf3fe; --green:#1a9e6e; --green-bg:#e8f7f0;
+    --orange:#e8890c; --orange-bg:#fdf3e3; --purple:#7a4fd8; --purple-bg:#f1ebfd;
+    --red:#d9534f; --red-bg:#fdeeed;
+    --gray-bg:#eef1f5; --mono:'SF Mono',Menlo,Consolas,'Courier New',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--ink);line-height:1.7;padding:32px 20px 80px}
+  .wrap{max-width:1120px;margin:0 auto}
+  header.hero{background:linear-gradient(135deg,#1d3a5f,#2b7de9);color:#fff;border-radius:16px;padding:32px 38px;margin-bottom:24px}
+  .hero h1{font-size:25px;letter-spacing:.5px}
+  .hero p{opacity:.9;margin-top:8px;font-size:14.5px}
+  .verdict{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px}
+  .verdict .v{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);border-radius:12px;padding:10px 18px;font-size:14px}
+  .verdict b{font-size:17px}
+  h2.sec{font-size:19px;margin:40px 0 6px;display:flex;align-items:center;gap:10px}
+  h2.sec .no{background:var(--blue);color:#fff;width:26px;height:26px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;flex:none}
+  .sec-sub{color:var(--sub);font-size:13.5px;margin-bottom:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 26px;box-shadow:0 1px 3px rgba(16,32,58,.05)}
+
+  /* 结论卡 */
+  .big{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media(max-width:860px){.big{grid-template-columns:1fr}}
+  .big .b{border-radius:12px;padding:16px 18px;font-size:14px}
+  .big .b b{display:block;font-size:16px;margin-bottom:4px}
+  .b1{background:var(--blue-bg);border:1.5px solid #bcd6f5}
+  .b2{background:var(--green-bg);border:1.5px solid #9fdcc3}
+  .b3{background:var(--orange-bg);border:1.5px solid #f3d9a8}
+  .cross{background:var(--red-bg);border:1.5px solid #efb9b7;border-radius:12px;padding:14px 18px;margin-top:14px;font-size:14px}
+  .cross b{color:var(--red)}
+
+  /* 调用链 */
+  .chain{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding:6px 0}
+  .chain .node{flex:1;min-width:200px;border-radius:12px;padding:14px 16px;font-size:13.5px}
+  .chain .arr{display:flex;align-items:center;padding:0 10px;color:var(--sub);font-size:22px;flex:none}
+  .node .t{font-weight:700;font-size:14px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+  .tagf{display:inline-block;font-size:11px;padding:1px 8px;border-radius:5px;color:#fff}
+  .code-inline{font-family:var(--mono);font-size:12px;background:#1e2833;color:#d7e1ec;border-radius:8px;padding:8px 10px;margin-top:8px;white-space:nowrap;overflow-x:auto}
+  .hl-b{color:#7fc7ff}.hl-g{color:#8fe6c3}.hl-o{color:#ffd28a}
+
+  /* 三文件并排 */
+  .files{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media(max-width:980px){.files{grid-template-columns:1fr}}
+  .file{border:1.5px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+  .file .head{padding:10px 14px;font-weight:700;font-size:13.5px;color:#fff;display:flex;align-items:center;gap:8px}
+  .file .path{font-family:var(--mono);font-size:11.5px;opacity:.92;font-weight:400}
+  .f1 .head{background:var(--blue)} .f2 .head{background:var(--green)} .f3 .head{background:var(--orange)}
+  pre{font-family:var(--mono);font-size:11.8px;line-height:1.75;background:#1e2833;color:#d7e1ec;padding:14px;overflow-x:auto;margin:0}
+  pre .cm{color:#8296aa}
+  pre .kw{color:#7fc7ff}
+  pre .lit{color:#ffd28a}
+  pre .call{color:#8fe6c3;font-weight:700}
+  pre .def{color:#c9a6ff;font-weight:700}
+  .file .note{padding:9px 14px;font-size:12.3px;color:var(--sub);border-top:1px dashed var(--line);background:#fbfcfe}
+
+  /* 执行旅程 */
+  .journey{counter-reset:step}
+  .jstep{display:flex;gap:12px;padding:9px 0;position:relative}
+  .jstep .dot{flex:none;width:26px;height:26px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+  .jstep:not(:last-child)::before{content:'';position:absolute;left:13px;top:38px;bottom:-10px;width:2px;background:#c4dcf7}
+  .jstep .tx{font-size:14px}
+  .jstep .tx .loc{color:var(--sub);font-size:12.5px}
+
+  /* 下拉对照 */
+  table.cmp{width:100%;border-collapse:collapse;font-size:13.5px}
+  table.cmp th{background:var(--gray-bg);padding:10px 14px;text-align:left;font-size:13px}
+  table.cmp td{border-top:1px solid var(--line);padding:11px 14px;vertical-align:top}
+  .ok{color:var(--green);font-weight:700}
+  .no{color:var(--red);font-weight:700}
+  code{font-family:var(--mono);font-size:12.3px;background:var(--gray-bg);border-radius:5px;padding:1px 7px}
+
+  /* 术语对照 */
+  .terms td:first-child{font-weight:600;white-space:nowrap}
+
+  footer{margin-top:40px;color:var(--sub);font-size:12.5px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>三个文件，一条链 —— 用例 / 页面 / 元素，一次说清</h1>
+  <p>针对的问题：「弹窗里有四个下拉，是不是四个文件？」—— 不是。是 <b>3 个文件 + 1 个起错名字的方法下拉</b>。下面全部用仓库里真实存在的代码说明。</p>
+  <div class="verdict">
+    <div class="v"><b>3 个文件</b><br>用例 / 页面 / 元素（三件套）</div>
+    <div class="v"><b>方法不是文件</b><br>方法是文件里的一段代码</div>
+    <div class="v"><b>绑定靠 import</b><br>引用哪个就是哪个，不看名字</div>
+  </div>
+</header>
+
+<!-- 1. 结论 -->
+<h2 class="sec"><span class="no">1</span>先记住这一屏</h2>
+<div class="card">
+  <div class="big">
+    <div class="b b1"><b>📄 文件一：用例文件</b>test_user_search_01.py<br>装的是「场景剧本」：先点什么、再输什么、最后断言什么。每一步是一行调用。</div>
+    <div class="b b2"><b>📄 文件二：页面操作文件</b>User_search_01Page.py<br>装的是「每台电器的说明书」：这个屏幕上每个可做的动作，一个动作一个方法。它就是弹窗里「写入页面文件」选的那个文件。</div>
+    <div class="b b3"><b>📄 文件三：元素文件</b>user_search_01Elements.py<br>装的是「按钮在哪」：每个元素的定位方式 + 定位值。全库共享，同定位自动复用。</div>
+  </div>
+  <div class="cross">你数的第四个「操作方法 / 页面操作」—— <b>不是文件，是文件里的一段代码</b>。就像「周三」是日程本里的一页，没有人会为周三单独装订一个本子。弹窗里那个叫「页面操作」的下拉，选的其实是<b>用例文件里的某个 test 方法</b>——它名字起错了，后续版本会改名「用例方法」。</div>
+</div>
+
+<!-- 2. 调用链 -->
+<h2 class="sec"><span class="no">2</span>一条调用链看懂三个文件怎么咬合</h2>
+<p class="sec-sub">以真实存在的用例「搜索歌曲」为例：你在弹窗录「点击搜索按钮」并保存后，磁盘上是这样的——</p>
+<div class="card">
+  <div class="chain">
+    <div class="node" style="background:var(--blue-bg);border:1.5px solid #bcd6f5">
+      <div class="t">📄 用例文件 <span class="tagf" style="background:var(--blue)">test_user_search_01.py</span></div>
+      多了一行调用（剧本上的一句台词）：
+      <div class="code-inline"><span class="hl-b">page.click_btnSearch()</span></div>
+    </div>
+    <div class="arr">→</div>
+    <div class="node" style="background:var(--green-bg);border:1.5px solid #9fdcc3">
+      <div class="t">📄 页面操作文件 <span class="tagf" style="background:var(--green)">User_search_01Page.py</span></div>
+      多了一个方法（说明书上的一页）：
+      <div class="code-inline"><span class="hl-g">def click_btnSearch(self):<br>&nbsp;&nbsp;appOperator.click(<br>&nbsp;&nbsp;&nbsp;&nbsp;self._elements.btnSearch)</span></div>
+    </div>
+    <div class="arr">→</div>
+    <div class="node" style="background:var(--orange-bg);border:1.5px solid #f3d9a8">
+      <div class="t">📄 元素文件 <span class="tagf" style="background:var(--orange)">user_search_01Elements.py</span></div>
+      元素定义（标签册上的位置，早已存在，不新增）：
+      <div class="code-inline"><span class="hl-o">btnSearch = CreateElement.create(<br>&nbsp;&nbsp;ID, 'com.x:id/btnSearch')</span></div>
+    </div>
+  </div>
+  <p style="font-size:13.5px;color:var(--sub);margin-top:10px">保存一步 = 用例文件<b>加一行</b> + 页面文件<b>加一个方法</b> + 元素文件<b>确认定义存在</b>。三个文件，从头到尾没有第四个文件出现过。</p>
+</div>
+
+<!-- 3. 三个文件真身 -->
+<h2 class="sec"><span class="no">3</span>三个文件的真实长相（仓库原文，可对照打开）</h2>
+<p class="sec-sub">彩色行 = 咬合点：蓝色是被用例调用的方法名，绿色是页面引用元素的位置，橙色是元素定义。</p>
+<div class="files">
+  <div class="file f1">
+    <div class="head">📄 文件一 · 用例文件 <span class="path">cases/.../test_user_search_01.py</span></div>
+<pre><span class="cm"># 用例中文名：用户搜索-精确昵称</span>
+<span class="kw">from</span> ... <span class="kw">import</span> APP_UI_Android_demoProject_Client
+<span class="kw">from</span> pages.User_search_01Page <span class="kw">import</span> User_search_01Page   <span class="cm">← 绑定页面②</span>
+
+<span class="kw">class</span> <span class="def">TestUserSearch01</span>:
+
+    <span class="kw">def</span> <span class="def">setup_class</span>(self):
+        self.appOperator = Client(...).appOperator
+        <span class="call">self.page = User_search_01Page(self.appOperator)</span>   <span class="cm">← 实例化：引用哪个就是哪个</span>
+
+    <span class="kw">def</span> <span class="def">test_user_search_01</span>(self):   <span class="cm">← 弹窗「页面操作」下拉选的就是它，它不是文件</span>
+        page = self.page
+        <span class="call">page.click_btnSearch()</span>            <span class="cm">← 去页面文件找同名方法</span>
+        <span class="call">page.input_search_input('所谓伊人')</span>
+        <span class="call">page.click_search_submit()</span>
+        <span class="call">page.assert_user_nick_text('所谓伊人')</span></pre>
+    <div class="note">弹窗「目标用例文件」下拉选的就是这个文件；「页面操作」（将改名「用例方法」）下拉选的是文件里的 test 方法。</div>
+  </div>
+
+  <div class="file f2">
+    <div class="head">📄 文件二 · 页面操作文件 <span class="path">pages/User_search_01Page.py</span></div>
+<pre><span class="cm"># 页面对象（用例包：user_search_01）</span>
+<span class="kw">from</span> elements.user_search_01Elements <span class="kw">import</span> User_search_01Elements   <span class="cm">← 绑定元素③</span>
+
+<span class="kw">class</span> <span class="def">User_search_01Page</span>:
+
+    <span class="kw">def</span> <span class="def">__init__</span>(self, appOperator):
+        self.appOperator = appOperator
+        <span class="call">self._elements = User_search_01Elements()</span>   <span class="cm">← 装上元素：引用哪个就是哪个</span>
+
+    <span class="kw">def</span> <span class="def">click_btnSearch</span>(self):        <span class="cm">← 用例那行调用的就是它</span>
+        self.appOperator.click(
+            <span class="call">self._elements.btnSearch</span>)   <span class="cm">← 去元素文件找 btnSearch</span>
+
+    <span class="kw">def</span> <span class="def">input_search_input</span>(self, text):
+        self.appOperator.sendText(
+            self._elements.search_input, text)</pre>
+    <div class="note">弹窗「写入页面文件」下拉选的就是这个文件；录一步=往里加一个方法，同名覆盖、新步骤新增。</div>
+  </div>
+
+  <div class="file f3">
+    <div class="head">📄 文件三 · 元素文件 <span class="path">elements/user_search_01Elements.py</span></div>
+<pre><span class="cm"># 本文件由 GUI 元素定位器自动生成/维护</span>
+<span class="kw">from</span> page_objects.createElement <span class="kw">import</span> CreateElement
+
+<span class="kw">class</span> <span class="def">User_search_01Elements</span>:
+
+    <span class="kw">def</span> <span class="def">__init__</span>(self):
+        <span class="call">self.btnSearch</span> = CreateElement.create(
+            Locator_Type.ID,
+            <span class="lit">'com.x:id/btnSearch'</span>,      <span class="cm">← 定位值，链的终点</span>
+            wait_type=Wait_By.VISIBILITY_OF,
+            wait_seconds=6, desc='搜索入口')
+
+        self.search_input = CreateElement.create(...)
+        self.search_submit = CreateElement.create(...)
+        self.user_nick = CreateElement.create(...)</pre>
+    <div class="note">全库共享：别的用例录同一个按钮时，同定位自动复用这行定义，不会写第二份。</div>
+  </div>
+</div>
+
+<!-- 4. 执行旅程 -->
+<h2 class="sec"><span class="no">4</span>执行时的一次点击，五步走完</h2>
+<div class="card journey">
+  <div class="jstep"><div class="dot">1</div><div class="tx">pytest 跑到 <code>test_user_search_01</code>，先执行 setup_class<br><span class="loc">看到 self.page = User_search_01Page(...) → 页面定了，就是它，不可能换成别人</span></div></div>
+  <div class="jstep"><div class="dot">2</div><div class="tx">执行 <code>page.click_btnSearch()</code><br><span class="loc">page = self.page → 到 User_search_01Page.py 里找同名方法</span></div></div>
+  <div class="jstep"><div class="dot">3</div><div class="tx">方法体执行 <code>appOperator.click(self._elements.btnSearch)</code><br><span class="loc">self._elements 在 __init__ 里装配好了 = User_search_01Elements 的实例 → 元素文件定了</span></div></div>
+  <div class="jstep"><div class="dot">4</div><div class="tx">取 btnSearch 的定义 → 拿到定位值 <code>ID: com.x:id/btnSearch</code></div></div>
+  <div class="jstep"><div class="dot">5</div><div class="tx">appium 在真机上找到这个按钮并点击，截图存证 ✅</div></div>
+</div>
+
+<!-- 5. 四个下拉对照 -->
+<h2 class="sec"><span class="no">5</span>弹窗里四个下拉的真相（你觉得是四个文件的地方）</h2>
+<div class="card" style="padding:6px 0 2px;overflow-x:auto">
+  <table class="cmp">
+    <tr><th>弹窗里的下拉</th><th>展开后选项长什么样</th><th>选的是</th><th>是文件吗</th></tr>
+    <tr><td><b>写入元素文件</b>（元素栏）</td><td><code>aaaaElements.py</code>、<code>opcheckElements.py</code>…… 都以 <code>.py</code> 结尾</td><td>元素文件</td><td class="ok">✅ 是（文件三）</td></tr>
+    <tr><td><b>目标用例文件</b>（用例栏）</td><td><code>test_aaaa.py</code>、<code>test_user_search_01.py</code>…… 都以 <code>.py</code> 结尾</td><td>用例文件</td><td class="ok">✅ 是（文件一）</td></tr>
+    <tr><td><b>写入页面文件</b>（操作栏）</td><td><code>AaaaPage.py</code>、<code>User_search_01Page.py</code>…… 都以 <code>.py</code> 结尾</td><td>页面操作文件</td><td class="ok">✅ 是（文件二）</td></tr>
+    <tr><td><b>页面操作</b>（用例栏，旧名）</td><td><code>test_user_search_01</code>、<code>test_e2ecase</code>…… <b>没有 .py，是方法名</b></td><td>用例文件里的 test 方法（写到哪个方法的末尾）</td><td class="no">❌ 不是——是文件里的位置</td></tr>
+  </table>
+  <p style="padding:12px 14px;font-size:13.5px">自己验证：展开四个下拉对比选项——三个文件的选项都带 <code>.py</code>，唯独「页面操作」不带。它马上会改名「<b>用例方法</b>」，改完弹窗自己就把 3 个文件说清楚了。</p>
+</div>
+
+<!-- 6. 实证 -->
+<h2 class="sec"><span class="no">6</span>不信的话，做个实验</h2>
+<div class="card">
+  <p style="font-size:14px">打开 <code>cases/app_ui/android/demoProject/</code>、<code>page_objects/.../pages/</code>、<code>page_objects/.../elements/</code> 三个文件夹，数一数文件个数。然后随便录 10 步、保存 10 次，再数一遍——</p>
+  <p style="font-size:14px;margin-top:10px"><b>文件个数一个没变，只有 3 个文件各自变厚了。</b><br>如果「操作方法」是文件，录 50 步就该冒出 50 个新文件——它从来没有出现过。这就是「方法住在文件里」的实证。</p>
+</div>
+
+<!-- 7. 术语表 -->
+<h2 class="sec"><span class="no">7</span>黑话 → 人话 对照表（终极防绕指南）</h2>
+<div class="card" style="padding:6px 0 2px;overflow-x:auto">
+  <table class="cmp terms">
+    <tr><th>听到/看到的词</th><th>它到底是什么</th><th>在哪</th></tr>
+    <tr><td>用例文件 / 三件套之一</td><td>场景剧本，一行一步</td><td>cases/app_ui/.../test_xxx.py</td></tr>
+    <tr><td>页面操作文件 / Page 文件 / 页面文件</td><td>同一个东西：某块屏幕所有动作的说明书</td><td>page_objects/.../pages/xxxPage.py</td></tr>
+    <tr><td>元素文件 / 元素库文件</td><td>按钮地址簿：定位方式 + 定位值</td><td>page_objects/.../elements/xxxElements.py</td></tr>
+    <tr><td>用例方法（弹窗旧名「页面操作」）</td><td>用例文件里的一个 test 方法，不是文件</td><td>用例文件内部</td></tr>
+    <tr><td>页面方法</td><td>Page 文件里的一个方法，不是文件</td><td>Page 文件内部</td></tr>
+    <tr><td>操作类型（点击/输入/滑动…）</td><td>动作词汇表，全局通用，不占文件</td><td>弹窗操作栏选项</td></tr>
+    <tr><td>三件套</td><td>上面三个文件一起生成的一套</td><td>三个目录各一个文件</td></tr>
+  </table>
+</div>
+
+<footer>三文件关系图解 · 生成于 2026-10-13 · 配套版本 6.15.37 · 代码均为仓库 user_search_01 真实内容（有精简）</footer>
+</div>
+</body>
+</html>
