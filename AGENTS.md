@@ -77,3 +77,11 @@ ponytail 完整插件仓库备份在 `ponytail-main/`（含 hooks、MCP、命令
 ## 停用方式
 
 单一任务临时绕过：在任务中说明「本次不用 ponytail」（或对应 skill）。全局停用需删除 `.workbuddy/skills/` 下对应目录并同步更新本文件。
+
+## 七、服务生命周期铁律（2026-10-15 用户明令，最高优先级）
+
+**禁止任何代理会话从沙箱启动/重启平台与 Appium 等长驻服务**（包括 `./run.command platform/restart-platform`、直接拉起 `web_platform/app.py`、`appium` 进程的任何变体）。历史教训：沙箱会向子进程注入 HTTP_PROXY / PYTHONPATH / NODE_OPTIONS，导致平台进程被回收、执行用例报 ProxyError、Appium 建会话崩溃，多次事故（v6.15.50~55 均因此）。
+
+- 服务需要启动/重启时，**唯一正确做法**：告知用户在自己终端执行 `./run.command restart-platform`（或 `platform` / `stop-platform`），并等待用户确认完成。
+- 代理会话只负责：改代码、跑测试断言前的**只读**健康检查（psutil 读进程环境/端口、HTTP 探测）、以及给出准确的排查结论。
+- 例外：仅当用户当次明确提出"由你来重启"时方可执行，且完成后必须用 psutil 复核进程环境无注入（HTTP_PROXY/PYTHONPATH/NODE_OPTIONS 均不存在）并如实报告。
