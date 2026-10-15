@@ -1087,11 +1087,7 @@ async function initRun() {
   initElementsPanel();
   adminPanelInit();   // 用例管理面板（原独立模块并入，绑定见 admin.js）
   appTestingInit();   // 用例编排 / 测试套件面板（绑定见 app_testing.js）
-  // 测试报告面板（原一级模块并入）：首次进入才加载 iframe，避免每次进 /run 都拉报告数据
-  const reportLink = document.querySelector('[data-panel="report"]');
-  if (reportLink) reportLink.addEventListener('click', () => {
-    if (!$('#reportFrame').src) $('#reportFrame').src = '/report';
-  });
+  // 测试报告面板的 iframe 加载已收口到 showRunPanel（覆盖点击与 hash 深链两条路径）
 }
 
 /* ---------------- 左侧二级菜单：hash 深链 + 记住上次所在面板 ---------------- */
@@ -1112,6 +1108,12 @@ function showRunPanel(name) {
   setCrumbSub(RUN_PANEL_NAMES[name]);
   if (name === 'asserts' && typeof loadAssertions === 'function') loadAssertions();
   if (name === 'visuals' && typeof loadVisualAssets === 'function') loadVisualAssets();
+  /* 测试报告面板：首次进入才加载 iframe（含 hash 深链/刷新场景——
+     此前只挂在菜单点击上，刷新后停在报告页 iframe 恒空 → 白屏） */
+  if (name === 'report') {
+    const f = $('#reportFrame');
+    if (f && !f.src) f.src = '/report';
+  }
 }
 function initRunPanels() {
   document.querySelectorAll('#subnav a').forEach(a => {
@@ -1680,6 +1682,7 @@ async function loadReportList() {
   const pages = Math.max(1, Math.ceil(runs.length / PAGE_SIZE));
   _reportPage = Math.min(Math.max(1, _reportPage), pages);
   const slice = runs.slice((_reportPage - 1) * PAGE_SIZE, _reportPage * PAGE_SIZE);
+  slice.forEach(r => { if (r.midscene_ready) _midsceneReady[r.run_id] = true; });
   tb.innerHTML = slice.map(r =>
     '<tr><td><a class="runlink" href="/runs/' + esc(r.run_id) + '">' + esc(r.run_id) + '</a></td>' +
     '<td>' + fmtTime(r.start_time) + '</td>' +
@@ -1691,7 +1694,9 @@ async function loadReportList() {
     '<td><div class="ops">' +
     '<button class="ghost mini" onclick="showRunDetail(\'' + esc(r.run_id) + '\')">详情</button>' +
     '<button class="ghost mini" onclick="openReportFor(\'' + esc(r.run_id) + '\', this)">打开报告</button>' +
-    '<button class="ghost mini" onclick="openMidsceneFor(\'' + esc(r.run_id) + '\', this)" title="Midscene 风格在线回放报告：视频帧时间轴 + 失败证据">生成在线报告</button>' +
+    '<button class="ghost mini" onclick="openMidsceneFor(\'' + esc(r.run_id) + '\', this)" title="' +
+    (r.midscene_ready ? '在线报告已生成，点击打开' : 'Midscene 风格在线回放报告：视频帧时间轴 + 失败证据') + '">' +
+    (r.midscene_ready ? '打开在线报告' : '生成在线报告') + '</button>' +
     '<button class="mini danger-ghost" onclick="deleteRunFor(\'' + esc(r.run_id) + '\')">删除数据</button>' +
     '</div></td></tr>').join('');
   renderPager('#reportPager', _reportPage, pages, (p) => { _reportPage = p; loadReportList(); }, runs.length);
@@ -1709,18 +1714,21 @@ function inReportFor(runId) {
 let _openReportLockUntil = 0;
 /* 在线报告生成状态：run_id -> true（生成中）。生成中重复点击 toast 提示 */
 const _reportGenerating = {};
+const _midsceneReady = {};  // run_id -> true（报告已生成，report.html 在磁盘上）；此时按钮为「打开在线报告」
 let _reportUrlByRun = {};   // run_id -> 最终报告 URL（横幅点击跳转用）
 
 async function openMidsceneFor(runId, btn) {
   // 生成中：按钮不可点击（disabled 持续），重复点击 toast 提示
   if (_reportGenerating[runId]) return toast('报告生成中，请稍候…');
   _reportGenerating[runId] = true;
+  const orig = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = '报告生成中'; btn.classList.add('loading'); }
   try {
     const d = await postJson('/api/run/' + runId + '/midscene/open', {});
     if (d.ok) {
       _reportUrlByRun[runId] = d.url;
-      showReportBanner(runId, d.url);          // 全局横幅：已生成，点击跳转
+      if (_midsceneReady[runId]) window.open(d.url, '_blank');   // 已生成过：直接打开报告网页
+      else { _midsceneReady[runId] = true; showReportBanner(runId, d.url); }  // 首次生成：横幅提示
     } else {
       toast('生成失败: ' + (d.msg || ''), false);
     }
@@ -1728,7 +1736,11 @@ async function openMidsceneFor(runId, btn) {
     toast('生成失败: 服务异常', false);
   } finally {
     _reportGenerating[runId] = false;
-    if (btn) { btn.disabled = false; btn.textContent = '生成在线报告'; btn.classList.remove('loading'); }
+    if (btn) {
+      btn.disabled = false; btn.classList.remove('loading');
+      // 恢复原文案；报告列表里刚生成成功的「生成在线报告」翻转为「打开在线报告」
+      btn.textContent = (orig === '生成在线报告' && _midsceneReady[runId]) ? '打开在线报告' : orig;
+    }
   }
 }
 

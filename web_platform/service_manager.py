@@ -36,8 +36,17 @@ _DEFAULT_ANDROID_HOME = '/Users/ouyang/Library/Android/sdk'
 
 
 def _appium_env():
-    """平台环境 + ANDROID_HOME 兜底（仅在缺失且默认 SDK 存在时注入）"""
-    env = dict(os.environ)
+    """平台环境 + 沙箱注入剥离 + ANDROID_HOME 兜底。
+
+    沙箱（AI 会话）通过 NODE_OPTIONS/NODE_PATH/PYTHONPATH 注入自身 shim：
+    Appium 是 Node 进程，shim 劫持其 fs 后建会话请求解析即崩（2026-10-15 事故）；
+    HTTP(S)_PROXY 同理会让 Appium/探测流量走死代理。这里统一剥离，
+    并在 ANDROID_HOME/ANDROID_SDK_ROOT 缺失时注入默认 SDK 路径（存在才注入）。"""
+    env = {k: v for k, v in os.environ.items()
+           if k not in ('NODE_OPTIONS', 'NODE_PATH', 'PYTHONPATH',
+                        'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY',
+                        'http_proxy', 'https_proxy', 'all_proxy')}
+    env['NO_PROXY'] = env['no_proxy'] = '127.0.0.1,localhost'
     if not env.get('ANDROID_HOME') and not env.get('ANDROID_SDK_ROOT') \
             and os.path.isdir(_DEFAULT_ANDROID_HOME):
         env['ANDROID_HOME'] = _DEFAULT_ANDROID_HOME

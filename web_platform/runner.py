@@ -39,6 +39,21 @@ RUNS_DIR = os.path.join(BASE_DIR, 'output', 'runs')
 APP_UI_TMP_DIR = os.path.join(BASE_DIR, 'config', 'app_ui_tmp')
 PYTHON_BIN = sys.executable or os.path.join(BASE_DIR, '.venv', 'bin', 'python')
 
+# 本机回环流量绝不走代理：平台进程可能从带 HTTP_PROXY 的环境启动（AI 会话沙箱、公司代理终端等），
+# pytest 继承后 selenium 会把发往 127.0.0.1:4726 的 Appium 建会话请求交给该代理——
+# 代理进程一死（或本就不该代理本机），用例 setup 即报 ProxyError/Connection refused。
+# 同时剥离 AI 会话沙箱注入的 PYTHONPATH shim（劫持 Python 文件操作，删除类操作会被注入异常）。
+# 在子进程环境里统一剥离，并把回环地址写入 NO_PROXY 双保险（2026-10-15 事故根因）。
+_SANDBOX_KEYS = ('HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'FTP_PROXY',
+                 'http_proxy', 'https_proxy', 'all_proxy', 'ftp_proxy',
+                 'PYTHONPATH')
+
+
+def _clean_exec_env():
+    env = {k: v for k, v in os.environ.items() if k not in _SANDBOX_KEYS}
+    env['NO_PROXY'] = env['no_proxy'] = '127.0.0.1,localhost'
+    return env
+
 # 任务级超时(秒)：设备/驱动挂起时客户端可能永久阻塞，超时强杀并标 ERROR 上报
 RUN_TIMEOUT_SECONDS = 30 * 60
 
@@ -383,8 +398,9 @@ class ExecutionManager(object):
                 pytest_args, cwd=BASE_DIR,
                 start_new_session=True,
                 # 清理策略（设备配置「前置/后置清理」）经环境变量下传：
-                # 平台自身进程环境里没有这两个变量，必须显式传，不能靠继承
-                env=dict(os.environ,
+                # 平台自身进程环境里没有这两个变量，必须显式传，不能靠继承；
+                # 同时剥离代理变量（_clean_exec_env），保证 Appium 回环请求直连
+                env=dict(_clean_exec_env(),
                          AT_SETUP_RESET='1' if setup_reset else '',
                          AT_TEARDOWN_RESET='1' if teardown_reset else ''),
                 # 显式 DEVNULL：pytest 不需要 stdin。不指定会继承平台自身的 stdin，

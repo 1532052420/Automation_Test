@@ -240,8 +240,38 @@
   function restartService() {
     if (!confirm('重启平台服务？将结束所有服务进程并拉起全新实例（3~5 秒）。')) return;
     toast('服务重启中…');
-    post('/api/service/restart', {}).catch(function () {});
-    setTimeout(function () { location.reload(); }, 5000);
+    /* 正确顺序（用户 2026-10-15 拍板）：记录旧实例身份证 → 下发重启 →
+       轮询到「boot_id 变化 + 服务就绪」才刷新页面。上一版用「首次成功/失败」分段，
+       旧实例的成功响应会被误判为新实例就绪 → 旧实例未死透就 reload → 页面裸奔。 */
+    function poll(oldBoot) {
+      var tries = 0;
+      var t = setInterval(function () {
+        if (++tries > 120) { clearInterval(t); location.reload(); return; }  // 3 分钟兜底
+        fetch('/api/status', { cache: 'no-store' })
+          .then(function (r) { return r.text(); })
+          .then(function (s) {
+            var d;
+            try { d = JSON.parse(s); } catch (e) { return; }
+            if (!d || d.service !== 'automation-test-platform') return;
+            /* boot_id 与重启前不同 = 新实例已就绪；旧实例响应 boot_id 相同，跳过 */
+            if (d.boot_id && String(d.boot_id) !== String(oldBoot || '')) {
+              clearInterval(t); location.reload();
+            }
+          })
+          .catch(function () { /* 旧实例已下线/新实例未起：继续等 */ });
+      }, 1500);
+    }
+    fetch('/api/status', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        post('/api/service/restart', {}).catch(function () {});
+        poll(d && d.boot_id ? String(d.boot_id) : '');
+      })
+      .catch(function () {
+        /* 重启前服务已不可用：拿不到旧身份证，下发重启后直接轮询就绪 */
+        post('/api/service/restart', {}).catch(function () {});
+        poll('');
+      });
   }
 
   function shutdownService() {

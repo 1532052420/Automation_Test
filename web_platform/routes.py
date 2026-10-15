@@ -32,6 +32,10 @@ bp = Blueprint('platform', __name__)
 
 PLATFORM_CFG = WebPlatformConfig()
 
+# 进程身份证（/api/status.boot_id）：本模块导入时间即进程启动时间。
+# 「重启服务」前端轮询该值变化判断新实例就绪——旧实例响应成功 ≠ 新实例就绪。
+BOOT_ID = str(int(time.time()))
+
 # 已启动的报告静态服务：run_id -> {'port': int, 'proc': Popen}（复用，避免重复起服务/进程泄漏）
 _report_services = {}
 _midscene_services = {}          # Midscene 风格回放报告：服务根 = runs/<id>/（附件 ../allure-results 可达）
@@ -326,6 +330,9 @@ def api_status():
         'ok': True,
         'service': 'automation-test-platform',
         'version': APP_VERSION,
+        # 进程身份证：本进程启动时间戳。前端「重启服务」轮询此值变化来判断
+        # 新实例真正就绪（旧实例响应成功 ≠ 新实例就绪，两者内容相同无法区分）
+        'boot_id': BOOT_ID,
         'confs': confs,
         'device_online': len(online),
         'devices': adb['devices'],
@@ -1018,7 +1025,11 @@ def api_open_report(run_id):
 
 @bp.route('/api/runs')
 def api_runs():
-    return jsonify({'ok': True, 'runs': runner.manager.list_tasks()})
+    runs = runner.manager.list_tasks()
+    for r in runs:
+        r['midscene_ready'] = os.path.isfile(
+            os.path.join(runner.RUNS_DIR, r['run_id'], 'report', 'report.html'))
+    return jsonify({'ok': True, 'runs': runs})
 
 
 @bp.route('/api/runs/<run_id>', methods=['DELETE'])

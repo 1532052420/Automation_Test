@@ -14,6 +14,15 @@ export JAVA_HOME="$(/usr/libexec/java_home -v 1.8 2>/dev/null || echo "$HOME/Lib
 export PATH="$PWD/.venv/bin:/Users/ouyang/homebrew/bin:$HOME/Library/Android/sdk/cmdline-tools/latest/bin:$HOME/Library/Android/sdk/platform-tools:$PATH"
 export ANDROID_HOME="$HOME/Library/Android/sdk"
 export ANDROID_SDK_ROOT="$ANDROID_HOME"
+# 本机平台及其全部子进程（pytest/Appium 探测）不走 HTTP 代理：
+# 平台若从带代理的环境启动（AI 会话沙箱、代理终端），继承的 HTTP_PROXY 会让
+# Appium 建会话请求被转发给代理——代理一死，执行用例 setup 即 Connection refused。
+unset HTTP_PROXY HTTPS_PROXY ALL_PROXY FTP_PROXY http_proxy https_proxy all_proxy ftp_proxy
+export NO_PROXY="127.0.0.1,localhost"
+export no_proxy="127.0.0.1,localhost"
+# 同理剥离 AI 会话沙箱注入的 shim（PYTHONPATH→Python、NODE_OPTIONS/NODE_PATH→Node/Appium），
+# 否则 Appium 建会话请求解析即崩、平台 Python 文件操作被劫持
+unset PYTHONPATH NODE_OPTIONS NODE_PATH
 
 PLATFORM_PORT="${WEB_PLATFORM_PORT:-8080}"
 
