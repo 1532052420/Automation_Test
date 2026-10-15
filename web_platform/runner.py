@@ -47,6 +47,12 @@ RUN_TIMEOUT_SECONDS = 30 * 60
 # 2) 平台启用 --log-cli-level=INFO 后结果词独立成行：PASSED [100%]
 _PROGRESS_RE = re.compile(r'(?:::[^ ]+\s+)?(PASSED|FAILED|ERROR|SKIPPED)(?:\s+\[\s*\d+%\])?\s*$')
 
+# pytest 收尾汇总行：`==== 1 passed, 4 warnings in 29.64 seconds ====`。
+# 实测 log_cli 开启时通过/失败用例的进度行会被实时日志吞掉不落盘（仅 setup 即 ERROR 的幸存），
+# 逐行统计会「跑完 passed/failed 恒 0」；汇总行恒打印，以它为准覆盖计数
+_SUMMARY_RE = re.compile(r'^=+\s*(.+?)\s+in\s+[\d.]+\s*(?:s|seconds)\s*=+\s*$')
+_SUMMARY_ITEM_RE = re.compile(r'\b(\d+)\s+(passed|failed|error|skipped)\b')
+
 
 def _now_str():
     return time.strftime('%Y-%m-%d %H:%M:%S')
@@ -472,6 +478,11 @@ class ExecutionManager(object):
                     pass
 
     def _count_progress(self, task, line):
+        m = _SUMMARY_RE.match(line)
+        if m:   # 收尾汇总行 = 权威终值，覆盖逐行累计（逐行会被 log_cli 吞行，见 _SUMMARY_RE 注释）
+            for n, key in _SUMMARY_ITEM_RE.findall(m.group(1)):
+                task[key] = int(n)
+            return
         m = _PROGRESS_RE.search(line)
         if not m:
             return

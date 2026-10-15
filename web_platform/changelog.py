@@ -10,7 +10,7 @@
 两端不再各自硬编码版本号。
 """
 
-APP_VERSION = '6.15.48'
+APP_VERSION = '6.15.50'
 
 # 最新版本在最前；time 精确到秒（YYYY-MM-DD HH:MM:SS）
 # 版本号格式 x.xx.xx（主版本 1-2 位 · 次版本固定 2 位 · 修订号固定 2 位，99 进位次版本）
@@ -18,6 +18,24 @@ APP_VERSION = '6.15.48'
 # 旧线历史条目保留原始记录，不回溯改写
 # 每条变更一句话 10~20 字，只说改了什么（详细背景见项目 memory 与设计文档）
 CHANGELOG = [
+    {
+        'version': '6.15.50',
+        'time': '2026-10-15 11:55:54',
+        'title': '根治「ANDROID_HOME 未导出」复发：平台拉起 Appium 时自动兜底注入 SDK 环境',
+        'changes': [
+            '根治 执行用例报「ANDROID_HOME 未导出」反复复发：此前该问题只是按 run.command 重启恢复，未落代码——平台实例从裸环境启动（如 8081 测试实例、普通终端）时拉起的 Appium 继承不到 SDK 环境，建会话必死',
+            '现在平台拉起 Appium 时若环境缺 ANDROID_HOME/ANDROID_SDK_ROOT，自动注入本机默认 SDK 路径（存在才注入，已有值不覆盖），无论平台从哪里启动均不再复发',
+        ],
+    },
+    {
+        'version': '6.15.49',
+        'time': '2026-10-15 11:15:31',
+        'title': '修复运行记录「空数据」：passed/failed 恒 0 改按 pytest 汇总行统计',
+        'changes': [
+            '修复 执行完用例运行记录 passed/failed 恒为 0：实时日志会吞掉 pytest 进度行，改以收尾汇总行为准覆盖计数',
+            '修复 执行用例报「ANDROID_HOME 未导出」：平台重启未带 SDK 环境所致，已按 run.command 环境重启恢复',
+        ],
+    },
     {
         'version': '6.15.48',
         'time': '2026-10-15 10:51:26',

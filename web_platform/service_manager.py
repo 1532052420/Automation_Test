@@ -28,6 +28,21 @@ _LOG_PATH = os.path.join(BASE_DIR, 'logs', 'service_autoclose.log')
 APPIUM_BIN = '/Users/ouyang/homebrew/bin/appium'
 MAESTRO_BIN = '/Users/ouyang/.maestro/bin/maestro'
 
+# Appium(appium-adb) 建会话强依赖 ANDROID_HOME/ANDROID_SDK_ROOT；平台实例若从裸环境启动
+# （如 WEB_PLATFORM_PORT 测试实例、非 run.command 的终端），继承环境可能缺失 →
+# 用例建会话即报「Neither ANDROID_HOME nor ANDROID_SDK_ROOT was exported」。
+# 这里统一兜底：缺失时注入本机默认 SDK 路径（存在才注入），保证从任何入口拉起的 Appium 都可用。
+_DEFAULT_ANDROID_HOME = '/Users/ouyang/Library/Android/sdk'
+
+
+def _appium_env():
+    """平台环境 + ANDROID_HOME 兜底（仅在缺失且默认 SDK 存在时注入）"""
+    env = dict(os.environ)
+    if not env.get('ANDROID_HOME') and not env.get('ANDROID_SDK_ROOT') \
+            and os.path.isdir(_DEFAULT_ANDROID_HOME):
+        env['ANDROID_HOME'] = _DEFAULT_ANDROID_HOME
+    return env
+
 AUTO_CLOSE_SECONDS = 5 * 3600    # 心跳停止满 5 小时自动关闭
 _CHECK_INTERVAL = 300            # 自动关闭巡检间隔（秒）
 _LOCK = threading.Lock()
@@ -141,7 +156,9 @@ def start_service(svc):
     else:
         return False, '该服务不支持托管启停（平台自身模块）'
     try:
-        subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        env = _appium_env() if svc == 'appui' else None
+        subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT,
+                         start_new_session=True, env=env)
     except Exception as e:
         return False, '启动失败: %s' % str(e)[:120]
     # 轮询就绪：避免「命令已下发但状态还没起来」的窗口期
