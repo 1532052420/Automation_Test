@@ -164,10 +164,20 @@ def build_data(run_id, meta, results, run_dir):
         v_dur = video_duration_ms(v0) if v0 else 0
         desc = str(res.get('description') or '')
         # 中文步骤名（v6.15.54）：左侧任务列表显示「操作步骤」字段的中文参数。
-        # 来源：用例登记 description 优先，allure description（方法 docstring）兜底；
-        # 仅当与 allure 步骤数一一对应时逐条映射，数量对不上则保持英文动作词（宁缺勿错）。
+        # 来源：用例登记 description 优先，allure description（方法 docstring）兜底。
+        # 与 allure 步骤一一对应时逐条映射；断言是方法内裸 assert、不生成 allure step——
+        # 描述恰好多一条且末条以「断言」开头时，合成末条断言任务
+        # （时间窗 = 末步骤结束 ~ 用例结束，截图取该窗口录屏帧），
+        # 使报告步骤与用例「操作步骤」弹窗逐条对齐；其余数量对不上仍保持英文动作词（宁缺勿错）。
         doc_steps = split_doc_steps(registry.get(node) or desc)
-        use_cn = bool(doc_steps) and len(doc_steps) == max(1, len(res.get('steps') or []))
+        steps = list(res.get('steps') or [])
+        assert_tail = (len(doc_steps) == len(steps) + 1
+                       and (doc_steps[-1] or '').startswith('断言'))
+        if assert_tail:
+            last_end = int((steps[-1].get('stop') if steps else 0) or case_stop)
+            steps.append({'name': doc_steps[-1], 'status': res.get('status') or 'passed',
+                          'start': last_end, 'stop': case_stop})
+        use_cn = bool(doc_steps) and len(doc_steps) == max(1, len(steps))
 
         def frames_for(ws, we, want):
             """时间窗内从录屏取 want 帧 dataURI（窗口均分）。"""
@@ -205,7 +215,6 @@ def build_data(run_id, meta, results, run_dir):
         #    时间（v6.15.53）：allure-pytest 2.7.0 的 step 时间是顶层 start/stop
         #    （attrs asdict 扁平序列化，无 time 子对象）——直接读取真实时间戳；
         #    仅当缺失时才退化为按步骤数均分用例时间窗。
-        steps = res.get('steps') or []
         n_steps = max(1, len(steps))
         win = (case_stop - case_start) / n_steps
         for si, st in enumerate(steps):
