@@ -185,6 +185,94 @@ def split_doc_steps(desc):
     return [s.strip() for s in (desc or '').split('→') if s.strip()]
 
 
+# ---------------------------------------------------------------- 断言详情（v6.15.71）
+# 左侧列表断言行二级展开「预期 vs 实际」的数据构建：
+# ① 框架 _assert_step 挂的 AT_ASSERT_JSON 附件（多断言，通过/失败都有预期实际值）；
+# ② 裸 assert/旧数据兜底：从断言描述句式解析预期，从失败原因解析实际。
+
+def assert_type_of(text):
+    """从断言名/描述推断断言类型标签（顺序敏感：先长词后短词，防「页面文本」命中「文本」）。"""
+    t = text or ''
+    if '文案消失' in t or '不再出现' in t:
+        return '页面文本消失'
+    if '页面文本' in t or '页面出现' in t:
+        return '页面文本'
+    if 'toast' in t.lower():
+        return 'Toast'
+    if '文本' in t:
+        return '文本'
+    if '视觉' in t or '相似度' in t:
+        return '视觉'
+    if '消失' in t:
+        return '控件消失'
+    if '存在' in t or '出现' in t:
+        return '控件存在'
+    return '断言'
+
+
+def parse_assert_desc(text):
+    """从断言描述解析预期值（裸 assert / 旧数据无 JSON 附件时的兜底）。
+    句式来自 case_generator：断言「X」文本为「Y」/ 断言toast「Y」/ 断言X出现 / 断言【X】已消失。"""
+    t = text or ''
+    m = re.search(r'文本为「(.+?)」', t)
+    if m:
+        return m.group(1)
+    m = re.search(r'toast[「](.+?)」', t)
+    if m:
+        return '出现含「%s」的toast' % m.group(1)
+    if '消失' in t:
+        return '元素已从页面消失'
+    if '视觉' in t:
+        return '与基线一致（相似度达标）'
+    if '存在' in t or '出现' in t:
+        return '元素出现且可见'
+    return ''
+
+
+def parse_actual_from_reason(reason):
+    """从失败原因解析实际值：期望「X」实际「Y」或 pytest 断言重写 assert 'X' == 'Y'。"""
+    r = reason or ''
+    m = re.search(r'期望「(.+?)」实际「(.+?)」', r)
+    if m:
+        return m.group(2)
+    m = re.search(r"assert\s+'(.+?)'\s*==\s*'", r)
+    if m:
+        return m.group(1)
+    return ''
+
+
+def load_assert_json(atts, att_dir):
+    """读步骤的 AT_ASSERT_JSON JSON 附件（框架 _assert_step 挂的结构化断言数据）。"""
+    for att in atts or []:
+        if (att.get('name') or '') == 'AT_ASSERT_JSON':
+            try:
+                return json.load(open(os.path.join(att_dir, att.get('source', '')), encoding='utf-8'))
+            except Exception:
+                return None
+    return None
+
+
+def build_assert_detail(st, att_dir, case_reason=''):
+    """allure 断言步骤 → 任务上的 _assert 详情 dict（无则 None）。
+    优先取框架 JSON 附件；缺字段时用描述句式/失败原因兜底解析。"""
+    name = st.get('name') or ''
+    if not name.startswith('断言'):
+        return None
+    ok = st.get('status') in (None, 'passed')
+    data = load_assert_json(st.get('attachments'), att_dir) or {}
+    desc = data.get('desc') or name
+    typ = assert_type_of(name + ' ' + desc)
+    expected = data.get('expected') or parse_assert_desc(name) or '（未记录）'
+    actual = data.get('actual') or ''
+    detail = data.get('detail') or ''
+    if not actual:
+        actual = parse_actual_from_reason(name + ' ' + detail + ' ' + (case_reason or ''))
+        if not actual:
+            actual = '与预期一致' if ok else (case_reason or '（未记录）')[:200]
+    return {'type': typ, 'desc': str(desc)[:120], 'ok': ok,
+            'expected': str(expected)[:200], 'actual': str(actual)[:200], 'detail': str(detail)[:200]}
+
+
 def link_case_video(run_dir, v0, case_no):
     """把用例录屏压缩转码后放进报告目录（用户反馈原片太大：1440x3168 原片 25s ≈ 7.4MB）。
     高度压到 1280（宽等比）、CRF 28、去音轨、faststart 便于边下边播；25s ≈ 1~2MB。
@@ -263,6 +351,7 @@ def build_data(run_id, meta, results, run_dir):
         # 使报告步骤与用例「操作步骤」弹窗逐条对齐；其余数量对不上仍保持英文动作词（宁缺勿错）。
         doc_steps = split_doc_steps(registry.get(node) or desc)
         steps = list(res.get('steps') or [])
+        case_reason = ((res.get('statusDetails') or {}).get('message') or '')[:2000]
         assert_tail = (len(doc_steps) == len(steps) + 1
                        and (doc_steps[-1] or '').startswith('断言'))
         if assert_tail:
@@ -353,10 +442,14 @@ def build_data(run_id, meta, results, run_dir):
                               if main_shot else None),
                 'recorder': rec,
             })
+            # 断言行二级展开数据（v6.15.71）：断言步骤挂「预期 vs 实际」详情，报告端可展开/收起
+            ad = build_assert_detail(st, ATT, case_reason)
+            if ad:
+                tasks[-1]['_assert'] = ad
 
         # 3) 失败：断言任务（含失败截图/录屏/原因）
         if status != 'passed':
-            reason = ((res.get('statusDetails') or {}).get('message') or '')[:2000]
+            reason = case_reason
             fail_shots = []
             for att in res.get('attachments', []) or []:
                 if (att.get('type') or '').startswith('image/'):
@@ -383,6 +476,14 @@ def build_data(run_id, meta, results, run_dir):
             }
             if fail_vids:
                 assert_task['video'] = 'file://' + fail_vids[0]
+            assert_task['_assert'] = {
+                'type': assert_type_of(reason) if reason else '断言',
+                'desc': '用例断言失败',
+                'ok': False,
+                'expected': parse_assert_desc(reason) or '（未记录）',
+                'actual': parse_actual_from_reason(reason) or reason[:200],
+                'detail': reason[:200],
+            }
             tasks.append(assert_task)
 
         # 录屏回放定位（自定义扩展字段，官方渲染器忽略）：_atVideo = 报告目录内的录屏相对地址，
@@ -448,7 +549,23 @@ REPLAY_JS = r'''
       '.detail-panel.at-replaying > :not(#atReplayBox){display:none!important}' +
       '#atReplayBox{flex:1;min-height:0;background:#000;border-radius:8px;overflow:hidden;position:relative}' +
       '#atReplayBox video{width:100%;height:100%;flex:1;min-height:0;display:block;background:#000;object-fit:contain}' +
-      '#atReplayTip{position:absolute;left:10px;top:10px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;padding:3px 10px;border-radius:6px;z-index:5;pointer-events:none}';
+      '#atReplayTip{position:absolute;left:10px;top:10px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;padding:3px 10px;border-radius:6px;z-index:5;pointer-events:none}' +
+      /* 断言结果二级行（v6.15.72）：断言行下缩进常显结果行，点它展开/收起「预期 vs 实际」明细 */
+      'tr.at-assert-res > td{padding:0 12px 3px 34px!important;border:none!important;background:transparent!important}' +
+      '.at-assert-line{font-size:12px;cursor:pointer;user-select:none;white-space:nowrap}' +
+      '.at-assert-line.ok{color:#389e0d}' +
+      '.at-assert-line.fail{color:#cf1322}' +
+      '.at-assert-arrow{font-style:normal;margin-left:6px;font-size:10px;opacity:.65}' +
+      'tr.at-assert-detail > td{padding:3px 12px 8px 34px!important;border:none!important;background:transparent!important}' +
+      '.at-assert-card{border:1px solid #e5e6eb;border-radius:6px;padding:8px 12px;font-size:12px;color:#333}' +
+      '.at-assert-card.ok{border-color:#b7eb8f;background:#f6ffed}' +
+      '.at-assert-card.fail{border-color:#ffccc7;background:#fff1f0}' +
+      '.at-assert-grid{display:grid;grid-template-columns:64px 1fr;gap:3px 8px}' +
+      '.at-assert-grid .lbl{color:#8c8c8c}' +
+      '.at-assert-grid .val{color:#333;word-break:break-all}' +
+      '.at-assert-grid .val.ok{color:#389e0d}' +
+      '.at-assert-grid .val.fail{color:#cf1322}' +
+      '.at-assert-note{margin-top:6px;color:#8c8c8c;white-space:pre-wrap}';
     document.head.appendChild(style);
 
     var box = document.createElement('div');
@@ -517,6 +634,8 @@ REPLAY_JS = r'''
 
     // 左侧 antd 表格点击代理：tr.task-row 第 i 行 ↔ executions[0].tasks[i]（官方渲染器重渲染不影响代理）
     document.addEventListener('click', function (ev) {
+      // 断言结果/明细行的点击只做展开收起，不触发录屏回放
+      if (ev.target.closest && ev.target.closest('.at-assert-sub')) return;
       var tr = ev.target.closest ? ev.target.closest('tr.task-row') : null;
       if (!tr) return;
       var i = Array.prototype.indexOf.call(document.querySelectorAll('tr.task-row'), tr);
@@ -527,6 +646,102 @@ REPLAY_JS = r'''
         : ((t.param && t.param.locate && t.param.locate.description) || t.subType || ('步骤 ' + i));
       play(t, label, isPlan);
     }, true);
+
+    // ---------------- 断言结果二级行（v6.15.72）----------------
+    // 断言行下方直接挂缩进的「断言结果」行（常显）：✅/❌ 结论 · 类型；
+    // 点结果行展开/收起「预期结果 vs 实际结果」明细卡——默认收起，只多一行结果。
+    // React 重渲染会重建表格行并摘掉注入节点，MutationObserver 触发 decorate() 自愈。
+    var assertExpanded = {};
+    function escHtml(s) {
+      return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function assertRowIndexes() {
+      var rows = document.querySelectorAll('tr.task-row');
+      var hits = [];
+      for (var i = 0; i < rows.length; i++) {
+        if (tasks[i] && tasks[i]._assert) hits.push(i);
+      }
+      return { rows: rows, hits: hits };
+    }
+    function resLineHTML(a, expanded) {
+      return '<span class="at-assert-line ' + (a.ok ? 'ok' : 'fail') + '">'
+        + (a.ok ? '✅ 断言通过' : '❌ 断言失败') + ' · ' + escHtml(a.type || '断言')
+        + '<i class="at-assert-arrow">' + (expanded ? '▲' : '▼') + '</i></span>';
+    }
+    function detailHTML(a) {
+      var cls = a.ok ? 'ok' : 'fail';
+      var actual = a.actual || (a.ok ? '与预期一致' : '（未记录）');
+      return '<div class="at-assert-card ' + cls + '">'
+        + '<div class="at-assert-grid">'
+        + '<div class="lbl">预期结果</div><div class="val">' + escHtml(a.expected || '（未记录）') + '</div>'
+        + '<div class="lbl">实际结果</div><div class="val ' + cls + '">' + escHtml(actual) + '</div>'
+        + '</div>'
+        + (a.detail ? '<div class="at-assert-note">' + escHtml(a.detail) + '</div>' : '')
+        + '</div>';
+    }
+    function decorateAssertRows() {
+      var snap = assertRowIndexes();
+      var rows = snap.rows;
+      // 清理：断言数据变动的行后面可能残留旧 sub 行
+      for (var i = 0; i < rows.length; i++) {
+        if (tasks[i] && tasks[i]._assert) continue;
+        var nx = rows[i].nextElementSibling;
+        if (nx && nx.classList && nx.classList.contains('at-assert-sub')) nx.parentNode.removeChild(nx);
+      }
+      for (var j = 0; j < snap.hits.length; j++) {
+        var idx = snap.hits[j];
+        var row = rows[idx];
+        var a = tasks[idx]._assert;
+        // 结果行（常显）
+        var nx = row.nextElementSibling;
+        if (!(nx && nx.classList && nx.classList.contains('at-assert-res'))) {
+          var res = document.createElement('tr');
+          res.className = 'at-assert-sub at-assert-res';
+          var td = document.createElement('td');
+          td.colSpan = row.cells.length || 6;
+          res.appendChild(td);
+          row.parentNode.insertBefore(res, nx);
+          nx = res;
+        }
+        var sig = (a.ok ? '1' : '0') + '|' + (assertExpanded[idx] ? '1' : '0');
+        if (nx._atSig !== sig) {           // 带签名防抖，避免触发 MutationObserver 循环
+          nx._atSig = sig;
+          nx.cells[0].colSpan = row.cells.length || 6;
+          nx.cells[0].innerHTML = resLineHTML(a, assertExpanded[idx]);
+        }
+        // 明细行（展开时插入）
+        var nx2 = nx.nextElementSibling;
+        var hasDetail = nx2 && nx2.classList && nx2.classList.contains('at-assert-detail');
+        if (assertExpanded[idx] && !hasDetail) {
+          var det = document.createElement('tr');
+          det.className = 'at-assert-sub at-assert-detail';
+          var dtd = document.createElement('td');
+          dtd.colSpan = row.cells.length || 6;
+          dtd.innerHTML = detailHTML(a);
+          det.appendChild(dtd);
+          nx.parentNode.insertBefore(det, nx.nextSibling);
+        } else if (!assertExpanded[idx] && hasDetail) {
+          nx2.parentNode.removeChild(nx2);
+        }
+      }
+    }
+    document.addEventListener('click', function (ev) {
+      var res = ev.target.closest ? ev.target.closest('tr.at-assert-res') : null;
+      if (!res) return;
+      // 第 k 个结果行 ↔ 第 k 个带 _assert 的任务（行序与 tasks 一一对应）
+      var k = Array.prototype.indexOf.call(document.querySelectorAll('tr.at-assert-res'), res);
+      var hits = assertRowIndexes().hits;
+      if (k < 0 || k >= hits.length) return;
+      assertExpanded[hits[k]] = !assertExpanded[hits[k]];
+      decorateAssertRows();
+    }, true);
+    var _atMoTick = false;
+    new MutationObserver(function () {
+      if (_atMoTick) return;
+      _atMoTick = true;
+      setTimeout(function () { _atMoTick = false; decorateAssertRows(); }, 60);
+    }).observe(document.body, { childList: true, subtree: true });
+    decorateAssertRows();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
