@@ -313,6 +313,19 @@ def inject_data(shell_html, data):
     return shell_html[:m.start()] + m.group(1) + payload + m.group(3) + shell_html[m.end():]
 
 
+def inject_style(html):
+    """注入平台定制样式（2026-10-15 用户要求）：隐藏帧时间轴条（Record + canvas 帧图，
+    体量大实用性低）、左上 Midscene logo（外链图片，顺带消除外网依赖）、侧栏底部
+    「如何插入自定义日志条目」提示文案。类名来自官方渲染器 DOM（.logo / .main-right-header /
+    .timeline-wrapper / .executions-tip），壳文件更换后重新生成报告仍会自动带上。"""
+    style = ('<style>/* AutomationTest 平台定制 */\n'
+             '.logo,.main-right-header,.timeline-wrapper,.executions-tip{display:none!important;}\n'
+             '</style>')
+    if '</head>' in html:
+        return html.replace('</head>', style + '\n</head>', 1)
+    return html + style
+
+
 def main():
     run_id = sys.argv[1] if len(sys.argv) > 1 else None
     shell = sys.argv[2] if len(sys.argv) > 2 else find_shell()
@@ -323,7 +336,7 @@ def main():
         run_id = os.path.basename(runs[0])
     run_dir, meta, results = load_run(run_id)
     data = build_data(run_id, meta, results, run_dir)
-    html = inject_data(open(shell, encoding='utf-8').read(), data)
+    html = inject_style(inject_data(open(shell, encoding='utf-8').read(), data))
     out_dir = os.path.join(run_dir, 'report')
     os.makedirs(out_dir, exist_ok=True)
     out = os.path.join(out_dir, 'report.html')
