@@ -146,13 +146,35 @@ def split_doc_steps(desc):
     return [s.strip() for s in (desc or '').split('→') if s.strip()]
 
 
+def link_case_video(run_dir, v0, case_no):
+    """把用例录屏以相对软链放进报告目录（http.server/file:// 均可访问）。
+    软链避免 mp4 双份落盘；失败（如跨盘）退回复制。返回供 HTML 引用的文件名或 None。"""
+    if not v0:
+        return None
+    rep_dir = os.path.join(run_dir, 'report')
+    os.makedirs(rep_dir, exist_ok=True)
+    link = os.path.join(rep_dir, 'recording_%d.mp4' % case_no)
+    try:
+        if os.path.lexists(link):
+            os.remove(link)
+        os.symlink(os.path.relpath(v0, rep_dir), link)
+        return os.path.basename(link)
+    except OSError:
+        try:
+            import shutil
+            shutil.copyfile(v0, link)
+            return os.path.basename(link)
+        except OSError:
+            return None
+
+
 def build_data(run_id, meta, results, run_dir):
     """平台 Allure 数据 → Midscene 原版报告 schema。"""
     ATT = os.path.join(run_dir, 'allure-results')
     registry = load_registry_desc()
     run_start = None
     tasks = []
-    for res in sorted(results, key=lambda r: r.get('start') or 0):
+    for case_no, res in enumerate(sorted(results, key=lambda r: r.get('start') or 0)):
         case_name = res.get('name') or '用例'
         status = res.get('status') or 'unknown'
         case_start = res.get('start') or 0
@@ -162,6 +184,8 @@ def build_data(run_id, meta, results, run_dir):
         videos = find_case_videos(node, meta.get('udid'))
         v0 = videos[0] if videos else None
         v_dur = video_duration_ms(v0) if v0 else 0
+        n_tasks_before = len(tasks)
+        rel_video = link_case_video(run_dir, v0, case_no)
         desc = str(res.get('description') or '')
         # 中文步骤名（v6.15.54）：左侧任务列表显示「操作步骤」字段的中文参数。
         # 来源：用例登记 description 优先，allure description（方法 docstring）兜底。
@@ -289,6 +313,12 @@ def build_data(run_id, meta, results, run_dir):
                 assert_task['video'] = 'file://' + fail_vids[0]
             tasks.append(assert_task)
 
+        # 录屏回放定位（自定义扩展字段，官方渲染器忽略）：_atVideo = 报告目录内的录屏相对地址，
+        # _atT0 = 录屏零点对应的 epoch ms（= 用例开始），供注入脚本换算「步骤开始前 2 秒」的起点
+        for t in tasks[n_tasks_before:]:
+            t['_atVideo'] = rel_video
+            t['_atT0'] = case_start
+
     return {
         'sdkVersion': '1.0.3',
         'groupName': 'AutomationTest Report',
@@ -326,6 +356,99 @@ def inject_style(html):
     return html + style
 
 
+REPLAY_JS = r'''
+(function () {
+  function boot() {
+    var dumpEl = null;
+    document.querySelectorAll('script').forEach(function (s) {
+      if ((s.getAttribute('type') || '').indexOf('midscene_web_dump') >= 0) dumpEl = s;
+    });
+    if (!dumpEl) return;
+    var dump;
+    try { dump = JSON.parse(dumpEl.textContent); } catch (e) { return; }
+    var tasks = (dump.executions && dump.executions[0] && dump.executions[0].tasks) || [];
+    if (!tasks.length) return;
+
+    var style = document.createElement('style');
+    style.textContent = '#atReplayBox{margin:0 0 10px;background:#000;border-radius:8px;overflow:hidden;position:relative}' +
+      '#atReplayBox video{width:100%;max-height:46vh;display:block;background:#000;object-fit:contain}' +
+      '#atReplayTip{position:absolute;left:10px;top:10px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;padding:3px 10px;border-radius:6px;z-index:5;pointer-events:none}';
+    document.head.appendChild(style);
+
+    var box = document.createElement('div');
+    box.id = 'atReplayBox';
+    box.style.display = 'none';
+    var video = document.createElement('video');
+    video.controls = true;
+    video.preload = 'auto';
+    var tip = document.createElement('div');
+    tip.id = 'atReplayTip';
+    box.appendChild(video);
+    box.appendChild(tip);
+
+    var curEnd = Infinity;
+    video.addEventListener('timeupdate', function () {
+      if (curEnd < Infinity && video.currentTime >= curEnd) video.pause();
+    });
+
+    function ensureInPanel() {
+      var panel = document.querySelector('.detail-panel');
+      if (panel && box.parentElement !== panel) panel.insertBefore(box, panel.firstChild);
+    }
+
+    function play(task, label) {
+      if (!task || !task._atVideo) { box.style.display = 'none'; return; }
+      ensureInPanel();
+      // React 点击后异步重渲染 detail-panel 会摘掉我们插入的节点：渲染稳定后补插几次
+      [80, 300, 900, 2000].forEach(function (d) { setTimeout(ensureInPanel, d); });
+      var from = Math.max(0, (task.timing.start - task._atT0) / 1000 - 2);  // 步骤开始前 2 秒：留缓冲看清上下文
+      var to = (task.timing.end - task._atT0) / 1000;
+      var startPlay = function () {
+        curEnd = to;
+        tip.textContent = '▶ 录屏回放 · ' + label + ' · 从开始前 2 秒播放';
+        box.style.display = 'block';
+        video.play().catch(function () {});
+      };
+      if (video.getAttribute('src') !== task._atVideo) {
+        video.setAttribute('src', task._atVideo);
+        video.addEventListener('loadedmetadata', function () {
+          video.currentTime = from;
+          startPlay();
+        }, { once: true });
+      } else {
+        video.currentTime = from;
+        startPlay();
+      }
+    }
+
+    // 左侧 antd 表格点击代理：tr.task-row 第 i 行 ↔ executions[0].tasks[i]（官方渲染器重渲染不影响代理）
+    document.addEventListener('click', function (ev) {
+      var tr = ev.target.closest ? ev.target.closest('tr.task-row') : null;
+      if (!tr) return;
+      var i = Array.prototype.indexOf.call(document.querySelectorAll('tr.task-row'), tr);
+      if (i < 0 || !tasks[i]) return;
+      var t = tasks[i];
+      var isPlan = t.type === 'Planning';
+      var label = isPlan ? '整个操作（用例全程）'
+        : ((t.param && t.param.locate && t.param.locate.description) || t.subType || ('步骤 ' + i));
+      play(t, label);
+    }, true);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+'''
+
+
+def inject_replay(html):
+    """注入录屏回放脚本（2026-10-15 用户需求）：点击左侧步骤行，在详情面板顶部内嵌
+    真实录屏播放器，从「步骤开始 - 2 秒」播放到步骤结束自动暂停（2 秒为缓冲，避免
+    直切看不到上下文）；点用例头（Plan）播放整个操作全程。依赖任务上的 _atVideo/_atT0
+    扩展字段与报告目录内的 recording_N.mp4（link_case_video）。"""
+    script = '<script>/* AutomationTest 录屏回放 */' + REPLAY_JS + '</script>\n</body>'
+    return html.replace('</body>', script, 1)
+
+
 def main():
     run_id = sys.argv[1] if len(sys.argv) > 1 else None
     shell = sys.argv[2] if len(sys.argv) > 2 else find_shell()
@@ -336,7 +459,7 @@ def main():
         run_id = os.path.basename(runs[0])
     run_dir, meta, results = load_run(run_id)
     data = build_data(run_id, meta, results, run_dir)
-    html = inject_style(inject_data(open(shell, encoding='utf-8').read(), data))
+    html = inject_replay(inject_style(inject_data(open(shell, encoding='utf-8').read(), data)))
     out_dir = os.path.join(run_dir, 'report')
     os.makedirs(out_dir, exist_ok=True)
     out = os.path.join(out_dir, 'report.html')
