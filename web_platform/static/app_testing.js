@@ -80,7 +80,8 @@ function projName(id) {
 /* ================= 项目管理（对齐 testhub APP项目管理：搜索/全列/详情/分页） ================= */
 let _projFilters = { name: '', status: '' };
 let _projPage = 1, _projPageSize = 10;
-let _clPage = 1;          // 用例管理列表当前页（每页 10 条）
+let _clPage = 1, _clPageSize = 20;   // 用例管理列表分页（项目管理同款：10/20/50，默认 20）
+let _suPage = 1, _suPageSize = 20;   // 测试套件列表分页（同款）
 
 async function loadProjects() {
   const d = await api(AT_PREFIX + '/api/projects');
@@ -998,7 +999,7 @@ async function renderCaseList() {
     const hay = [c.file, c.class, c.method, c.cn_name, reg && reg.name, reg && reg.description, reg && reg.created_by];
     return inProj && (!kw || hay.some(v => String(v || '').toLowerCase().includes(kw)));
   });
-  const perPage = 10;
+  const perPage = _clPageSize;
   const pages = Math.max(1, Math.ceil(list.length / perPage));
   if (_clPage > pages) _clPage = pages;
   if (_clPage < 1) _clPage = 1;
@@ -1027,7 +1028,8 @@ async function renderCaseList() {
       '<button class="danger mini" data-delfile="' + esc(c.file) + '">删除</button>' +
       '</td></tr>';
   }).join('');
-  listPager('#clPager', list.length, _clPage, perPage, p => { _clPage = p; renderCaseList(); });
+  listPager('#clPager', list.length, _clPage, perPage, p => { _clPage = p; renderCaseList(); },
+    s => { _clPageSize = s; _clPage = 1; renderCaseList(); });
 }
 
 /* ---- 移动用例到项目：已登记 = 只改归属；未登记 = 移动时顺带登记（仅登记模式，不动框架文件） ---- */
@@ -1086,7 +1088,12 @@ async function renderSuites() {
   const pf = $('#suiteProj') ? $('#suiteProj').value : '';
   const list = (d.results || []).filter(s => matchProj(s, pf));
   $('#suiteEmpty').style.display = list.length ? 'none' : '';
-  $('#suiteTbody').innerHTML = list.map(s => {
+  /* 分页（项目管理同款：10/20/50，默认 20） */
+  const pages = Math.max(1, Math.ceil(list.length / _suPageSize));
+  if (_suPage > pages) _suPage = pages;
+  if (_suPage < 1) _suPage = 1;
+  const view = list.slice((_suPage - 1) * _suPageSize, _suPage * _suPageSize);
+  $('#suiteTbody').innerHTML = view.map(s => {
     const stats = (s.execution_status === 'NOT_RUN') ? '—' :
       '<b class="num-ok">' + (s.passed_count || 0) + '</b> / <b class="num-bad">' + (s.failed_count || 0) + '</b>';
     const detail = (s.cases || []).map(c => esc(c.name)).join('、') || '<span class="muted">未选用例</span>';
@@ -1104,6 +1111,8 @@ async function renderSuites() {
       '<button class="ghost mini" data-hist="' + s.id + '">历史</button>' +
       '<button class="danger mini" data-del="' + s.id + '">删除</button></td></tr>';
   }).join('');
+  listPager('#suPager', list.length, _suPage, _suPageSize, p => { _suPage = p; renderSuites(); },
+    s => { _suPageSize = s; _suPage = 1; renderSuites(); });
 }
 
 function renderSuiteModal() {

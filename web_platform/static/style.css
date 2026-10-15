@@ -978,7 +978,8 @@ html.night ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, .26
 .orch-step.missing .orch-index { background: var(--bad-bg); color: var(--bad-text); }
 
 /* 列表分页条（通用）：元素管理 / 用例管理 / 执行用例 等列表底部 */
-.list-pager { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-top: 1px solid var(--line-soft, #e8e8ed); }
+/* 列表分页条（项目管理同款）：右对齐 + 同间距，与 treebar.mt 分页条视觉一致（无边框、无内边距） */
+.list-pager { display: flex; align-items: center; gap: 10px; margin-top: 14px; justify-content: flex-end; }
 .list-pager .mono { font-variant-numeric: tabular-nums; }
 
 /* ---------- 步骤描述（执行用例列表）：截断可点击 + 纵向步骤流弹窗（步骤卡片 + ↓ 连接） ---------- */

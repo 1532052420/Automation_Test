@@ -22,19 +22,26 @@ async function api(url, opts) {
 const postJson = (url, body) => api(url, { method: 'POST', body: JSON.stringify(body || {}) });
 const del = (url) => api(url, { method: 'DELETE' });
 
-/* 列表分页条（通用）：渲染「共 N 条 · 每页 x · 上一页/下一页」到容器；
-   go(目标页) 由调用方写入自己的页码变量并重渲染列表 */
-function listPager(elId, total, page, perPage, go) {
+/* 列表分页条（项目管理同款）：「共 N 条 · [10/20/50] 条/页 · ‹ x/y ›」右对齐，视觉与项目管理完全一致；
+   go(目标页) 由调用方写入自己的页码变量并重渲染列表；onSize(每页条数) 可选（切换后回第 1 页） */
+function listPager(elId, total, page, perPage, go, onSize) {
   const el = $(elId);
   if (!el) return;
   const pages = Math.max(1, Math.ceil(total / perPage));
   const cur = Math.min(Math.max(1, page), pages);
   el.innerHTML =
-    '<span class="muted" style="margin-right:auto">共 ' + total + ' 条 · 每页 ' + perPage + ' 条</span>' +
-    '<button class="ghost mini" data-pg="-1"' + (cur <= 1 ? ' disabled' : '') + '>上一页</button>' +
-    '<span class="mono" style="min-width:56px;text-align:center">' + cur + ' / ' + pages + '</span>' +
-    '<button class="ghost mini" data-pg="1"' + (cur >= pages ? ' disabled' : '') + '>下一页</button>';
-  el.querySelectorAll('button[data-pg]').forEach(b => b.addEventListener('click', () => go(cur + (+b.dataset.pg))));
+    '<span class="muted">共 ' + total + ' 条</span>' +
+    '<select style="width:auto">' + [10, 20, 50].map(n =>
+      '<option value="' + n + '"' + (n === perPage ? ' selected' : '') + '>' + n + '</option>').join('') + '</select>' +
+    '<span class="muted">条/页</span>' +
+    '<button class="ghost mini" data-pg="-1"' + (cur <= 1 ? ' disabled' : '') + '>‹</button>' +
+    '<span class="muted" style="min-width:40px;text-align:center">' + cur + ' / ' + pages + '</span>' +
+    '<button class="ghost mini" data-pg="1"' + (cur >= pages ? ' disabled' : '') + '>›</button>';
+  el.querySelectorAll('button[data-pg]').forEach(b =>
+    b.addEventListener('click', () => go(cur + (+b.dataset.pg))));
+  el.querySelector('select').addEventListener('change', e => {
+    if (onSize) onSize(+e.target.value);
+  });
 }
 const $ = (sel) => document.querySelector(sel);
 
@@ -300,8 +307,9 @@ async function pollFootStatus() {
    数据源：/api/cases（scan_case_tree：文件/方法/docstring/中文名映射/mtime）
          + app_testing 登记实体（node→项目归属，供「所属项目」筛选）。 */
 let _caseRows = [];       // 选择用例表行 [{node, file, cls, method, cn_name, mtime, desc, ent}]
-let _elPage = 1;          // 元素管理列表当前页（每页 10 条）
-let _casePage = 1;        // 执行用例列表当前页（每页 10 条）
+let _elPage = 1, _elPageSize = 20;   // 元素管理列表分页（项目管理同款：10/20/50，默认 20）
+let _elFPage = 1, _elFPageSize = 20; // 元素文件列表分页（同款）
+let _casePage = 1, _casePageSize = 20;   // 执行用例列表分页（项目管理同款：10/20/50，默认 20）
 let _caseCnFile = null;   // 命名弹窗当前操作的用例文件
 
 async function loadCaseSelectPanel() {
@@ -338,7 +346,7 @@ function renderCaseTable() {
     const hay = [r.method, r.file, r.cls, r.cn_name, reg && reg.name, reg && reg.description];
     return inProj && (!kw || hay.some(v => String(v || '').toLowerCase().includes(kw)));
   });
-  const perPage = 10;
+  const perPage = _casePageSize;
   const pages = Math.max(1, Math.ceil(list.length / perPage));
   if (_casePage > pages) _casePage = pages;
   if (_casePage < 1) _casePage = 1;
@@ -364,7 +372,8 @@ function renderCaseTable() {
       '<td class="ops"><button class="mini" data-runone="' + esc(r.node) + '">执行</button></td></tr>';
   }).join('');
   $('#caseEmpty').style.display = list.length ? 'none' : '';
-  listPager('#casePager', list.length, _casePage, perPage, p => { _casePage = p; renderCaseTable(); });
+  listPager('#casePager', list.length, _casePage, perPage, p => { _casePage = p; renderCaseTable(); },
+    s => { _casePageSize = s; _casePage = 1; renderCaseTable(); });
 }
 
 /* 步骤描述弹窗：把「步骤A → 步骤B」拆成自上而下的步骤流（步骤卡片 + ↓ 连接），清晰不挤 */
@@ -1153,20 +1162,30 @@ function renderElMgr() {
 }
 
 function renderElementFiles() {
-  /* 只显示磁盘上真实存在的文件；默认落点不存在时不显示幽灵行 */
-  const rows = _elExistingFiles.map(f =>
-    '<tr><td><b>' + esc(f) + '</b>' +
-    (_elCnNames[f] ? ' <span class="muted">' + esc(_elCnNames[f]) + '</span>' : '') +
-    '</td><td><div class="ops">' +
-    '<button class="ghost mini" data-act="open" data-file="' + esc(f) + '">编辑</button>' +
-    '<button class="mini danger-ghost" data-act="delfile" data-file="' + esc(f) + '">删除</button>' +
-    '</div></td></tr>').join('') +
-    (_elements.some(e => e.popup)
-      ? '<tr><td><b>popupElements.py</b> <span class="el-popup-badge">规则库</span></td><td><div class="ops">' +
-        '<button class="ghost mini" data-act="open" data-file="popupElements.py">编辑</button>' +
-        '</div></td></tr>' : '');
-  $('#elFilesTbody').innerHTML = rows;
+  /* 只显示磁盘上真实存在的文件；默认落点不存在时不显示幽灵行。
+     规则库（popupElements.py）不在磁盘文件清单时作为特殊行追加（只有「编辑」，不提供删除）。 */
+  const hasPopup = _elements.some(e => e.popup);
+  const names = _elExistingFiles.concat(
+    hasPopup && !_elExistingFiles.includes('popupElements.py') ? ['popupElements.py'] : []);
+  const perPage = _elFPageSize;
+  const pages = Math.max(1, Math.ceil(names.length / perPage));
+  if (_elFPage > pages) _elFPage = pages;
+  if (_elFPage < 1) _elFPage = 1;
+  const view = names.slice((_elFPage - 1) * perPage, _elFPage * perPage);
+  const rowFor = f => (f === 'popupElements.py' && !_elExistingFiles.includes(f))
+    ? '<tr><td><b>popupElements.py</b> <span class="el-popup-badge">规则库</span></td><td><div class="ops">' +
+      '<button class="ghost mini" data-act="open" data-file="popupElements.py">编辑</button></div></td></tr>'
+    : '<tr><td><b>' + esc(f) + '</b>' +
+      (_elCnNames[f] ? ' <span class="muted">' + esc(_elCnNames[f]) + '</span>' : '') +
+      '</td><td><div class="ops">' +
+      '<button class="ghost mini" data-act="open" data-file="' + esc(f) + '">编辑</button>' +
+      '<button class="mini danger-ghost" data-act="delfile" data-file="' + esc(f) + '">删除</button>' +
+      '</div></td></tr>';
+  $('#elFilesTbody').innerHTML = view.map(rowFor).join('');
   $('#elFilesEmpty').style.display = _elExistingFiles.length ? 'none' : '';
+  listPager('#elFilesPager', names.length, _elFPage, perPage,
+    p => { _elFPage = p; renderElementFiles(); },
+    s => { _elFPageSize = s; _elFPage = 1; renderElementFiles(); });
 }
 
 async function deleteElementFile(file) {
@@ -1193,7 +1212,7 @@ function renderElements() {
     (!_elMgrFile || e.file === _elMgrFile) &&
     (!kw || [e.name, e.cn_name, e.value, e.desc, e.type].some(v =>
       String(v || '').toLowerCase().includes(kw))));
-  const perPage = 10;
+  const perPage = _elPageSize;
   const pages = Math.max(1, Math.ceil(list.length / perPage));
   if (_elPage > pages) _elPage = pages;
   if (_elPage < 1) _elPage = 1;
@@ -1228,7 +1247,8 @@ function renderElements() {
     '<td>' + actions + '</td></tr>';
   }).join('');
   $('#elEmpty').style.display = list.length ? 'none' : '';
-  listPager('#elPager', list.length, _elPage, perPage, p => { _elPage = p; renderElements(); });
+  listPager('#elPager', list.length, _elPage, perPage, p => { _elPage = p; renderElements(); },
+    s => { _elPageSize = s; _elPage = 1; renderElements(); });
 }
 
 function fillSelect(sel, options, val) {
