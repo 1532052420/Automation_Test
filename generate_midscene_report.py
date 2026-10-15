@@ -267,6 +267,9 @@ def build_assert_detail(st, att_dir, case_reason=''):
     detail = data.get('detail') or ''
     if not actual:
         actual = parse_actual_from_reason(name + ' ' + detail + ' ' + (case_reason or ''))
+        if not actual and ok and typ == '文本' and expected not in ('', '（未记录）'):
+            # 通过的相等断言：实际值=预期值（断言通过在数学上保证相等），直接展示真实文本
+            actual = expected
         if not actual:
             actual = '与预期一致' if ok else (case_reason or '（未记录）')[:200]
     return {'type': typ, 'desc': str(desc)[:120], 'ok': ok,
@@ -613,22 +616,23 @@ REPLAY_JS = r'''
       var endV = (task.timing.end - task._atT0) / 1000 * k;
       var from = fullVideo ? 0 : Math.max(0, endV - 2);
       var to = fullVideo ? Infinity : endV + 2;
-      var startPlay = function () {
+      // 只定位不自动播（用户 2026-10-15 要求）：跳到步骤位置保持暂停，由用户点播放按钮观看
+      var locate = function () {
         curEnd = to;
-        tip.textContent = fullVideo ? '▶ 录屏回放 · ' + label + ' · 用例全程'
-          : '▶ 录屏回放 · ' + label + ' · 操作前后各留 2 秒';
+        tip.textContent = fullVideo ? '⏸ 已定位用例全程 · 点击播放按钮观看'
+          : '⏸ 已定位到操作时刻 · 点击播放按钮观看';
         box.style.display = 'block';
-        video.play().catch(function () {});
+        video.pause();
       };
       if (video.getAttribute('src') !== task._atVideo) {
         video.setAttribute('src', task._atVideo);
         video.addEventListener('loadedmetadata', function () {
           video.currentTime = from;
-          startPlay();
+          locate();
         }, { once: true });
       } else {
         video.currentTime = from;
-        startPlay();
+        locate();
       }
     }
 
