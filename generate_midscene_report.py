@@ -370,8 +370,10 @@ REPLAY_JS = r'''
     if (!tasks.length) return;
 
     var style = document.createElement('style');
-    style.textContent = '#atReplayBox{margin:0 0 10px;background:#000;border-radius:8px;overflow:hidden;position:relative}' +
-      '#atReplayBox video{width:100%;max-height:46vh;display:block;background:#000;object-fit:contain}' +
+    style.textContent = '.detail-panel.at-replaying{display:flex;flex-direction:column}' +
+      '.detail-panel.at-replaying > :not(#atReplayBox){display:none!important}' +
+      '#atReplayBox{flex:1;min-height:0;background:#000;border-radius:8px;overflow:hidden;position:relative}' +
+      '#atReplayBox video{width:100%;height:100%;flex:1;min-height:0;display:block;background:#000;object-fit:contain}' +
       '#atReplayTip{position:absolute;left:10px;top:10px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;padding:3px 10px;border-radius:6px;z-index:5;pointer-events:none}';
     document.head.appendChild(style);
 
@@ -391,16 +393,24 @@ REPLAY_JS = r'''
       if (curEnd < Infinity && video.currentTime >= curEnd) video.pause();
     });
 
-    function ensureInPanel() {
+    function ensureUI() {
+      // 播放期间中间区域只保留视频：官方详情内容（截图/JSON）整体隐藏；
+      // React 重渲染会摘节点、还原类名——每次都补插+补类
       var panel = document.querySelector('.detail-panel');
-      if (panel && box.parentElement !== panel) panel.insertBefore(box, panel.firstChild);
+      if (!panel) return;
+      if (box.parentElement !== panel) panel.insertBefore(box, panel.firstChild);
+      if (!panel.classList.contains('at-replaying')) panel.classList.add('at-replaying');
     }
 
     function play(task, label) {
-      if (!task || !task._atVideo) { box.style.display = 'none'; return; }
-      ensureInPanel();
-      // React 点击后异步重渲染 detail-panel 会摘掉我们插入的节点：渲染稳定后补插几次
-      [80, 300, 900, 2000].forEach(function (d) { setTimeout(ensureInPanel, d); });
+      if (!task || !task._atVideo) {
+        box.style.display = 'none';
+        var p = document.querySelector('.detail-panel');
+        if (p) p.classList.remove('at-replaying');
+        return;
+      }
+      ensureUI();
+      [80, 300, 900, 2000].forEach(function (d) { setTimeout(ensureUI, d); });
       var from = Math.max(0, (task.timing.start - task._atT0) / 1000 - 2);  // 步骤开始前 2 秒：留缓冲看清上下文
       var to = (task.timing.end - task._atT0) / 1000;
       var startPlay = function () {

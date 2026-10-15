@@ -202,12 +202,16 @@ def _spawn_service_action(restart):
     wait_free = ("for i in $(seq 1 20); do lsof -nP -iTCP:8080 -sTCP:LISTEN 2>/dev/null "
                  "| grep -q python || break; sleep 0.3; done; ") if restart else ''
     # 2026-10-12 起「所有服务默认关闭」：重启不再复活 Appium（执行用例时 runner 会按需自启）
+    # 2026-10-15 修复：nohup 依赖平台进程的标准输入——启动平台用的终端窗口关闭后该 tty 失效，
+    # nohup 脱离控制台报「Inappropriate ioctl for device」直接放弃 → 新实例从未拉起（看起来重启=关闭）。
+    # 外层 bash 已是 start_new_session 独立会话，无需 nohup 兜底；stdin 一律指向 /dev/null。
     start = ''
     if restart:
-        start += ("cd %s && nohup %s web_platform/app.py >> /tmp/platform_8080.log 2>&1 &"
+        start += ("cd %s && %s web_platform/app.py < /dev/null >> /tmp/platform_8080.log 2>&1 &"
                   % (root, sys.executable))
     script = 'sleep 0.4; %s %s %s' % (kill, wait_free, start)
     subprocess.Popen(['bash', '-c', script], start_new_session=True,
+                     stdin=subprocess.DEVNULL,
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return [s['pid'] for s in services]
 
