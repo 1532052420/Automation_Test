@@ -11,7 +11,7 @@ import sys
 import time
 import urllib.request
 
-from flask import Blueprint, jsonify, render_template, request, send_file
+from flask import Blueprint, jsonify, render_template, request, send_file, send_from_directory
 
 from web_platform import report_data
 from web_platform import runner
@@ -38,7 +38,6 @@ BOOT_ID = str(int(time.time()))
 
 # 已启动的报告静态服务：run_id -> {'port': int, 'proc': Popen}（复用，避免重复起服务/进程泄漏）
 _report_services = {}
-_midscene_services = {}          # Midscene 风格回放报告：服务根 = runs/<id>/（附件 ../allure-results 可达）
 
 
 @atexit.register
@@ -929,12 +928,23 @@ def api_generate_report(run_id):
     return jsonify({'ok': True, 'report_dir': msg})
 
 
+@bp.route('/runs/<run_id>/report/<path:filename>')
+def run_report_file(run_id, filename):
+    """报告目录文件（report.html / 录屏 mp4）经平台直出。
+    平台全局 no-store（见 app.py after_request）：报告页每次打开必然最新，
+    不再有独立 http.server 的「改了不生效/拿到旧页」问题。"""
+    if not re.match(r'^[\w.-]+$', run_id):
+        return jsonify({'ok': False, 'msg': '非法 run_id'}), 404
+    rep_dir = os.path.join(runner.RUNS_DIR, run_id, 'report')
+    return send_from_directory(rep_dir, filename)
+
+
 @bp.route('/api/run/<run_id>/midscene/open', methods=['POST'])
 def api_open_midscene(run_id):
     """生成并打开 Midscene 风格回放报告（单文件 HTML + 失败截图/录屏证据）。
-
-    服务根为 runs/<run_id>/ 整目录（而非 report/ 子目录）：报告内附件用
-    ../allure-results/ 相对路径引用，越出 report/ 子树，必须以 run 目录为根才能访问。"""
+    报告与录屏经平台路由 /runs/<id>/report/... 直出（2026-10-15 起，
+    不再为每个 run 拉独立 http.server——独立端口会被中间层/浏览器按路径缓存，
+    报告重新生成后打开仍是旧版）。"""
     run_dir = os.path.join(runner.RUNS_DIR, run_id)
     if not os.path.isfile(os.path.join(run_dir, 'result.json')):
         return jsonify({'ok': False, 'msg': '运行不存在: %s' % run_id}), 404
@@ -944,32 +954,8 @@ def api_open_midscene(run_id):
                            capture_output=True, text=True, timeout=300, cwd=BASE_DIR)
         if not os.path.isfile(html):
             return jsonify({'ok': False, 'msg': '生成失败: %s' % ((r.stderr or r.stdout)[-200:])}), 500
-    svc = _midscene_services.get(run_id)
-    if svc and svc['proc'].poll() is None:
-        return jsonify({'ok': True, 'url': 'http://127.0.0.1:%d/report/report.html' % svc['port'],
-                        'reused': True})
-    if svc:
-        _midscene_services.pop(run_id, None)
-    port = find_free_port(PLATFORM_CFG.report_start_port)
-    try:
-        proc = subprocess.Popen(
-            [sys.executable, '-m', 'http.server', str(port), '--directory', run_dir],
-            cwd=run_dir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            start_new_session=True)
-    except Exception as e:
-        return jsonify({'ok': False, 'msg': '启动报告服务失败: %s' % e}), 500
-    _midscene_services[run_id] = {'proc': proc, 'port': port}
-    url = 'http://127.0.0.1:%d/report/report.html' % port
-    deadline = time.time() + 8
-    while time.time() < deadline:
-        try:
-            with urllib.request.urlopen(url, timeout=1) as resp:
-                if resp.status == 200:
-                    return jsonify({'ok': True, 'url': url})
-        except Exception as e:
-            last_err = str(e)
-            time.sleep(0.4)
-    return jsonify({'ok': False, 'msg': '报告服务未就绪: %s' % last_err}), 500
+    url = 'http://127.0.0.1:%d/runs/%s/report/report.html' % (PLATFORM_CFG.port, run_id)
+    return jsonify({'ok': True, 'url': url})
 
 
 @bp.route('/api/run/<run_id>/report/open', methods=['POST'])
