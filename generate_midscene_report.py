@@ -524,10 +524,12 @@ def inject_data(shell_html, data):
 def inject_style(html):
     """注入平台定制样式（2026-10-15 用户要求）：隐藏帧时间轴条（Record + canvas 帧图，
     体量大实用性低）、左上 Midscene logo（外链图片，顺带消除外网依赖）、侧栏底部
-    「如何插入自定义日志条目」提示文案。类名来自官方渲染器 DOM（.logo / .main-right-header /
-    .timeline-wrapper / .executions-tip），壳文件更换后重新生成报告仍会自动带上。"""
+    「如何插入自定义日志条目」提示文案；（2026-10-16）隐藏官方执行动画条
+    player-timeline/player-tools——播放顺序无意义，由 atReplayBar（视频播放/暂停 +
+    当前步骤名）取代。类名来自官方渲染器 DOM，壳文件更换后重新生成报告仍会自动带上。"""
     style = ('<style>/* AutomationTest 平台定制 */\n'
-             '.logo,.main-right-header,.timeline-wrapper,.executions-tip{display:none!important;}\n'
+             '.logo,.main-right-header,.timeline-wrapper,.executions-tip,'
+             '.player-timeline-wrapper,.player-tools-wrapper{display:none!important;}\n'
              '</style>')
     if '</head>' in html:
         return html.replace('</head>', style + '\n</head>', 1)
@@ -568,7 +570,15 @@ REPLAY_JS = r'''
       '.at-assert-grid .val{color:#333;word-break:break-all}' +
       '.at-assert-grid .val.ok{color:#389e0d}' +
       '.at-assert-grid .val.fail{color:#cf1322}' +
-      '.at-assert-note{margin-top:6px;color:#8c8c8c;white-space:pre-wrap}';
+      '.at-assert-note{margin-top:6px;color:#8c8c8c;white-space:pre-wrap}' +
+      /* 视频控制条（v6.15.77）：播放/暂停真实录屏 + 当前播放到的步骤名 */
+      '#atReplayBar{display:flex;align-items:center;gap:10px;height:36px;padding:0 12px;' +
+      'background:#141414;color:#fff;font-size:13px;flex:none;min-width:0}' +
+      '#atReplayToggle{cursor:pointer;flex:none;font-size:14px;line-height:1;background:none;' +
+      'border:1px solid #ffffff55;color:#fff;border-radius:4px;padding:3px 10px}' +
+      '#atReplayLabel{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}' +
+      /* 播放位置联动：视频播到哪个步骤，左侧对应行高亮 */
+      'tr.task-row.at-playing>td{background:#e6f4ff!important}';
     document.head.appendChild(style);
 
     var box = document.createElement('div');
@@ -579,10 +589,23 @@ REPLAY_JS = r'''
     video.preload = 'auto';
     var tip = document.createElement('div');
     tip.id = 'atReplayTip';
+    // 控制条：播放/暂停按钮 + 当前播放到的步骤名（v6.15.77，取代官方执行动画条）
+    var bar = document.createElement('div');
+    bar.id = 'atReplayBar';
+    var toggleBtn = document.createElement('button');
+    toggleBtn.id = 'atReplayToggle';
+    toggleBtn.textContent = '▶';
+    var labelEl = document.createElement('span');
+    labelEl.id = 'atReplayLabel';
+    bar.appendChild(toggleBtn);
+    bar.appendChild(labelEl);
     box.appendChild(video);
     box.appendChild(tip);
+    box.appendChild(bar);
 
     var curEnd = Infinity;
+    var currentTask = null;   // 正在回放的任务（步骤位置联动/highlight 的数据源）
+    var playingIdx = -1;      // 当前播放到的任务行下标（左侧高亮）
     video.addEventListener('timeupdate', function () {
       // 到步骤结束点自动暂停；暂停后即解除限制——手动点播放可继续看完，不会被再次按住
       if (curEnd < Infinity && video.currentTime >= curEnd) {
@@ -590,6 +613,68 @@ REPLAY_JS = r'''
         curEnd = Infinity;
       }
     });
+    // 播放/暂停按钮：控制当前录屏视频本身
+    toggleBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (!video.getAttribute('src')) return;
+      if (video.paused) {
+        var p = video.play();
+        if (p && p.catch) p.catch(function () {});
+      } else {
+        video.pause();
+      }
+    });
+    function syncToggleIcon() {
+      toggleBtn.textContent = video.paused ? '▶' : '⏸';
+    }
+    video.addEventListener('play', syncToggleIcon);
+    video.addEventListener('pause', syncToggleIcon);
+    video.addEventListener('ended', syncToggleIcon);
+
+    // 步骤位置联动：视频播到哪个步骤，控制条显示该步骤文案 + 左侧行高亮；
+    // 播到下一个自动切换，上一个恢复正常。窗口间隙保持上一个步骤（粘滞）。
+    function taskWindow(tk) {
+      var k = tk._atScale || 1;
+      return [(tk.timing.start - tk._atT0) / 1000 * k, (tk.timing.end - tk._atT0) / 1000 * k];
+    }
+    function syncPlayingStep() {
+      if (box.style.display === 'none' || !currentTask) return;
+      var t = video.currentTime;
+      var cur = -1, sticky = -1;
+      for (var i = tasks.length - 1; i >= 0; i--) {
+        var tk = tasks[i];
+        if (!tk || tk._atVideo !== currentTask._atVideo || !tk.timing || !tk._atT0) continue;
+        var w = taskWindow(tk);
+        if (cur < 0 && t >= w[0] && t < w[1]) cur = i;   // 命中步骤窗口（后命中优先，步骤比 Plan 精细）
+        if (sticky < 0 && w[1] <= t) sticky = i;          // 窗口间隙：最近一个已结束的步骤
+      }
+      if (cur < 0) cur = sticky;
+      if (cur === playingIdx) return;
+      playingIdx = cur;
+      if (cur >= 0) {
+        var tk2 = tasks[cur];
+        labelEl.textContent = (tk2.param && ((tk2.param.locate && tk2.param.locate.description) ||
+          tk2.param.userInstruction)) || tk2.subType || '';
+      }
+      applyPlayingClass();
+    }
+    function applyPlayingClass() {
+      var rows = document.querySelectorAll('tr.task-row');
+      for (var i = 0; i < rows.length; i++) {
+        var want = i === playingIdx;
+        var has = rows[i].classList.contains('at-playing');
+        if (want && !has) rows[i].classList.add('at-playing');
+        else if (!want && has) rows[i].classList.remove('at-playing');
+      }
+    }
+    function clearPlayingStep() {
+      if (playingIdx < 0) return;
+      playingIdx = -1;
+      applyPlayingClass();
+    }
+    video.addEventListener('timeupdate', syncPlayingStep);
+    video.addEventListener('seeked', syncPlayingStep);
+    video.addEventListener('play', syncPlayingStep);
 
     function ensureUI() {
       // 播放期间中间区域只保留视频：官方详情内容（截图/JSON）整体隐藏；
@@ -603,10 +688,13 @@ REPLAY_JS = r'''
     function play(task, label, fullVideo) {
       if (!task || !task._atVideo) {
         box.style.display = 'none';
-        var p = document.querySelector('.detail-panel');
-        if (p) p.classList.remove('at-replaying');
+        currentTask = null;
+        clearPlayingStep();
+        var p0 = document.querySelector('.detail-panel');
+        if (p0) p0.classList.remove('at-replaying');
         return;
       }
+      currentTask = task;
       ensureUI();
       [80, 300, 900, 2000].forEach(function (d) { setTimeout(ensureUI, d); });
       var k = task._atScale || 1;
@@ -621,10 +709,10 @@ REPLAY_JS = r'''
       // 不加载视频，播放只由点击触发
       var locate = function () {
         curEnd = to;
-        tip.textContent = '▶ 正在回放：' + label;
+        tip.textContent = '';
+        labelEl.textContent = label;
         box.style.display = 'block';
         if (tip._t) clearTimeout(tip._t);
-        tip._t = setTimeout(function () { tip.textContent = ''; }, 3000);
         var p = video.play();
         if (p && p.catch) p.catch(function () {});
       };
@@ -810,10 +898,11 @@ REPLAY_JS = r'''
     new MutationObserver(function () {
       if (_atMoTick) return;
       _atMoTick = true;
-      setTimeout(function () { _atMoTick = false; decorateAssertRows(); decorateCaseGroups(); }, 60);
+      setTimeout(function () { _atMoTick = false; decorateAssertRows(); decorateCaseGroups(); applyPlayingClass(); }, 60);
     }).observe(document.body, { childList: true, subtree: true });
     decorateAssertRows();
     decorateCaseGroups();
+    applyPlayingClass();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
