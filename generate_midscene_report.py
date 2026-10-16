@@ -318,6 +318,11 @@ def link_case_video(run_dir, v0, case_no):
             return None
 
 
+# 运行状态中文（报告头执行名用）：PENDING/RUNNING/PASSED/FAILED/STOPPED/ERROR
+RUN_STATUS_CN = {'PENDING': '待执行', 'RUNNING': '执行中', 'PASSED': '通过',
+                 'FAILED': '失败', 'STOPPED': '已停止', 'ERROR': '异常'}
+
+
 def build_data(run_id, meta, results, run_dir):
     """平台 Allure 数据 → Midscene 原版报告 schema。"""
     ATT = os.path.join(run_dir, 'allure-results')
@@ -385,6 +390,8 @@ def build_data(run_id, meta, results, run_dir):
         #    （v6.15.53：去掉组头顶部的视频帧截图，报告更清爽、体积更小）
         tasks.append({
             'status': 'finished' if status == 'passed' else 'failed',
+            # subType 保持 'Plan'：官方渲染器按 "Plan"===subType 走 Plan 行特殊逻辑，
+            # 改名会破坏详情面板；「Plan - 用例名」的汉化在渲染层 translateShellUI 做
             'type': 'Planning', 'subType': 'Plan',
             'param': {'userInstruction': case_name, 'imagesIncludeCount': 0},
             'timing': {'start': case_start, 'end': case_stop, 'cost': case_stop - case_start},
@@ -465,7 +472,7 @@ def build_data(run_id, meta, results, run_dir):
                    for ts, d in fr]
             main_shot = fail_shots[0] if fail_shots else (rec[-1]['screenshot'] if rec else None)
             assert_task = {
-                'status': 'failed', 'type': 'Action Space', 'subType': 'Print_Assert_Result',
+                'status': 'failed', 'type': 'Action Space', 'subType': '断言结果',
                 'param': {'result': 'failed', 'expect': '', 'actual': reason[:200]},
                 'subTask': True,
                 'timing': {'start': case_stop, 'end': case_stop, 'cost': 0},
@@ -502,8 +509,9 @@ def build_data(run_id, meta, results, run_dir):
         'groupName': 'AutomationTest Report',
         'groupDescription': run_id,
         'executions': [{'logTime': int(time.time() * 1000),
-                        'name': 'Action - %s · %s (%s)' % (meta.get('device_model') or '',
-                                                           run_id, meta.get('status') or ''),
+                        'name': '执行 - %s · %s（%s）' % (
+                            meta.get('device_model') or '', run_id,
+                            RUN_STATUS_CN.get(meta.get('status') or '', meta.get('status') or '')),
                         'tasks': tasks}],
         'modelBriefs': [],
     }
@@ -548,6 +556,7 @@ REPLAY_JS = r'''
     try { dump = JSON.parse(dumpEl.textContent); } catch (e) { return; }
     var tasks = (dump.executions && dump.executions[0] && dump.executions[0].tasks) || [];
     if (!tasks.length) return;
+    document.title = '测试报告 · ' + (dump.groupDescription || '');
 
     var style = document.createElement('style');
     style.textContent = '.detail-panel.at-replaying{display:flex;flex-direction:column}' +
@@ -894,15 +903,34 @@ REPLAY_JS = r'''
       decorateCaseGroups();
     }, true);
 
+    // ---------------- 界面汉化（v6.15.78）：壳的固定英文标签按国内软件惯用词翻译 ----------------
+    // 只替换「整段文本完全相等」的文本节点（标签/状态值），不碰 JSON 值与日期；
+    // React 重渲染后由 MutationObserver 触发重跑，恢复英文即再译。Plan 行前缀单独处理。
+    var TXT_CN = {'Report': '报告', 'Switch: Command + Up / Down': '切换：Command + ↑ / ↓',
+      'Execution': '执行', 'Model Call Details': '模型调用详情', 'Type': '类型', 'Time': '耗时',
+      'Information': '信息', 'Param': '参数', 'Meta': '元信息', 'locate': '定位', 'description': '描述',
+      'value': '值', 'type': '类型', 'status': '状态', 'start': '开始', 'end': '结束',
+      'total time': '总耗时', 'finished': '已完成', 'passed': '通过', 'failed': '失败',
+      'running': '执行中', 'no tasks': '无任务', 'Done': '完成'};
+    function translateShellUI() {
+      var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+      var n;
+      while ((n = w.nextNode())) {
+        var t = n.nodeValue, s = t.trim();
+        if (TXT_CN.hasOwnProperty(s)) n.nodeValue = TXT_CN[s];
+        else if (s.slice(0, 7) === 'Plan - ') n.nodeValue = '规划 - ' + t.slice(t.indexOf('-') + 2);
+      }
+    }
     var _atMoTick = false;
     new MutationObserver(function () {
       if (_atMoTick) return;
       _atMoTick = true;
-      setTimeout(function () { _atMoTick = false; decorateAssertRows(); decorateCaseGroups(); applyPlayingClass(); }, 60);
+      setTimeout(function () { _atMoTick = false; decorateAssertRows(); decorateCaseGroups(); applyPlayingClass(); translateShellUI(); }, 60);
     }).observe(document.body, { childList: true, subtree: true });
     decorateAssertRows();
     decorateCaseGroups();
     applyPlayingClass();
+    translateShellUI();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
