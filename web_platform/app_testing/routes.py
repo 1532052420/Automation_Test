@@ -330,6 +330,7 @@ def api_cases_framework():
                 'class': item['class_name'], 'method': m,
                 'cn_name': item.get('cn_name', ''),   # 文件头「# 用例中文名：」映射（定位器「添加测试用例」与平台重命名同源）
                 'step_count': step_by_method.get((os.path.basename(item['file']), item['class_name'], m), 0),
+                'mtime': item.get('mtime'),           # 文件更新时间：未登记用例「创建时间」的兜底（元素管理同款）
                 'case': {'id': reg['id'], 'name': reg['name'],
                          'project_id': reg.get('project_id'),
                          'created_by': reg.get('created_by'),

@@ -996,7 +996,7 @@ async function renderCaseList() {
   const list = _fwCases.filter(c => {
     const reg = c.case;
     const inProj = !pf || (pf === 'none' ? !(reg && reg.project_id) : !!(reg && +reg.project_id === +pf));
-    const hay = [c.file, c.class, c.method, c.cn_name, reg && reg.name, reg && reg.description, reg && reg.created_by];
+    const hay = [c.file, c.class, c.method, c.cn_name, reg && reg.name, reg && reg.description];
     return inProj && (!kw || hay.some(v => String(v || '').toLowerCase().includes(kw)));
   });
   const perPage = _clPageSize;
@@ -1019,8 +1019,9 @@ async function renderCaseList() {
       '<td class="clip" title="' + esc(reg ? (projName(reg.project_id) || '未分组') : '—') + '">' +
       esc(reg ? (projName(reg.project_id) || '未分组') : '—') + '</td>' +
       '<td>' + (c.step_count || 0) + ' 步</td>' +
-      '<td class="clip" title="' + esc((reg && reg.created_by) || '—') + '">' + esc((reg && reg.created_by) || '—') + '</td>' +
-      '<td>' + (reg ? fmtTs(reg.created_at) : '—') + '</td>' +
+      /* 创建时间：登记时间优先；未登记/缺登记时间用框架文件 mtime 兜底（元素管理同款） */
+      '<td>' + (reg && reg.created_at ? fmtTs(reg.created_at)
+        : (c.mtime ? fmtTs(c.mtime) : '—')) + '</td>' +
       '<td class="ops">' +
       '<button class="mini" data-editsteps="' + esc(c.node) + '">编辑步骤</button>' +
       '<button class="ghost mini" data-cncase="' + esc(c.file) + '" data-cn="' + esc(c.cn_name || '') + '">重命名</button>' +
