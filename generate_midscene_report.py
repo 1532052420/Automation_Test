@@ -642,8 +642,8 @@ REPLAY_JS = r'''
 
     // 左侧 antd 表格点击代理：tr.task-row 第 i 行 ↔ executions[0].tasks[i]（官方渲染器重渲染不影响代理）
     document.addEventListener('click', function (ev) {
-      // 断言结果/明细行的点击只做展开收起，不触发录屏回放
-      if (ev.target.closest && ev.target.closest('.at-assert-sub')) return;
+      // 断言结果/明细行、用例分组箭头的点击只做展开收起，不触发录屏回放
+      if (ev.target.closest && (ev.target.closest('.at-assert-sub') || ev.target.closest('.at-case-toggle'))) return;
       var tr = ev.target.closest ? ev.target.closest('tr.task-row') : null;
       if (!tr) return;
       var i = Array.prototype.indexOf.call(document.querySelectorAll('tr.task-row'), tr);
@@ -743,13 +743,77 @@ REPLAY_JS = r'''
       assertExpanded[hits[k]] = !assertExpanded[hits[k]];
       decorateAssertRows();
     }, true);
+
+    // ---------------- 用例分组折叠（v6.15.76）----------------
+    // 每条用例的首个任务必是 Plan（组头）：组 = 本 Plan 行 → 下一个 Plan 行前。
+    // ≥2 条用例时在 Plan 行注入折叠箭头，点箭头收起/展开该用例的步骤行（含断言子行）；
+    // 单用例报告无分组意义，保持原样。React 重渲染后由 MutationObserver 触发
+    // decorateCaseGroups() 自愈（与断言子行同一套机制）。
+    var caseCollapsed = {};
+    function caseGroupBounds(rows) {
+      var heads = [];
+      for (var i = 0; i < rows.length; i++) {
+        if (tasks[i] && tasks[i].type === 'Planning') heads.push(i);
+      }
+      var bounds = [];
+      for (var k = 0; k < heads.length; k++) {
+        bounds.push([heads[k], (k + 1 < heads.length ? heads[k + 1] : rows.length) - 1]);
+      }
+      return { heads: heads, bounds: bounds };
+    }
+    function decorateCaseGroups() {
+      var rows = document.querySelectorAll('tr.task-row');
+      var g = caseGroupBounds(rows);
+      for (var i = 0; i < rows.length; i++) {
+        var row = rows[i], td = row.cells && row.cells[0];
+        var head = -1;
+        for (var b = 0; b < g.bounds.length; b++) if (g.bounds[b][0] === i) { head = g.bounds[b][0]; break; }
+        var chev = td && td.querySelector('.at-case-toggle');
+        if (head >= 0 && g.heads.length >= 2) {
+          if (!chev) {
+            chev = document.createElement('i');
+            chev.className = 'at-case-toggle';
+            chev.style.cssText = 'font-style:normal;cursor:pointer;margin-right:2px;font-size:10px;opacity:.65;user-select:none';
+            td.insertBefore(chev, td.firstChild);
+          }
+          var sig = caseCollapsed[head] ? '1' : '0';
+          if (chev._atSig !== sig) { chev._atSig = sig; chev.textContent = caseCollapsed[head] ? '▶' : '▼'; }
+        } else if (chev) {
+          chev.parentNode.removeChild(chev);
+        }
+        // 折叠落地：组内非组头行（含断言子行）隐藏
+        var hide = false;
+        for (var b2 = 0; b2 < g.bounds.length; b2++) {
+          if (i > g.bounds[b2][0] && i <= g.bounds[b2][1] && caseCollapsed[g.bounds[b2][0]]) { hide = true; break; }
+        }
+        var want = hide ? 'none' : '';
+        if (row.style.display !== want) row.style.display = want;
+        var nx = row.nextElementSibling;
+        while (nx && nx.classList && nx.classList.contains('at-assert-sub')) {
+          if (nx.style.display !== want) nx.style.display = want;
+          nx = nx.nextElementSibling;
+        }
+      }
+    }
+    document.addEventListener('click', function (ev) {
+      var t = ev.target.closest ? ev.target.closest('.at-case-toggle') : null;
+      if (!t) return;
+      ev.stopPropagation();          // 不让官方行选中逻辑跟着触发
+      var rows = document.querySelectorAll('tr.task-row');
+      var i = Array.prototype.indexOf.call(rows, t.closest('tr.task-row'));
+      if (i < 0) return;
+      caseCollapsed[i] = !caseCollapsed[i];
+      decorateCaseGroups();
+    }, true);
+
     var _atMoTick = false;
     new MutationObserver(function () {
       if (_atMoTick) return;
       _atMoTick = true;
-      setTimeout(function () { _atMoTick = false; decorateAssertRows(); }, 60);
+      setTimeout(function () { _atMoTick = false; decorateAssertRows(); decorateCaseGroups(); }, 60);
     }).observe(document.body, { childList: true, subtree: true });
     decorateAssertRows();
+    decorateCaseGroups();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
