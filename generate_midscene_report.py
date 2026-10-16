@@ -616,13 +616,17 @@ REPLAY_JS = r'''
       var endV = (task.timing.end - task._atT0) / 1000 * k;
       var from = fullVideo ? 0 : Math.max(0, endV - 2);
       var to = fullVideo ? Infinity : endV + 2;
-      // 只定位不自动播（用户 2026-10-15 要求）：跳到步骤位置保持暂停，由用户点播放按钮观看
+      // 点击步骤即播放（用户 2026-10-16 要求）：定位到操作时刻直接开播，到步骤结束点
+      // 自动暂停（timeupdate 解除限制后可手动续播看完）；进入报告仍不自动播——未点击
+      // 不加载视频，播放只由点击触发
       var locate = function () {
         curEnd = to;
-        tip.textContent = fullVideo ? '⏸ 已定位用例全程 · 点击播放按钮观看'
-          : '⏸ 已定位到操作时刻 · 点击播放按钮观看';
+        tip.textContent = '▶ 正在回放：' + label;
         box.style.display = 'block';
-        video.pause();
+        if (tip._t) clearTimeout(tip._t);
+        tip._t = setTimeout(function () { tip.textContent = ''; }, 3000);
+        var p = video.play();
+        if (p && p.catch) p.catch(function () {});
       };
       if (video.getAttribute('src') !== task._atVideo) {
         video.setAttribute('src', task._atVideo);
