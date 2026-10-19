@@ -73,8 +73,10 @@ class OmniParser:
         cap_device = 'cpu' if self.device_name == 'mps' else self.device_name
         # Florence-2 在 MPS 上有已知数值问题，描述模型兜底 CPU（检测仍走 GPU/MPS）
         self._cap_device = cap_device
+        # 与官方 pipeline 一致：processor 取 Florence-2 原仓库（本地 icon_caption 只存了
+        # 微调权重，不带处理代码），首次需联网，之后走本地缓存
         self._cap_processor = AutoProcessor.from_pretrained(
-            cap_dir, trust_remote_code=True)
+            'microsoft/Florence-2-base', trust_remote_code=True)
         self._cap_model = AutoModelForCausalLM.from_pretrained(
             cap_dir, trust_remote_code=True,
             torch_dtype=torch.float32).to(cap_device)

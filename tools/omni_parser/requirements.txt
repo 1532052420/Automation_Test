@@ -18,3 +18,7 @@ huggingface_hub>=0.23
 ultralytics>=8.2
 # opencv 5.x 要 numpy>=2，与 torch 2.2 冲突，锁 4.x
 opencv-python<5
+# FastAPI 文件上传依赖
+python-multipart>=0.0.9
+einops>=0.8               # Florence-2 建模代码依赖
+timm>=1.0                 # Florence-2 建模代码依赖
