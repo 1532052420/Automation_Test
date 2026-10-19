@@ -10,7 +10,7 @@
 两端不再各自硬编码版本号。
 """
 
-APP_VERSION = '6.15.88'
+APP_VERSION = '6.15.89'
 
 # 最新版本在最前；time 精确到秒（YYYY-MM-DD HH:MM:SS）
 # 版本号格式 x.xx.xx（主版本 1-2 位 · 次版本固定 2 位 · 修订号固定 2 位，99 进位次版本）
@@ -18,6 +18,15 @@ APP_VERSION = '6.15.88'
 # 旧线历史条目保留原始记录，不回溯改写
 # 每条变更一句话 10~20 字，只说改了什么（详细背景见项目 memory 与设计文档）
 CHANGELOG = [
+    {
+        'version': '6.15.89',
+        'time': '2026-10-19 19:02:33',
+        'title': '合并补遗：找回在线报告 6.15.47 记录与 JPEG 尺寸解析修复',
+        'changes': [
+            '补录 6.15.87 双线合并时误判遗漏的在线报告 6.15.47（replay 修复）更新记录',
+            '修复 报告图片尺寸解析：png_size 用 PNG 结构盲解 JPEG 会解出天文数字画布（在线报告 6.15.47 修复项，随合并找回），现按 JPEG/PNG 各自格式解析',
+        ],
+    },
     {
         'version': '6.15.88',
         'time': '2026-10-19 18:39:40',
@@ -457,6 +466,16 @@ CHANGELOG = [
             '对齐 断言任务改官方结构 param{condition,thought,result} + errorMessage，删除渲染器不消费的自创字段（expect/actual/assertion）',
             '对齐 Input 任务补 param.value（步骤名「」内实际输入值），recorder 条目补 description，顶层补 deviceType:android',
             '核对 官方 core/src/types.ts 的 IReportActionDump/ExecutionTask 字段定义 + su7 dump 黄金样例逐字段比对',
+        ],
+    },
+    {
+        'version': '6.15.47',
+        'time': '2026-10-14 14:41:46',
+        'title': '在线报告 replay 修复：录屏可播放、恢复录屏轨道与截图视图（另一工作线，合并入库）',
+        'changes': [
+            '修复 在线报告 replay 全废：图片尺寸误用 PNG 结构解析 JPEG，解出 8 亿像素画布，现按 JPEG/PNG 各自格式取真实分辨率（V2505A 为 1440×3168）',
+            '修复 Plan 任务画布尺寸为空导致渲染器放弃生成回放帧（Record 录屏轨道整条消失），现统一回填真实尺寸',
+            '移除 渲染器不消费的 file:// 本地视频字段（官方报告为帧序列回放，非 video 标签）',
         ],
     },
     {

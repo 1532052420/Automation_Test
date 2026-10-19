@@ -168,14 +168,40 @@ def step_to_action(name):
     return 'Tap'
 
 
-def png_size(datauri):
+def image_size(datauri):
+    """从 dataURI 解析图片真实像素尺寸。
+
+    坑史：旧版 png_size() 用 PNG IHDR 结构去解 JPEG 字节，解出
+    width=8 亿像素的天文数字，渲染器画布直接爆炸（replay 全废）。
+    JPEG 需扫 SOF0/1/2 标记段取宽高，PNG 读 IHDR，两者不可混用。"""
     try:
-        import struct
-        raw = base64.b64decode(datauri.split(',', 1)[1][:64] + '==')
-        w, h = struct.unpack('>II', raw[16:24])
-        return {'width': w, 'height': h, 'dpr': 3}
+        raw = base64.b64decode(datauri.split(',', 1)[1][:65536])
+        if raw[:8] == b'\x89PNG\r\n\x1a\n':
+            import struct
+            w, h = struct.unpack('>II', raw[16:24])
+            if 0 < w < 100000 and 0 < h < 100000:
+                return {'width': w, 'height': h, 'dpr': 1}
+        if raw[:2] == b'\xff\xd8':
+            import struct
+            i = 2
+            while i + 9 < len(raw):
+                if raw[i] != 0xFF:
+                    i += 1
+                    continue
+                marker = raw[i + 1]
+                if marker in (0xC0, 0xC1, 0xC2, 0xC3):
+                    h, w = struct.unpack('>HH', raw[i + 5:i + 9])
+                    if 0 < w < 100000 and 0 < h < 100000:
+                        return {'width': w, 'height': h, 'dpr': 1}
+                    break
+                if marker in (0xD8, 0x01) or 0xD0 <= marker <= 0xD7:
+                    i += 2
+                else:
+                    seg_len = struct.unpack('>H', raw[i + 2:i + 4])[0]
+                    i += 2 + seg_len
     except Exception:
-        return {'width': 1080, 'height': 2400, 'dpr': 3}
+        pass
+    return None
 
 
 def load_registry_desc():
@@ -459,7 +485,7 @@ def build_data(run_id, meta, results, run_dir):
                 # 全程耗时含 AI 规划等待（数据源无规划/操作分段），向用户说明时间口径
                 'log': {'rawResponse': '步骤全程 %.1fs（含 AI 规划等待）；实际操作集中在窗口末尾 2~4 秒，回放已自动对准'
                                         % ((s_end - s_start) / 1000.0)},
-                'uiContext': ({'size': png_size(main_shot), 'screenshotBase64': main_shot}
+                'uiContext': ({'size': (image_size(main_shot) or {'width': 1080, 'height': 2400, 'dpr': 3}), 'screenshotBase64': main_shot}
                               if main_shot else None),
                 'recorder': rec,
             })
@@ -487,7 +513,7 @@ def build_data(run_id, meta, results, run_dir):
                 'param': {'result': 'failed', 'expect': '', 'actual': reason[:200]},
                 'subTask': True,
                 'timing': {'start': case_stop, 'end': case_stop, 'cost': 0},
-                'uiContext': ({'size': png_size(main_shot), 'screenshotBase64': main_shot}
+                'uiContext': ({'size': (image_size(main_shot) or {'width': 1080, 'height': 2400, 'dpr': 3}), 'screenshotBase64': main_shot}
                               if main_shot else None),
                 'output': {'assertion': {'type': 'assertion', 'status': 'failed',
                                          'expected': '', 'actual': reason[:200],
