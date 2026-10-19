@@ -6,13 +6,14 @@
 <style>
 * { box-sizing: border-box; margin: 0; }
 body { font-family: -apple-system, "PingFang SC", sans-serif; background: #f2f3f7; color: #1d2129; padding: 18px 20px 30px; }
-.hd { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+.hd { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .hd h1 { font-size: 19px; }
 .hd .m { font-size: 12.5px; color: #86909c; }
+.st-inline { margin-left: auto; font-size: 12px; color: #4e5969; background: #fff; border: 1px solid #e5e6eb; border-radius: 14px; padding: 4px 12px; }
 .grid { display: flex; gap: 14px; align-items: flex-start; }
 .card { background: #fff; border: 1px solid #e5e6eb; border-radius: 10px; }
 .ch { font-size: 13.5px; font-weight: 600; padding: 12px 14px 0; display: flex; align-items: center; }
-.ch .aux { margin-left: auto; }
+.ch .aux { margin-left: auto; display: flex; gap: 8px; align-items: center; }
 .cb { padding: 10px 14px 14px; }
 .f { margin-bottom: 10px; }
 .f label { display: block; font-size: 11.5px; color: #86909c; margin-bottom: 4px; }
@@ -24,93 +25,118 @@ body { font-family: -apple-system, "PingFang SC", sans-serif; background: #f2f3f
 .dot { width: 8px; height: 8px; border-radius: 50%; background: #c9cdd4; display: inline-block; margin-right: 6px; }
 .dot.on { background: #00d26a; }
 .st { font-size: 12px; color: #4e5969; background: #f2f3f5; border-radius: 6px; padding: 7px 10px; margin-bottom: 10px; }
-.col-l { width: 258px; flex: none; }
 .col-m { flex: 1; min-width: 0; }
-.col-r { width: 420px; flex: none; }
-.drop { border: 2px dashed #c9cdd4; border-radius: 10px; padding: 22px; text-align: center; font-size: 12.5px; color: #86909c; cursor: pointer; }
+.col-m .mt { margin-top: 14px; }
+.col-r { width: 330px; flex: none; }
+.devrow { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+.devrow select { flex: 1; height: 32px; border: 1px solid #e5e6eb; border-radius: 6px; font-size: 12px; padding: 0 8px; color: #4e5969; }
+.drop { border: 2px dashed #c9cdd4; border-radius: 10px; padding: 16px; text-align: center; font-size: 12.5px; color: #86909c; cursor: pointer; }
 .drop.on { border-color: #165dff; background: #f0f5ff; }
-.stage { position: relative; display: none; margin-top: 10px; height: 46vh; overflow: auto; background: #eef0f3; border-radius: 8px; }
-.shotbox { position: relative; width: 100%; }
-.shotbox img.main { width: 100%; display: block; }
+.msg { font-size: 12px; padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; display: none; }
+.msg.err { background: #fff1f0; color: #cf1322; display: block; }
+.msg.ok { background: #f6ffed; color: #389e0d; display: block; }
+/* 画布：整图可见（等比缩放进固定高度视窗，标注框随图等比映射） */
+.stage { position: relative; display: none; margin-top: 10px; height: 62vh; background: #eef0f3; border-radius: 8px; overflow: hidden; }
+.shotbox { position: relative; margin: auto; top: 50%; transform: translateY(-50%); }
+.shotbox img.main { width: 100%; height: 100%; display: block; }
 #boxes { position: absolute; inset: 0; }
-.stage img.main { width: 100%; display: block; border-radius: 8px; }
 .bx { position: absolute; border: 2px solid; border-radius: 3px; cursor: pointer; }
 .bx .tag { position: absolute; top: -18px; left: -2px; font-size: 10.5px; color: #fff; padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
 .bx.hl { box-shadow: 0 0 0 2px #165dff; }
 .cap { font-size: 11.5px; color: #86909c; margin-top: 8px; }
-.eitems { margin-top: 10px; max-height: 240px; overflow: auto; }
+.eitems { max-height: 46vh; overflow: auto; }
 .eitem { display: flex; gap: 8px; font-size: 11.5px; padding: 5px 8px; border-radius: 6px; cursor: pointer; align-items: center; }
 .eitem:hover, .eitem.hl { background: #e8f1ff; }
-.eitem b { width: 18px; text-align: center; }
+.eitem b { width: 18px; text-align: center; flex: none; }
 .eitem .d { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.eitem .c { color: #86909c; }
-pre.code { background: #14161a; color: #d5e0f0; border-radius: 8px; padding: 12px; font-size: 12px; font-family: "SF Mono", Menlo, Consolas, monospace; overflow: auto; max-height: 460px; white-space: pre; }
+.eitem .c { color: #86909c; flex: none; }
+pre.code { background: #14161a; color: #d5e0f0; border-radius: 8px; padding: 12px; font-size: 12px; font-family: "SF Mono", Menlo, Consolas, monospace; overflow: auto; max-height: 300px; white-space: pre; }
 .ops { display: flex; gap: 8px; margin-top: 10px; }
-.msg { font-size: 12px; padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; display: none; }
-.msg.err { background: #fff1f0; color: #cf1322; display: block; }
-.msg.ok { background: #f6ffed; color: #389e0d; display: block; }
+/* 服务配置抽屉（默认收起） */
+.mask { position: fixed; inset: 0; background: rgba(29,33,41,.35); display: none; z-index: 9; }
+.mask.show { display: block; }
+.drawer { position: fixed; top: 0; right: -320px; width: 300px; height: 100vh; background: #fff; z-index: 10; box-shadow: -8px 0 24px rgba(0,0,0,.12); transition: right .25s; padding: 18px 16px; overflow: auto; }
+.drawer.show { right: 0; }
+.drawer h3 { font-size: 14.5px; margin-bottom: 14px; display: flex; justify-content: space-between; }
+.drawer .x { color: #86909c; cursor: pointer; font-weight: 400; }
 </style>
 </head>
 <body>
-<div class="hd"><h1>屏幕解析 OmniParser</h1><span class="m">独立工具 · Web 页面截图 → 元素识别 → 自然语言生成 Selenium 代码（APP 接入后续规划）</span></div>
+<div class="hd">
+  <h1>屏幕解析 OmniParser</h1>
+  <span class="m">独立工具 · Web 页面截图 → 元素识别 → 自然语言生成 Selenium 代码（APP 接入后续规划）</span>
+  <span class="st-inline"><span class="dot" id="stDot"></span><span id="stText">检测服务中…</span></span>
+  <button class="btn g" id="btnCfg">⚙ 服务配置</button>
+</div>
 
 <div class="grid">
-  <!-- 左：服务配置 -->
-  <div class="card col-l">
-    <div class="ch">服务配置 <span style="font-weight:400;color:#a9aeb8;font-size:11px">（手动）</span></div>
-    <div class="cb">
-      <div class="msg" id="cfgMsg"></div>
-      <div class="f"><label>LLM 接口地址（OpenAI 兼容 chat/completions）</label><input id="cfgBase" placeholder="https://open.bigmodel.cn/api/paas/v4/chat/completions"></div>
-      <div class="f"><label>API Key</label><input id="cfgKey" type="password" placeholder="手动填写（免费档即可）"></div>
-      <div class="f"><label>模型（免费档文本模型即可）</label><input id="cfgModel" placeholder="glm-4-flash"></div>
-      <div class="f"><label>检测置信度阈值</label><input id="cfgConf" type="number" step="0.01" min="0.01" max="1" value="0.05"></div>
-      <div style="display:flex; gap:8px;"><button class="btn" id="btnSaveCfg">保存配置</button><button class="btn g" id="btnReloadCfg">刷新</button></div>
-      <div class="st" style="margin-top:12px;"><span class="dot" id="stDot"></span><span id="stText">检测服务中…</span></div>
-      <div class="cap">配置存于本目录 config.yaml；端口改后需重启服务并同步改平台首页卡片。</div>
-    </div>
-  </div>
-
-  <!-- 中：截图解析 -->
-  <div class="card col-m">
-    <div class="ch">截图解析</div>
-    <div class="cb">
-      <div class="msg" id="parseMsg"></div>
-      <div style="display:flex; gap:8px; margin-bottom:10px; align-items:center;">
-        <select id="devSel" style="flex:1; height:32px; border:1px solid #e5e6eb; border-radius:6px; font-size:12px; padding:0 8px; color:#4e5969;"><option value="">未刷新设备</option></select>
-        <button class="btn g" id="btnDevRefresh">刷新设备</button>
-        <button class="btn" id="btnCapture">手机截图</button>
+  <!-- 中：画布 + 意图生成 -->
+  <div class="col-m">
+    <div class="card">
+      <div class="ch">截图解析
+        <span class="aux">
+          <select id="devSel" style="height:30px; border:1px solid #e5e6eb; border-radius:6px; font-size:12px; padding:0 8px; color:#4e5969; max-width:190px;"><option value="">未刷新设备</option></select>
+          <button class="btn g" style="height:30px;" id="btnDevRefresh">刷新设备</button>
+          <button class="btn" style="height:30px;" id="btnCapture">手机截图</button>
+          <button class="btn g" style="height:30px;" id="btnExport">导出 JSON</button>
+        </span>
       </div>
-      <div class="drop" id="drop">拖入网页截图，或点击选择文件（PNG / JPG · 也可用上方「手机截图」直接抓取）</div>
-      <input type="file" id="file" accept="image/*" hidden>
-      <div class="stage" id="stage">
-        <div class="shotbox">
-          <img class="main" id="img">
-          <div id="boxes"></div>
+      <div class="cb">
+        <div class="msg" id="parseMsg"></div>
+        <div class="drop" id="drop">拖入截图，或点击选择文件（PNG / JPG · 也可用上方「手机截图」直接抓取）</div>
+        <input type="file" id="file" accept="image/*" hidden>
+        <div class="stage" id="stage">
+          <div class="shotbox" id="shotbox">
+            <img class="main" id="img">
+            <div id="boxes"></div>
+          </div>
         </div>
+        <div class="cap" id="parseCap"></div>
       </div>
-      <div class="cap" id="parseCap"></div>
+    </div>
+
+    <div class="card mt">
+      <div class="ch">自然语言 → Selenium 代码</div>
+      <div class="cb">
+        <div class="msg" id="genMsg"></div>
+        <div class="f"><label>测试意图（自然语言，先上传并解析截图）</label>
+          <textarea id="intent" rows="3" placeholder="例：打开登录页，输入用户名 admin 和密码 123456，点击登录，断言跳转到首页"></textarea></div>
+        <button class="btn" id="btnGen" disabled>生成自动化代码</button>
+        <div style="margin-top:12px;" class="card">
+          <pre class="code" id="code"># 生成的 Selenium Python 代码会显示在这里</pre>
+        </div>
+        <div class="ops">
+          <button class="btn g" id="btnCopy">复制代码</button>
+          <button class="btn g" id="btnDownload">下载 generated_test.py</button>
+        </div>
+        <div class="cap">代码由免费档文本模型依据「元素清单 + 你的意图」生成；清单外的元素不会被编造。</div>
+      </div>
     </div>
   </div>
 
-  <!-- 右：意图 → 代码 -->
+  <!-- 右：解析数据 -->
   <div class="card col-r">
-    <div class="ch">自然语言 → Selenium 代码</div>
+    <div class="ch">解析数据 <span class="aux" style="font-weight:400;font-size:11px;color:#a9aeb8;" id="elCount"></span></div>
     <div class="cb">
-      <div class="msg" id="genMsg"></div>
-      <div class="f"><label>测试意图（自然语言，先上传并解析截图）</label>
-        <textarea id="intent" rows="3" placeholder="例：打开登录页，输入用户名 admin 和密码 123456，点击登录，断言跳转到首页"></textarea></div>
-      <button class="btn" id="btnGen" disabled>生成自动化代码</button>
-      <div style="margin-top:12px;" class="card">
-        <pre class="code" id="code"># 生成的 Selenium Python 代码会显示在这里</pre>
-      </div>
-      <div class="ops">
-        <button class="btn g" id="btnCopy">复制代码</button>
-        <button class="btn g" id="btnDownload">下载 generated_test.py</button>
-      </div>
-      <div class="cap">代码由免费档文本模型依据「元素清单 + 你的意图」生成；清单外的元素不会被编造。</div>
+      <div class="eitems" id="elist"><div class="cap">上传或截取截图后，识别出的元素清单显示在这里</div></div>
+      <div class="cap">点元素行 ↔ 画布框互相高亮；勾选导出仅含所选元素。</div>
     </div>
   </div>
 </div>
+
+<!-- 服务配置抽屉（默认收起，不占版面） -->
+<div class="mask" id="cfgMask"></div>
+<aside class="drawer" id="cfgDrawer">
+  <h3>服务配置 <span style="font-weight:400;font-size:11px;color:#a9aeb8;">（手动）</span><span class="x" id="cfgClose">✕</span></h3>
+  <div class="msg" id="cfgMsg"></div>
+  <div class="f"><label>LLM 接口地址（OpenAI 兼容 chat/completions）</label><input id="cfgBase" placeholder="https://open.bigmodel.cn/api/paas/v4/chat/completions"></div>
+  <div class="f"><label>API Key</label><input id="cfgKey" type="password" placeholder="手动填写（免费档即可）"></div>
+  <div class="f"><label>模型（免费档文本模型即可）</label><input id="cfgModel" placeholder="glm-4-flash"></div>
+  <div class="f"><label>检测置信度阈值</label><input id="cfgConf" type="number" step="0.01" min="0.01" max="1" value="0.05"></div>
+  <div class="st"><span class="dot" id="stDot2"></span><span id="stText2">检测服务中…</span></div>
+  <div style="display:flex; gap:8px;"><button class="btn" id="btnSaveCfg">保存配置</button><button class="btn g" id="btnReloadCfg">刷新</button></div>
+  <div class="cap" style="margin-top:10px;">配置存于本目录 config.yaml；端口改后需重启服务并同步改平台首页卡片。</div>
+</aside>
 
 <script>
 var $ = function (id) { return document.getElementById(id); };
@@ -123,15 +149,23 @@ function showMsg(id, text, ok) {
 }
 function clearMsg(id) { $(id).className = 'msg'; }
 
+/* ---------- 抽屉开合 ---------- */
+function openCfg() { $('cfgDrawer').classList.add('show'); $('cfgMask').classList.add('show'); loadCfg(); }
+function closeCfg() { $('cfgDrawer').classList.remove('show'); $('cfgMask').classList.remove('show'); }
+$('btnCfg').onclick = openCfg;
+$('cfgClose').onclick = closeCfg;
+$('cfgMask').onclick = closeCfg;
+
 /* ---------- 服务状态 & 配置 ---------- */
 function ping() {
   fetch('/api/ping').then(r => r.json()).then(d => {
+    var txt = '服务运行中 · 端口 ' + location.port + ' · 设备 ' + (d.device || 'auto')
+      + (d.models_loaded ? ' · 模型已加载' : ' · 模型未加载');
+    $('stText').textContent = txt;
+    $('stText2').textContent = txt;
     $('stDot').className = 'dot on';
-    $('stText').textContent = '服务运行中 · 端口 ' + location.port + ' · 设备 ' + (d.device || 'auto')
-      + (d.models_loaded ? ' · 模型已加载' : ' · 模型未加载（首次解析时加载）');
-  }).catch(() => {
-    $('stText').textContent = '服务异常';
-  });
+    $('stDot2').className = 'dot on';
+  }).catch(() => { $('stText').textContent = '服务异常'; });
 }
 function loadCfg() {
   fetch('/api/config').then(r => r.json()).then(d => {
@@ -151,16 +185,14 @@ $('btnSaveCfg').onclick = function () {
   fd.append('llm_model', $('cfgModel').value.trim());
   fd.append('conf_threshold', $('cfgConf').value || 0.05);
   var key = $('cfgKey').value.trim();
-  if (!(key && $('cfgKey').dataset.masked && key === $('cfgKey').dataset.masked && key.indexOf('****') >= 0)) {
-    if (key && key.indexOf('****') < 0) fd.append('llm_api_key', key);
-  }
+  if (key && key.indexOf('****') < 0) fd.append('llm_api_key', key);
   fetch('/api/config', { method: 'POST', body: fd }).then(r => r.json()).then(d => {
     showMsg('cfgMsg', d.msg || (d.ok ? '已保存' : '保存失败'), d.ok);
     setTimeout(() => clearMsg('cfgMsg'), 2500);
   });
 };
 
-/* ---------- 截图上传与解析 ---------- */
+/* ---------- 截图上传 / 手机截图 / 解析 ---------- */
 $('drop').onclick = () => $('file').click();
 $('drop').ondragover = (e) => { e.preventDefault(); $('drop').classList.add('on'); };
 $('drop').ondragleave = () => $('drop').classList.remove('on');
@@ -170,24 +202,26 @@ $('drop').ondrop = (e) => {
 };
 $('file').onchange = () => { if ($('file').files.length) parseBlob($('file').files[0], $('file').files[0].name); };
 
+var parseSeq = 0;                                // 解析请求序号：新动作使旧结果作废
 function parseBlob(blob, name) {
   clearMsg('parseMsg');
-  var seq = ++parseSeq;                            // 后发的截图/上传使先发的解析结果作废
+  var seq = ++parseSeq;
   var url = URL.createObjectURL(blob);
-  showStage(url);                                  // 截图先同步上屏
+  showStage(url);                                // 截图先同步上屏（整图可见）
   $('parseCap').textContent = '已显示截图，解析中…（首次调用需加载模型，可能要几十秒）';
   var fd = new FormData();
   fd.append('file', blob, name);
   fetch('/api/parse', { method: 'POST', body: fd }).then(r => r.json().then(d => ({ status: r.status, d })))
     .then(({ status, d }) => {
-      if (seq !== parseSeq) return;                // 过期结果：期间用户又截了新图/传了新图
+      if (seq !== parseSeq) return;              // 过期结果：期间用户又截了新图/传了新图
       if (!d.ok) { showMsg('parseMsg', d.msg || '解析失败', false); $('parseCap').textContent = ''; return; }
       lastResult = d;
-      annotate(d);
       $('btnGen').disabled = false;
       showMsg('parseMsg', '识别完成：' + d.elements.length + ' 个可交互元素', true);
       $('parseCap').textContent = '检出 ' + d.elements.length + ' 个可交互元素 · 页面尺寸 '
-        + d.image_size.join('×') + ' · 点元素行可在图上高亮';
+        + d.image_size.join('×');
+      if (imgReady) annotate(d);                 // 图已上屏：直接叠框；否则等 onload 再叠
+      else pendingAnnotate = d;
       setTimeout(() => clearMsg('parseMsg'), 3000);
     }).catch(e => { if (seq === parseSeq) { showMsg('parseMsg', '请求失败：' + e, false); $('parseCap').textContent = ''; } });
 }
@@ -229,58 +263,78 @@ $('btnCapture').onclick = function () {
 };
 loadDevices();
 
+/* ---------- 画布：整图等比可见 + 标注映射 ---------- */
 var COLORS = ['#00b96b', '#4096ff', '#ffa940', '#ff4d4f', '#9254de', '#13c2c2'];
-var parseSeq = 0;                                // 解析请求序号：新动作使旧结果作废
+var parseSeq = 0;
+var curSize = null;
+var imgReady = false;
+var pendingAnnotate = null;
 function showStage(url) {
+  curSize = null;
+  imgReady = false;
+  pendingAnnotate = null;
   $('stage').style.display = 'block';
-  $('img').src = url;
-  $('boxes').innerHTML = '';                     // 新图先清旧框，解析完成后补
-  var old = document.querySelector('.eitems');
-  if (old) old.remove();
-}
-function annotate(result) {
-  var draw = function () {
-    var boxWrap = $('boxes');
-    boxWrap.innerHTML = '';
-    var iw = $('img').clientWidth, ih = $('img').clientHeight;
-    var W = result.image_size[0], H = result.image_size[1];
-    result.elements.forEach(function (el, i) {
-      var pct = [el.box_xyxy[0] / W, el.box_xyxy[1] / H, el.box_xyxy[2] / W, el.box_xyxy[3] / H];
-      var div = document.createElement('div');
-      div.className = 'bx';
-      div.id = 'bx' + el.index;
-      div.style.cssText = 'left:' + (pct[0] * 100) + '%;top:' + (pct[1] * 100) + '%;width:'
-        + ((pct[2] - pct[0]) * 100) + '%;height:' + ((pct[3] - pct[1]) * 100)
-        + '%;border-color:' + COLORS[i % COLORS.length] + ';';
-      var tag = document.createElement('span');
-      tag.className = 'tag';
-      tag.style.background = COLORS[i % COLORS.length];
-      tag.textContent = el.index + ' ' + (el.description || '').slice(0, 14);
-      div.appendChild(tag);
-      div.onclick = function () { highlight(el.index); };
-      boxWrap.appendChild(div);
-    });
-    renderList(result);
+  var img = $('img');
+  img.onload = function () {
+    imgReady = true;
+    curSize = [img.naturalWidth, img.naturalHeight];
+    fitStage();
+    if (pendingAnnotate) { var r = pendingAnnotate; pendingAnnotate = null; annotate(r); }
   };
-  if ($('img').complete) draw();
-  else $('img').onload = draw;
+  img.src = url;
+  $('boxes').innerHTML = '';
+  var old = document.getElementById('elist').querySelector('.eitems');
+  if (old) old.remove();
+  $('elCount').textContent = '';
+  fitStage();
+}
+function fitStage() {
+  if (!curSize) return;
+  var stage = $('stage');
+  var availW = stage.clientWidth - 16, availH = stage.clientHeight - 16;
+  var s = Math.min(availW / curSize[0], availH / curSize[1]);
+  var sb = $('shotbox');
+  sb.style.width = Math.max(40, Math.round(curSize[0] * s)) + 'px';
+  sb.style.height = Math.max(30, Math.round(curSize[1] * s)) + 'px';
+}
+window.addEventListener('resize', function () { if (lastResult) fitStage(); });
+function annotate(result) {
+  fitStage();
+  var boxWrap = $('boxes');
+  boxWrap.innerHTML = '';
+  var W = result.image_size[0], H = result.image_size[1];
+  result.elements.forEach(function (el, i) {
+    var pct = [el.box_xyxy[0] / W, el.box_xyxy[1] / H, el.box_xyxy[2] / W, el.box_xyxy[3] / H];
+    var div = document.createElement('div');
+    div.className = 'bx';
+    div.id = 'bx' + el.index;
+    div.style.cssText = 'left:' + (pct[0] * 100) + '%;top:' + (pct[1] * 100) + '%;width:'
+      + ((pct[2] - pct[0]) * 100) + '%;height:' + ((pct[3] - pct[1]) * 100)
+      + '%;border-color:' + COLORS[i % COLORS.length] + ';';
+    var tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.style.background = COLORS[i % COLORS.length];
+    tag.textContent = el.index + ' ' + (el.description || '').slice(0, 14);
+    div.appendChild(tag);
+    div.onclick = function () { highlight(el.index); };
+    boxWrap.appendChild(div);
+  });
+  renderList(result);
 }
 function renderList(result) {
-  var old = document.querySelector('.eitems');
-  if (old) old.remove();
-  var wrap = document.createElement('div');
-  wrap.className = 'eitems';
+  var wrap = $('elist');
+  wrap.innerHTML = '';
+  $('elCount').textContent = result.elements.length + ' 个元素';
   result.elements.forEach(function (el, i) {
     var row = document.createElement('div');
     row.className = 'eitem';
     row.id = 'ei' + el.index;
     row.innerHTML = '<b style="color:' + COLORS[i % COLORS.length] + '">' + el.index
-      + '</b><span class="d">' + (el.description || '未命名元素') + '</span>'
-      + '<span class="c">置信度 ' + el.confidence + '</span>';
+      + '</b><span class="d" title="' + (el.description || '').replace(/"/g, '&quot;') + '">'
+      + (el.description || '未命名元素') + '</span><span class="c">' + el.confidence + '</span>';
     row.onclick = function () { highlight(el.index); };
     wrap.appendChild(row);
   });
-  document.querySelector('.col-m .cb').appendChild(wrap);
 }
 function highlight(index) {
   document.querySelectorAll('.bx, .eitem').forEach(el => el.classList.remove('hl'));
@@ -317,16 +371,16 @@ $('btnCopy').onclick = function () {
     setTimeout(() => $('btnCopy').textContent = '复制代码', 1500);
   });
 };
-$('btnDownload').onclick = function () {
-  var blob = new Blob([$('code').textContent], { type: 'text/x-python' });
+$('btnExport').onclick = function () {
+  if (!lastResult) { showMsg('parseMsg', '还没有解析结果', false); return; }
+  var blob = new Blob([JSON.stringify(lastResult, null, 2)], { type: 'application/json' });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'generated_test.py';
+  a.download = 'omniparser_elements.json';
   a.click();
 };
 
 ping();
-loadCfg();
 </script>
 </body>
 </html>
