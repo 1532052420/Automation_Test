@@ -5,57 +5,71 @@
 <title>屏幕解析 OmniParser · 独立工具</title>
 <style>
 * { box-sizing: border-box; margin: 0; }
-body { font-family: -apple-system, "PingFang SC", sans-serif; background: #f2f3f7; color: #1d2129; padding: 18px 20px 30px; }
-.hd { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-.hd h1 { font-size: 19px; }
+/* 整页高度固定（同元素定位器）：头部一行 + 三栏撑满，栏内各自滚动 */
+body { font-family: -apple-system, "PingFang SC", sans-serif; background: #f2f3f7; color: #1d2129;
+       height: 100vh; display: flex; flex-direction: column; padding: 10px 12px; overflow: hidden; }
+.hd { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.hd h1 { font-size: 18px; }
 .hd .m { font-size: 12.5px; color: #86909c; }
 .st-inline { margin-left: auto; font-size: 12px; color: #4e5969; background: #fff; border: 1px solid #e5e6eb; border-radius: 14px; padding: 4px 12px; }
-.grid { display: flex; gap: 14px; align-items: flex-start; }
-.card { background: #fff; border: 1px solid #e5e6eb; border-radius: 10px; }
-.ch { font-size: 13.5px; font-weight: 600; padding: 12px 14px 0; display: flex; align-items: center; }
-.ch .aux { margin-left: auto; display: flex; gap: 8px; align-items: center; }
-.cb { padding: 10px 14px 14px; }
+
+/* ---------- 三栏（尺寸布局照抄元素定位器 style.css）---------- */
+main { flex: 1; display: flex; gap: 10px; min-height: 0; min-width: 0; overflow: hidden; }
+.col { display: flex; flex-direction: column; background: #fff; border-radius: 8px; overflow: hidden; min-width: 0; }
+.col-title { padding: 8px 12px; font-weight: 600; border-bottom: 1px solid #eee; background: #fafafa;
+             flex: 0 0 auto; font-size: 13.5px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.col-title .hint { font-weight: 400; font-size: 12px; color: #9ca3af; margin-left: 8px; }
+.col-title .aux { margin-left: auto; display: flex; gap: 8px; align-items: center; font-weight: 400; }
+.left   { flex: 0 1 40%; min-width: 280px; }
+.middle { flex: 0 1 34%; min-width: 280px; }
+.right  { flex: 1 1 0; min-width: 280px; }
+.col-body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; overflow: auto; }
+
 .f { margin-bottom: 10px; }
 .f label { display: block; font-size: 11.5px; color: #86909c; margin-bottom: 4px; }
 .f input, .f textarea { width: 100%; border: 1px solid #e5e6eb; border-radius: 6px; padding: 7px 9px; font-size: 12.5px; font-family: inherit; }
 .f textarea { resize: vertical; }
-.btn { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 14px; border-radius: 7px; background: #165dff; border: none; color: #fff; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.btn { display: inline-flex; align-items: center; justify-content: center; height: 30px; padding: 0 12px; border-radius: 6px; background: #165dff; border: none; color: #fff; font-size: 12.5px; font-weight: 600; cursor: pointer; }
 .btn.g { background: #f2f3f5; color: #4e5969; }
 .btn:disabled { opacity: .55; cursor: default; }
+.btn.mini { height: 26px; padding: 0 9px; font-size: 11.5px; font-weight: 500; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: #c9cdd4; display: inline-block; margin-right: 6px; }
 .dot.on { background: #00d26a; }
-.st { font-size: 12px; color: #4e5969; background: #f2f3f5; border-radius: 6px; padding: 7px 10px; margin-bottom: 10px; }
-.col-m { flex: 1; min-width: 0; }
-.col-m .mt { margin-top: 14px; }
-.col-r { width: 330px; flex: none; }
-.devrow { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
-.devrow select { flex: 1; height: 32px; border: 1px solid #e5e6eb; border-radius: 6px; font-size: 12px; padding: 0 8px; color: #4e5969; }
-.drop { border: 2px dashed #c9cdd4; border-radius: 10px; padding: 16px; text-align: center; font-size: 12.5px; color: #86909c; cursor: pointer; }
+.st { font-size: 12px; color: #4e5969; background: #f2f3f5; border-radius: 6px; padding: 7px 10px; }
+.devrow { display: flex; gap: 8px; align-items: center; }
+.devrow select { flex: 1; min-width: 0; height: 30px; border: 1px solid #e5e6eb; border-radius: 6px; font-size: 12px; padding: 0 8px; color: #4e5969; }
+.drop { border: 2px dashed #c9cdd4; border-radius: 10px; padding: 14px; text-align: center; font-size: 12px; color: #86909c; cursor: pointer; flex: 0 0 auto; }
 .drop.on { border-color: #165dff; background: #f0f5ff; }
-.msg { font-size: 12px; padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; display: none; }
+.msg { font-size: 12px; padding: 7px 10px; border-radius: 6px; display: none; }
 .msg.err { background: #fff1f0; color: #cf1322; display: block; }
 .msg.ok { background: #f6ffed; color: #389e0d; display: block; }
-/* 画布：整图可见（等比缩放进固定高度视窗，标注框随图等比映射） */
-.stage { position: relative; display: none; margin-top: 10px; height: 62vh; background: #eef0f3; border-radius: 8px; overflow: hidden; }
+.cap { font-size: 11.5px; color: #86909c; flex: 0 0 auto; }
+
+/* 左栏截图视窗：46vh（同定位器），整图等比可见 */
+.shot-wrap { position: relative; height: 46vh; background: #eef0f3; border-radius: 8px; overflow: hidden; flex: 0 0 auto; }
 .shotbox { position: relative; margin: auto; top: 50%; transform: translateY(-50%); }
-.shotbox img.main { width: 100%; height: 100%; display: block; }
+.shotbox img { width: 100%; height: 100%; display: block; }
 #boxes { position: absolute; inset: 0; }
 .bx { position: absolute; border: 2px solid; border-radius: 3px; cursor: pointer; }
 .bx .tag { position: absolute; top: -18px; left: -2px; font-size: 10.5px; color: #fff; padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
 .bx.hl { box-shadow: 0 0 0 2px #165dff; }
-.cap { font-size: 11.5px; color: #86909c; margin-top: 8px; }
-.eitems { max-height: 46vh; overflow: auto; }
+
+/* 中栏元素清单 / 右栏代码：撑满余量，内部滚动 */
+.eitems { flex: 1; min-height: 0; overflow: auto; }
 .eitem { display: flex; gap: 8px; font-size: 11.5px; padding: 5px 8px; border-radius: 6px; cursor: pointer; align-items: center; }
 .eitem:hover, .eitem.hl { background: #e8f1ff; }
 .eitem b { width: 18px; text-align: center; flex: none; }
 .eitem .d { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .eitem .c { color: #86909c; flex: none; }
-pre.code { background: #14161a; color: #d5e0f0; border-radius: 8px; padding: 12px; font-size: 12px; font-family: "SF Mono", Menlo, Consolas, monospace; overflow: auto; max-height: 300px; white-space: pre; }
-.ops { display: flex; gap: 8px; margin-top: 10px; }
+pre.code { flex: 1; min-height: 0; overflow: auto; background: #14161a; color: #d5e0f0; border-radius: 8px;
+           padding: 12px; font-size: 12px; font-family: "SF Mono", Menlo, Consolas, monospace; white-space: pre; }
+.ops { display: flex; gap: 8px; }
+
 /* 服务配置抽屉（默认收起） */
 .mask { position: fixed; inset: 0; background: rgba(29,33,41,.35); display: none; z-index: 9; }
 .mask.show { display: block; }
-.drawer { position: fixed; top: 0; right: -320px; width: 300px; height: 100vh; background: #fff; z-index: 10; box-shadow: -8px 0 24px rgba(0,0,0,.12); transition: right .25s; padding: 18px 16px; overflow: auto; }
+.drawer { position: fixed; top: 0; right: -320px; width: 300px; height: 100vh; background: #fff; z-index: 10;
+          box-shadow: -8px 0 24px rgba(0,0,0,.12); transition: right .25s; padding: 18px 16px; overflow: auto; }
 .drawer.show { right: 0; }
 .drawer h3 { font-size: 14.5px; margin-bottom: 14px; display: flex; justify-content: space-between; }
 .drawer .x { color: #86909c; cursor: pointer; font-weight: 400; }
@@ -64,67 +78,67 @@ pre.code { background: #14161a; color: #d5e0f0; border-radius: 8px; padding: 12p
 <body>
 <div class="hd">
   <h1>屏幕解析 OmniParser</h1>
-  <span class="m">独立工具 · Web 页面截图 → 元素识别 → 自然语言生成 Selenium 代码（APP 接入后续规划）</span>
+  <span class="m">独立工具 · Web 截图 → 元素识别 → 自然语言生成 Selenium 代码（APP 已可截图，执行链路后续接入）</span>
   <span class="st-inline"><span class="dot" id="stDot"></span><span id="stText">检测服务中…</span></span>
   <button class="btn g" id="btnCfg">⚙ 服务配置</button>
 </div>
 
-<div class="grid">
-  <!-- 中：画布 + 意图生成 -->
-  <div class="col-m">
-    <div class="card">
-      <div class="ch">截图解析
-        <span class="aux">
-          <select id="devSel" style="height:30px; border:1px solid #e5e6eb; border-radius:6px; font-size:12px; padding:0 8px; color:#4e5969; max-width:190px;"><option value="">未刷新设备</option></select>
-          <button class="btn g" style="height:30px;" id="btnDevRefresh">刷新设备</button>
-          <button class="btn" style="height:30px;" id="btnCapture">手机截图</button>
-          <button class="btn g" style="height:30px;" id="btnExport">导出 JSON</button>
-        </span>
-      </div>
-      <div class="cb">
-        <div class="msg" id="parseMsg"></div>
-        <div class="drop" id="drop">拖入截图，或点击选择文件（PNG / JPG · 也可用上方「手机截图」直接抓取）</div>
-        <input type="file" id="file" accept="image/*" hidden>
-        <div class="stage" id="stage">
-          <div class="shotbox" id="shotbox">
-            <img class="main" id="img">
-            <div id="boxes"></div>
-          </div>
-        </div>
-        <div class="cap" id="parseCap"></div>
-      </div>
+<main>
+  <!-- 左：截图 -->
+  <div class="col left">
+    <div class="col-title">截图解析
+      <span class="aux">
+        <button class="btn mini" id="btnDevRefresh">刷新设备</button>
+        <button class="btn mini" id="btnCapture">手机截图</button>
+      </span>
     </div>
-
-    <div class="card mt">
-      <div class="ch">自然语言 → Selenium 代码</div>
-      <div class="cb">
-        <div class="msg" id="genMsg"></div>
-        <div class="f"><label>测试意图（自然语言，先上传并解析截图）</label>
-          <textarea id="intent" rows="3" placeholder="例：打开登录页，输入用户名 admin 和密码 123456，点击登录，断言跳转到首页"></textarea></div>
-        <button class="btn" id="btnGen" disabled>生成自动化代码</button>
-        <div style="margin-top:12px;" class="card">
-          <pre class="code" id="code"># 生成的 Selenium Python 代码会显示在这里</pre>
-        </div>
-        <div class="ops">
-          <button class="btn g" id="btnCopy">复制代码</button>
-          <button class="btn g" id="btnDownload">下载 generated_test.py</button>
-        </div>
-        <div class="cap">代码由免费档文本模型依据「元素清单 + 你的意图」生成；清单外的元素不会被编造。</div>
+    <div class="col-body">
+      <div class="devrow">
+        <select id="devSel"><option value="">未刷新设备</option></select>
+        <span class="cap" style="flex:none;">连接手机后点「刷新设备」</span>
       </div>
+      <div class="msg" id="parseMsg"></div>
+      <div class="drop" id="drop">拖入截图，或点击选择文件（PNG / JPG）</div>
+      <input type="file" id="file" accept="image/*" hidden>
+      <div class="shot-wrap">
+        <div class="shotbox" id="shotbox">
+          <img id="img">
+          <div id="boxes"></div>
+        </div>
+      </div>
+      <div class="cap" id="parseCap">上传、拖拽或手机截图后，画面显示在这里（整图等比可见）</div>
     </div>
   </div>
 
-  <!-- 右：解析数据 -->
-  <div class="card col-r">
-    <div class="ch">解析数据 <span class="aux" style="font-weight:400;font-size:11px;color:#a9aeb8;" id="elCount"></span></div>
-    <div class="cb">
+  <!-- 中：解析数据 -->
+  <div class="col middle">
+    <div class="col-title">解析数据 <span class="hint" id="elCount"></span>
+      <span class="aux"><button class="btn mini g" id="btnExport">导出 JSON</button></span>
+    </div>
+    <div class="col-body">
       <div class="eitems" id="elist"><div class="cap">上传或截取截图后，识别出的元素清单显示在这里</div></div>
-      <div class="cap">点元素行 ↔ 画布框互相高亮；勾选导出仅含所选元素。</div>
+      <div class="cap">点元素行 ↔ 左侧画布框互相高亮</div>
     </div>
   </div>
-</div>
 
-<!-- 服务配置抽屉（默认收起，不占版面） -->
+  <!-- 右：自然语言 → 代码 -->
+  <div class="col right">
+    <div class="col-title">自然语言 → Selenium 代码 <span class="hint">免费档文本模型 · 清单外元素不编造</span></div>
+    <div class="col-body">
+      <div class="msg" id="genMsg"></div>
+      <div class="f"><label>测试意图（自然语言，先在左侧解析截图）</label>
+        <textarea id="intent" rows="3" placeholder="例：打开登录页，输入用户名 admin 和密码 123456，点击登录，断言跳转到首页"></textarea></div>
+      <button class="btn" id="btnGen" disabled>生成自动化代码</button>
+      <pre class="code" id="code"># 生成的 Selenium Python 代码会显示在这里</pre>
+      <div class="ops">
+        <button class="btn g" id="btnCopy">复制代码</button>
+        <button class="btn g" id="btnDownload">下载 generated_test.py</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- 服务配置抽屉（默认收起） -->
 <div class="mask" id="cfgMask"></div>
 <aside class="drawer" id="cfgDrawer">
   <h3>服务配置 <span style="font-weight:400;font-size:11px;color:#a9aeb8;">（手动）</span><span class="x" id="cfgClose">✕</span></h3>
@@ -207,7 +221,7 @@ function parseBlob(blob, name) {
   clearMsg('parseMsg');
   var seq = ++parseSeq;
   var url = URL.createObjectURL(blob);
-  showStage(url);                                // 截图先同步上屏（整图可见）
+  showStage(url);                                // 截图先同步上屏
   $('parseCap').textContent = '已显示截图，解析中…（首次调用需加载模型，可能要几十秒）';
   var fd = new FormData();
   fd.append('file', blob, name);
@@ -273,7 +287,6 @@ function showStage(url) {
   curSize = null;
   imgReady = false;
   pendingAnnotate = null;
-  $('stage').style.display = 'block';
   var img = $('img');
   img.onload = function () {
     imgReady = true;
@@ -283,15 +296,12 @@ function showStage(url) {
   };
   img.src = url;
   $('boxes').innerHTML = '';
-  var old = document.getElementById('elist').querySelector('.eitems');
-  if (old) old.remove();
-  $('elCount').textContent = '';
   fitStage();
 }
 function fitStage() {
-  if (!curSize) return;
-  var stage = $('stage');
-  var availW = stage.clientWidth - 16, availH = stage.clientHeight - 16;
+  if (!curSize || !imgReady) return;
+  var wrap = document.querySelector('.shot-wrap');
+  var availW = wrap.clientWidth - 12, availH = wrap.clientHeight - 12;
   var s = Math.min(availW / curSize[0], availH / curSize[1]);
   var sb = $('shotbox');
   sb.style.width = Math.max(40, Math.round(curSize[0] * s)) + 'px';
