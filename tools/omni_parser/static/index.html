@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>屏幕解析 OmniParser · 独立工具</title>
+<style>
+* { box-sizing: border-box; margin: 0; }
+body { font-family: -apple-system, "PingFang SC", sans-serif; background: #f2f3f7; color: #1d2129; padding: 18px 20px 30px; }
+.hd { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+.hd h1 { font-size: 19px; }
+.hd .m { font-size: 12.5px; color: #86909c; }
+.grid { display: flex; gap: 14px; align-items: flex-start; }
+.card { background: #fff; border: 1px solid #e5e6eb; border-radius: 10px; }
+.ch { font-size: 13.5px; font-weight: 600; padding: 12px 14px 0; display: flex; align-items: center; }
+.ch .aux { margin-left: auto; }
+.cb { padding: 10px 14px 14px; }
+.f { margin-bottom: 10px; }
+.f label { display: block; font-size: 11.5px; color: #86909c; margin-bottom: 4px; }
+.f input, .f textarea { width: 100%; border: 1px solid #e5e6eb; border-radius: 6px; padding: 7px 9px; font-size: 12.5px; font-family: inherit; }
+.f textarea { resize: vertical; }
+.btn { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 14px; border-radius: 7px; background: #165dff; border: none; color: #fff; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.btn.g { background: #f2f3f5; color: #4e5969; }
+.btn:disabled { opacity: .55; cursor: default; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #c9cdd4; display: inline-block; margin-right: 6px; }
+.dot.on { background: #00d26a; }
+.st { font-size: 12px; color: #4e5969; background: #f2f3f5; border-radius: 6px; padding: 7px 10px; margin-bottom: 10px; }
+.col-l { width: 258px; flex: none; }
+.col-m { flex: 1; min-width: 0; }
+.col-r { width: 420px; flex: none; }
+.drop { border: 2px dashed #c9cdd4; border-radius: 10px; padding: 22px; text-align: center; font-size: 12.5px; color: #86909c; cursor: pointer; }
+.drop.on { border-color: #165dff; background: #f0f5ff; }
+.stage { position: relative; display: none; margin-top: 10px; }
+.stage img.main { width: 100%; display: block; border-radius: 8px; }
+.bx { position: absolute; border: 2px solid; border-radius: 3px; cursor: pointer; }
+.bx .tag { position: absolute; top: -18px; left: -2px; font-size: 10.5px; color: #fff; padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
+.bx.hl { box-shadow: 0 0 0 2px #165dff; }
+.cap { font-size: 11.5px; color: #86909c; margin-top: 8px; }
+.eitems { margin-top: 10px; max-height: 240px; overflow: auto; }
+.eitem { display: flex; gap: 8px; font-size: 11.5px; padding: 5px 8px; border-radius: 6px; cursor: pointer; align-items: center; }
+.eitem:hover, .eitem.hl { background: #e8f1ff; }
+.eitem b { width: 18px; text-align: center; }
+.eitem .d { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eitem .c { color: #86909c; }
+pre.code { background: #14161a; color: #d5e0f0; border-radius: 8px; padding: 12px; font-size: 12px; font-family: "SF Mono", Menlo, Consolas, monospace; overflow: auto; max-height: 460px; white-space: pre; }
+.ops { display: flex; gap: 8px; margin-top: 10px; }
+.msg { font-size: 12px; padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; display: none; }
+.msg.err { background: #fff1f0; color: #cf1322; display: block; }
+.msg.ok { background: #f6ffed; color: #389e0d; display: block; }
+</style>
+</head>
+<body>
+<div class="hd"><h1>屏幕解析 OmniParser</h1><span class="m">独立工具 · Web 页面截图 → 元素识别 → 自然语言生成 Selenium 代码（APP 接入后续规划）</span></div>
+
+<div class="grid">
+  <!-- 左：服务配置 -->
+  <div class="card col-l">
+    <div class="ch">服务配置 <span style="font-weight:400;color:#a9aeb8;font-size:11px">（手动）</span></div>
+    <div class="cb">
+      <div class="msg" id="cfgMsg"></div>
+      <div class="f"><label>LLM 接口地址（OpenAI 兼容 chat/completions）</label><input id="cfgBase" placeholder="https://open.bigmodel.cn/api/paas/v4/chat/completions"></div>
+      <div class="f"><label>API Key</label><input id="cfgKey" type="password" placeholder="手动填写（免费档即可）"></div>
+      <div class="f"><label>模型（免费档文本模型即可）</label><input id="cfgModel" placeholder="glm-4-flash"></div>
+      <div class="f"><label>检测置信度阈值</label><input id="cfgConf" type="number" step="0.01" min="0.01" max="1" value="0.05"></div>
+      <div style="display:flex; gap:8px;"><button class="btn" id="btnSaveCfg">保存配置</button><button class="btn g" id="btnReloadCfg">刷新</button></div>
+      <div class="st" style="margin-top:12px;"><span class="dot" id="stDot"></span><span id="stText">检测服务中…</span></div>
+      <div class="cap">配置存于本目录 config.yaml；端口改后需重启服务并同步改平台首页卡片。</div>
+    </div>
+  </div>
+
+  <!-- 中：截图解析 -->
+  <div class="card col-m">
+    <div class="ch">截图解析</div>
+    <div class="cb">
+      <div class="msg" id="parseMsg"></div>
+      <div class="drop" id="drop">拖入网页截图，或点击选择文件（PNG / JPG）</div>
+      <input type="file" id="file" accept="image/*" hidden>
+      <div class="stage" id="stage">
+        <img class="main" id="img">
+        <div id="boxes"></div>
+      </div>
+      <div class="cap" id="parseCap"></div>
+    </div>
+  </div>
+
+  <!-- 右：意图 → 代码 -->
+  <div class="card col-r">
+    <div class="ch">自然语言 → Selenium 代码</div>
+    <div class="cb">
+      <div class="msg" id="genMsg"></div>
+      <div class="f"><label>测试意图（自然语言，先上传并解析截图）</label>
+        <textarea id="intent" rows="3" placeholder="例：打开登录页，输入用户名 admin 和密码 123456，点击登录，断言跳转到首页"></textarea></div>
+      <button class="btn" id="btnGen" disabled>生成自动化代码</button>
+      <div style="margin-top:12px;" class="card">
+        <pre class="code" id="code"># 生成的 Selenium Python 代码会显示在这里</pre>
+      </div>
+      <div class="ops">
+        <button class="btn g" id="btnCopy">复制代码</button>
+        <button class="btn g" id="btnDownload">下载 generated_test.py</button>
+      </div>
+      <div class="cap">代码由免费档文本模型依据「元素清单 + 你的意图」生成；清单外的元素不会被编造。</div>
+    </div>
+  </div>
+</div>
+
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var lastResult = null;
+
+function showMsg(id, text, ok) {
+  var el = $(id);
+  el.className = 'msg ' + (ok ? 'ok' : 'err');
+  el.textContent = text;
+}
+function clearMsg(id) { $(id).className = 'msg'; }
+
+/* ---------- 服务状态 & 配置 ---------- */
+function ping() {
+  fetch('/api/ping').then(r => r.json()).then(d => {
+    $('stDot').className = 'dot on';
+    $('stText').textContent = '服务运行中 · 端口 ' + location.port + ' · 设备 ' + (d.device || 'auto')
+      + (d.models_loaded ? ' · 模型已加载' : ' · 模型未加载（首次解析时加载）');
+  }).catch(() => {
+    $('stText').textContent = '服务异常';
+  });
+}
+function loadCfg() {
+  fetch('/api/config').then(r => r.json()).then(d => {
+    if (!d.ok) return;
+    var c = d.config || {}, llm = c.llm || {}, p = c.parser || {};
+    $('cfgBase').value = llm.base_url || '';
+    $('cfgKey').value = llm.api_key_masked || '';
+    $('cfgKey').dataset.masked = llm.api_key_masked && llm.api_key_masked.indexOf('****') >= 0 ? '1' : '';
+    $('cfgModel').value = llm.model || '';
+    $('cfgConf').value = p.conf_threshold != null ? p.conf_threshold : 0.05;
+  });
+}
+$('btnReloadCfg').onclick = loadCfg;
+$('btnSaveCfg').onclick = function () {
+  var fd = new FormData();
+  fd.append('llm_base_url', $('cfgBase').value.trim());
+  fd.append('llm_model', $('cfgModel').value.trim());
+  fd.append('conf_threshold', $('cfgConf').value || 0.05);
+  var key = $('cfgKey').value.trim();
+  if (!(key && $('cfgKey').dataset.masked && key === $('cfgKey').dataset.masked && key.indexOf('****') >= 0)) {
+    if (key && key.indexOf('****') < 0) fd.append('llm_api_key', key);
+  }
+  fetch('/api/config', { method: 'POST', body: fd }).then(r => r.json()).then(d => {
+    showMsg('cfgMsg', d.msg || (d.ok ? '已保存' : '保存失败'), d.ok);
+    setTimeout(() => clearMsg('cfgMsg'), 2500);
+  });
+};
+
+/* ---------- 截图上传与解析 ---------- */
+$('drop').onclick = () => $('file').click();
+$('drop').ondragover = (e) => { e.preventDefault(); $('drop').classList.add('on'); };
+$('drop').ondragleave = () => $('drop').classList.remove('on');
+$('drop').ondrop = (e) => {
+  e.preventDefault(); $('drop').classList.remove('on');
+  if (e.dataTransfer.files.length) parseFile(e.dataTransfer.files[0]);
+};
+$('file').onchange = () => { if ($('file').files.length) parseFile($('file').files[0]); };
+
+function parseFile(f) {
+  clearMsg('parseMsg');
+  $('parseCap').textContent = '解析中…（首次调用需加载模型，可能要几十秒）';
+  var fd = new FormData();
+  fd.append('file', f);
+  fetch('/api/parse', { method: 'POST', body: fd }).then(r => r.json().then(d => ({ status: r.status, d })))
+    .then(({ status, d }) => {
+      if (!d.ok) { showMsg('parseMsg', d.msg || '解析失败', false); $('parseCap').textContent = ''; return; }
+      lastResult = d;
+      showImage(URL.createObjectURL(f), d);
+      $('btnGen').disabled = false;
+      showMsg('parseMsg', '识别完成：' + d.elements.length + ' 个可交互元素', true);
+      setTimeout(() => clearMsg('parseMsg'), 3000);
+    }).catch(e => showMsg('parseMsg', '请求失败：' + e, false));
+}
+
+var COLORS = ['#00b96b', '#4096ff', '#ffa940', '#ff4d4f', '#9254de', '#13c2c2'];
+function showImage(url, result) {
+  $('img').src = url;
+  $('stage').style.display = 'block';
+  $('img').onload = function () {
+    var boxWrap = $('boxes');
+    boxWrap.innerHTML = '';
+    var iw = $('img').clientWidth, ih = $('img').clientHeight;
+    var W = result.image_size[0], H = result.image_size[1];
+    result.elements.forEach(function (el, i) {
+      var pct = [el.box_xyxy[0] / W, el.box_xyxy[1] / H, el.box_xyxy[2] / W, el.box_xyxy[3] / H];
+      var div = document.createElement('div');
+      div.className = 'bx';
+      div.id = 'bx' + el.index;
+      div.style.cssText = 'left:' + (pct[0] * 100) + '%;top:' + (pct[1] * 100) + '%;width:'
+        + ((pct[2] - pct[0]) * 100) + '%;height:' + ((pct[3] - pct[1]) * 100)
+        + '%;border-color:' + COLORS[i % COLORS.length] + ';';
+      var tag = document.createElement('span');
+      tag.className = 'tag';
+      tag.style.background = COLORS[i % COLORS.length];
+      tag.textContent = el.index + ' ' + (el.description || '').slice(0, 14);
+      div.appendChild(tag);
+      div.onclick = function () { highlight(el.index); };
+      boxWrap.appendChild(div);
+    });
+    renderList(result);
+    $('parseCap').textContent = '检出 ' + result.elements.length + ' 个可交互元素 · 页面尺寸 '
+      + result.image_size.join('×') + ' · 点元素行可在图上高亮';
+  };
+}
+function renderList(result) {
+  var old = document.querySelector('.eitems');
+  if (old) old.remove();
+  var wrap = document.createElement('div');
+  wrap.className = 'eitems';
+  result.elements.forEach(function (el, i) {
+    var row = document.createElement('div');
+    row.className = 'eitem';
+    row.id = 'ei' + el.index;
+    row.innerHTML = '<b style="color:' + COLORS[i % COLORS.length] + '">' + el.index
+      + '</b><span class="d">' + (el.description || '未命名元素') + '</span>'
+      + '<span class="c">置信度 ' + el.confidence + '</span>';
+    row.onclick = function () { highlight(el.index); };
+    wrap.appendChild(row);
+  });
+  document.querySelector('.col-m .cb').appendChild(wrap);
+}
+function highlight(index) {
+  document.querySelectorAll('.bx, .eitem').forEach(el => el.classList.remove('hl'));
+  var b = $('bx' + index), e = $('ei' + index);
+  if (b) b.classList.add('hl');
+  if (e) { e.classList.add('hl'); e.scrollIntoView({ block: 'nearest' }); }
+}
+
+/* ---------- 生成代码 ---------- */
+$('btnGen').onclick = function () {
+  if (!lastResult) return;
+  var intent = $('intent').value.trim();
+  if (!intent) { showMsg('genMsg', '请先描述测试意图', false); return; }
+  $('btnGen').disabled = true;
+  clearMsg('genMsg');
+  $('code').textContent = '# 生成中…（免费档模型一般 5~20 秒）';
+  var fd = new FormData();
+  fd.append('intent', intent);
+  fd.append('elements', JSON.stringify(lastResult.elements));
+  fd.append('image_size', JSON.stringify(lastResult.image_size));
+  fetch('/api/generate', { method: 'POST', body: fd })
+    .then(r => r.json().then(d => ({ status: r.status, d })))
+    .then(({ status, d }) => {
+      $('btnGen').disabled = false;
+      if (!d.ok) { showMsg('genMsg', d.msg || '生成失败', false); $('code').textContent = '# 生成失败'; return; }
+      $('code').textContent = d.code;
+      showMsg('genMsg', '已生成，可直接复制运行', true);
+      setTimeout(() => clearMsg('genMsg'), 3000);
+    }).catch(e => { $('btnGen').disabled = false; showMsg('genMsg', '请求失败：' + e, false); });
+};
+$('btnCopy').onclick = function () {
+  navigator.clipboard.writeText($('code').textContent).then(() => {
+    $('btnCopy').textContent = '已复制';
+    setTimeout(() => $('btnCopy').textContent = '复制代码', 1500);
+  });
+};
+$('btnDownload').onclick = function () {
+  var blob = new Blob([$('code').textContent], { type: 'text/x-python' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'generated_test.py';
+  a.click();
+};
+
+ping();
+loadCfg();
+</script>
+</body>
+</html>

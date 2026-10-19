@@ -1,0 +1,15 @@
+# OmniParser 独立工具依赖（Python 3.12 · 与平台 3.8 venv 完全分开）
+fastapi>=0.110
+uvicorn[standard]>=0.29
+torch>=2.2
+torchvision>=0.17
+transformers>=4.42,<4.46
+accelerate>=0.30
+pillow>=10.0
+numpy
+pyyaml>=6.0
+requests>=2.31
+huggingface_hub>=0.23
+# 检测模型 icon_detect(YOLOv8 权重) 的推理运行时（AGPL-3.0，仅内部使用；
+# 规避方式见 README「许可证说明」：改用 icon_detect_v3 TorchScript 权重）
+ultralytics>=8.2
