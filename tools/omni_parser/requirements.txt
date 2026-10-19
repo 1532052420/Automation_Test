@@ -6,10 +6,15 @@ torchvision>=0.17
 transformers>=4.42,<4.46
 accelerate>=0.30
 pillow>=10.0
-numpy
+# Intel Mac 上 torch 最高 2.2.x（按 NumPy 1.x 编译），以下三件必须锁 NumPy 1.x 兼容线：
+numpy<2                   # torch 2.2 是按 NumPy 1.x 编译的，必须锁 1.x
+opencv-python<5           # 5.x 要求 numpy>=2，与上冲突
+contourpy<1.4             # matplotlib 传递依赖，1.4 起要求 numpy>=2
 pyyaml>=6.0
 requests>=2.31
 huggingface_hub>=0.23
 # 检测模型 icon_detect(YOLOv8 权重) 的推理运行时（AGPL-3.0，仅内部使用；
 # 规避方式见 README「许可证说明」：改用 icon_detect_v3 TorchScript 权重）
 ultralytics>=8.2
+# opencv 5.x 要 numpy>=2，与 torch 2.2 冲突，锁 4.x
+opencv-python<5
