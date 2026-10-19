@@ -1856,6 +1856,8 @@ let _visAll = [], _visPage = 1, _visPageSize = 10;
   on('btnVisNext', 'click', () => { _visPage++; renderVisualAssets(); });
   /* 「日志」：打开视觉断言日志三级页（执行留痕：基线/对比图/三联/阈值） */
   on('btnVisLogs', 'click', () => { location.href = '/visual-logs'; });
+  /* 基线大图查看器：点图片以外区域（暗色遮罩本体）关闭——此前无任何关闭途径 */
+  on('vaMgrViewer', 'click', function (e) { if (e.target === this) this.classList.remove('show'); });
 })();
 
 async function loadVisualAssets() {
