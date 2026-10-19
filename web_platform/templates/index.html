@@ -68,28 +68,10 @@
         <p>HTTP 接口压测，阶梯递增 / 瞬时脉冲双模式</p>
       </a>
 
-      <!-- 屏幕解析（OmniParser 独立工具，tools/omni_parser/）：新窗口打开，状态灯浏览器侧探测 -->
-      <a class="nav-card" href="http://127.0.0.1:8090" target="_blank" rel="noopener">
-        <div class="card-icon icon-indigo"><span class="ico" data-ico="scan"></span></div>
-        <h3>屏幕解析 <span id="omniStatus" style="font-size:11px;font-weight:400;"></span></h3>
-        <p>截图识别元素 · 自然语言生成 Web 自动化代码（独立工具）</p>
-      </a>
-
     </div>
   </div>
 </main>
 <div id="toast"></div>
-<script>
-/* 屏幕解析工具（独立端口）在线状态探测：失败即显示未启动，不影响平台本身 */
-(function () {
-  var el = document.getElementById('omniStatus');
-  if (!el) return;
-  fetch('http://127.0.0.1:8090/api/ping', { cache: 'no-store' })
-    .then(function (r) { return r.json(); })
-    .then(function () { el.textContent = '● 在线'; el.style.color = '#00b96b'; })
-    .catch(function () { el.textContent = '○ 未启动'; el.style.color = '#c9cdd4'; });
-})();
-</script>
 <script src="/assets/{{ asset_v }}/nav.js"></script>
 <script src="/static/connect_qr.js"></script>
 <script src="/assets/{{ asset_v }}/app.js"></script>
