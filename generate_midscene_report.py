@@ -23,11 +23,22 @@ import time
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 VIDEO_EVIDENCE_DIR = os.path.join(BASE_DIR, 'output', 'video_evidence')
 SHELL_CANDIDATES = [
-    os.path.expanduser('~/Downloads/su7-full.html'),
     os.path.join(BASE_DIR, 'design', 'midscene-ref', 'su7-full.html'),
+    os.path.expanduser('~/Downloads/su7-full.html'),
 ]
 FFMPEG = 'ffmpeg'
 FFPROBE = 'ffprobe'
+
+
+def report_version():
+    """报告版本号 = 平台版本号（web_platform/changelog.py 唯一数据源）。
+
+    报告顶部展示 v<该值>；报告相关改动随平台版本号一起递增，
+    不再展示官方壳的 sdkVersion 1.0.3。正则提取避免 import 副作用。"""
+    m = re.search(r"APP_VERSION\s*=\s*'([\d.]+)'",
+                  open(os.path.join(BASE_DIR, 'web_platform', 'changelog.py'),
+                       encoding='utf-8').read())
+    return m.group(1) if m else 'unknown'
 
 
 def find_shell():
@@ -505,7 +516,7 @@ def build_data(run_id, meta, results, run_dir):
             t['_atScale'] = v_scale
 
     return {
-        'sdkVersion': '1.0.3',
+        'sdkVersion': report_version(),
         'groupName': 'AutomationTest Report',
         'groupDescription': run_id,
         'executions': [{'logTime': int(time.time() * 1000),
