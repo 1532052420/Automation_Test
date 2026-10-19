@@ -2105,8 +2105,7 @@ function bindVdbgOnce(name) {
     mask.dataset.lastSim = String(sim * 100);
     const rz = document.getElementById('vdbgResize');
     if (d.resized) {
-      rz.textContent = '⚠ 上传图 ' + (d.resized_from || '?') + ' 已缩放至基线尺寸 ' +
-        (d.actual_size ? d.actual_size.replace('x', '×') : '') + ' 比对——仅供阈值有效性验证';
+      rz.textContent = '⚠ 两图尺寸不同，已等比缩放居中至同一画布（不拉伸变形）比对——仅供阈值有效性验证';
       rz.style.display = '';
     } else {
       rz.style.display = 'none';
@@ -2247,8 +2246,7 @@ function bindVdbgOnce(name) {
     document.getElementById('vfreeThTxt').textContent = th;
     const rz = document.getElementById('vfreeResize');
     if (d.resized) {
-      rz.textContent = '⚠ 实际图 ' + (d.resized_from || '?') + ' 已缩放至基线尺寸 ' +
-        (d.actual_size ? d.actual_size.replace('x', '×') : '') + ' 比对';
+      rz.textContent = '⚠ 两图尺寸不同，已等比缩放居中至同一画布（不拉伸变形）比对';
       rz.style.display = '';
     } else {
       rz.style.display = 'none';

@@ -299,30 +299,28 @@ def debug_compare(name, actual_bytes):
     except Exception as e:
         return False, '配置读取失败: %s' % e
     from common.appium import visual_assertions as _va
-    # 调试路径不拒绝异尺寸图：自动缩放到基线尺寸再比对（执行链护栏不动）。
+    # 调试路径不拒绝异尺寸图：两图等比缩放居中到同一最大画布（不拉伸变形）再比对。
     # 调试的本意就是传任意图验证阈值有效性，拒绝尺寸 = 无法调试。
     resized, resized_from = False, ''
     try:
-        from PIL import Image
-        import io as _io
-        bw, bh = Image.open(baseline).size
-        aw, ah = Image.open(_io.BytesIO(actual_bytes)).size
-        if (aw, ah) != (bw, bh):
-            img = Image.open(_io.BytesIO(actual_bytes)).convert('RGB').resize((bw, bh))
-            buf = _io.BytesIO()
-            img.save(buf, format='PNG')
-            actual_bytes = buf.getvalue()
-            resized, resized_from = True, '%dx%d' % (aw, ah)
+        with open(baseline, 'rb') as _f:
+            baseline_bytes = _f.read()
+        b_png, a_png, a_scaled = _va.letterbox_pair(baseline_bytes, actual_bytes)
+        baseline_bytes, actual_bytes = b_png, a_png
+        resized = a_scaled   # 等比缩放居中（不拉伸变形）
     except Exception:
-        pass   # PIL 不可用或图损坏时按原图交引擎处理，由引擎报真实错误
-    tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+        resized = False      # 预处理失败时按原图交引擎处理，由引擎报真实错误
+    b_tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
     try:
+        b_tmp.write(baseline_bytes)          # letterbox 后的基线（可能与原文件尺寸不同）
+        b_tmp.close()
+        tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
         tmp.write(actual_bytes)
         tmp.close()
         diff_tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
         diff_tmp.close()
         ok, actual, err, triple = _va.compare_images(
-            baseline, tmp.name, float(cfg.get('threshold') or 0.98), diff_tmp.name,
+            b_tmp.name, tmp.name, float(cfg.get('threshold') or 0.98), diff_tmp.name,
             ignore_regions=cfg.get('ignore_regions') or [],
             match_mode=cfg.get('match_mode') or 'strict')
         def _b64(p):
@@ -346,7 +344,7 @@ def debug_compare(name, actual_bytes):
         }
     finally:
         import os as _os
-        for f in (tmp.name, diff_tmp.name):
+        for f in (b_tmp.name, tmp.name, diff_tmp.name):
             try:
                 _os.remove(f)
             except OSError:
@@ -374,18 +372,11 @@ def debug_compare_free(baseline_bytes, actual_bytes, threshold=0.98, match_mode=
     # 实际图自动缩放到基线尺寸再比对（调试语义：任意图都能比，执行链护栏不动）
     resized, resized_from = False, ''
     try:
-        from PIL import Image
-        import io as _io
-        bw, bh = Image.open(_io.BytesIO(baseline_bytes)).size
-        aw, ah = Image.open(_io.BytesIO(actual_bytes)).size
-        if (aw, ah) != (bw, bh):
-            img = Image.open(_io.BytesIO(actual_bytes)).convert('RGB').resize((bw, bh))
-            buf = _io.BytesIO()
-            img.save(buf, format='PNG')
-            actual_bytes = buf.getvalue()
-            resized, resized_from = True, '%dx%d' % (aw, ah)
+        b_png, a_png, a_scaled = _va.letterbox_pair(baseline_bytes, actual_bytes)
+        baseline_bytes, actual_bytes = b_png, a_png
+        resized = a_scaled   # 等比缩放居中（不拉伸变形），仅较小的一侧被放大
     except Exception:
-        pass   # PIL 不可用或图损坏时按原图交引擎处理，由引擎报真实错误
+        pass   # PIL 不可用时按原图交引擎处理，由引擎报真实错误
     tmps = []
     try:
         for data in (baseline_bytes, actual_bytes):

@@ -64,7 +64,16 @@ def _diff_triple(baseline_path, actual_path, out_path, ignore_regions=None):
     def _pad(img):
         return cv2.copyMakeBorder(img, 0, h - img.shape[0], 0, 4, cv2.BORDER_CONSTANT, value=(255, 255, 255))
 
-    row = np.hstack([_pad(b), _pad(mark), _pad(a)])
+    # 三张等比缩放到统一高度 h（以质量最高的一张为基准显示）：此前只补边不缩放，
+    # 基线与实际分辨率差异大时（如 128×64 基线 vs 406×422 实际），实际图被压得与基线一样小、比例失调
+    def _scale_to_h(img):
+        if img.shape[0] == h:
+            return img
+        s = h / img.shape[0]
+        nw = max(1, int(round(img.shape[1] * s)))
+        return cv2.resize(img, (nw, h), interpolation=cv2.INTER_NEAREST)
+
+    row = np.hstack([_pad(_scale_to_h(b)), _pad(_scale_to_h(mark)), _pad(_scale_to_h(a))])
     cv2.imwrite(out_path, row)
     return out_path
 
@@ -154,3 +163,31 @@ def ensure_baseline(actual_path, baseline_path):
         return True, None
     except Exception as e:
         return False, str(e)
+
+
+def letterbox_pair(baseline_bytes, actual_bytes):
+    """两图等比缩放、居中到同一最大画布（白底），不产生拉伸变形。
+    供调试比对使用（尺寸不同的两图也能不失真地比对）。
+    返回 (baseline_png, actual_png, actual_scaled: bool)。"""
+    from PIL import Image
+    import io as _io
+    bi = Image.open(_io.BytesIO(baseline_bytes)).convert('RGB')
+    ai = Image.open(_io.BytesIO(actual_bytes)).convert('RGB')
+    tw, th = max(bi.width, ai.width), max(bi.height, ai.height)
+
+    def fit(im):
+        if im.size == (tw, th):
+            return im, False
+        s = min(tw / im.width, th / im.height)
+        r = im.resize((max(1, int(round(im.width * s))), max(1, int(round(im.height * s)))))
+        canvas = Image.new('RGB', (tw, th), (255, 255, 255))
+        canvas.paste(r, ((tw - r.width) // 2, (th - r.height) // 2))
+        return canvas, True
+
+    bc, b_scaled = fit(bi)
+    ac, a_scaled = fit(ai)
+    buf_b = _io.BytesIO()
+    bc.save(buf_b, format='PNG')
+    buf_a = _io.BytesIO()
+    ac.save(buf_a, format='PNG')
+    return buf_b.getvalue(), buf_a.getvalue(), a_scaled
