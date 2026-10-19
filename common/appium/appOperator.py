@@ -813,6 +813,7 @@ class AppOperator:
                 'time': DateTimeTool.getNowTime('%Y-%m-%d %H:%M:%S'),
                 'run_id': os.environ.get('AT_RUN_ID', ''),
                 'case': os.environ.get('AT_CURRENT_CASE', ''),
+                'case_file': os.environ.get('AT_CURRENT_CASE_FILE', ''),
                 'name': asset_name,
                 'scope': cfg.get('scope') or 'screen',
                 'match_mode': cfg.get('match_mode') or 'strict',

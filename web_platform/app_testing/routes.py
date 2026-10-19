@@ -19,7 +19,7 @@ import time
 
 from flask import Blueprint, jsonify, request
 
-from web_platform import runner
+from web_platform import runner, visual_log_store
 from web_platform.app_testing import codegen
 from web_platform.yaml_store import YamlStore
 from web_platform.runtime_config import BASE_DIR, list_devices_conf_files, scan_case_tree
@@ -274,7 +274,8 @@ def api_case_detail(cid):
     if request.method == 'GET':
         return _ok(case=case)
     if request.method == 'DELETE':
-        codegen.remove_generated(cid)           # 只清理本模块生成的页面/用例文件
+        gen_files = codegen.remove_generated(cid)   # 只清理本模块生成的页面/用例文件
+        visual_log_store.prune_by_case_files(gen_files)   # 级联清理该用例的视觉断言日志（记录+图）
         cases_store.delete(cid)
         for s in suites_store.list():
             if cid in (s.get('case_ids') or []):

@@ -73,10 +73,13 @@ def is_generated(path):
 
 
 def remove_generated(cid):
-    """删除编排用例时清理其生成文件（只删带标记的，防误删手写文件）"""
-    for p in _generated_paths(cid):
+    """删除编排用例时清理其生成文件（只删带标记的，防误删手写文件）；
+    返回该用例的生成文件清单（供视觉断言日志级联清理，无论文件是否真实存在）"""
+    paths = _generated_paths(cid)
+    for p in paths:
         if os.path.exists(p) and is_generated(p):
             os.unlink(p)
+    return paths
 
 
 def validate_steps(steps):

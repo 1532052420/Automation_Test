@@ -940,19 +940,13 @@ def api_run_attachment(run_id, source):
 
 @bp.route('/api/appui/visual_logs')
 def api_visual_logs():
-    """视觉断言执行记录（records.jsonl 倒序；scope/ok/kw 筛选 + 分页）"""
-    path = os.path.join(BASE_DIR, 'output', 'visual_logs', 'records.jsonl')
-    recs = []
-    if os.path.isfile(path):
-        with open(path, encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    recs.append(json.loads(line))
-                except Exception:
-                    continue
+    """视觉断言执行记录（records.jsonl 倒序；scope/ok/kw 筛选 + 分页）。
+
+    读取前先惰性清理：绑定用例文件已被删除的日志连记录带图移除
+    （visual_log_store.prune_stale，兜底一切不经编排的删除途径）。"""
+    from web_platform import visual_log_store
+    visual_log_store.prune_stale()
+    recs = visual_log_store.read_all()
     recs.reverse()          # 最新在前
     scope = (request.args.get('scope') or '').strip()
     ok = (request.args.get('ok') or '').strip()

@@ -12,12 +12,15 @@
 
 
 def pytest_runtest_logstart(nodeid, location):
-    """记录当前用例短名（视觉断言日志「所属用例」字段的数据源）。
+    """记录当前用例短名与用例文件相对路径（视觉断言日志的数据源）。
 
     logstart 在每条用例开始时触发、先于用例体内的断言调用；
-    appOperator 的视觉断言执行器经环境变量读取（同进程内生效）。"""
+    appOperator 的视觉断言执行器经环境变量读取（同进程内生效）。
+    case_file 供日志与用例文件绑定：用例文件被删除后，日志随读随清。"""
     import os
-    os.environ['AT_CURRENT_CASE'] = (nodeid or '').split('::')[-1]
+    parts = (nodeid or '').split('::')
+    os.environ['AT_CURRENT_CASE'] = parts[-1] if parts else ''
+    os.environ['AT_CURRENT_CASE_FILE'] = parts[0] if parts else ''
 
 
 def pytest_sessionfinish(session, exitstatus):
