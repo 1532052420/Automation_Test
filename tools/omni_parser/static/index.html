@@ -29,7 +29,10 @@ body { font-family: -apple-system, "PingFang SC", sans-serif; background: #f2f3f
 .col-r { width: 420px; flex: none; }
 .drop { border: 2px dashed #c9cdd4; border-radius: 10px; padding: 22px; text-align: center; font-size: 12.5px; color: #86909c; cursor: pointer; }
 .drop.on { border-color: #165dff; background: #f0f5ff; }
-.stage { position: relative; display: none; margin-top: 10px; }
+.stage { position: relative; display: none; margin-top: 10px; height: 46vh; overflow: auto; background: #eef0f3; border-radius: 8px; }
+.shotbox { position: relative; width: 100%; }
+.shotbox img.main { width: 100%; display: block; }
+#boxes { position: absolute; inset: 0; }
 .stage img.main { width: 100%; display: block; border-radius: 8px; }
 .bx { position: absolute; border: 2px solid; border-radius: 3px; cursor: pointer; }
 .bx .tag { position: absolute; top: -18px; left: -2px; font-size: 10.5px; color: #fff; padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
@@ -80,8 +83,10 @@ pre.code { background: #14161a; color: #d5e0f0; border-radius: 8px; padding: 12p
       <div class="drop" id="drop">拖入网页截图，或点击选择文件（PNG / JPG · 也可用上方「手机截图」直接抓取）</div>
       <input type="file" id="file" accept="image/*" hidden>
       <div class="stage" id="stage">
-        <img class="main" id="img">
-        <div id="boxes"></div>
+        <div class="shotbox">
+          <img class="main" id="img">
+          <div id="boxes"></div>
+        </div>
       </div>
       <div class="cap" id="parseCap"></div>
     </div>
@@ -167,6 +172,7 @@ $('file').onchange = () => { if ($('file').files.length) parseBlob($('file').fil
 
 function parseBlob(blob, name) {
   clearMsg('parseMsg');
+  var seq = ++parseSeq;                            // 后发的截图/上传使先发的解析结果作废
   var url = URL.createObjectURL(blob);
   showStage(url);                                  // 截图先同步上屏
   $('parseCap').textContent = '已显示截图，解析中…（首次调用需加载模型，可能要几十秒）';
@@ -174,6 +180,7 @@ function parseBlob(blob, name) {
   fd.append('file', blob, name);
   fetch('/api/parse', { method: 'POST', body: fd }).then(r => r.json().then(d => ({ status: r.status, d })))
     .then(({ status, d }) => {
+      if (seq !== parseSeq) return;                // 过期结果：期间用户又截了新图/传了新图
       if (!d.ok) { showMsg('parseMsg', d.msg || '解析失败', false); $('parseCap').textContent = ''; return; }
       lastResult = d;
       annotate(d);
@@ -182,7 +189,7 @@ function parseBlob(blob, name) {
       $('parseCap').textContent = '检出 ' + d.elements.length + ' 个可交互元素 · 页面尺寸 '
         + d.image_size.join('×') + ' · 点元素行可在图上高亮';
       setTimeout(() => clearMsg('parseMsg'), 3000);
-    }).catch(e => { showMsg('parseMsg', '请求失败：' + e, false); $('parseCap').textContent = ''; });
+    }).catch(e => { if (seq === parseSeq) { showMsg('parseMsg', '请求失败：' + e, false); $('parseCap').textContent = ''; } });
 }
 
 /* ---------- 手机截图（adb 直连，独立于框架） ---------- */
@@ -223,6 +230,7 @@ $('btnCapture').onclick = function () {
 loadDevices();
 
 var COLORS = ['#00b96b', '#4096ff', '#ffa940', '#ff4d4f', '#9254de', '#13c2c2'];
+var parseSeq = 0;                                // 解析请求序号：新动作使旧结果作废
 function showStage(url) {
   $('stage').style.display = 'block';
   $('img').src = url;

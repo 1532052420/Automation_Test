@@ -33,6 +33,14 @@ app = FastAPI(title='OmniParser 屏幕解析（独立工具）')
 # 平台首页卡片状态灯会跨域探测 /api/ping，放开只读探测
 app.add_middleware(CORSMiddleware, allow_origins=['*'],
                     allow_methods=['GET'], allow_headers=['*'])
+
+
+@app.middleware('http')
+async def no_store(request, call_next):
+    """页面与接口一律 no-store：工具页更新后浏览器永不拿旧版（与平台全局 no-store 同款）。"""
+    resp = await call_next(request)
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
 _parser = None
 _parse_error = None
 
