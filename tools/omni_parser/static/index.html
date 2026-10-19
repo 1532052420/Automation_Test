@@ -167,18 +167,22 @@ $('file').onchange = () => { if ($('file').files.length) parseBlob($('file').fil
 
 function parseBlob(blob, name) {
   clearMsg('parseMsg');
-  $('parseCap').textContent = '解析中…（首次调用需加载模型，可能要几十秒）';
+  var url = URL.createObjectURL(blob);
+  showStage(url);                                  // 截图先同步上屏
+  $('parseCap').textContent = '已显示截图，解析中…（首次调用需加载模型，可能要几十秒）';
   var fd = new FormData();
   fd.append('file', blob, name);
   fetch('/api/parse', { method: 'POST', body: fd }).then(r => r.json().then(d => ({ status: r.status, d })))
     .then(({ status, d }) => {
       if (!d.ok) { showMsg('parseMsg', d.msg || '解析失败', false); $('parseCap').textContent = ''; return; }
       lastResult = d;
-      showImage(URL.createObjectURL(blob), d);
+      annotate(d);
       $('btnGen').disabled = false;
       showMsg('parseMsg', '识别完成：' + d.elements.length + ' 个可交互元素', true);
+      $('parseCap').textContent = '检出 ' + d.elements.length + ' 个可交互元素 · 页面尺寸 '
+        + d.image_size.join('×') + ' · 点元素行可在图上高亮';
       setTimeout(() => clearMsg('parseMsg'), 3000);
-    }).catch(e => showMsg('parseMsg', '请求失败：' + e, false));
+    }).catch(e => { showMsg('parseMsg', '请求失败：' + e, false); $('parseCap').textContent = ''; });
 }
 
 /* ---------- 手机截图（adb 直连，独立于框架） ---------- */
@@ -213,17 +217,21 @@ $('btnCapture').onclick = function () {
     .then(r => r.json().then(d => ({ status: r.status, d })))
     .then(({ status, d }) => {
       if (!d.ok) { showMsg('parseMsg', d.msg, false); $('parseCap').textContent = ''; return; }
-      var blob = base64ToBlob(d.png_base64, 'image/png');
-      parseBlob(blob, 'device_' + Date.now() + '.png');
+      parseBlob(base64ToBlob(d.png_base64, 'image/png'), 'device_' + Date.now() + '.png');
     }).catch(e => { showMsg('parseMsg', '请求失败：' + e, false); $('parseCap').textContent = ''; });
 };
 loadDevices();
 
 var COLORS = ['#00b96b', '#4096ff', '#ffa940', '#ff4d4f', '#9254de', '#13c2c2'];
-function showImage(url, result) {
-  $('img').src = url;
+function showStage(url) {
   $('stage').style.display = 'block';
-  $('img').onload = function () {
+  $('img').src = url;
+  $('boxes').innerHTML = '';                     // 新图先清旧框，解析完成后补
+  var old = document.querySelector('.eitems');
+  if (old) old.remove();
+}
+function annotate(result) {
+  var draw = function () {
     var boxWrap = $('boxes');
     boxWrap.innerHTML = '';
     var iw = $('img').clientWidth, ih = $('img').clientHeight;
@@ -245,9 +253,9 @@ function showImage(url, result) {
       boxWrap.appendChild(div);
     });
     renderList(result);
-    $('parseCap').textContent = '检出 ' + result.elements.length + ' 个可交互元素 · 页面尺寸 '
-      + result.image_size.join('×') + ' · 点元素行可在图上高亮';
   };
+  if ($('img').complete) draw();
+  else $('img').onload = draw;
 }
 function renderList(result) {
   var old = document.querySelector('.eitems');
