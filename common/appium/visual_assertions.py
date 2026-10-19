@@ -51,8 +51,12 @@ def _diff_triple(baseline_path, actual_path, out_path, ignore_regions=None):
         gb = _apply_ignores(gb, ignore_regions)
     diff = cv2.absdiff(ga, gb)
     _, mask = cv2.threshold(diff, 24, 255, cv2.THRESH_BINARY)
-    mark = a.copy()
-    mark[mask > 0] = (0, 0, 255)
+    # 中图：以上传的实际图为主体（清晰不透明），基线 30% 透明叠影（原图透明 70%）；
+    # 差异区域标半透明淡红（红色先调淡 15%，再 35% 透明叠加），不再整块实心红盖住内容
+    mark = cv2.addWeighted(a, 0.7, b, 0.3, 0)
+    tint = np.full_like(mark, (38, 38, 255))            # 淡红 = 正红调淡 15%（混白）
+    m = mask > 0
+    mark[m] = (mark[m] * 0.65 + tint[m] * 0.35).astype(np.uint8)
     # 忽略区域在 diff 图上涂白（可视化为「已排除」）
     for (x, y, rw, rh) in (ignore_regions or []):
         x1, y1 = max(0, int(x)), max(0, int(y))
