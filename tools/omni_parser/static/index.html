@@ -45,17 +45,21 @@ main { flex: 1; display: flex; gap: 10px; min-height: 0; min-width: 0; overflow:
 .msg.ok { background: #f6ffed; color: #389e0d; display: block; }
 .cap { font-size: 11.5px; color: #86909c; flex: 0 0 auto; }
 
-/* 左栏截图：占满剩余高度，图片按视窗等比缩放完整显示（无滚动条） */
+/* 左栏截图：占满剩余高度，图片按视窗等比缩放完整显示（无滚动条）；双击灯箱放大 */
 .shot-wrap { position: relative; flex: 1; min-height: 0; background: #eef0f3; border-radius: 8px;
-             overflow: hidden; display: flex; align-items: center; justify-content: center; }
+             overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: zoom-in; }
 #shotinner { position: relative; }
 #shotinner img { width: 100%; height: 100%; display: block; }
 #boxes { position: absolute; inset: 0; }
 .bx { position: absolute; border: 2px solid; border-radius: 3px; cursor: pointer; }
 .bx .tag { position: absolute; top: -18px; left: -2px; font-size: 10.5px; color: #fff; padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
 .bx.hl { box-shadow: 0 0 0 2px #165dff; }
-.drop-hint { position: absolute; font-size: 12px; color: #86909c; }
+.drop-hint { position: absolute; font-size: 12px; color: #86909c; text-align: center; line-height: 1.8; }
 .drop.on { outline: 2px dashed #165dff; outline-offset: -6px; }
+.lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.88); display: none;
+            align-items: center; justify-content: center; z-index: 30; cursor: zoom-out; }
+.lightbox.show { display: flex; }
+.lightbox img { max-width: 97vw; max-height: 95vh; }
 
 /* 中栏元素清单 / 右栏代码：撑满余量，内部滚动 */
 .eitems { flex: 1; min-height: 0; overflow: auto; }
@@ -91,26 +95,23 @@ pre.code { flex: 1; min-height: 0; overflow: auto; background: #14161a; color: #
   <div class="col left">
     <div class="col-title">截图解析
       <span class="aux">
+        <select id="devSel" style="height:26px; max-width:150px; border:1px solid #dcdfe6; border-radius:5px; font-size:11.5px; padding:0 6px; color:#4e5969; font-weight:400;"><option value="">未刷新设备</option></select>
         <button class="btn mini" id="btnDevRefresh">刷新设备</button>
         <button class="btn mini" id="btnCapture">手机截图</button>
         <button class="btn mini" id="btnUpload">上传截图</button>
       </span>
     </div>
     <div class="col-body">
-      <div class="devrow">
-        <select id="devSel"><option value="">未刷新设备</option></select>
-        <span class="cap" style="flex:none;">连接手机后点「刷新设备」</span>
-      </div>
       <div class="msg" id="parseMsg"></div>
-      <div class="shot-wrap" id="drop">
+      <div class="shot-wrap" id="drop" title="双击可放大查看">
         <div id="shotinner">
           <img id="img">
           <div id="boxes"></div>
         </div>
-        <div class="drop-hint" id="dropHint">拖入截图，或点右上「上传截图」（PNG / JPG）</div>
+        <div class="drop-hint" id="dropHint">拖入截图，或点右上「上传截图 / 手机截图」<br>双击图片可放大查看</div>
       </div>
       <input type="file" id="file" accept="image/*" hidden>
-      <div class="cap" id="parseCap">上传、拖拽或手机截图后，画面完整显示在这里（无滚动条）</div>
+      <div class="cap" id="parseCap">上传、拖拽或手机截图后，画面完整显示在这里（无滚动条 · 双击可放大）</div>
     </div>
   </div>
 
@@ -144,6 +145,7 @@ pre.code { flex: 1; min-height: 0; overflow: auto; background: #14161a; color: #
 
 <!-- 服务配置抽屉（默认收起） -->
 <div class="mask" id="cfgMask"></div>
+<div class="lightbox" id="lightbox"><img id="lightboxImg"></div>
 <aside class="drawer" id="cfgDrawer">
   <h3>服务配置 <span style="font-weight:400;font-size:11px;color:#a9aeb8;">（手动）</span><span class="x" id="cfgClose">✕</span></h3>
   <div class="msg" id="cfgMsg"></div>
@@ -397,6 +399,14 @@ $('btnExport').onclick = function () {
   a.download = 'omniparser_elements.json';
   a.click();
 };
+
+/* ---------- 双击画布：灯箱放大查看 ---------- */
+$('drop').ondblclick = function () {
+  if (!$('img').src) return;
+  $('lightboxImg').src = $('img').src;
+  $('lightbox').classList.add('show');
+};
+$('lightbox').onclick = function () { $('lightbox').classList.remove('show'); };
 
 ping();
 </script>

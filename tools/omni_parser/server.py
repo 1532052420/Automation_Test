@@ -43,7 +43,34 @@ async def no_store(request, call_next):
     return resp
 _parser = None
 _parse_error = None
-_label_cache = {}          # 英文描述 → 中文控件名（进程内缓存，避免重复调 LLM 翻译）
+_label_cache = {}          # 英文描述 → 中文控件名（LLM 翻译缓存，避免重复调）
+
+
+# 免 key 规则翻译兜底：Florence-2 英文描述按关键词映射中文控件名（LLM 配置后优先用 LLM 精译）
+_ZH_NOUNS = [('search', '搜索'), ('keyboard', '键盘'), ('play button', '播放按钮'),
+             ('play', '播放'), ('button', '按钮'), ('input field', '输入框'),
+             ('text field', '输入框'), ('text box', '输入框'), ('input', '输入框'),
+             ('toggle', '开关'), ('switch', '开关'), ('checkbox', '复选框'),
+             ('progress', '进度条'), ('loading', '加载'), ('avatar', '头像'),
+             ('profile', '头像'), ('keyboard', '键盘'), ('arrow', '箭头'),
+             ('zoom', '缩放'), ('banner', '横幅'), ('icon', '图标'),
+             ('image', '图片'), ('photo', '图片'), ('picture', '图片'),
+             ('video', '视频'), ('player', '播放器'), ('close', '关闭'),
+             ('list', '列表'), ('menu', '菜单'), ('tab ', '标签页'),
+             ('logo', '标志'), ('text', '文本'), ('window', '窗口'),
+             ('screen', '屏幕'), ('page', '页面'), ('bar', '栏'),
+             ('rectangle', '矩形区域'), ('shape', '形状'), ('dock', '栏')]
+_ZH_COLORS = [('green', '绿色'), ('red', '红色'), ('blue', '蓝色'), ('orange', '橙色'),
+              ('purple', '紫色'), ('yellow', '黄色'), ('white', '白色'), ('black', '黑色')]
+
+
+def zh_label(desc):
+    d = (desc or '').lower()
+    noun = next((zh for kw, zh in _ZH_NOUNS if kw in d), None)
+    if not noun:
+        return '界面元素'
+    color = next((zh for kw, zh in _ZH_COLORS if kw in d), '')
+    return color + noun
 
 
 def load_config():
@@ -151,8 +178,8 @@ def api_parse(file: UploadFile = File(None), image_b64: str = Form(None)):
         return JSONResponse({'ok': False, 'msg': str(e)}, status_code=503)
     except Exception as e:
         return JSONResponse({'ok': False, 'msg': '解析失败：%s' % e}, status_code=500)
-    # 元素描述中文化：Florence-2 只会输出英文，交给已配置的文本模型批量翻译；
-    # 未配置/翻译失败回退英文原文；相同描述走进程内缓存不重复调
+    # 元素描述中文化：优先 LLM 批量精译（已配置 key 时），无 key/失败用规则映射兜底；
+    # 相同描述走进程内缓存不重复调
     descs = [el['description'] for el in result['elements']]
     todo = [d for d in descs if d and d not in _label_cache]
     if todo:
@@ -161,7 +188,8 @@ def api_parse(file: UploadFile = File(None), image_b64: str = Form(None)):
             for d, c in zip(todo, cn):
                 _label_cache[d] = c
     for el in result['elements']:
-        el['label'] = _label_cache.get(el['description']) or el['description']
+        d = el['description']
+        el['label'] = _label_cache.get(d) or zh_label(d)
     return {'ok': True, **result}
 
 
