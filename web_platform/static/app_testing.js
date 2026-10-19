@@ -2095,8 +2095,11 @@ function bindVdbgOnce(name) {
       return;
     }
     simEl.textContent = (sim * 100).toFixed(2) + '%';
-    simEl.dataset.level = simLevel(sim);
-    const th = Math.round((d.threshold || 0.98) * 100);
+    /* 判定着色：通过绿；未达阈值但差距≤10 个百分点黄描边；差距大红 */
+    const thPct = Math.round((d.threshold || 0.98) * 100);
+    const simPct = sim * 100;
+    simEl.dataset.level = d.passed ? 'pass' : (simPct >= thPct - 10 ? 'near' : 'fail');
+    const th = thPct;
     document.getElementById('vdbgThTxt').textContent = th;
     document.getElementById('vdbgJudge').textContent = d.passed ? '达到' : '低于';
     mask.dataset.lastSim = String(sim * 100);
@@ -2236,8 +2239,11 @@ function bindVdbgOnce(name) {
     const sim = (d.similarity == null) ? null : d.similarity;
     if (sim === null) { simEl.textContent = '—'; diffWrap.style.display = 'none'; return; }
     simEl.textContent = (sim * 100).toFixed(2) + '%';
-    simEl.dataset.level = simLevel(sim);
-    const th = Math.round((d.threshold || 0.98) * 100);
+    /* 判定着色：通过绿；未达阈值但差距≤10 个百分点黄描边；差距大红 */
+    const thPct = Math.round((d.threshold || 0.98) * 100);
+    const simPct = sim * 100;
+    simEl.dataset.level = d.passed ? 'pass' : (simPct >= thPct - 10 ? 'near' : 'fail');
+    const th = thPct;
     document.getElementById('vfreeThTxt').textContent = th;
     const rz = document.getElementById('vfreeResize');
     if (d.resized) {

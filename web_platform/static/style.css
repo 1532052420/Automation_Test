@@ -1054,14 +1054,17 @@ html.night ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, .26
 #panel-requests .debugbar #reqEnvSel { width: 170px; }
 
 /* 调试弹窗相似度大字分色（Material 语义色；夜间提亮一档保证可读） */
-#vdbgSim[data-level="perfect"] { color:#059669; }
-#vdbgSim[data-level="good"]    { color:#10B981; }
-#vdbgSim[data-level="warn"]    { color:#F59E0B; }
-#vdbgSim[data-level="bad"]     { color:#EF4444; }
-html.night #vdbgSim[data-level="perfect"] { color:#34D399; }
-html.night #vdbgSim[data-level="good"]    { color:#6EE7B7; }
-html.night #vdbgSim[data-level="warn"]    { color:#FBBF24; }
-html.night #vdbgSim[data-level="bad"]     { color:#F87171; }
+/* 相似度判定着色（按阈值判定而非绝对档位）：pass 绿 / near 黄描边 / fail 红描边 */
+#vdbgSim[data-level="pass"], #vfreeSim[data-level="pass"] { color:#059669; }
+#vdbgSim[data-level="near"], #vfreeSim[data-level="near"] {
+  color:#d97706; border:3px solid #f59e0b; border-radius:12px; padding:2px 16px; }
+#vdbgSim[data-level="fail"], #vfreeSim[data-level="fail"] {
+  color:#ef4444; border:3px solid #ef4444; border-radius:12px; padding:2px 16px; }
+html.night #vdbgSim[data-level="pass"], html.night #vfreeSim[data-level="pass"] { color:#34D399; }
+html.night #vdbgSim[data-level="near"], html.night #vfreeSim[data-level="near"] {
+  color:#fbbf24; border-color:#fbbf24; }
+html.night #vdbgSim[data-level="fail"], html.night #vfreeSim[data-level="fail"] {
+  color:#f87171; border-color:#f87171; }
 
 /* AI 用例生成首页卡片：最近任务状态行（无任务不展示） */
 .nav-card .ai-card-status { font-size: 12px; color: var(--muted2); margin: 0; }
