@@ -1865,7 +1865,7 @@ function renderVisualAssets() {
     <td>${a.thumb ? `<img class="as-thumb" src="${a.thumb}" data-full="/api/appui/visual_assets/${encodeURIComponent(a.name)}/baseline.png" title="点击查看基线大图">` : '<span class="muted">—</span>'}</td>
     <td>${SCOPE_CN[a.scope] || esc(a.scope)}</td>
     <td>${esc(a.biz_type_name || a.biz_type || '—')}</td>
-    <td>${a.match_mode === 'layout' ? 'Layout（布局）' : 'Strict（像素级）'}</td>
+    <td>${a.match_mode === 'layout' ? '结构·忽略细节' : '像素级·严格'}</td>
     <td>${Math.round((a.threshold || 0.98) * 100)}%</td>
     <td>${a.ignore_count || 0}</td>
     <td>${esc(a.case_name || '—')}</td>

@@ -383,8 +383,8 @@
             </select>
             <select id="visMatch" style="max-width:180px">
               <option value="">全部比较模式</option>
-              <option value="strict">Strict（像素级）</option>
-              <option value="layout">Layout（布局）</option>
+              <option value="strict">像素级·严格比对</option>
+              <option value="layout">结构·忽略细微差异</option>
             </select>
             <button class="ghost mini" id="btnVisReset" title="清除筛选项并重新加载数据">重置</button>
             <button class="mini" id="btnVisDebugFree" style="margin-left:auto" title="手动上传基线图与实际图自由比对，零落盘不保存">调试</button>
@@ -427,8 +427,8 @@
                   </select></label>
                 <label style="display:block;font-size:13px;color:var(--ink,#374151)">比较模式 <span style="color:#d33">*</span>
                   <select id="vedMatch" style="width:100%;margin-top:4px;padding:7px 10px;border:1px solid var(--line,#dcdfe6);border-radius:6px;font-size:13px">
-                    <option value="strict">Strict（像素级）</option>
-                    <option value="layout">Layout（布局）</option>
+                    <option value="strict">像素级·严格比对</option>
+                    <option value="layout">结构·忽略细微差异</option>
                   </select></label>
                 <label style="display:block;font-size:13px;color:var(--ink,#374151)">相似度阈值（%） <span style="color:#d33">*</span>
                   <input id="vedTh" type="number" min="50" max="100" style="width:100%;margin-top:4px;padding:7px 10px;border:1px solid var(--line,#dcdfe6);border-radius:6px;font-size:13px"></label>
@@ -456,45 +456,45 @@
         </div>
         <!-- 视觉断言调试弹窗（V7 渐变强调 · v6.14.83 全尺寸×0.7 + 日/夜主题变量：日间浅色/夜间深色；零落盘） -->
         <div class="mask" id="visDebugMask">
-          <div style="display:block;width:700px;max-width:96vw;border-radius:14px;padding:2px;background:linear-gradient(135deg,#EF4444,#F59E0B 40%,#10B981 80%)">
-            <div style="border-radius:13px;background:var(--panel,#fff);padding:17px 21px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
+          <div style="display:block;width:630px;max-width:96vw;border-radius:14px;padding:2px;background:linear-gradient(135deg,#EF4444,#F59E0B 40%,#10B981 80%)">
+            <div style="border-radius:13px;background:var(--panel,#fff);padding:14px 18px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px">
                 <span style="font-size:13px;font-weight:700;color:var(--ink,#1f2937)">🧪 调试视觉断言 · <span id="vdbgName"></span></span>
                 <span id="vdbgCloseX" style="font-size:10px;color:var(--muted,#6e6e73);cursor:pointer">✕ 关闭</span>
               </div>
               <div style="display:flex;gap:11px">
                 <div style="flex:1;border-radius:9px;overflow:hidden;border:1px solid var(--line-soft,#e5e7eb)">
-                  <img id="vdbgBase" style="width:100%;height:161px;object-fit:contain;display:block;background:var(--panel2,#f7f8fa)">
+                  <img id="vdbgBase" style="width:100%;height:146px;object-fit:contain;display:block;background:var(--panel2,#f7f8fa)">
                   <div style="padding:5px;text-align:center;font-size:10px;color:var(--muted,#6e6e73);background:var(--panel2,#f7f8fa)">基线 Expected · <span id="vdbgScopeCn">—</span></div>
                 </div>
                 <div style="flex:1;border-radius:9px;overflow:hidden;border:1px solid var(--line-soft,#e5e7eb);position:relative">
-                  <div id="vdbgUpBox" style="height:183px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;background:var(--panel2,#f7f8fa);border:1px dashed var(--line,#dcdfe6)">
+                  <div id="vdbgUpBox" style="height:165px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;background:var(--panel2,#f7f8fa);border:1px dashed var(--line,#dcdfe6)">
                     <div style="font-size:21px">🖼️</div>
                     <div style="font-size:10px;font-weight:600;color:var(--ink2,#374151)">上传实际图片（PNG / JPG）</div>
                     <div style="font-size:10px;color:var(--muted,#6e6e73)">点击选择 或 拖拽图片到此区域</div>
                     <div style="font-size:10px;color:var(--muted2,#9ca3af)">仅本次比对使用，不做保存</div>
                   </div>
-                  <img id="vdbgUpImg" style="width:100%;height:161px;object-fit:contain;display:none;background:var(--panel2,#f7f8fa)">
+                  <img id="vdbgUpImg" style="width:100%;height:146px;object-fit:contain;display:none;background:var(--panel2,#f7f8fa)">
                   <span id="vdbgUpX" style="display:none;position:absolute;top:6px;right:6px;width:18px;height:18px;border-radius:50%;background:rgba(12,15,21,.72);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:9px;line-height:16px;text-align:center;cursor:pointer;z-index:2" title="移除图片">✕</span>
                   <div style="padding:5px;text-align:center;font-size:10px;color:var(--muted,#6e6e73);background:var(--panel2,#f7f8fa)">实际 Actual · <span id="vdbgBizCn">—</span></div>
                   <input type="file" id="vdbgFile" accept="image/png,image/jpeg" style="display:none">
                 </div>
               </div>
-              <div style="margin:13px 0;text-align:center;padding:11px;border-radius:10px;background:linear-gradient(90deg,rgba(239,68,68,.12),rgba(245,158,11,.12));border:1px solid rgba(239,68,68,.25)">
-                <div id="vdbgSim" style="font-size:39px;font-weight:800" data-level="bad">—</div>
+              <div style="margin:11px 0;text-align:center;padding:11px;border-radius:10px;background:linear-gradient(90deg,rgba(239,68,68,.12),rgba(245,158,11,.12));border:1px solid rgba(239,68,68,.25)">
+                <div id="vdbgSim" style="font-size:35px;font-weight:800" data-level="bad">—</div>
                 <div style="font-size:10px;color:var(--muted,#6e6e73);margin-top:2px">当前相似度（<span id="vdbgJudge">低于</span>阈值 <span id="vdbgThTxt">98</span>%，上传图片后点「调试」比对）</div>
                 <div id="vdbgResize" style="display:none;font-size:9.5px;color:var(--muted2,#9ca3af);margin-top:3px"></div>
               </div>
               <div id="vdbgDiffWrap" style="display:none;margin:0 0 13px;border-radius:9px;overflow:hidden;border:1px solid var(--line-soft,#e5e7eb)">
-                <img id="vdbgDiffImg" style="width:100%;max-height:161px;object-fit:contain;display:block;background:var(--panel2,#f7f8fa);cursor:zoom-in">
+                <img id="vdbgDiffImg" style="width:100%;max-height:146px;object-fit:contain;display:block;background:var(--panel2,#f7f8fa);cursor:zoom-in">
                 <div style="padding:5px;text-align:center;font-size:10px;color:var(--muted,#6e6e73);background:var(--panel2,#f7f8fa)">差异高光 Diff · 红色为差异区域（左基线 ｜ 中实际 ｜ 右差异）· 点击图片可放大</div>
               </div>
               <div style="display:flex;gap:8px">
                 <div style="flex:1;background:var(--panel2,#f7f8fa);border:1px solid var(--line-soft,#e5e7eb);border-radius:7px;padding:6px 10px;text-align:center">
                   <div style="font-size:10px;color:var(--muted,#6e6e73)">比较模式</div>
-                  <select id="vdbgMatchTxt" title="Strict=逐像素严格比对；Layout=布局结构比对（文字/数字变化不敏感）" style="border:none;background:transparent;font-size:11px;font-weight:700;color:var(--ink,#1f2937);outline:none;cursor:pointer;width:100%;text-align:center;margin-top:2px">
-                    <option value="strict">Strict·像素级</option>
-                    <option value="layout">Layout·布局</option>
+                  <select id="vdbgMatchTxt" title="像素级：任何细微差异都会判失败；结构：忽略文字/图标等细微差异，只比对位置与尺寸" style="border:none;background:transparent;font-size:11px;font-weight:700;color:var(--ink,#1f2937);outline:none;cursor:pointer;width:100%;text-align:center;margin-top:2px">
+                    <option value="strict">像素级·严格比对</option>
+                    <option value="layout">结构·忽略细微差异</option>
                   </select>
                 </div>
                 <div style="flex:1;background:var(--panel2,#f7f8fa);border:1px solid var(--line-soft,#e5e7eb);border-radius:7px;padding:6px 10px;text-align:center">
@@ -518,7 +518,7 @@
                   <div style="font-size:10px;color:var(--muted,#6e6e73)">断言范围</div><div style="font-size:11px;font-weight:700;color:var(--ink,#1f2937);margin-top:2px" id="vdbgScope">—</div>
                 </div>
               </div>
-              <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:13px">
+              <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:11px">
                 <button id="vdbgCancel" style="padding:6px 20px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;background:var(--panel2,#f7f8fa);border:1px solid var(--line-soft,#e5e7eb);color:var(--ink,#1f2937)">取消</button>
                 <button id="vdbgRun" style="padding:6px 20px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;background:linear-gradient(135deg,#0a84ff,#0066cc);color:#fff;border:none">调试</button>
               </div>
@@ -527,53 +527,53 @@
         </div>
         <!-- 自由调试弹窗（双图手动上传 · 零落盘不保存；布局样式与行内调试一致，基线也手动上传） -->
         <div class="mask" id="visFreeDebugMask">
-          <div style="display:block;width:700px;max-width:96vw;border-radius:14px;padding:2px;background:linear-gradient(135deg,#EF4444,#F59E0B 40%,#10B981 80%)">
-            <div style="border-radius:13px;background:var(--panel,#fff);padding:17px 21px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
+          <div style="display:block;width:630px;max-width:96vw;border-radius:14px;padding:2px;background:linear-gradient(135deg,#EF4444,#F59E0B 40%,#10B981 80%)">
+            <div style="border-radius:13px;background:var(--panel,#fff);padding:14px 18px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px">
                 <span style="font-size:13px;font-weight:700;color:var(--ink,#1f2937)">🧪 自由调试视觉断言 · <span style="color:var(--muted,#6e6e73)">双图手动上传 · 不保存数据</span></span>
                 <span id="vfreeCloseX" style="font-size:10px;color:var(--muted,#6e6e73);cursor:pointer">✕ 关闭</span>
               </div>
               <div style="display:flex;gap:11px">
                 <div style="flex:1;border-radius:9px;overflow:hidden;border:1px solid var(--line-soft,#e5e7eb);position:relative">
-                  <div id="vfreeBaseBox" style="height:183px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;background:var(--panel2,#f7f8fa);border:1px dashed var(--line,#dcdfe6)">
+                  <div id="vfreeBaseBox" style="height:165px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;background:var(--panel2,#f7f8fa);border:1px dashed var(--line,#dcdfe6)">
                     <div style="font-size:21px">📐</div>
                     <div style="font-size:10px;font-weight:600;color:var(--ink2,#374151)">上传基线图（PNG / JPG）</div>
                     <div style="font-size:10px;color:var(--muted,#6e6e73)">点击选择 或 拖拽图片到此区域</div>
                     <div style="font-size:10px;color:var(--muted2,#9ca3af)">仅本次比对使用，不做保存</div>
                   </div>
-                  <img id="vfreeBaseImg" style="width:100%;height:161px;object-fit:contain;display:none;background:var(--panel2,#f7f8fa)">
+                  <img id="vfreeBaseImg" style="width:100%;height:146px;object-fit:contain;display:none;background:var(--panel2,#f7f8fa)">
                   <span id="vfreeBaseX" style="display:none;position:absolute;top:6px;right:6px;width:18px;height:18px;border-radius:50%;background:rgba(12,15,21,.72);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:9px;line-height:16px;text-align:center;cursor:pointer;z-index:2" title="移除图片">✕</span>
                   <div style="padding:5px;text-align:center;font-size:10px;color:var(--muted,#6e6e73);background:var(--panel2,#f7f8fa)">基线 Expected</div>
                   <input type="file" id="vfreeBaseFile" accept="image/png,image/jpeg" style="display:none">
                 </div>
                 <div style="flex:1;border-radius:9px;overflow:hidden;border:1px solid var(--line-soft,#e5e7eb);position:relative">
-                  <div id="vfreeUpBox" style="height:183px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;background:var(--panel2,#f7f8fa);border:1px dashed var(--line,#dcdfe6)">
+                  <div id="vfreeUpBox" style="height:165px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;background:var(--panel2,#f7f8fa);border:1px dashed var(--line,#dcdfe6)">
                     <div style="font-size:21px">🖼️</div>
                     <div style="font-size:10px;font-weight:600;color:var(--ink2,#374151)">上传实际图（PNG / JPG）</div>
                     <div style="font-size:10px;color:var(--muted,#6e6e73)">点击选择 或 拖拽图片到此区域</div>
                     <div style="font-size:10px;color:var(--muted2,#9ca3af)">仅本次比对使用，不做保存</div>
                   </div>
-                  <img id="vfreeUpImg" style="width:100%;height:161px;object-fit:contain;display:none;background:var(--panel2,#f7f8fa)">
+                  <img id="vfreeUpImg" style="width:100%;height:146px;object-fit:contain;display:none;background:var(--panel2,#f7f8fa)">
                   <span id="vfreeUpX" style="display:none;position:absolute;top:6px;right:6px;width:18px;height:18px;border-radius:50%;background:rgba(12,15,21,.72);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:9px;line-height:16px;text-align:center;cursor:pointer;z-index:2" title="移除图片">✕</span>
                   <div style="padding:5px;text-align:center;font-size:10px;color:var(--muted,#6e6e73);background:var(--panel2,#f7f8fa)">实际 Actual</div>
                   <input type="file" id="vfreeUpFile" accept="image/png,image/jpeg" style="display:none">
                 </div>
               </div>
-              <div style="margin:13px 0;text-align:center;padding:11px;border-radius:10px;background:linear-gradient(90deg,rgba(239,68,68,.12),rgba(245,158,11,.12));border:1px solid rgba(239,68,68,.25)">
-                <div id="vfreeSim" style="font-size:39px;font-weight:800" data-level="bad">—</div>
+              <div style="margin:11px 0;text-align:center;padding:11px;border-radius:10px;background:linear-gradient(90deg,rgba(239,68,68,.12),rgba(245,158,11,.12));border:1px solid rgba(239,68,68,.25)">
+                <div id="vfreeSim" style="font-size:35px;font-weight:800" data-level="bad">—</div>
                 <div style="font-size:10px;color:var(--muted,#6e6e73);margin-top:2px">相似度（阈值 <span id="vfreeThTxt">98</span>%，两图都上传后点「调试」比对）</div>
                 <div id="vfreeResize" style="display:none;font-size:9.5px;color:var(--muted2,#9ca3af);margin-top:3px"></div>
               </div>
               <div id="vfreeDiffWrap" style="display:none;margin:0 0 13px;border-radius:9px;overflow:hidden;border:1px solid var(--line-soft,#e5e7eb)">
-                <img id="vfreeDiffImg" style="width:100%;max-height:161px;object-fit:contain;display:block;background:var(--panel2,#f7f8fa);cursor:zoom-in">
+                <img id="vfreeDiffImg" style="width:100%;max-height:146px;object-fit:contain;display:block;background:var(--panel2,#f7f8fa);cursor:zoom-in">
                 <div style="padding:5px;text-align:center;font-size:10px;color:var(--muted,#6e6e73);background:var(--panel2,#f7f8fa)">差异高光 Diff · 红色为差异区域（左基线 ｜ 中实际 ｜ 右差异）· 点击图片可放大</div>
               </div>
               <div style="display:flex;gap:8px">
                 <div style="flex:1;background:var(--panel2,#f7f8fa);border:1px solid var(--line-soft,#e5e7eb);border-radius:7px;padding:6px 10px;text-align:center">
                   <div style="font-size:10px;color:var(--muted,#6e6e73)">比较模式</div>
-                  <select id="vfreeMatch" title="Strict=逐像素严格比对；Layout=布局结构比对（文字/数字变化不敏感）" style="border:none;background:transparent;font-size:11px;font-weight:700;color:var(--ink,#1f2937);outline:none;cursor:pointer;width:100%;text-align:center;margin-top:2px">
-                    <option value="strict">Strict·像素级</option>
-                    <option value="layout">Layout·布局</option>
+                  <select id="vfreeMatch" title="像素级：任何细微差异都会判失败；结构：忽略文字/图标等细微差异，只比对位置与尺寸" style="border:none;background:transparent;font-size:11px;font-weight:700;color:var(--ink,#1f2937);outline:none;cursor:pointer;width:100%;text-align:center;margin-top:2px">
+                    <option value="strict">像素级·严格比对</option>
+                    <option value="layout">结构·忽略细微差异</option>
                   </select>
                 </div>
                 <div style="flex:1;background:var(--panel2,#f7f8fa);border:1px solid var(--line-soft,#e5e7eb);border-radius:7px;padding:6px 10px;text-align:center">
@@ -584,7 +584,7 @@
                   </div>
                 </div>
               </div>
-              <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:13px">
+              <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:11px">
                 <button id="vfreeCancel" style="padding:6px 20px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;background:var(--panel2,#f7f8fa);border:1px solid var(--line-soft,#e5e7eb);color:var(--ink,#1f2937)">取消</button>
                 <button id="vfreeRun" style="padding:6px 20px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;background:linear-gradient(135deg,#0a84ff,#0066cc);color:#fff;border:none">调试</button>
               </div>
