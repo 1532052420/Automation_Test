@@ -10,7 +10,7 @@
 两端不再各自硬编码版本号。
 """
 
-APP_VERSION = '6.15.89'
+APP_VERSION = '6.15.90'
 
 # 最新版本在最前；time 精确到秒（YYYY-MM-DD HH:MM:SS）
 # 版本号格式 x.xx.xx（主版本 1-2 位 · 次版本固定 2 位 · 修订号固定 2 位，99 进位次版本）
@@ -18,6 +18,16 @@ APP_VERSION = '6.15.89'
 # 旧线历史条目保留原始记录，不回溯改写
 # 每条变更一句话 10~20 字，只说改了什么（详细背景见项目 memory 与设计文档）
 CHANGELOG = [
+    {
+        'version': '6.15.90',
+        'time': '2026-10-19 19:10:28',
+        'title': '双线合并差距审计收尾：补齐官方协议 Input value 与 deviceType 字段',
+        'changes': [
+            '补齐 Input 任务 param.value（步骤名「」内实际输入值，官方协议字段，6.15.48 对齐项）',
+            '补齐报告顶层 deviceType: android（官方 schema 字段，6.15.48 对齐项）',
+            '双线合并差距审计完成：远程线功能点逐项核对，断言展示维持本地自研方案（二级展开 vs 官方 Print_Assert_Result），element_rect 维持不采纳（本地走 _atVideo 视频联动）',
+        ],
+    },
     {
         'version': '6.15.89',
         'time': '2026-10-19 19:02:33',

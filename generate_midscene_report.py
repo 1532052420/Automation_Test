@@ -476,10 +476,16 @@ def build_data(run_id, meta, results, run_dir):
             locate = {'description': cn or st.get('name', '')}
             if m:
                 locate.update({'value': m.group(1), 'type': 'id'})
+            # 官方 Input 任务 param 带 value（步骤名「」内实际输入值）
+            action_param = {'locate': locate}
+            if sub == 'Input':
+                q = re.search(r'「([^」]*)」', st.get('name', ''))
+                if q:
+                    action_param['value'] = q.group(1)
             tasks.append({
                 'status': 'finished' if (st.get('status') in (None, 'passed', 'finished')) else 'failed',
                 'type': 'Action Space', 'subType': cn or sub,
-                'param': {'locate': locate},
+                'param': action_param,
                 'subTask': True,
                 'timing': {'start': s_start, 'end': s_end, 'cost': s_end - s_start},
                 # 全程耗时含 AI 规划等待（数据源无规划/操作分段），向用户说明时间口径
@@ -543,6 +549,7 @@ def build_data(run_id, meta, results, run_dir):
 
     return {
         'sdkVersion': report_version(),
+        'deviceType': 'android',
         'groupName': 'AutomationTest Report',
         'groupDescription': run_id,
         'executions': [{'logTime': int(time.time() * 1000),
