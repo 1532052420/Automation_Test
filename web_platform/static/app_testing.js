@@ -2269,16 +2269,63 @@ function bindVdbgOnce(name) {
   document.getElementById('btnVisDebugFree').onclick = openFreeDebug;
 })();
 
-/* ================= 图片预览灯箱（diff 三联图等点击放大 · 右上角 X 关闭） ================= */
+/* ================= 图片预览灯箱（点击打开 · 滚轮/按钮缩放 · 拖拽平移 · 双击还原 · X 关闭） ================= */
 (function () {
   const lb = document.getElementById('imgLightbox');
   if (!lb) return;
+  const img = document.getElementById('imgLightboxImg');
+  const tip = document.getElementById('imgLightboxX');
+  let s = 1, tx = 0, ty = 0, drag = null, moved = false;
+
+  function apply() {
+    img.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + s + ')';
+    img.style.cursor = s > 1.02 ? 'grab' : 'zoom-in';
+  }
+  function zoomAt(px, py, f) {
+    var r = img.getBoundingClientRect();
+    var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    var old = s;
+    s = Math.min(10, Math.max(0.3, s * f));
+    tx = px - cx - (px - cx - tx) * (s / old);
+    ty = py - cy - (py - cy - ty) * (s / old);
+    apply();
+  }
+  function resetView() { s = 1; tx = 0; ty = 0; apply(); }
   function openImgLightbox(src) {
-    document.getElementById('imgLightboxImg').src = src;
+    img.src = src;
+    resetView();
     lb.classList.add('show');
   }
+  window.__openImgLightbox = openImgLightbox;
   document.getElementById('vfreeDiffImg').onclick = function () { openImgLightbox(this.src); };
   document.getElementById('vdbgDiffImg').onclick = function () { openImgLightbox(this.src); };
-  document.getElementById('imgLightboxX').onclick = function (e) { e.stopPropagation(); lb.classList.remove('show'); };
-  lb.onclick = function () { lb.classList.remove('show'); };
+
+  lb.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.2 : 1 / 1.2);
+  }, { passive: false });
+  img.addEventListener('pointerdown', function (e) {
+    if (s <= 1.02) return;                      // 未放大时不需要平移
+    drag = { x: e.clientX, y: e.clientY, tx: tx, ty: ty };
+    moved = false;
+    img.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  img.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+    tx = drag.tx + dx; ty = drag.ty + dy;
+    apply();
+  });
+  img.addEventListener('pointerup', function () { drag = null; apply(); });
+  img.addEventListener('dblclick', resetView);
+  document.getElementById('imgLbZoomIn').onclick = function () { zoomAt(innerWidth / 2, innerHeight / 2, 1.25); };
+  document.getElementById('imgLbZoomOut').onclick = function () { zoomAt(innerWidth / 2, innerHeight / 2, 0.8); };
+  document.getElementById('imgLbReset').onclick = resetView;
+  tip.onclick = function (e) { e.stopPropagation(); lb.classList.remove('show'); };
+  lb.addEventListener('click', function (e) {
+    if (moved) { moved = false; return; }       // 拖拽结束的 click 不当关闭
+    if (e.target === lb || e.target === tip) lb.classList.remove('show');
+  });
 })();

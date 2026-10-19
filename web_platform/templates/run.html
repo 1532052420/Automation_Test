@@ -593,9 +593,14 @@
         </div>
         <!-- 图片预览灯箱（点击打开 · 右上角 X 关闭） -->
         <div class="mask" id="imgLightbox" style="z-index:1100;cursor:zoom-out">
-          <div style="position:relative;max-width:94vw;max-height:92vh">
-            <span id="imgLightboxX" style="position:absolute;top:-14px;right:-14px;width:30px;height:30px;border-radius:50%;background:rgba(12,15,21,.82);border:1px solid rgba(255,255,255,.35);color:#fff;font-size:14px;line-height:28px;text-align:center;cursor:pointer;z-index:2" title="关闭">✕</span>
-            <img id="imgLightboxImg" style="max-width:94vw;max-height:92vh;border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.45);display:block">
+          <div style="position:relative;max-width:96vw;max-height:94vh">
+            <div style="position:absolute;top:-40px;right:0;display:flex;gap:6px;z-index:2">
+              <span id="imgLbZoomIn" style="width:30px;height:30px;border-radius:50%;background:rgba(12,15,21,.82);border:1px solid rgba(255,255,255,.35);color:#fff;font-size:15px;line-height:28px;text-align:center;cursor:pointer" title="放大">＋</span>
+              <span id="imgLbZoomOut" style="width:30px;height:30px;border-radius:50%;background:rgba(12,15,21,.82);border:1px solid rgba(255,255,255,.35);color:#fff;font-size:15px;line-height:28px;text-align:center;cursor:pointer" title="缩小">－</span>
+              <span id="imgLbReset" style="width:30px;height:30px;border-radius:50%;background:rgba(12,15,21,.82);border:1px solid rgba(255,255,255,.35);color:#fff;font-size:10px;line-height:28px;text-align:center;cursor:pointer" title="还原尺寸">1:1</span>
+              <span id="imgLightboxX" style="width:30px;height:30px;border-radius:50%;background:rgba(12,15,21,.82);border:1px solid rgba(255,255,255,.35);color:#fff;font-size:14px;line-height:28px;text-align:center;cursor:pointer" title="关闭">✕</span>
+            </div>
+            <img id="imgLightboxImg" style="max-width:96vw;max-height:94vh;border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.45);display:block;cursor:zoom-in">
           </div>
         </div>
         <!-- 基线大图查看器 -->
