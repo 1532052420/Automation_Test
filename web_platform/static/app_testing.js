@@ -1025,7 +1025,6 @@ async function renderCaseList() {
       '<td class="ops">' +
       '<button class="mini" data-editsteps="' + esc(c.node) + '">编辑步骤</button>' +
       '<button class="ghost mini" data-cncase="' + esc(c.file) + '" data-cn="' + esc(c.cn_name || '') + '">重命名</button>' +
-      '<button class="mini" data-mvnode="' + esc(c.node) + '">移动项目</button>' +
       '<button class="danger mini" data-delfile="' + esc(c.file) + '">删除</button>' +
       '</td></tr>';
   }).join('');
