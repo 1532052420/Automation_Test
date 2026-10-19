@@ -401,6 +401,7 @@ class ExecutionManager(object):
                 # 平台自身进程环境里没有这两个变量，必须显式传，不能靠继承；
                 # 同时剥离代理变量（_clean_exec_env），保证 Appium 回环请求直连
                 env=dict(_clean_exec_env(),
+                         AT_RUN_ID=run_id,
                          AT_SETUP_RESET='1' if setup_reset else '',
                          AT_TEARDOWN_RESET='1' if teardown_reset else ''),
                 # 显式 DEVNULL：pytest 不需要 stdin。不指定会继承平台自身的 stdin，

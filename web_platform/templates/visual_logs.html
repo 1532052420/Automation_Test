@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>视觉断言日志 · 自动化测试平台</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="icon" sizes="32x32" href="/static/favicon-32.png">
+<link rel="shortcut icon" href="/static/favicon.ico">
+
+<script src="/assets/{{ asset_v }}/theme.js"></script>
+<link rel="stylesheet" href="/assets/{{ asset_v }}/nav.css">
+<link rel="stylesheet" href="/assets/{{ asset_v }}/style.css">
+</head>
+<body data-page="valogs">
+<header class="gnav" id="sidebar"></header>
+<main>
+  <div class="pagehead">
+    <h1>视觉断言日志</h1>
+    <span class="sub"><a class="runlink" href="/run">← 返回执行用例</a></span>
+  </div>
+  <p class="muted" style="margin:-6px 0 12px 4px">
+    跑用例时视觉断言（框选区域 / 元素 / 整屏）的执行留痕：基线图、实际对比图、差异三联图与当次阈值，
+    成功与失败都记录；列表按时间倒序，只读不删。</p>
+
+  <section class="panel">
+    <div class="card">
+      <div class="treebar">
+        <input type="search" id="vlSearch" placeholder="搜索名称 / 所属用例" style="max-width:240px">
+        <select id="vlScope" style="max-width:170px">
+          <option value="">全部类型</option>
+          <option value="region">框选区域</option>
+          <option value="element">元素</option>
+          <option value="screen">整屏</option>
+        </select>
+        <select id="vlResult" style="max-width:160px">
+          <option value="">全部结果</option>
+          <option value="1">无差异（通过）</option>
+          <option value="0">有差异（未通过）</option>
+        </select>
+        <button class="ghost mini" id="btnVlReset" title="清除筛选项并重新加载">重置</button>
+        <button class="mini" id="btnVlRefresh" style="margin-left:auto" title="重新加载最新记录">刷新</button>
+      </div>
+      <div class="tblwrap">
+        <table>
+          <thead><tr>
+            <th>时间</th><th>名称</th><th>所属用例</th><th>类型</th><th>比较模式</th>
+            <th>基线图</th><th>对比图</th><th>对比结果 · 内容图</th><th>阈值</th>
+          </tr></thead>
+          <tbody id="vlTbody"><tr><td colspan="9" class="empty">加载中…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="treebar mt" style="justify-content:flex-end">
+        <span class="muted" id="vlPagerInfo"></span>
+        <select id="vlPageSize" style="width:auto"><option>10</option><option selected>20</option><option>50</option></select>
+        <span class="muted">条/页</span>
+        <button class="ghost mini" id="btnVlPrev">‹</button>
+        <span class="muted" id="vlPageNow"></span>
+        <button class="ghost mini" id="btnVlNext">›</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- 大图查看 -->
+<div class="mask" id="vlViewer">
+  <div style="position:relative;max-width:92vw;max-height:88vh">
+    <img id="vlViewerImg" alt="" style="display:block;max-width:92vw;max-height:82vh;border-radius:10px;background:#fff">
+    <div id="vlViewerCap" class="muted" style="text-align:center;margin-top:8px;font-size:12px"></div>
+    <button id="vlViewerX" class="danger mini" style="position:absolute;top:-10px;right:-10px;border-radius:50%;width:30px;height:30px">✕</button>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script src="/assets/{{ asset_v }}/nav.js"></script>
+<script src="/assets/{{ asset_v }}/visual_logs.js"></script>
+</body>
+</html>

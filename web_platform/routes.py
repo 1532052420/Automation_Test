@@ -78,6 +78,12 @@ def page_run_detail(run_id):
     return render_template('run_detail.html', run_id=run_id)
 
 
+@bp.route('/visual-logs')
+def page_visual_logs():
+    """视觉断言日志（三级页：无左侧菜单，顶部面包屑路径，从视觉断言管理「日志」进入）"""
+    return render_template('visual_logs.html')
+
+
 @bp.route('/report')
 def page_report():
     return render_template('report.html')
@@ -929,6 +935,57 @@ def api_run_attachment(run_id, source):
     p = report_data.resolve_attachment_path(run_id, source)
     if not p:
         return jsonify({'ok': False, 'msg': '附件不存在'}), 404
+    return send_file(p)
+
+
+@bp.route('/api/appui/visual_logs')
+def api_visual_logs():
+    """视觉断言执行记录（records.jsonl 倒序；scope/ok/kw 筛选 + 分页）"""
+    path = os.path.join(BASE_DIR, 'output', 'visual_logs', 'records.jsonl')
+    recs = []
+    if os.path.isfile(path):
+        with open(path, encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    recs.append(json.loads(line))
+                except Exception:
+                    continue
+    recs.reverse()          # 最新在前
+    scope = (request.args.get('scope') or '').strip()
+    ok = (request.args.get('ok') or '').strip()
+    kw = (request.args.get('kw') or '').strip().lower()
+    if scope:
+        recs = [r for r in recs if r.get('scope') == scope]
+    if ok in ('0', '1'):
+        recs = [r for r in recs if bool(r.get('ok')) == (ok == '1')]
+    if kw:
+        recs = [r for r in recs
+                if kw in str(r.get('name', '')).lower() or kw in str(r.get('case', '')).lower()]
+    try:
+        page = max(1, int(request.args.get('page', 1)))
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        size = max(1, min(100, int(request.args.get('size', 20))))
+    except (TypeError, ValueError):
+        size = 20
+    pages = max(1, (len(recs) + size - 1) // size)
+    page = min(page, pages)
+    return jsonify({'ok': True, 'total': len(recs), 'page': page, 'pages': pages,
+                    'records': recs[(page - 1) * size: page * size]})
+
+
+@bp.route('/api/appui/visual_logs/img/<path:fn>')
+def api_visual_logs_img(fn):
+    """视觉断言日志图片服务；文件名白名单字符校验，防路径穿越"""
+    if not re.fullmatch(r'[\w\-.]+', fn):
+        return jsonify({'ok': False, 'msg': '文件名不合法'}), 400
+    p = os.path.join(BASE_DIR, 'output', 'visual_logs', 'imgs', fn)
+    if not os.path.isfile(p):
+        return jsonify({'ok': False, 'msg': '图片不存在'}), 404
     return send_file(p)
 
 

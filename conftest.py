@@ -11,6 +11,15 @@
 """
 
 
+def pytest_runtest_logstart(nodeid, location):
+    """记录当前用例短名（视觉断言日志「所属用例」字段的数据源）。
+
+    logstart 在每条用例开始时触发、先于用例体内的断言调用；
+    appOperator 的视觉断言执行器经环境变量读取（同进程内生效）。"""
+    import os
+    os.environ['AT_CURRENT_CASE'] = (nodeid or '').split('::')[-1]
+
+
 def pytest_sessionfinish(session, exitstatus):
     import os
     if os.environ.get('AT_TEARDOWN_RESET') != '1':

@@ -1839,6 +1839,25 @@ function openAsImgViewer(src) {
 /* ================= 视觉断言管理（定位器采集的视觉资产；筛选/分页/大图/删除，UI 与项目管理同款） ================= */
 let _visAll = [], _visPage = 1, _visPageSize = 10;
 
+/* 视觉断言管理：筛选/分页/重置事件绑定（此前控件未绑定事件，为死按钮——补齐） */
+(function () {
+  const on = (id, ev, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
+  on('visScope', 'change', () => { _visPage = 1; renderVisualAssets(); });
+  on('visMatch', 'change', () => { _visPage = 1; renderVisualAssets(); });
+  on('visSearch', 'input', () => { _visPage = 1; renderVisualAssets(); });
+  on('visPageSize', 'change', function () { _visPageSize = parseInt(this.value, 10) || 10; _visPage = 1; renderVisualAssets(); });
+  on('btnVisReset', 'click', () => {
+    document.getElementById('visSearch').value = '';
+    document.getElementById('visScope').value = '';
+    document.getElementById('visMatch').value = '';
+    loadVisualAssets();
+  });
+  on('btnVisPrev', 'click', () => { if (_visPage > 1) { _visPage--; renderVisualAssets(); } });
+  on('btnVisNext', 'click', () => { _visPage++; renderVisualAssets(); });
+  /* 「日志」：打开视觉断言日志三级页（执行留痕：基线/对比图/三联/阈值） */
+  on('btnVisLogs', 'click', () => { location.href = '/visual-logs'; });
+})();
+
 async function loadVisualAssets() {
   try {
     const d = await api('/api/appui/visual_assets?_=' + Date.now());   // 防缓存：采集/删除后即时刷新

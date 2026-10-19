@@ -791,6 +791,41 @@ class AppOperator:
         httpResponseResult=self._doRequest.get('/session/'+self._session_id+'/location')
         return httpResponseResult.body
 
+    def _va_log_write(self, asset_name, cfg, ok, err, base_p=None, actual_path=None, triple=None):
+        """视觉断言执行记录落盘（三级页「视觉断言日志」数据源）。
+
+        基线/实际/三联三图复制到 output/visual_logs/imgs/（output/tmp 会被清理，
+        基线也留存执行当时版本），记录追加 output/visual_logs/records.jsonl。
+        任何写失败静默吞掉——日志功能不能影响断言本身。"""
+        try:
+            import json as _json
+            import shutil as _shutil
+            tag = 'va_%s_%s' % (asset_name, DateTimeTool.getNowTime('%Y%m%d%H%M%S%f'))
+            img_dir = os.path.join('output', 'visual_logs', 'imgs')
+            os.makedirs(img_dir, exist_ok=True)
+            imgs = {}
+            for key, p in (('baseline', base_p), ('actual', actual_path), ('triple', triple)):
+                if p and os.path.isfile(p):
+                    fn = '%s_%s.png' % (tag, key)
+                    _shutil.copyfile(p, os.path.join(img_dir, fn))
+                    imgs[key] = fn
+            rec = {
+                'time': DateTimeTool.getNowTime('%Y-%m-%d %H:%M:%S'),
+                'run_id': os.environ.get('AT_RUN_ID', ''),
+                'case': os.environ.get('AT_CURRENT_CASE', ''),
+                'name': asset_name,
+                'scope': cfg.get('scope') or 'screen',
+                'match_mode': cfg.get('match_mode') or 'strict',
+                'threshold': cfg.get('threshold'),
+                'ok': bool(ok),
+                'err': str(err or '')[:300],
+                'imgs': imgs,
+            }
+            with open(os.path.join('output', 'visual_logs', 'records.jsonl'), 'a', encoding='utf-8') as f:
+                f.write(_json.dumps(rec, ensure_ascii=False) + '\n')
+        except Exception:
+            pass
+
     def assert_visual_asset_record(self, failures, desc, asset_name, threshold=None):
         """视觉资产断言（资产库版）：按资产 config 的范围取实际图与基线比对。
         成功与失败都把 基线图/实际图/diff 三联 提交报告（失败附差异集中区域说明）。
@@ -801,6 +836,8 @@ class AppOperator:
             cfg = va.get_config(asset_name) or {}
             base_p = va.baseline_path(asset_name)
             if not cfg or not base_p:
+                self._va_log_write(asset_name, {}, False,
+                                   '视觉资产不存在：%s（请先在定位器采集）' % asset_name)
                 self._assert_step(failures, desc, False, '视觉资产不存在：%s（请先在定位器采集）' % asset_name)
                 return
             th = float(cfg.get('threshold') or 0.98) if threshold is None else float(threshold)
@@ -842,9 +879,12 @@ class AppOperator:
                                       attachment_type=allure.attachment_type.PNG)
             except Exception:
                 pass
+            self._va_log_write(asset_name, cfg, ok, err, base_p, actual_path,
+                               triple if (triple and os.path.isfile(triple)) else None)
             self._assert_step(failures, desc, ok, err or ('相似度 %s' % (actual or {}).get('similarity')),
                               actual=actual)
         except Exception as e:
+            self._va_log_write(asset_name, {}, False, '（比对异常）%s' % e)
             self._assert_step(failures, desc, False, e)
 
     def set_geolocation(self,latitude,longitude,altitude):
