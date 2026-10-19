@@ -9,6 +9,11 @@ parser:
   conf_threshold: 0.05       # 检测置信度阈值（OmniParser 官方推荐 0.05）
   iou_threshold: 0.45        # NMS IoU
 
+device:
+  adb_path: adb              # adb 可执行文件（也可填绝对路径，如 /Users/xxx/Library/Android/sdk/platform-tools/adb）
+  udid: ""                   # 指定设备序列号；留空 = 自动用第一台在线设备
+  timeout: 15                # 截屏超时（秒）
+
 llm:
   base_url: https://open.bigmodel.cn/api/paas/v4/chat/completions   # OpenAI 兼容 chat/completions
   api_key: ""                # 手动填写（如智谱 GLM-4-Flash 免费档）

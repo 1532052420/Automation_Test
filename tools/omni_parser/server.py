@@ -5,13 +5,17 @@
 接口：
   GET  /                工具页面
   GET  /api/ping        存活探测（平台首页卡片状态灯用）
+  GET  /api/devices     在线设备列表（直调 adb devices，不经框架）
+  POST /api/capture     手机截屏（adb exec-out screencap，二进制安全）
   POST /api/parse       上传截图 → 元素清单
-  POST /api/generate    意图 + 元素清单 → Selenium 代码
+  POST /api/generate    意图 + 元素清单 → 代码
   GET  /api/config      读配置（api_key 打码）
   POST /api/config      保存配置（写回 config.yaml）
 """
+import base64
 import io
 import os
+import subprocess
 
 import yaml
 from fastapi import FastAPI, File, Form, UploadFile
@@ -75,6 +79,52 @@ def ping():
     return {'ok': True, 'service': 'omni_parser',
             'device': (cfg.get('parser') or {}).get('device') or 'auto',
             'models_loaded': bool(_parser and _parser.loaded)}
+
+
+# ---------- 设备截图（直调 adb，不经框架任何代码） ----------
+def _adb_bin(cfg):
+    return (cfg.get('device') or {}).get('adb_path') or 'adb'
+
+
+@app.get('/api/devices')
+def api_devices():
+    cfg = load_config()
+    try:
+        r = subprocess.run([_adb_bin(cfg), 'devices'],
+                           capture_output=True, text=True, timeout=10)
+    except FileNotFoundError:
+        return {'ok': False, 'msg': '找不到 adb：请在 config.yaml → device.adb_path 填可执行文件路径'}
+    except Exception as e:
+        return {'ok': False, 'msg': 'adb 执行失败：%s' % e}
+    devices = []
+    for line in (r.stdout or '').splitlines()[1:]:
+        parts = line.split()
+        if len(parts) >= 2 and parts[1] in ('device', 'offline', 'unauthorized'):
+            devices.append({'udid': parts[0], 'state': parts[1]})
+    return {'ok': True, 'devices': devices}
+
+
+@app.post('/api/capture')
+def api_capture(udid: str = Form('')):
+    cfg = load_config()
+    dev = cfg.get('device') or {}
+    udid = (udid or dev.get('udid') or '').strip()
+    cmd = [_adb_bin(cfg)] + (['-s', udid] if udid else []) + ['exec-out', 'screencap', '-p']
+    try:
+        r = subprocess.run(cmd, capture_output=True,
+                           timeout=int(dev.get('timeout') or 15))
+    except FileNotFoundError:
+        return JSONResponse({'ok': False, 'msg': '找不到 adb：请在 config.yaml → device.adb_path 填路径'},
+                            status_code=400)
+    except subprocess.TimeoutExpired:
+        return JSONResponse({'ok': False, 'msg': '截屏超时（设备未响应）'}, status_code=400)
+    png = r.stdout or b''
+    if r.returncode != 0 or not png.startswith(b'\x89PNG'):
+        detail = (r.stderr or b'').decode('utf-8', 'ignore').strip()[:200]
+        return JSONResponse({'ok': False,
+                             'msg': '截屏失败：%s（多为没有在线设备，或设备未授权）' % (detail or 'adb 无输出')},
+                            status_code=400)
+    return {'ok': True, 'png_base64': base64.b64encode(png).decode()}
 
 
 @app.post('/api/parse')

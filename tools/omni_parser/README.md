@@ -54,8 +54,10 @@ cd tools/omni_parser
 - 检测推理默认用 ultralytics 运行 YOLO 权重（AGPL-3.0）：**仅限内部使用**；
   如需规避，改用 icon_detect_v3 TorchScript 权重（parser.py 已支持 torch.jit 直载）。
 
-## APP 接入规划（未实现）
+## APP 接入进度
 
-Android 真机截图的检出质量待实测（OmniParser 训练数据以 Web/桌面为主）。
-后续接入点：截图源从"上传"扩为"adb 实时截屏"，代码生成目标从 Selenium 扩为
-uiautomator2 / Appium；服务与页面结构不变。
+- **已支持：手机截图作为解析源**——页面「刷新设备 → 手机截图」直调 `adb exec-out screencap -p`
+  （独立 subprocess，不经框架代码）；设备序列号可在 config.yaml → device.udid 固定。
+  前置：本机装有 adb（Android SDK platform-tools）且手机已开启 USB 调试授权。
+- **待接入**：自然语言 → uiautomator2/Appium 代码生成（Android 侧执行）。
+  OmniParser 对 Android 原生/自绘页面的检出质量需实测（训练数据以 Web/桌面为主）。

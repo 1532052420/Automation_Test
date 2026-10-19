@@ -72,7 +72,12 @@ pre.code { background: #14161a; color: #d5e0f0; border-radius: 8px; padding: 12p
     <div class="ch">截图解析</div>
     <div class="cb">
       <div class="msg" id="parseMsg"></div>
-      <div class="drop" id="drop">拖入网页截图，或点击选择文件（PNG / JPG）</div>
+      <div style="display:flex; gap:8px; margin-bottom:10px; align-items:center;">
+        <select id="devSel" style="flex:1; height:32px; border:1px solid #e5e6eb; border-radius:6px; font-size:12px; padding:0 8px; color:#4e5969;"><option value="">未刷新设备</option></select>
+        <button class="btn g" id="btnDevRefresh">刷新设备</button>
+        <button class="btn" id="btnCapture">手机截图</button>
+      </div>
+      <div class="drop" id="drop">拖入网页截图，或点击选择文件（PNG / JPG · 也可用上方「手机截图」直接抓取）</div>
       <input type="file" id="file" accept="image/*" hidden>
       <div class="stage" id="stage">
         <img class="main" id="img">
@@ -156,25 +161,63 @@ $('drop').ondragover = (e) => { e.preventDefault(); $('drop').classList.add('on'
 $('drop').ondragleave = () => $('drop').classList.remove('on');
 $('drop').ondrop = (e) => {
   e.preventDefault(); $('drop').classList.remove('on');
-  if (e.dataTransfer.files.length) parseFile(e.dataTransfer.files[0]);
+  if (e.dataTransfer.files.length) parseBlob(e.dataTransfer.files[0], e.dataTransfer.files[0].name);
 };
-$('file').onchange = () => { if ($('file').files.length) parseFile($('file').files[0]); };
+$('file').onchange = () => { if ($('file').files.length) parseBlob($('file').files[0], $('file').files[0].name); };
 
-function parseFile(f) {
+function parseBlob(blob, name) {
   clearMsg('parseMsg');
   $('parseCap').textContent = '解析中…（首次调用需加载模型，可能要几十秒）';
   var fd = new FormData();
-  fd.append('file', f);
+  fd.append('file', blob, name);
   fetch('/api/parse', { method: 'POST', body: fd }).then(r => r.json().then(d => ({ status: r.status, d })))
     .then(({ status, d }) => {
       if (!d.ok) { showMsg('parseMsg', d.msg || '解析失败', false); $('parseCap').textContent = ''; return; }
       lastResult = d;
-      showImage(URL.createObjectURL(f), d);
+      showImage(URL.createObjectURL(blob), d);
       $('btnGen').disabled = false;
       showMsg('parseMsg', '识别完成：' + d.elements.length + ' 个可交互元素', true);
       setTimeout(() => clearMsg('parseMsg'), 3000);
     }).catch(e => showMsg('parseMsg', '请求失败：' + e, false));
 }
+
+/* ---------- 手机截图（adb 直连，独立于框架） ---------- */
+function base64ToBlob(b64, type) {
+  var bin = atob(b64), arr = [];
+  for (var i = 0; i < bin.length; i++) arr.push(bin.charCodeAt(i));
+  return new Blob([new Uint8Array(arr)], { type: type });
+}
+function loadDevices() {
+  fetch('/api/devices').then(r => r.json()).then(d => {
+    var sel = $('devSel');
+    sel.innerHTML = '';
+    if (!d.ok || !(d.devices || []).length) {
+      sel.innerHTML = '<option value="">' + (d.msg || '无在线设备（连接手机后点刷新）') + '</option>';
+      return;
+    }
+    d.devices.forEach(function (x) {
+      var o = document.createElement('option');
+      o.value = x.udid;
+      o.textContent = x.udid + '（' + (x.state === 'device' ? '在线' : x.state) + '）';
+      sel.appendChild(o);
+    });
+  });
+}
+$('btnDevRefresh').onclick = loadDevices;
+$('btnCapture').onclick = function () {
+  clearMsg('parseMsg');
+  $('parseCap').textContent = '手机截屏中…';
+  var fd = new FormData();
+  fd.append('udid', $('devSel').value);
+  fetch('/api/capture', { method: 'POST', body: fd })
+    .then(r => r.json().then(d => ({ status: r.status, d })))
+    .then(({ status, d }) => {
+      if (!d.ok) { showMsg('parseMsg', d.msg, false); $('parseCap').textContent = ''; return; }
+      var blob = base64ToBlob(d.png_base64, 'image/png');
+      parseBlob(blob, 'device_' + Date.now() + '.png');
+    }).catch(e => { showMsg('parseMsg', '请求失败：' + e, false); $('parseCap').textContent = ''; });
+};
+loadDevices();
 
 var COLORS = ['#00b96b', '#4096ff', '#ffa940', '#ff4d4f', '#9254de', '#13c2c2'];
 function showImage(url, result) {
