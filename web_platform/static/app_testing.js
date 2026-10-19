@@ -2165,13 +2165,33 @@ function bindVdbgOnce(name) {
     const box = el(side, 'box'), input = el(side, 'input'),
           img = el(side, 'img'), x = el(side, 'x');
     box.onclick = () => input.click();
-    input.onchange = function () {
-      const f = this.files[0];
+    /* 选图统一处理：浏览器解码验证 → 转标准 PNG → 预览+存 File。
+       兜住 HEIC 等非标格式（否则预览碎图、后端 cv2 读失败双报错） */
+    function handleFile(f) {
       if (!f) return;
       const rd = new FileReader();
-      rd.onload = () => showPicked(side, rd.result, f);
+      rd.onload = function () {
+        const pr = new Image();
+        pr.onload = function () {
+          const c = document.createElement('canvas');
+          c.width = pr.naturalWidth; c.height = pr.naturalHeight;
+          c.getContext('2d').drawImage(pr, 0, 0);
+          const pngUrl = c.toDataURL('image/png');
+          c.toBlob(function (blob) {
+            if (!blob) { showToast('图片处理失败，请重试'); return; }
+            const pngFile = new Blob([blob], { type: 'image/png' });
+            pngFile.name = (f.name || 'image').replace(/\.[^.]+$/, '') + '.png';
+            showPicked(side, pngUrl, pngFile);
+          }, 'image/png');
+        };
+        pr.onerror = function () {
+          showToast('图片无法识别（请使用 PNG / JPG 格式的截图）');
+        };
+        pr.src = rd.result;
+      };
       rd.readAsDataURL(f);
-    };
+    }
+    input.onchange = function () { handleFile(this.files[0]); };
     x.onclick = (e) => { e.stopPropagation(); clearPicked(side); };
     if (!box.dataset.dragBound) {
       box.dataset.dragBound = '1';
@@ -2180,15 +2200,9 @@ function bindVdbgOnce(name) {
       box.addEventListener('drop', e => {
         e.preventDefault(); box.style.borderColor = '';
         const f = e.dataTransfer.files[0];
-        if (!f || !/image\/(png|jpeg)/.test(f.type)) { showToast('仅支持 PNG / JPG 图片'); return; }
-        const rd = new FileReader();
-        rd.onload = () => showPicked(side, rd.result, f);
-        rd.readAsDataURL(f);
-        try {
-          const dt = new DataTransfer();
-          dt.items.add(f);
-          input.files = dt.files;
-        } catch (err) {}
+        if (!f) return;
+        if (f.type && !/^image\//.test(f.type)) { showToast('仅支持图片文件（PNG / JPG）'); return; }
+        handleFile(f);
       });
     }
   }
