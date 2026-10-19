@@ -2268,3 +2268,17 @@ function bindVdbgOnce(name) {
   bindSide('act');
   document.getElementById('btnVisDebugFree').onclick = openFreeDebug;
 })();
+
+/* ================= 图片预览灯箱（diff 三联图等点击放大 · 右上角 X 关闭） ================= */
+(function () {
+  const lb = document.getElementById('imgLightbox');
+  if (!lb) return;
+  function openImgLightbox(src) {
+    document.getElementById('imgLightboxImg').src = src;
+    lb.classList.add('show');
+  }
+  document.getElementById('vfreeDiffImg').onclick = function () { openImgLightbox(this.src); };
+  document.getElementById('vdbgDiffImg').onclick = function () { openImgLightbox(this.src); };
+  document.getElementById('imgLightboxX').onclick = function (e) { e.stopPropagation(); lb.classList.remove('show'); };
+  lb.onclick = function () { lb.classList.remove('show'); };
+})();
