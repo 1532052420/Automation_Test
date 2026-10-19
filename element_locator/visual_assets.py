@@ -360,3 +360,70 @@ def baseline_path(name):
 
 # 延迟 import（visual_assets 被 server 引入时 device 已可用）
 import device  # noqa: E402
+
+
+def debug_compare_free(baseline_bytes, actual_bytes, threshold=0.98, match_mode='strict'):
+    """自由调试比对（零落盘）：手动上传的基线图与实际图直接 SSIM，不依赖任何资产配置。
+    供视觉断言管理页「调试」弹窗（双图上传版）使用；返回结构与 debug_compare 一致
+    （相似度/阈值/比较模式/diff 三联图 base64，无忽略区域），图片不保存。"""
+    import base64
+    import tempfile
+    from common.appium import visual_assertions as _va
+    if not baseline_bytes or not actual_bytes:
+        return False, '基线图与实际图都需要上传'
+    # 实际图自动缩放到基线尺寸再比对（调试语义：任意图都能比，执行链护栏不动）
+    resized, resized_from = False, ''
+    try:
+        from PIL import Image
+        import io as _io
+        bw, bh = Image.open(_io.BytesIO(baseline_bytes)).size
+        aw, ah = Image.open(_io.BytesIO(actual_bytes)).size
+        if (aw, ah) != (bw, bh):
+            img = Image.open(_io.BytesIO(actual_bytes)).convert('RGB').resize((bw, bh))
+            buf = _io.BytesIO()
+            img.save(buf, format='PNG')
+            actual_bytes = buf.getvalue()
+            resized, resized_from = True, '%dx%d' % (aw, ah)
+    except Exception:
+        pass   # PIL 不可用或图损坏时按原图交引擎处理，由引擎报真实错误
+    tmps = []
+    try:
+        for data in (baseline_bytes, actual_bytes):
+            t = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+            t.write(data)
+            t.close()
+            tmps.append(t)
+        d_tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+        d_tmp.close()
+        tmps.append(d_tmp)
+        ok, actual, err, triple = _va.compare_images(
+            tmps[0].name, tmps[1].name, float(threshold or 0.98), d_tmp.name,
+            ignore_regions=[], match_mode=match_mode or 'strict')
+
+        def _b64(p):
+            try:
+                with open(p, 'rb') as f:
+                    return 'data:image/png;base64,' + base64.b64encode(f.read()).decode()
+            except Exception:
+                return ''
+
+        return True, {
+            'resized': resized,
+            'resized_from': resized_from,
+            'passed': ok,
+            'similarity': (actual or {}).get('similarity'),
+            'threshold': float(threshold or 0.98),
+            'match_mode': match_mode or 'strict',
+            'ignored': 0,
+            'baseline_size': (actual or {}).get('baseline_size'),
+            'actual_size': (actual or {}).get('actual_size'),
+            'err': err or '',
+            'triple': _b64(d_tmp.name) if triple else '',
+        }
+    finally:
+        import os as _os
+        for t in tmps:
+            try:
+                _os.remove(t.name)
+            except OSError:
+                pass

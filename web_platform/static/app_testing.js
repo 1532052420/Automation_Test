@@ -2117,3 +2117,134 @@ function bindVdbgOnce(name) {
   };
 }
 
+
+/* ================= 视觉断言 · 自由调试（双图手动上传，零落盘不保存） =================
+   与行内调试的差异仅一处：基线图也手动上传（行内调试用资产基线）；其余布局/样式/交互一致。 */
+(function () {
+  const mask = document.getElementById('visFreeDebugMask');
+  if (!mask) return;
+  const sides = {
+    base: { box: 'vfreeBaseBox', input: 'vfreeBaseFile', img: 'vfreeBaseImg', x: 'vfreeBaseX' },
+    act:  { box: 'vfreeUpBox',   input: 'vfreeUpFile',   img: 'vfreeUpImg',   x: 'vfreeUpX' },
+  };
+  const picked = { base: null, act: null };   // File 对象
+  let bound = false;
+
+  function el(side, key) { return document.getElementById(sides[side][key]); }
+  function showPicked(side, dataUrl, file) {
+    picked[side] = file;
+    const img = el(side, 'img'), x = el(side, 'x'), box = el(side, 'box');
+    img.src = dataUrl; img.style.display = '';
+    x.style.display = '';
+    box.style.display = 'none';
+  }
+  function clearPicked(side) {
+    picked[side] = null;
+    const img = el(side, 'img'), x = el(side, 'x'), box = el(side, 'box'), input = el(side, 'input');
+    input.value = ''; img.style.display = 'none'; img.removeAttribute('src');
+    x.style.display = 'none';
+    box.style.display = 'flex';
+    resetSim();
+  }
+  function resetSim() {
+    const simEl = document.getElementById('vfreeSim');
+    simEl.textContent = '—'; simEl.dataset.level = 'bad';
+    document.getElementById('vfreeThTxt').textContent =
+      Math.round((parseFloat(document.getElementById('vfreeTh').value) || 98));;
+  document.getElementById('vfreeTh').onchange = function () {
+    var pct = Math.min(100, Math.max(1, parseFloat(this.value) || 98));
+    this.value = pct;
+    document.getElementById('vfreeThTxt').textContent = pct;
+  };
+    document.getElementById('vfreeDiffWrap').style.display = 'none';
+    document.getElementById('vfreeResize').style.display = 'none';
+  }
+  function bothPicked() { return !!(picked.base && picked.act); }
+
+  function bindSide(side) {
+    const box = el(side, 'box'), input = el(side, 'input'),
+          img = el(side, 'img'), x = el(side, 'x');
+    box.onclick = () => input.click();
+    input.onchange = function () {
+      const f = this.files[0];
+      if (!f) return;
+      const rd = new FileReader();
+      rd.onload = () => showPicked(side, rd.result, f);
+      rd.readAsDataURL(f);
+    };
+    x.onclick = (e) => { e.stopPropagation(); clearPicked(side); };
+    if (!box.dataset.dragBound) {
+      box.dataset.dragBound = '1';
+      ['dragover', 'dragenter'].forEach(ev => box.addEventListener(ev, e => { e.preventDefault(); box.style.borderColor = '#0071e3'; }));
+      box.addEventListener('dragleave', () => { box.style.borderColor = ''; });
+      box.addEventListener('drop', e => {
+        e.preventDefault(); box.style.borderColor = '';
+        const f = e.dataTransfer.files[0];
+        if (!f || !/image\/(png|jpeg)/.test(f.type)) { showToast('仅支持 PNG / JPG 图片'); return; }
+        const rd = new FileReader();
+        rd.onload = () => showPicked(side, rd.result, f);
+        rd.readAsDataURL(f);
+        try {
+          const dt = new DataTransfer();
+          dt.items.add(f);
+          input.files = dt.files;
+        } catch (err) {}
+      });
+    }
+  }
+
+  function openFreeDebug() {
+    clearPicked('base'); clearPicked('act');
+    resetSim();
+    mask.classList.add('show');
+  }
+
+  /* 调试按钮：双图上传 → /api/appui/visual_assets/debug_free（零落盘） */
+  document.getElementById('vfreeRun').onclick = async () => {
+    if (!picked.base) { showToast('请先上传基线图'); return; }
+    if (!picked.act) { showToast('请先上传实际图片'); return; }
+    const simEl = document.getElementById('vfreeSim');
+    const btn = document.getElementById('vfreeRun');
+    btn.disabled = true; btn.textContent = '比对中…';
+    simEl.textContent = '比对中…';
+    const fd = new FormData();
+    fd.append('baseline', picked.base);
+    fd.append('actual', picked.act);
+    fd.append('threshold', (parseFloat(document.getElementById('vfreeTh').value) || 98) / 100);
+    fd.append('match_mode', document.getElementById('vfreeMatch').value);
+    const r = await fetch('/api/appui/visual_assets/debug_free',
+      { method: 'POST', body: fd }).then(x => x.json()).catch(() => null);
+    btn.disabled = false; btn.textContent = '调试';
+    if (!r || !r.ok) { simEl.textContent = '—'; showToast((r && r.msg) || '比对失败', false); return; }
+    const d = r.data || {};
+    const diffWrap = document.getElementById('vfreeDiffWrap');
+    if (d.err) showToast(d.err, false);
+    const sim = (d.similarity == null) ? null : d.similarity;
+    if (sim === null) { simEl.textContent = '—'; diffWrap.style.display = 'none'; return; }
+    simEl.textContent = (sim * 100).toFixed(2) + '%';
+    simEl.dataset.level = simLevel(sim);
+    const th = Math.round((d.threshold || 0.98) * 100);
+    document.getElementById('vfreeThTxt').textContent = th;
+    const rz = document.getElementById('vfreeResize');
+    if (d.resized) {
+      rz.textContent = '⚠ 实际图 ' + (d.resized_from || '?') + ' 已缩放至基线尺寸 ' +
+        (d.actual_size ? d.actual_size.replace('x', '×') : '') + ' 比对';
+      rz.style.display = '';
+    } else {
+      rz.style.display = 'none';
+    }
+    if (d.triple) {
+      document.getElementById('vfreeDiffImg').src = d.triple;
+      diffWrap.style.display = '';
+    } else {
+      diffWrap.style.display = 'none';
+    }
+  };
+
+  // 关闭：✕ 与「取消」
+  document.getElementById('vfreeCloseX').onclick = () => mask.classList.remove('show');
+  document.getElementById('vfreeCancel').onclick = () => mask.classList.remove('show');
+  bindSide('base');
+  bindSide('act');
+  document.getElementById('btnVisDebugFree').onclick = openFreeDebug;
+})();

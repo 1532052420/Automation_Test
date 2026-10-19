@@ -526,6 +526,25 @@ def api_visual_assets_debug(name):
     return jsonify({'ok': ok, **({'data': r} if ok else {'msg': r})})
 
 
+@bp.route('/api/appui/visual_assets/debug_free', methods=['POST'])
+def api_visual_assets_debug_free():
+    """自由调试比对（零落盘）：手动上传基线图与实际图（multipart：baseline / actual 字段），
+    按指定阈值与比较模式直接 SSIM，不依赖任何资产、不保存任何数据。"""
+    import sys
+    el_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'element_locator')
+    if el_dir not in sys.path:
+        sys.path.insert(0, el_dir)
+    from element_locator import visual_assets as va
+    b = request.files.get('baseline')
+    a = request.files.get('actual')
+    if not b or not a:
+        return jsonify({'ok': False, 'msg': '基线图与实际图都需要上传（baseline / actual 字段）'}), 400
+    threshold = request.form.get('threshold') or 0.98
+    match_mode = request.form.get('match_mode') or 'strict'
+    ok, r = va.debug_compare_free(b.read(), a.read(), threshold, match_mode)
+    return jsonify({'ok': ok, **({'data': r} if ok else {'msg': r})})
+
+
 @bp.route('/api/appui/visual_assets/<name>/baseline.png')
 def api_visual_assets_baseline(name):
     import sys
