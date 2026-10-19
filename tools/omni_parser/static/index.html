@@ -45,14 +45,17 @@ main { flex: 1; display: flex; gap: 10px; min-height: 0; min-width: 0; overflow:
 .msg.ok { background: #f6ffed; color: #389e0d; display: block; }
 .cap { font-size: 11.5px; color: #86909c; flex: 0 0 auto; }
 
-/* 左栏截图视窗：46vh（同定位器），图片铺满栏宽大图显示、视窗内滚动 */
-.shot-wrap { position: relative; height: 46vh; background: #eef0f3; border-radius: 8px; overflow: auto; }
+/* 左栏截图：占满剩余高度，图片按视窗等比缩放完整显示（无滚动条） */
+.shot-wrap { position: relative; flex: 1; min-height: 0; background: #eef0f3; border-radius: 8px;
+             overflow: hidden; display: flex; align-items: center; justify-content: center; }
 #shotinner { position: relative; }
-#shotinner img { width: 100%; display: block; }
+#shotinner img { width: 100%; height: 100%; display: block; }
 #boxes { position: absolute; inset: 0; }
 .bx { position: absolute; border: 2px solid; border-radius: 3px; cursor: pointer; }
 .bx .tag { position: absolute; top: -18px; left: -2px; font-size: 10.5px; color: #fff; padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
 .bx.hl { box-shadow: 0 0 0 2px #165dff; }
+.drop-hint { position: absolute; font-size: 12px; color: #86909c; }
+.drop.on { outline: 2px dashed #165dff; outline-offset: -6px; }
 
 /* 中栏元素清单 / 右栏代码：撑满余量，内部滚动 */
 .eitems { flex: 1; min-height: 0; overflow: auto; }
@@ -90,6 +93,7 @@ pre.code { flex: 1; min-height: 0; overflow: auto; background: #14161a; color: #
       <span class="aux">
         <button class="btn mini" id="btnDevRefresh">刷新设备</button>
         <button class="btn mini" id="btnCapture">手机截图</button>
+        <button class="btn mini" id="btnUpload">上传截图</button>
       </span>
     </div>
     <div class="col-body">
@@ -98,15 +102,15 @@ pre.code { flex: 1; min-height: 0; overflow: auto; background: #14161a; color: #
         <span class="cap" style="flex:none;">连接手机后点「刷新设备」</span>
       </div>
       <div class="msg" id="parseMsg"></div>
-      <div class="drop" id="drop">拖入截图，或点击选择文件（PNG / JPG）</div>
-      <input type="file" id="file" accept="image/*" hidden>
-      <div class="shot-wrap">
+      <div class="shot-wrap" id="drop">
         <div id="shotinner">
           <img id="img">
           <div id="boxes"></div>
         </div>
+        <div class="drop-hint" id="dropHint">拖入截图，或点右上「上传截图」（PNG / JPG）</div>
       </div>
-      <div class="cap" id="parseCap">上传、拖拽或手机截图后，画面显示在这里（整图等比可见）</div>
+      <input type="file" id="file" accept="image/*" hidden>
+      <div class="cap" id="parseCap">上传、拖拽或手机截图后，画面完整显示在这里（无滚动条）</div>
     </div>
   </div>
 
@@ -207,7 +211,7 @@ $('btnSaveCfg').onclick = function () {
 };
 
 /* ---------- 截图上传 / 手机截图 / 解析 ---------- */
-$('drop').onclick = () => $('file').click();
+$('btnUpload').onclick = () => $('file').click();
 $('drop').ondragover = (e) => { e.preventDefault(); $('drop').classList.add('on'); };
 $('drop').ondragleave = () => $('drop').classList.remove('on');
 $('drop').ondrop = (e) => {
@@ -279,21 +283,39 @@ loadDevices();
 
 /* ---------- 画布：铺满栏宽大图显示（同定位器默认）+ 标注映射 ---------- */
 var COLORS = ['#00b96b', '#4096ff', '#ffa940', '#ff4d4f', '#9254de', '#13c2c2'];
-var parseSeq = 0;
+var curSize = null;
 var imgReady = false;
 var pendingAnnotate = null;
 function showStage(url) {
+  curSize = null;
   imgReady = false;
   pendingAnnotate = null;
+  $('dropHint').style.display = 'none';
   var img = $('img');
   img.onload = function () {
     imgReady = true;
+    curSize = [img.naturalWidth, img.naturalHeight];
+    fitStage();
     if (pendingAnnotate) { var r = pendingAnnotate; pendingAnnotate = null; annotate(r); }
   };
   img.src = url;
   $('boxes').innerHTML = '';
+  fitStage();
 }
+/* 按视窗与图片原始宽高比计算显示尺寸（等比、完整、无滚动条） */
+function fitStage() {
+  if (!curSize) return;
+  var wrap = $('drop');
+  var availW = wrap.clientWidth - 16, availH = wrap.clientHeight - 16;
+  if (availW <= 20 || availH <= 20) return;
+  var s = Math.min(availW / curSize[0], availH / curSize[1]);
+  var inner = $('shotinner');
+  inner.style.width = Math.max(40, Math.round(curSize[0] * s)) + 'px';
+  inner.style.height = Math.max(30, Math.round(curSize[1] * s)) + 'px';
+}
+window.addEventListener('resize', fitStage);
 function annotate(result) {
+  fitStage();
   var boxWrap = $('boxes');
   boxWrap.innerHTML = '';
   var W = result.image_size[0], H = result.image_size[1];
