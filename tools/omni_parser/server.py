@@ -43,6 +43,7 @@ async def no_store(request, call_next):
     return resp
 _parser = None
 _parse_error = None
+_label_cache = {}          # 英文描述 → 中文控件名（进程内缓存，避免重复调 LLM 翻译）
 
 
 def load_config():
@@ -150,6 +151,17 @@ def api_parse(file: UploadFile = File(None), image_b64: str = Form(None)):
         return JSONResponse({'ok': False, 'msg': str(e)}, status_code=503)
     except Exception as e:
         return JSONResponse({'ok': False, 'msg': '解析失败：%s' % e}, status_code=500)
+    # 元素描述中文化：Florence-2 只会输出英文，交给已配置的文本模型批量翻译；
+    # 未配置/翻译失败回退英文原文；相同描述走进程内缓存不重复调
+    descs = [el['description'] for el in result['elements']]
+    todo = [d for d in descs if d and d not in _label_cache]
+    if todo:
+        cn = llm_client.translate_labels(load_config().get('llm') or {}, todo)
+        if cn:
+            for d, c in zip(todo, cn):
+                _label_cache[d] = c
+    for el in result['elements']:
+        el['label'] = _label_cache.get(el['description']) or el['description']
     return {'ok': True, **result}
 
 

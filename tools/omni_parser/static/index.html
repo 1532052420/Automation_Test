@@ -327,10 +327,10 @@ function annotate(result) {
     div.style.cssText = 'left:' + (pct[0] * 100) + '%;top:' + (pct[1] * 100) + '%;width:'
       + ((pct[2] - pct[0]) * 100) + '%;height:' + ((pct[3] - pct[1]) * 100)
       + '%;border-color:' + COLORS[i % COLORS.length] + ';';
-    var tag = document.createElement('span');
-    tag.className = 'tag';
-    tag.style.background = COLORS[i % COLORS.length];
-    tag.textContent = el.index + ' ' + (el.description || '').slice(0, 14);
+      var tag = document.createElement('span');
+      tag.className = 'tag';
+      tag.style.background = COLORS[i % COLORS.length];
+      tag.textContent = el.index + ' ' + (el.label || el.description || '').slice(0, 14);
     div.appendChild(tag);
     div.onclick = function () { highlight(el.index); };
     boxWrap.appendChild(div);
@@ -342,12 +342,14 @@ function renderList(result) {
   wrap.innerHTML = '';
   $('elCount').textContent = result.elements.length + ' 个元素';
   result.elements.forEach(function (el, i) {
+    var label = el.label || el.description || '未命名元素';
+    var tip = (el.label && el.label !== el.description) ? '原文：' + el.description : label;
     var row = document.createElement('div');
     row.className = 'eitem';
     row.id = 'ei' + el.index;
     row.innerHTML = '<b style="color:' + COLORS[i % COLORS.length] + '">' + el.index
-      + '</b><span class="d" title="' + (el.description || '').replace(/"/g, '&quot;') + '">'
-      + (el.description || '未命名元素') + '</span><span class="c">' + el.confidence + '</span>';
+      + '</b><span class="d" title="' + tip.replace(/"/g, '&quot;') + '">' + label
+      + '</span><span class="c">' + el.confidence + '</span>';
     row.onclick = function () { highlight(el.index); };
     wrap.appendChild(row);
   });

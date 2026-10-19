@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """文本大模型客户端（OpenAI 兼容 /chat/completions）：元素清单 + 自然语言意图 → Selenium 代码。
 完全独立：requests 直连，不依赖任何 openai SDK。"""
+import re
+
 import requests
 
 SYSTEM_PROMPT = '''你是资深 Web 自动化测试工程师。用户会给你：
@@ -29,7 +31,7 @@ def generate_code(cfg, intent, elements, image_size=None):
     lines = []
     for el in elements:
         lines.append('#%d %s（置信度 %s，坐标 %s）' % (
-            el['index'], el['description'], el['confidence'],
+            el['index'], el.get('label') or el['description'], el['confidence'],
             ','.join(str(int(v)) for v in el['box_xyxy'])))
     size = ('页面尺寸 %dx%d' % tuple(image_size)) if image_size else ''
     user = ('测试意图：%s\n\n页面元素清单（%d 个可交互元素，%s）：\n%s'
@@ -53,3 +55,36 @@ def generate_code(cfg, intent, elements, image_size=None):
     if content.startswith('```'):
         content = content.split('\n', 1)[-1].rsplit('```', 1)[0].strip()
     return content
+
+
+_TRANSLATE_SYSTEM = ('把英文界面元素描述翻译成简短中文控件名称（2~10 个字，如"搜索输入框""取消按钮"）。'
+                     '逐行输出，保持行号与输入一致，不要任何解释。')
+
+
+def translate_labels(cfg, descriptions):
+    """批量把英文元素描述翻译成简短中文控件名（一次请求）。
+    返回与输入等长的中文列表；LLM 未配置/失败/对齐率过低时返回 None（调用方回退英文）。"""
+    if not (cfg.get('api_key') or '').strip():
+        return None
+    lines = '\n'.join('%d. %s' % (i + 1, d) for i, d in enumerate(descriptions))
+    try:
+        resp = requests.post(
+            cfg['base_url'], timeout=float(cfg.get('timeout') or 60),
+            headers={'Authorization': 'Bearer ' + cfg['api_key'],
+                     'Content-Type': 'application/json'},
+            json={'model': cfg['model'], 'temperature': 0.1,
+                  'messages': [{'role': 'system', 'content': _TRANSLATE_SYSTEM},
+                               {'role': 'user', 'content': lines}]})
+        if resp.status_code != 200:
+            return None
+        content = resp.json()['choices'][0]['message']['content'].strip()
+    except Exception:
+        return None
+    mapping = {}
+    for line in content.splitlines():
+        m = re.match(r'\s*(\d+)\s*[.、:：]?\s*(.+)', line)
+        if m:
+            mapping[int(m.group(1))] = m.group(2).strip()
+    if len(mapping) < max(1, len(descriptions) // 2):   # 对上的行数过半才算翻译成功
+        return None
+    return [mapping.get(i + 1) or descriptions[i] for i in range(len(descriptions))]
