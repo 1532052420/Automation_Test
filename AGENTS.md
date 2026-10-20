@@ -17,6 +17,7 @@
 | 7 | `webapp-testing` | Web 端功能测试（Playwright：前端功能验证/UI行为调试/截图/服务生命周期），来源 anthropics/skills 官方仓库（179k★） | `.workbuddy/skills/webapp-testing/` |
 | 8 | `frontend-design`（官方版） | Web 端 UI/视觉设计方向（美学/排版/布局，anthropics 官方最新版，覆盖旧版） | `.workbuddy/skills/frontend-design/` |
 | 9 | `self-test-gate` | **代码修改任务完成编码后必过四道门禁**（语法/引用完整+改动行审计/行为自测+影响面回归/数据链）+ 收尾执行声明 | `.workbuddy/skills/self-test-gate/` |
+| 10 | `retrospectives` | **代理失误发生后的复盘**：按模板追加案例到案例库（最新在最上）；每任务收尾声明中说明本任务有无失误复盘 | `.workbuddy/skills/retrospectives/` |
 
 > 同一份 skill 亦同步存放于 `.zcode/skills/`（ZCode/Qoder 运行时读取路径）。两处内容需保持一致，权威副本为 `.workbuddy/skills/`。
 

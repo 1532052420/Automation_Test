@@ -775,7 +775,13 @@
 <div class="mask" id="pfEditMask">
   <div class="modal" style="width:min(880px,94vw)">
     <h4>编辑页面文件 · <span id="pfEditName"></span></h4>
-    <textarea id="pfContent" class="pf-editor" spellcheck="false"></textarea>
+    <div class="pf-editor-wrap">
+      <div class="pf-gutter" id="pfGutter"></div>
+      <div class="pf-code-area">
+        <pre class="pf-highlight" id="pfHighlight" aria-hidden="true"></pre>
+        <textarea id="pfContent" class="pf-editor" spellcheck="false" wrap="off" autocomplete="off" autocapitalize="off"></textarea>
+      </div>
+    </div>
     <div class="mops mt">
       <button class="ghost" id="pfEditCancel">取消</button>
       <button id="pfEditSave">保存</button>

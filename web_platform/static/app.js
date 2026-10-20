@@ -1518,11 +1518,73 @@ function setElMgrMode(pagesMode) {
   if (_pfMode) loadPageFiles();
 }
 
+/* 行号槽 + Python 语法高亮：高亮层(pre)垫底、透明 textarea 覆盖，输入/滚动三方同步；
+   内网禁 CDN，tokenizer 手写（注释 / 字符串含三引号 / 关键字 / 内建 / 数字 / 装饰器） */
+const PF_PY_KW = new Set('def class import from as return if elif else try except finally with for while in not and or is None True False lambda pass raise global nonlocal yield del assert break continue async await match case'.split(' '));
+const PF_PY_BI = new Set('self cls print len range str int float list dict set tuple open super isinstance enumerate zip map sorted min max abs type getattr setattr hasattr repr bool sum any all'.split(' '));
+
+function pfHighlightPython(src) {
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  let out = '', i = 0;
+  const push = (cls, text) => { out += cls ? '<span class="' + cls + '">' + esc(text) + '</span>' : esc(text); };
+  while (i < src.length) {
+    const ch = src[i];
+    if (ch === '#') {                                   // 注释到行尾
+      let j = src.indexOf('\n', i); if (j < 0) j = src.length;
+      push('pf-tok-com', src.slice(i, j)); i = j; continue;
+    }
+    if (ch === '"' || ch === "'") {                     // 字符串：三引号优先，转义跨字符
+      if (src.slice(i, i + 3) === ch.repeat(3)) {
+        const end = src.indexOf(ch.repeat(3), i + 3);
+        const j = end < 0 ? src.length : end + 3;
+        push('pf-tok-str', src.slice(i, j)); i = j; continue;
+      }
+      let j = i + 1;
+      while (j < src.length && src[j] !== ch && src[j] !== '\n') { if (src[j] === '\\') j++; j++; }
+      j = Math.min(j + 1, src.length);
+      push('pf-tok-str', src.slice(i, j)); i = j; continue;
+    }
+    if (/[A-Za-z_]/.test(ch)) {                         // 标识符：关键字 > 内建 > 函数调用
+      let j = i;
+      while (j < src.length && /\w/.test(src[j])) j++;
+      const word = src.slice(i, j);
+      const cls = PF_PY_KW.has(word) ? 'pf-tok-kw'
+        : (PF_PY_BI.has(word) ? 'pf-tok-builtin' : (src[j] === '(' ? 'pf-tok-fn' : ''));
+      push(cls, word); i = j; continue;
+    }
+    if (/[0-9]/.test(ch)) {                             // 数字（含 hex / 下划线分隔）
+      let j = i;
+      while (j < src.length && /[0-9a-fA-FxXoO_.]/.test(src[j])) j++;
+      push('pf-tok-num', src.slice(i, j)); i = j; continue;
+    }
+    if (ch === '@') {                                   // 装饰器：行首（允许缩进，类内 @decorator 常缩进）
+      let k = i - 1;
+      while (k >= 0 && (src[k] === ' ' || src[k] === '\t')) k--;
+      if (k < 0 || src[k] === '\n') {
+        let j = i;
+        while (j < src.length && src[j] !== '\n') j++;
+        push('pf-tok-dec', src.slice(i, j)); i = j; continue;
+      }
+    }
+    push('', ch); i++;
+  }
+  return out;
+}
+
+function refreshPfEditor() {
+  const v = $('#pfContent').value;
+  $('#pfHighlight').innerHTML = pfHighlightPython(v);
+  const n = v.split('\n').length;
+  $('#pfGutter').innerHTML = Array.from({ length: n }, (_, i) => '<div>' + (i + 1) + '</div>').join('');
+  $('#pfGutter').style.width = (String(n).length * 7 + 22) + 'px';   // 行号位数决定槽宽
+}
+
 async function openPageEditor(name) {
   const d = await api('/api/appui/pages/content?name=' + encodeURIComponent(name));
   if (!d.ok) return toast(d.msg || '读取失败', false);
   $('#pfEditName').textContent = name;
   $('#pfContent').value = d.content;
+  refreshPfEditor();
   $('#pfEditMask').classList.add('show');
 }
 
@@ -1590,6 +1652,13 @@ function initElementsPanel() {
     if (e.target === $('#pfEditMask')) $('#pfEditMask').classList.remove('show');
   });
   $('#pfEditSave').addEventListener('click', savePageFile);
+  $('#pfContent').addEventListener('input', refreshPfEditor);
+  $('#pfContent').addEventListener('scroll', () => {
+    const ta = $('#pfContent');
+    $('#pfHighlight').scrollTop = ta.scrollTop;
+    $('#pfHighlight').scrollLeft = ta.scrollLeft;
+    $('#pfGutter').scrollTop = ta.scrollTop;
+  });
   loadElements();     // 元素文件列表初始加载（曾误删致进面板无数据——新增调用勿替换既有调用）
   loadPageFiles();
 }

@@ -948,8 +948,26 @@ html.embedded { overflow: hidden; }
 .seg button + button { border-left: 1px solid var(--line-soft); }
 .seg button.on { background: var(--brand-tint); color: var(--brand); font-weight: 600; }
 
-/* 页面文件编辑器（编辑弹窗内整文件代码编辑）：等宽 + 大视口 */
-#pfContent { width: 100%; height: 56vh; resize: vertical; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; line-height: 1.55; padding: 10px 12px; }
+/* 页面文件编辑器：行号槽 + Python 语法高亮层（pre 垫底、透明 textarea 覆盖、滚动三方同步） */
+.pf-editor-wrap { display: flex; height: 56vh; border: 1px solid var(--line-soft); border-radius: 8px; overflow: hidden; background: var(--panel2); }
+.pf-gutter { flex: none; overflow: hidden; padding: 10px 8px 10px 0; text-align: right; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; line-height: 1.55; color: var(--muted2); background: var(--panel3); user-select: none; }
+.pf-code-area { position: relative; flex: 1; min-width: 0; }
+.pf-highlight, #pfContent { position: absolute; inset: 0; margin: 0; border: 0; padding: 10px 12px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; line-height: 1.55; white-space: pre; overflow: auto; tab-size: 4; }
+.pf-highlight { z-index: 0; color: var(--ink); pointer-events: none; }
+#pfContent { z-index: 1; background: transparent; color: transparent; caret-color: var(--ink); resize: none; outline: none; }
+#pfContent::selection { background: rgba(29, 111, 216, .28); }
+.pf-tok-kw { color: var(--brand); font-weight: 600; }
+.pf-tok-str { color: #116e3b; }
+.pf-tok-com { color: var(--muted2); font-style: italic; }
+.pf-tok-num { color: #a35b00; }
+.pf-tok-dec { color: #7c4dbe; }
+.pf-tok-builtin { color: #00668c; }
+.pf-tok-fn { color: #14508c; }
+html.night .pf-tok-str { color: #7fd4a3; }
+html.night .pf-tok-num { color: #ffb84d; }
+html.night .pf-tok-dec { color: #c9a6ff; }
+html.night .pf-tok-builtin { color: #7cc7e8; }
+html.night .pf-tok-fn { color: #86b9ec; }
 
 /* 用例编排顶栏（SceneBuilder 头部：用例选择 + 名称/描述/创建人 + 保存/执行） */
 .orchtoolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
