@@ -128,6 +128,10 @@
           <div class="cardhead">
             <h3>元素管理 <span class="muted">元素库与元素定位器共用同一份数据，编辑实时生效</span></h3>
             <div class="ops">
+              <div class="seg" id="pfTabs">
+                <button type="button" data-mode="files" class="on">元素文件</button>
+                <button type="button" data-mode="pages">页面文件</button>
+              </div>
               <button class="mini" id="btnElCreate">➕ 新增元素</button>
               <button class="ghost mini" id="btnElRefresh">重置</button>
             </div>
@@ -142,6 +146,17 @@
             </div>
             <div id="elFilesEmpty" class="empty" style="display:none">元素库为空</div>
             <div class="list-pager" id="elFilesPager"></div>
+          </div>
+          <!-- 页面文件视图（页签切换；表格样式/分页复用元素文件列表） -->
+          <div id="pfView" style="display:none">
+            <div class="tblwrap">
+              <table>
+                <thead><tr><th>页面文件名</th><th>关联用例</th><th>大小</th><th>最后修改</th><th>操作</th></tr></thead>
+                <tbody id="pfTbody"></tbody>
+              </table>
+            </div>
+            <div id="pfEmpty" class="empty" style="display:none">暂无页面对象文件</div>
+            <div class="list-pager" id="pfPager"></div>
           </div>
           <!-- 二级：文件内元素列表（字段与操作同原元素管理） -->
           <div id="elElemsView" style="display:none">
@@ -753,6 +768,17 @@
     <div class="mops mt">
       <button class="ghost" id="caseCCancel">取消</button>
       <button id="caseCOk">确定</button>
+    </div>
+  </div>
+</div>
+<!-- 页面文件 编辑弹窗：整文件代码编辑，保存走服务端 ast 语法校验 -->
+<div class="mask" id="pfEditMask">
+  <div class="modal" style="width:min(880px,94vw)">
+    <h4>编辑页面文件 · <span id="pfEditName"></span></h4>
+    <textarea id="pfContent" class="pf-editor" spellcheck="false"></textarea>
+    <div class="mops mt">
+      <button class="ghost" id="pfEditCancel">取消</button>
+      <button id="pfEditSave">保存</button>
     </div>
   </div>
 </div>

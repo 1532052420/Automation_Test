@@ -1129,6 +1129,7 @@ function showRunPanel(name) {
   setCrumbSub(RUN_PANEL_NAMES[name]);
   if (name === 'asserts' && typeof loadAssertions === 'function') loadAssertions();
   if (name === 'visuals' && typeof loadVisualAssets === 'function') loadVisualAssets();
+  if (name === 'elements' && typeof loadPageFiles === 'function') loadPageFiles();   // 进入元素管理即刷新页面文件列表
   if (name === 'projects' && typeof loadProjects === 'function') loadProjects();   // 进入项目管理即查询列表
   if (name === 'caselist' && typeof loadProjects === 'function') {
     // 进入用例管理即加载：先项目数据（列表列名映射用），再用例列表
@@ -1226,8 +1227,11 @@ async function loadElements() {
 /* 一级视图：元素文件列表（文件名 + 编辑/删除）；popupElements.py 规则库只能进入查看，不提供删除 */
 function renderElMgr() {
   const inFile = _elMgrFile !== null;
-  $('#elFilesView').style.display = inFile ? 'none' : '';
+  $('#elFilesView').style.display = (inFile || _pfMode) ? 'none' : '';
+  $('#pfView').style.display = _pfMode ? '' : 'none';
   $('#elElemsView').style.display = inFile ? '' : 'none';
+  $('#btnElCreate').style.display = _pfMode ? 'none' : '';   // 页面文件视图没有「新增元素」
+  if (_pfMode) { renderPageFiles(); return; }
   if (inFile) {
     $('#elCurFile').textContent = _elMgrFile;
     renderElements();
@@ -1465,11 +1469,89 @@ async function saveElCreate() {
   }
 }
 
+/* ================= 页面文件管理（元素管理模块·页面文件视图：列表 / 编辑 / 删除） =================
+   数据源与执行框架、元素定位器共用同一份页面对象（page_objects/.../pages/*.py）；
+   编辑走后端 /api/appui/pages/save（服务端 ast 语法校验通过才落盘）；
+   关联用例数来自用例 self.page 绑定解析（case_files_info 同源口径），死文件一眼可辨。 */
+let _pfMode = false, _pfFiles = [], _pfPage = 1, _pfPageSize = 20;
+
+async function loadPageFiles() {
+  const d = await api('/api/appui/pages/manage');
+  if (!d.ok) return toast(d.msg || '页面文件列表加载失败', false);
+  _pfFiles = d.files || [];
+  renderPageFiles();
+}
+
+function renderPageFiles() {
+  const perPage = _pfPageSize;
+  const pages = Math.max(1, Math.ceil(_pfFiles.length / perPage));
+  if (_pfPage > pages) _pfPage = pages;
+  if (_pfPage < 1) _pfPage = 1;
+  const view = _pfFiles.slice((_pfPage - 1) * perPage, _pfPage * perPage);
+  const fmt = ts => {
+    if (!ts) return '-';
+    const d = new Date(ts * 1000), p = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+      ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  };
+  $('#pfTbody').innerHTML = view.map(f =>
+    '<tr><td><b>' + esc(f.name) + '</b></td>' +
+    '<td>' + (f.usage ? f.usage + ' 个用例' : '<span class="muted">0（未使用）</span>') + '</td>' +
+    '<td>' + (f.size / 1024).toFixed(1) + ' KB</td>' +
+    '<td>' + fmt(f.mtime) + '</td>' +
+    '<td><div class="ops">' +
+    '<button class="ghost mini" data-act="edit" data-file="' + esc(f.name) + '">编辑</button>' +
+    '<button class="mini danger-ghost" data-act="del" data-file="' + esc(f.name) + '">删除</button>' +
+    '</div></td></tr>').join('');
+  $('#pfEmpty').style.display = _pfFiles.length ? 'none' : '';
+  listPager('#pfPager', _pfFiles.length, _pfPage, perPage,
+    p => { _pfPage = p; renderPageFiles(); },
+    s => { _pfPageSize = s; _pfPage = 1; renderPageFiles(); });
+}
+
+function setElMgrMode(pagesMode) {
+  _pfMode = pagesMode;
+  _elMgrFile = null;
+  document.querySelectorAll('#pfTabs button').forEach(b =>
+    b.classList.toggle('on', (b.dataset.mode === 'pages') === _pfMode));
+  renderElMgr();
+  if (_pfMode) loadPageFiles();
+}
+
+async function openPageEditor(name) {
+  const d = await api('/api/appui/pages/content?name=' + encodeURIComponent(name));
+  if (!d.ok) return toast(d.msg || '读取失败', false);
+  $('#pfEditName').textContent = name;
+  $('#pfContent').value = d.content;
+  $('#pfEditMask').classList.add('show');
+}
+
+async function savePageFile() {
+  const name = $('#pfEditName').textContent;
+  const d = await postJson('/api/appui/pages/save', { name: name, content: $('#pfContent').value });
+  toast(d.msg || (d.ok ? '已保存' : '保存失败'), !!d.ok);
+  if (d.ok) { $('#pfEditMask').classList.remove('show'); loadPageFiles(); }
+}
+
+async function deletePageFile(name) {
+  const meta = _pfFiles.find(f => f.name === name) || { usage: 0 };
+  const warn = meta.usage
+    ? '该文件正被 ' + meta.usage + ' 个用例绑定，删除后这些用例将无法执行，'
+    : '';
+  const yes = await confirmModal('删除页面文件',
+    '将删除 ' + name + '，删除后不可恢复。' + warn + '确定删除？', true);
+  if (!yes) return;
+  const d = await postJson('/api/appui/pages/delete', { name: name });
+  toast(d.msg || (d.ok ? '已删除' : '删除失败'), !!d.ok);
+  if (d.ok) loadPageFiles();
+}
+
 function initElementsPanel() {
   $('#btnElRefresh').addEventListener('click', () => {
-    /* 重置：清空搜索词并回到文件列表视图 */
+    /* 重置：清空搜索词并回到文件列表视图；页面文件视图下重置 = 刷新页面文件列表 */
     $('#elSearch').value = '';
     _elMgrFile = null;
+    if (_pfMode) { loadPageFiles(); return; }
     loadElements();
   });
   $('#btnElCreate').addEventListener('click', () => {
@@ -1493,7 +1575,22 @@ function initElementsPanel() {
   $('#elMask').addEventListener('click', (e) => {
     if (e.target === $('#elMask')) $('#elMask').classList.remove('show');
   });
-  loadElements();
+  /* 页面文件视图：页签切换 / 行内操作 / 编辑弹窗（与元素管理共用确认与弹窗基建） */
+  document.querySelectorAll('#pfTabs button').forEach(b => b.addEventListener('click', () => {
+    setElMgrMode(b.dataset.mode === 'pages');
+  }));
+  $('#pfTbody').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    if (btn.dataset.act === 'edit') openPageEditor(btn.dataset.file);
+    else if (btn.dataset.act === 'del') deletePageFile(btn.dataset.file);
+  });
+  $('#pfEditCancel').addEventListener('click', () => $('#pfEditMask').classList.remove('show'));
+  $('#pfEditMask').addEventListener('click', (e) => {
+    if (e.target === $('#pfEditMask')) $('#pfEditMask').classList.remove('show');
+  });
+  $('#pfEditSave').addEventListener('click', savePageFile);
+  loadPageFiles();
 }
 
 /* ================= 前后置清理（独立卡片，保存后持久化，全部执行入口共用） ================= */

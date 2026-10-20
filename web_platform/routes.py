@@ -551,6 +551,39 @@ def api_appui_pages():
     return jsonify({'ok': True, 'pages': cg.list_page_files(), 'usage': usage})
 
 
+@bp.route('/api/appui/pages/manage')
+def api_appui_pages_manage():
+    """页面文件管理列表（元素管理模块「页面文件」视图）：文件名 / 大小 / 最后修改 / 关联用例数"""
+    from web_platform import page_manager
+    return jsonify({'ok': True, 'files': page_manager.list_meta()})
+
+
+@bp.route('/api/appui/pages/content')
+def api_appui_pages_content():
+    """读取页面文件内容（编辑弹窗回填）"""
+    from web_platform import page_manager
+    ok, data = page_manager.read_content((request.args.get('name') or '').strip())
+    return jsonify({'ok': ok, 'content': data} if ok else {'ok': False, 'msg': data}), (200 if ok else 400)
+
+
+@bp.route('/api/appui/pages/save', methods=['POST'])
+def api_appui_pages_save():
+    """保存页面文件编辑（服务端 ast 语法校验通过才落盘）"""
+    from web_platform import page_manager
+    d = request.get_json(silent=True) or {}
+    ok, msg = page_manager.save_content((d.get('name') or '').strip(), d.get('content'))
+    return jsonify({'ok': ok, 'msg': msg}), (200 if ok else 400)
+
+
+@bp.route('/api/appui/pages/delete', methods=['POST'])
+def api_appui_pages_delete():
+    """删除页面文件（前端确认框已展示关联用例警告；git 可恢复）"""
+    from web_platform import page_manager
+    d = request.get_json(silent=True) or {}
+    ok, msg = page_manager.delete_page_file((d.get('name') or '').strip())
+    return jsonify({'ok': ok, 'msg': msg}), (200 if ok else 400)
+
+
 @bp.route('/api/appui/visual_assets/debug_free', methods=['POST'])
 def api_visual_assets_debug_free():
     """自由调试比对（零落盘）：手动上传基线图与实际图（multipart：baseline / actual 字段），
