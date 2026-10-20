@@ -212,22 +212,40 @@ function svcConfirm(title, desc, onOk) {
 }
 
 function restartService() {
-  svcConfirm('确认重启平台服务吗？', '结束所有平台进程，初始化平台', restartServiceRun);
+  svcConfirm('确认重启平台服务吗？', '结束所有平台进程，初始化平台', function () { restartServiceRun($('#btnSvcRestart')); });
 }
-async function restartServiceRun() {
-  const rsBtn = $('#btnSvcRestart');
-  rsBtn.disabled = true; rsBtn.textContent = '🔄 重启中…';
+/* 重启流程（首页按钮与「服务体检」面板按钮共用）：
+   记录旧实例身份证（boot_id）→ 下发重启 → 轮询 /api/status 直到身份证变化（新实例真正就绪，
+   旧实例的响应因身份证相同被跳过）→ 横幅「重启成功，刷新页面中」→ 2 秒后横幅消失，
+   带一次性缓存标记刷新页面（?_style_bust= 与 theme.js 裸奔自愈同一标记：
+   站点本就 no-store + 资源版本化路径，该标记兜底中间层缓存；sessionStorage 防自愈循环）。 */
+async function restartServiceRun(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '🔄 重启中…'; }
+  let oldBoot = '';
+  try {
+    const d = await api('/api/status');
+    if (d && d.boot_id) oldBoot = String(d.boot_id);
+  } catch (e) { /* 重启前服务已不可用：拿不到旧身份证，新实例任意 boot_id 即算就绪 */ }
   try { await postJson('/api/service/restart', {}); } catch (e) { /* 服务自我了断时请求中断属预期 */ }
   toast('旧进程已通知结束，等待全新实例就绪…');
-  for (let i = 0; i < 24; i++) {
-    await new Promise(r => setTimeout(r, 500));
+  const deadline = Date.now() + 180000;   // 3 分钟兜底
+  let ready = false;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 800));
     try {
-      const d = await api('/api/changelog');
-      if (d && d.entries) { toast('✓ 服务已重启，全新实例就绪', true); location.reload(); return; }
-    } catch (e) { /* 还没起来，继续等 */ }
+      const d = await api('/api/status');
+      if (d && d.service === 'automation-test-platform' && d.boot_id && String(d.boot_id) !== oldBoot) {
+        ready = true; break;
+      }
+    } catch (e) { /* 旧实例已下线/新实例未起：继续等 */ }
   }
-  rsBtn.disabled = false; rsBtn.textContent = '🔄 重启服务';
-  toast('重启超时：请查看 /tmp/platform_8080.log', false);
+  showGlobalBanner(ready ? '✅ 服务重启成功，刷新页面中…' : '⚠️ 重启等待超时，尝试刷新页面…',
+    { autoHideMs: 0 });
+  setTimeout(function () {
+    hideGlobalBanner();
+    try { sessionStorage.setItem('_style_bust', '1'); } catch (e) {}
+    location.replace(location.pathname + '?_style_bust=' + Date.now() + location.hash);
+  }, 2000);
 }
 
 /* 更新顶部面包屑第三级（各页面切面板时调用；导航未渲染时静默跳过） */
@@ -1085,8 +1103,7 @@ async function initRun() {
   $('#btnCleanupSave').addEventListener('click', saveCleanupConfig);
   loadCleanupConfig();   // 前后置清理：回读持久化配置填充勾选
   initElementsPanel();
-  adminPanelInit();   // 用例管理面板（原独立模块并入，绑定见 admin.js）
-  appTestingInit();   // 用例编排 / 测试套件面板（绑定见 app_testing.js）
+  appTestingInit();   // 项目管理 / 用例列表 / 套件面板（绑定见 app_testing.js；编排与上传面板已删除）
   // 测试报告面板的 iframe 加载已收口到 showRunPanel（覆盖点击与 hash 深链两条路径）
 }
 
@@ -1746,27 +1763,39 @@ async function openMidsceneFor(runId, btn) {
   }
 }
 
-/* 全局横幅：在线报告已生成，点击跳转；显示 3 秒后消失。
-   位置：平台所有页面全局（挂在 body），页面中间顶部，顶部预留 60px */
-let _reportBannerTimer = null;
-function showReportBanner(runId, url) {
-  let b = document.getElementById('reportReadyBanner');
+/* 全局横幅：页面中上部绿色提示条（报告就绪 / 服务重启成功等一次性通知共用）。
+   opts.onClick 自定义点击行为；opts.autoHideMs 自动消失时长，0 = 不自动消失 */
+let _globalBannerTimer = null;
+function showGlobalBanner(html, opts) {
+  opts = opts || {};
+  let b = document.getElementById('globalBanner');
   if (!b) {
     b = document.createElement('div');
-    b.id = 'reportReadyBanner';
+    b.id = 'globalBanner';
     b.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:9999;' +
       'background:#1a9e6e;color:#fff;padding:10px 22px;border-radius:8px;font-size:14px;' +
       'box-shadow:0 4px 18px rgba(0,0,0,.25);cursor:pointer;display:flex;align-items:center;gap:10px;';
     document.body.appendChild(b);
   }
-  b.innerHTML = '✅ 在线报告已生成（' + esc(runId) + '）· <u>点击打开</u>';
-  b.onclick = function () {
-    window.open(url, '_blank');
-    b.style.display = 'none';
-  };
+  b.innerHTML = html;
+  b.onclick = opts.onClick || null;
   b.style.display = 'flex';
-  clearTimeout(_reportBannerTimer);
-  _reportBannerTimer = setTimeout(function () { b.style.display = 'none'; }, 3000);
+  clearTimeout(_globalBannerTimer);
+  if (opts.autoHideMs !== 0) {
+    _globalBannerTimer = setTimeout(hideGlobalBanner, opts.autoHideMs || 3000);
+  }
+  return b;
+}
+function hideGlobalBanner() {
+  const b = document.getElementById('globalBanner');
+  if (b) b.style.display = 'none';
+}
+
+/* 报告横幅 = 全局横幅的报告场景文案：显示 3 秒，点击跳转报告 */
+function showReportBanner(runId, url) {
+  showGlobalBanner('✅ 在线报告已生成（' + esc(runId) + '）· <u>点击打开</u>', {
+    onClick: function () { window.open(url, '_blank'); hideGlobalBanner(); },
+  });
 }
 
 async function openReportFor(runId, btn) {

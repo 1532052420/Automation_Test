@@ -330,42 +330,6 @@
       </section>
 
       <!-- 用例管理（原独立模块并入）：上传用例包 zip，覆盖确认 + 自动备份 -->
-      <section class="panel" id="panel-admin" hidden>
-        <div class="card" id="authCard" style="display:none">
-          <h3>访问口令</h3>
-          <p class="muted">服务端已启用口令保护（环境变量 ADMIN_TOKEN），请输入团队口令：</p>
-          <div class="mt" style="display:flex;gap:8px;max-width:420px">
-            <input type="password" id="inToken" placeholder="团队口令">
-            <button id="btnToken">保存</button>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3>上传用例包（zip） <span class="muted">元素定位器「下载用例包」的产物，平台自动识别入库；框架公共文件受保护</span></h3>
-          <div class="fields">
-            <div class="field"><label>用例包 zip（元素定位器「下载用例包」的产物）</label>
-              <div class="filepick">
-                <input type="file" id="upPkgFile" accept=".zip">
-                <button type="button" class="filepick-btn" data-for="upPkgFile">选择 zip</button>
-                <span class="filepick-name" data-name-for="upPkgFile">未选择文件</span>
-              </div>
-            </div>
-            <div class="field"><label>上传人（用于追溯）</label>
-              <input type="text" id="upPkgUploader" placeholder="你的名字">
-            </div>
-          </div>
-          <div class="mt">
-            <button id="btnUploadPkg">上传用例包</button>
-          </div>
-          <p class="muted mt">zip 内文件须落在受管目录：用例 <code>cases/app_ui/android/demoProject/</code>、
-            页面 <code>page_objects/app_ui/android/demoProject/pages/</code>、元素 <code>…/elements/</code>
-            （定位器「保存测试用例包」导出的 zip 即此结构，其余文件自动忽略）。
-            三件套一次性入库：先整体做语法校验，全部通过才落盘；同名文件自动备份历史版本。</p>
-        </div>
-      </section>
-
-      <!-- 用例管理（testhub TestCaseList 移植）：只管理 / 编辑用例实体，执行统一走「执行用例」 -->
-      <!-- 视觉断言管理（定位器采集的视觉资产；列表 UI 全部参考项目管理：筛选+表格+分页） -->
       <section class="panel" id="panel-visuals" hidden>
         <div class="card">
           <div class="cardhead">
@@ -691,37 +655,6 @@
 
       <!-- 用例编排（testhub SceneBuilder 移植：顶栏用例信息条 + 三栏 操作面板/画布/参数配置）
            用例 = 元素 + 页面操作的有序组合；保存时编译成框架三件套接入执行链路 -->
-      <section class="panel" id="panel-orch" hidden>
-        <div class="card">
-          <h3>用例编排 <span class="muted">左栏点选操作 → 选元素、填参数 → 保存后自动生成执行文件</span></h3>
-          <div class="orchtoolbar">
-            <select id="orchSel"><option value="">＋ 新建用例</option></select>
-            <input type="text" id="orchName" placeholder="用例名称，如：快歌登录">
-            <input type="text" id="orchDesc" placeholder="描述（可选）">
-            <input type="text" id="orchBy" placeholder="创建人" style="max-width:100px">
-            <select id="orchProj" style="max-width:150px" title="用例归属的项目（可先到「项目管理」新建）"><option value="">— 未分组 —</option></select>
-            <select id="orchElemFile" style="max-width:200px" title="元素来自元素定位器采集的元素库"><option value="">— 元素文件 —</option></select>
-            <button class="ghost mini" id="btnOrchRun" disabled>执行此用例</button>
-            <button id="btnOrchSave">保存用例</button>
-          </div>
-          <div class="orchlayout">
-            <div class="orchcol">
-              <div class="orchcol-title">操作面板 <span class="muted">页面操作 · 点击或拖入画布</span></div>
-              <div class="orchtree orchpalette" id="orchTree">加载中…</div>
-            </div>
-            <div class="orchcol orchcol-mid">
-              <div class="orchcol-title">编排画布 <span class="muted">按此顺序执行，可拖拽</span></div>
-              <div class="orchsteps" id="orchSteps"></div>
-            </div>
-            <div class="orchcol">
-              <div class="orchcol-title" id="orchCfgTitle">用例信息</div>
-              <div class="orchform" id="orchCfg"></div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 测试套件（testhub SuiteList 移植：顶部执行配置卡 + 套件表格 + 双栏编辑/历史弹窗） -->
       <section class="panel" id="panel-suites" hidden>
         <div class="card">
           <div class="cardhead">

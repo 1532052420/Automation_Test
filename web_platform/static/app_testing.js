@@ -29,9 +29,6 @@ function showToast(msg, ok) {
 
 const AT_PREFIX = '/app-testing';
 let _orchSteps = [];       // 当前编排的步骤 [{type, element, param, desc}]
-let _orchSelStep = -1;     // 画布中选中的步骤下标（-1 = 未选，右栏显示用例信息）
-let _orchMeta = null;      // 正在编辑用例的原始信息
-let _orchCaseId = 0;       // 正在编辑的用例 id（0 = 新建）
 let _atElements = [];        // 元素库（定位器/元素管理同一份数据）
 let _atElFiles = [];         // 元素文件清单
 let _cases = [];           // 用例列表（用例面板 / 套件弹窗共用）
@@ -225,8 +222,6 @@ async function deleteProj(pid) {
   toast(d.ok ? (d.msg || '已删除') : (d.msg || '删除失败'), d.ok);
   if (d.ok) {
     await loadProjects();
-    await loadOrchData();
-    if (_orchCaseId && !_cases.some(c => c.id === _orchCaseId)) selectOrchCase(0);   // 正在编辑的用例随项目删除 → 重置表单
     renderCaseList();
     renderSuites();
   }
@@ -757,192 +752,6 @@ async function cnFinish() {
   else if (n) toast('本次共写入 ' + n + ' 步，已入库框架文件（④ 用例名称为空或未选目标用例，未登记）', true);
 }
 
-/* ================= 用例编排（SceneBuilder：顶栏 + 三栏） ================= */
-function renderPalette() {
-  const box = $('#orchTree');
-  let html = '';
-  STEP_GROUPS.forEach(g => {
-    html += '<div class="palette-group">' + g + '</div><div class="palette-items">';
-    Object.keys(STEP_META).filter(t => STEP_META[t].group === g).forEach(t => {
-      html += '<span class="palette-item orch-add" draggable="true" data-type="' + t + '" title="' +
-        STEP_META[t].label + '">' + STEP_META[t].label + '</span>';
-    });
-    html += '</div>';
-  });
-  box.innerHTML = html;
-}
-
-function renderOrchSteps() {
-  const box = $('#orchSteps');
-  if (!_orchSteps.length) {
-    box.innerHTML = '<div class="orch-empty">从左侧点选操作加入步骤并选元素；拖拽可调整顺序，点步骤卡在右栏配置</div>';
-    return;
-  }
-  box.innerHTML = _orchSteps.map((s, i) => {
-    const meta = STEP_META[s.type] || {};
-    const miss = (meta.el && !s.element) ? ' missing' : '';
-    return '<div class="orch-step' + (i === _orchSelStep ? ' active' : '') + miss + '" draggable="true" data-idx="' + i + '">' +
-      '<span class="drag-handle">⋮⋮</span><span class="orch-index">' + (i + 1) + '</span>' +
-      '<span class="orch-step-name">' + esc(s.desc || meta.label || s.type) + '</span>' +
-      '<span class="orch-step-node">' + esc((meta.label || s.type) + (s.element ? ' · ' + s.element : '')) + '</span>' +
-      '<button class="orch-mini" data-dup="' + i + '" title="复制此步骤">⧉</button>' +
-      '<button class="orch-del" data-del="' + i + '" title="移除">✕</button></div>';
-  }).join('');
-}
-
-function _elementOptions(selected) {
-  const file = $('#orchElemFile').value;
-  const pool = _atElements.filter(e => !file || e.file === file);
-  return '<option value="">— 选择元素 —</option>' +
-    pool.map(e => '<option value="' + esc(e.name) + '"' +
-      (e.name === selected ? ' selected' : '') + '>' + esc(e.name) +
-      (e.desc ? '（' + esc(e.desc) + '）' : '') + '</option>').join('');
-}
-
-function renderOrchCfg() {
-  const box = $('#orchCfg'), title = $('#orchCfgTitle');
-  if (_orchSelStep >= 0 && _orchSteps[_orchSelStep]) {
-    const s = _orchSteps[_orchSelStep];
-    const meta = STEP_META[s.type] || { param: null };
-    title.textContent = '步骤配置 · 第 ' + (_orchSelStep + 1) + ' 步';
-    box.innerHTML =
-      '<div class="field"><label>操作类型</label>' +
-      '<select id="cfgType">' + Object.keys(STEP_META).map(t =>
-        '<option value="' + t + '"' + (t === s.type ? ' selected' : '') + '>' + STEP_META[t].label + '</option>').join('') + '</select></div>' +
-      '<div class="field"><label>元素（来自元素库）</label>' +
-      '<select id="cfgElement">' + _elementOptions(s.element) + '</select></div>' +
-      (meta.param
-        ? '<div class="field"><label>参数：' + meta.param + '</label>' +
-          '<input type="text" id="cfgParam" value="' + esc(s.param || '') + '" placeholder="' + esc(meta.param) + '"></div>'
-        : '') +
-      '<div class="field"><label>步骤描述（用例与报告里展示）</label>' +
-      '<input type="text" id="cfgDesc" value="' + esc(s.desc || '') + '" placeholder="缺省自动生成"></div>' +
-      '<div class="orchops"><button class="danger mini" id="cfgDel">删除此步骤</button></div>';
-    $('#cfgType').addEventListener('change', () => { s.type = $('#cfgType').value; renderOrchCfg(); renderOrchSteps(); });
-    $('#cfgElement').addEventListener('change', () => { s.element = $('#cfgElement').value; renderOrchSteps(); });
-    const pi = $('#cfgParam');
-    if (pi) pi.addEventListener('input', () => { s.param = pi.value; });
-    $('#cfgDesc').addEventListener('input', () => { s.desc = $('#cfgDesc').value; renderOrchSteps(); });
-    $('#cfgDel').addEventListener('click', () => removeStep(_orchSelStep));
-  } else {
-    title.textContent = '用例信息';
-    box.innerHTML = (_orchCaseId
-      ? '<div class="cfg-meta">元素文件 <b>' + esc(_orchMeta && _orchMeta.elements_file || '—') + '</b></div>' +
-        '<div class="cfg-meta">步骤数 <b>' + _orchSteps.length + '</b></div>' +
-        '<div class="cfg-meta">创建人 <b>' + esc(_orchMeta && _orchMeta.created_by || '—') + '</b></div>' +
-        '<div class="cfg-meta">创建时间 <b>' + fmtTs(_orchMeta && _orchMeta.created_at) + '</b></div>'
-      : '<div class="cfg-meta muted">新用例 —— 顶栏选元素文件并填名称，点左侧操作编排步骤后「保存用例」</div>') +
-      '<p class="muted" style="font-size:12px">保存时平台会把编排编译成页面 + 用例文件（元素只引用不复制），自动进入「执行用例」与执行链路。</p>';
-  }
-}
-
-function selectStep(i) {
-  _orchSelStep = (i === _orchSelStep ? -1 : i);
-  renderOrchSteps();
-  renderOrchCfg();
-}
-
-function moveStep(from, to) {
-  const [s] = _orchSteps.splice(from, 1);
-  _orchSteps.splice(from < to ? to - 1 : to, 0, s);
-  if (_orchSelStep === from) _orchSelStep = from < to ? to - 1 : to;
-  else if (from < to && _orchSelStep > from && _orchSelStep <= to) _orchSelStep--;
-  else if (from > to && _orchSelStep >= to && _orchSelStep < from) _orchSelStep++;
-  renderOrchSteps();
-}
-
-function removeStep(i) {
-  _orchSteps.splice(i, 1);
-  if (_orchSelStep === i) _orchSelStep = -1;
-  else if (_orchSelStep > i) _orchSelStep--;
-  renderOrchSteps();
-  renderOrchCfg();
-}
-
-function addOrchStep(type, at) {
-  const step = { type, element: '', param: '', desc: '' };
-  if (at === undefined || at >= _orchSteps.length) _orchSteps.push(step);
-  else _orchSteps.splice(at, 0, step);
-  _orchSelStep = _orchSteps.indexOf(step);
-  renderOrchSteps();
-  renderOrchCfg();
-}
-
-async function loadOrchData() {
-  const [el, cases] = await Promise.all([api('/api/appui/elements'), api(AT_PREFIX + '/api/cases')]);
-  _atElements = el.ok ? (el.elements || []) : [];
-  _atElFiles = el.ok ? (el.files || []) : [];
-  _cases = cases.ok ? (cases.results || []) : [];
-  const cur = $('#orchElemFile').value;
-  $('#orchElemFile').innerHTML = '<option value="">— 选择元素文件 —</option>' +
-    _atElFiles.filter(f => !f.includes('_backup')).map(f =>
-      '<option value="' + esc(f) + '"' + (f === cur ? ' selected' : '') + '>' + esc(f) + '</option>').join('');
-  refreshOrchCaseOptions();
-  renderOrchSteps();
-  renderOrchCfg();
-}
-
-function refreshOrchCaseOptions() {
-  /* 只重建下拉选项（不动正在编辑的表单/画布），保持当前选中项 */
-  const sel = $('#orchSel');
-  sel.innerHTML = '<option value="">＋ 新建用例</option>' +
-    _cases.map(c => '<option value="' + c.id + '">' + esc(c.name) + '（' + (c.steps || []).length + ' 步）</option>').join('');
-  if (_orchCaseId && _cases.some(c => c.id === _orchCaseId)) sel.value = _orchCaseId;
-}
-
-function selectOrchCase(id) {
-  _orchCaseId = +id || 0;
-  const c = _cases.find(x => x.id === _orchCaseId);
-  _orchSteps = c ? (c.steps || []).map(s => ({
-    type: s.type, element: s.element || '', param: s.param || '', desc: s.desc || '' })) : [];
-  _orchMeta = c || null;
-  _orchSelStep = -1;
-  $('#orchName').value = c ? c.name : '';
-  $('#orchDesc').value = c ? (c.description || '') : '';
-  $('#orchBy').value = c && c.created_by ? c.created_by : '';
-  if (c && c.elements_file) $('#orchElemFile').value = c.elements_file;
-  $('#orchProj').value = c && c.project_id ? c.project_id : '';
-  $('#btnOrchRun').disabled = !c;
-  renderOrchSteps();
-  renderOrchCfg();
-}
-
-async function saveOrchCase() {
-  const name = ($('#orchName').value || '').trim();
-  if (!name) return toast('请填写用例名称', false);
-  if (!$('#orchElemFile').value) return toast('请选择元素文件（元素来自定位器采集的元素库）', false);
-  if (!_orchSteps.length) return toast('请至少编排一个步骤', false);
-  const body = { name, description: $('#orchDesc').value.trim(),
-                 created_by: $('#orchBy').value.trim(),
-                 project_id: $('#orchProj').value || '',
-                 elements_file: $('#orchElemFile').value, steps: _orchSteps };
-  const d = _orchCaseId ? await api(AT_PREFIX + '/api/cases/' + _orchCaseId,
-    { method: 'PUT', body: JSON.stringify(body) })
-    : await postJson(AT_PREFIX + '/api/cases', body);
-  if (!d.ok) return toast(d.msg || '保存失败', false);
-  toast('用例已保存并生成执行文件', true);
-  await loadOrchData();
-  $('#orchSel').value = d.case.id;
-  selectOrchCase(d.case.id);
-  renderCaseList();   // 「测试用例」列表与套件表中的用例名同步刷新
-  renderSuites();
-}
-
-function _runBody() {
-  // 前后置清理走「前后置清理」卡片保存的持久化配置，执行时不随请求传
-  return { conf_file: $('#suiteConf') ? $('#suiteConf').value : '',
-           overrides: { udid: ($('#suiteUdid') && $('#suiteUdid').value.trim()) || '' },
-           owner: ($('#suiteOwner') && $('#suiteOwner').value.trim()) || '' };
-}
-
-async function runOrchCase() {
-  if (!_orchCaseId) return;
-  const d = await postJson(AT_PREFIX + '/api/cases/' + _orchCaseId + '/run', _runBody());
-  if (!d.ok) return toast(d.msg || '执行失败', false);
-  /* 不跳转：留在编排页继续编辑，进度到「测试报告」面板或 /runs 详情看 */
-  toast('用例已开始执行 → Run ' + d.run_id + '，进度见「测试报告」面板', true);
-}
-
 /* ================= 测试用例列表（数据源：框架 cases/app_ui 测试用例 + 平台登记信息按 node 合并） ================= */
 let _fwCases = [];        // 框架用例行 [{node, file, class, method, step_count, case|null}]
 let _mvNode = null;       // 移动到项目弹窗当前操作的框架用例 node
@@ -1243,7 +1052,7 @@ function bindCanvasDnD(box, onReorder, onExternal) {
 
 /* ================= 面板初始化（initRun 调用） ================= */
 async function appTestingInit() {
-  if (!$('#panel-orch')) return;
+  if (!$('#panel-projects')) return;   // 全部面板绑定挂在项目管理面板存在性上（编排面板已删除）
 
   /* ---- 项目管理 ---- */
   $('#btnProjNew').addEventListener('click', () => openProjModal(0));
@@ -1269,43 +1078,6 @@ async function appTestingInit() {
   $('#projDetailMask').addEventListener('click', e => {
     if (e.target === e.currentTarget) e.currentTarget.classList.remove('show');
   });
-
-  /* ---- 编排：顶栏 ---- */
-  $('#orchSel').addEventListener('change', () => selectOrchCase($('#orchSel').value));
-  $('#orchElemFile').addEventListener('change', () => { renderOrchCfg(); });
-  $('#btnOrchSave').addEventListener('click', saveOrchCase);
-  $('#btnOrchRun').addEventListener('click', runOrchCase);
-
-  /* ---- 编排：左栏操作面板 ---- */
-  renderPalette();
-  $('#orchTree').addEventListener('click', e => {
-    const add = e.target.closest('.orch-add');
-    if (add) addOrchStep(add.dataset.type);
-  });
-  $('#orchTree').addEventListener('dragstart', e => {   // 拖入时的数据（与画布 drop 对接）
-    const add = e.target.closest('.orch-add');
-    if (add) {
-      e.dataTransfer.setData('text/plain', add.dataset.type);
-      e.dataTransfer.effectAllowed = 'copy';
-    }
-  });
-
-  /* ---- 编排：中栏画布（点选 / 复制 / 删除 / 排序 / 拖入） ---- */
-  $('#orchSteps').addEventListener('click', e => {
-    const dup = e.target.closest('[data-dup]');
-    if (dup) {
-      const i = +dup.dataset.dup;
-      _orchSteps.splice(i + 1, 0, { ..._orchSteps[i] });
-      renderOrchSteps();
-      return;
-    }
-    const del = e.target.closest('[data-del]');
-    if (del) return removeStep(+del.dataset.del);
-    const card = e.target.closest('.orch-step');
-    if (card) selectStep(+card.dataset.idx);
-  });
-  bindCanvasDnD($('#orchSteps'), moveStep,
-    (type, at) => { addOrchStep(type, at); });
 
   /* ---- 测试用例列表 ---- */
   $('#clSearch').addEventListener('input', () => { _clPage = 1; renderCaseList(); });
@@ -1594,8 +1366,6 @@ async function appTestingInit() {
       const d = await del(AT_PREFIX + '/api/case/file?file=' + encodeURIComponent(f));
       toast(d.ok ? '已删除' : (d.msg || '删除失败'), d.ok);
       if (d.ok) {
-        refreshOrchCaseOptions();
-        if (_orchCaseId && !_cases.some(c => c.id === _orchCaseId)) selectOrchCase(0);
         renderCaseList();
         renderSuites();
         await loadCaseSelectPanel();   // 执行用例面板同步刷新（删掉的节点立即消失）
@@ -1655,7 +1425,6 @@ async function appTestingInit() {
   });
 
   await loadProjects();
-  await loadOrchData();
   await renderCaseList();
   await renderSuites();
 }

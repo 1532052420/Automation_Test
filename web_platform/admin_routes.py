@@ -70,16 +70,6 @@ def _save_meta(meta):
         f.write(json.dumps(meta, ensure_ascii=False, indent=1))
 
 
-def _check_token():
-    """返回鉴权状态字符串：'off'（本机模式）/ 'on'（口令校验通过）"""
-    token = os.environ.get('ADMIN_TOKEN', '').strip()
-    if not token:
-        return 'off'
-    if request.headers.get('X-Admin-Token', '') != token:
-        raise AdminError('访问口令不正确（用例管理已启用口令保护）')
-    return 'on'
-
-
 def _resolve_managed_path(full_rel):
     """把相对项目根的路径解析到受管目录之一，返回 (abs_path, base_kind, rel_to_base)"""
     rel = (full_rel or '').strip().replace('\\', '/')
@@ -265,47 +255,6 @@ def _read_package_zip(zf):
 
 @bp.route('/admin')
 def page_admin():
-    """用例管理页已并入 AppUI 自动化页（二级菜单「用例管理」）；旧链接 302 过去"""
-    return redirect('/run#admin')
+    """旧「用例管理页」链接兼容：302 到执行用例页（上传面板已随菜单下线删除）"""
+    return redirect('/run')
 
-
-@bp.route('/api/admin/upload_zip_content', methods=['POST'])
-def api_admin_upload_zip_content():
-    """用例包入库（JSON 形式）：{package, uploader, files:[{dir,name,content}]}。
-    元素定位器「💾 保存到框架」与平台同进程，直接调用 import_case_package，
-    不再依赖任何外部端口。"""
-    try:
-        auth = _check_token()
-    except AdminError as e:
-        return jsonify({'ok': False, 'msg': str(e)}), 401
-    data = request.get_json(silent=True) or {}
-    payload, status = import_case_package(
-        (data.get('package') or '').strip(), data.get('files'),
-        (data.get('uploader') or 'locator').strip()[:32])
-    payload['auth'] = auth
-    return jsonify(payload), status
-
-
-@bp.route('/api/admin/upload_package', methods=['POST'])
-def api_admin_upload_package():
-    """用例包入库（multipart 上传 .zip）：用例管理「📦 上传用例包」入口。
-    zip 内一级目录须为 cases/ pages/ elements/（与定位器「⬇ 下载用例包」产出一致）。"""
-    try:
-        auth = _check_token()
-    except AdminError as e:
-        return jsonify({'ok': False, 'msg': str(e)}), 401
-    f = request.files.get('file')
-    if f is None or not f.filename:
-        return jsonify({'ok': False, 'msg': '未选择文件'}), 400
-    try:
-        zf = zipfile.ZipFile(io.BytesIO(f.read()))
-    except zipfile.BadZipFile:
-        return jsonify({'ok': False, 'msg': '不是合法的 zip 文件'}), 400
-    files = _read_package_zip(zf)
-    if isinstance(files, str):
-        return jsonify({'ok': False, 'msg': files}), 400
-    payload, status = import_case_package(
-        os.path.splitext(os.path.basename(f.filename))[0], files,
-        (request.form.get('uploader') or 'admin').strip()[:32])
-    payload['auth'] = auth
-    return jsonify(payload), status
