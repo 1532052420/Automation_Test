@@ -1137,7 +1137,11 @@ function showRunPanel(name) {
   }
   if (name === 'caseedit') {
     // 步骤编辑驻留：刷新后凭会话保存的编辑上下文重进（无上下文则回用例管理）。
-    // _ceOpening 守卫：openCaseEditor 内部会再调 showRunPanel('caseedit')，防止无限递归
+    // _ceOpening 守卫（2026-10-20 补实现——注释早有、代码缺失，导致驻留 IIFE 自激振荡：
+    // openCaseEditor 末尾 showRunPanel('caseedit') 无条件再启动驻留 IIFE → 无限循环，
+    // 用户切到其他菜单 1~2 秒内被拽回步骤编辑）：openCaseEditor 执行期间直接跳过驻留，
+    // 面板切换/渲染已由 openCaseEditor 自身完成。
+    if (window._ceOpening) return;
     var savedCe = null;
     try { savedCe = JSON.parse(sessionStorage.getItem('ceLast') || 'null'); } catch (e) {}
     if (savedCe && savedCe.node) {
