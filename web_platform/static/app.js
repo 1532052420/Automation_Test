@@ -1590,6 +1590,7 @@ function initElementsPanel() {
     if (e.target === $('#pfEditMask')) $('#pfEditMask').classList.remove('show');
   });
   $('#pfEditSave').addEventListener('click', savePageFile);
+  loadElements();     // 元素文件列表初始加载（曾误删致进面板无数据——新增调用勿替换既有调用）
   loadPageFiles();
 }
 
