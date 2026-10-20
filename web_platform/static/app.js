@@ -2079,3 +2079,56 @@ _wirelessWatch();
 
 /* ③ 配对连接成功：横幅明确提示「连接成功」 */
 
+
+
+/* ================= 平台更新感知（重启/发版 → 已打开页面自动提示刷新） =================
+   浏览器里的页面是「快照」：平台重启、静态文件更新后，旧 JS 不会自己重载——
+   这是「重启了但页面还是旧样子」的真正原因（本平台全局 no-store，不存在缓存给旧文件）。
+   本守护在轮询（30s）+ 窗口回前台时比对后端版本号：
+   - 版本变化（重启带新版本/发版）→ 横幅提示刷新；
+   - 连续 ≥2 次探活失败后恢复（重启窗口期，同版本重启也能感知）→ 同样提示。
+   点击刷新 = location.reload()：全局 no-store 下普通重载即全量拉新，等价「强刷」
+   （JS 无强刷 API，浏览器也不允许网页清缓存——好在 no-store 让这两步天然多余）。
+   不做全自动重载：用户可能正在填表单/改步骤，自动重载会毁掉未保存内容。
+   iframe 内页（embedded）不挂载，由外层页面统一处理。 */
+(function () {
+  if (document.documentElement.classList.contains('embedded')) return;
+  var seen = null, down = 0, shown = false;
+  function check() {
+    fetch('/api/changelog', { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        var v = d && d.version ? String(d.version) : '';
+        if (!v) return;
+        if (seen === null) { seen = v; return; }   // 首次成功探活 = 基线
+        if (!shown && (v !== seen || down >= 2)) {
+          show(v, v !== seen
+            ? '平台已更新至 v' + v + '，当前页面仍是旧版'
+            : '平台服务在页面打开期间重启过，当前页面可能已过时');
+        }
+        down = 0;
+      })
+      .catch(function () { down++; });
+  }
+  function show(v, msg) {
+    if (shown) return;
+    shown = true;
+    var bar = document.createElement('div');
+    bar.className = 'update-banner';
+    var txt = document.createElement('span');
+    txt.textContent = '⟳ ' + msg;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '刷新页面';
+    btn.addEventListener('click', function () { location.reload(); });
+    bar.appendChild(txt);
+    bar.appendChild(btn);
+    document.body.appendChild(bar);
+  }
+  window.__showUpdateBanner = show;   // 测试钩子：浏览器控制台可手动触发验证样式
+  check();
+  setInterval(check, 30000);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) check();
+  });
+})();
