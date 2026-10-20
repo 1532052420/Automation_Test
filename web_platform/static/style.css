@@ -934,6 +934,9 @@ html.night ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, .26
 /* 子页 embedded 态（目前仅报告页）：自带导航已隐藏，main 顶部不再预留导航高度，
    内容整体上移、顶部只留 20px；底部间距交给外层页面自然滚动 */
 html.embedded main { padding: 20px 22px 0; }
+/* 内页文档禁滚动：iframe 高度由 app.js 按内容自适应，外层页面是唯一滚动条——
+   内层若能滚会抢走滚轮形成双滚动条（表格横向滚动已由 .tblwrap 自带 overflow 承接） */
+html.embedded { overflow: hidden; }
 
 /* 报告列表卡底部「清空全部数据」条：右对齐弱收尾（无边框线，不与卡底形成截断感） */
 .report-foot { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 14px; }

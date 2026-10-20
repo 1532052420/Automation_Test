@@ -1176,10 +1176,14 @@ function showRunPanel(name) {
         };
         fit();
         try {
-          if (window.ResizeObserver && f.contentDocument.documentElement) {
-            new ResizeObserver(fit).observe(f.contentDocument.documentElement);
+          if (window.ResizeObserver) {
+            const ro = new ResizeObserver(fit);
+            ro.observe(f.contentDocument.documentElement);
+            ro.observe(f.contentDocument.body);
           }
         } catch (e) {}
+        /* 异步数据（报告列表/执行详情）落地后内容还会长高，定时补测兜底 */
+        [300, 1000, 2500].forEach(t => setTimeout(fit, t));
       });
     }
   }
