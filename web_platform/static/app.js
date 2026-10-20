@@ -1127,6 +1127,7 @@ function showRunPanel(name) {
   setCrumbSub(RUN_PANEL_NAMES[name]);
   if (name === 'asserts' && typeof loadAssertions === 'function') loadAssertions();
   if (name === 'visuals' && typeof loadVisualAssets === 'function') loadVisualAssets();
+  if (name === 'projects' && typeof loadProjects === 'function') loadProjects();   // 进入项目管理即查询列表
   /* 测试报告面板：首次进入才加载 iframe（含 hash 深链/刷新场景——
      此前只挂在菜单点击上，刷新后停在报告页 iframe 恒空 → 白屏） */
   if (name === 'report') {
