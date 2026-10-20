@@ -10,7 +10,7 @@
 两端不再各自硬编码版本号。
 """
 
-APP_VERSION = '6.16.01'
+APP_VERSION = '6.16.02'
 
 # 最新版本在最前；time 精确到秒（YYYY-MM-DD HH:MM:SS）
 # 版本号格式 x.xx.xx（主版本 1-2 位 · 次版本固定 2 位 · 修订号固定 2 位，99 进位次版本）
@@ -18,6 +18,16 @@ APP_VERSION = '6.16.01'
 # 旧线历史条目保留原始记录，不回溯改写
 # 每条变更一句话 10~20 字，只说改了什么（详细背景见项目 memory 与设计文档）
 CHANGELOG = [
+    {
+        'version': '6.16.02',
+        'time': '2026-10-20 11:17:40',
+        'title': '项目级 skill 双镜像逐字节对齐，rollback-cleanup 纳入版本管理',
+        'changes': [
+            '.workbuddy/skills 与 .zcode/skills 两处镜像完全一致：补齐 frontend-design、webapp-testing 的上游 LICENSE.txt（此前仅镜像侧有）',
+            'rollback-cleanup（回滚后残留清查清单）此前游离于 git 之外，现纳入版本管理，团队 clone 即得全部规范',
+            'qa-engineer-agent 的 README.md 同步至镜像侧，两侧目录 diff 零差异',
+        ],
+    },
     {
         'version': '6.16.01',
         'time': '2026-10-20 11:20:00',
