@@ -1184,59 +1184,25 @@ async function appTestingInit() {
     });
   }
 
-  /* ---- 步骤拖拽排序（手柄长按/按下拖动，松手落位；保存后顺序写入文件） ---- */
-  let _ceDrag = null;
-  function ceStartDrag(e, i, row) {
-    if (!_ceCtx || _ceDrag) return;
-    if (_ceDelSids.indexOf((_cePending[i] || {})._sid) >= 0) return;   // 已删除行不参与拖动
-    e.preventDefault();
-    const grip = e.currentTarget;
-    try { grip.setPointerCapture(e.pointerId); } catch (_) {}
-    _ceDrag = { i, row, grip, startY: e.clientY };
-    row.classList.add('ce-dragging');
-    const onMove = function (ev) {
-      const dy = ev.clientY - _ceDrag.startY;
-      if (Math.abs(dy) > 4) _ceDrag.moved = true;
-      row.style.transform = 'translateY(' + dy + 'px)';
-    };
-    const onUp = function (ev) {
-      grip.removeEventListener('pointermove', onMove);
-      grip.removeEventListener('pointerup', onUp);
-      grip.removeEventListener('pointercancel', onUp);
-      row.classList.remove('ce-dragging');
-      row.style.transform = '';
-      const dy = ev.clientY - _ceDrag.startY;
-      const drag = _ceDrag; _ceDrag = null;
-      if (Math.abs(dy) < 6) return;                  // 位移过小视为点击，不重排
-      const slot = ceDropSlot(ev.clientY, row);
-      ceApplyReorder(drag.i, slot);
-    };
-    grip.addEventListener('pointermove', onMove);
-    grip.addEventListener('pointerup', onUp);
-    grip.addEventListener('pointercancel', onUp);
-  }
-  function ceDropSlot(pointerY, dragRow) {
-    const rows = [...document.querySelectorAll('#ceSteps .ce-step')].filter(r => r !== dragRow);
-    let slot = rows.length;
-    for (let p = 0; p < rows.length; p++) {
-      const r = rows[p].getBoundingClientRect();
-      if (pointerY < r.top + r.height / 2) { slot = p; break; }
-    }
-    return slot;
-  }
-  function ceApplyReorder(i, slot) {
+  /* ---- 步骤排序（↑/↓ 相邻移动，2026-10-20 起替代拖拽；保存后顺序写入文件） ----
+     过滤态下与「可见序中相邻步骤」交换；已标记删除的步骤不参与移动 */
+  function ceMoveStep(i, dir) {
+    if (!_ceCtx) return;
+    if (_ceDelSids.indexOf((_cePending[i] || {})._sid) >= 0) return;
     const kw = ($('#ceQ').value || '').trim().toLowerCase();
     const visIdxs = [];
     (_cePending || []).forEach(function (s, idx) {
       const t = ceTypeMeta(s.type);
       if (!kw || [s.desc, s.element, s.param, t.label].some(v => String(v || '').toLowerCase().includes(kw))) visIdxs.push(idx);
     });
-    const others = visIdxs.filter(function (idx) { return idx !== i; });
-    let before = slot < others.length ? others[slot] : (_cePending.length);
-    const item = _cePending.splice(i, 1)[0];
-    let j = before; if (j > i) j -= 1;
-    _cePending.splice(j, 0, item);
-    _ceSel = j;
+    const pos = visIdxs.indexOf(i);
+    if (pos < 0) return;
+    const target = visIdxs[pos + dir];
+    if (target === undefined) return;
+    const item = _cePending[i];                      // 与可见序中相邻步骤直接交换
+    _cePending[i] = _cePending[target];
+    _cePending[target] = item;
+    _ceSel = target;
     $('#ceDirty').style.display = '';               // 顺序变化待保存（保存即写入新顺序）
     renderCeSteps(); renderCeEditor();
   }
@@ -1259,16 +1225,23 @@ async function appTestingInit() {
         : (_ceModSids.indexOf(s._sid) >= 0 ? ' <span class="ce-badge" style="background:#b26a00">已修改</span>' : ''));
       const row = document.createElement('div');
       row.className = 'ce-step' + (i === _ceSel ? ' sel' : '') + (deleted ? ' ce-del' : '');
+      const isFirst = items.length > 0 && items[0].i === i;
+      const isLast = items.length > 0 && items[items.length - 1].i === i;
+      let moveBtns = '';
+      if (!deleted && !isFirst) moveBtns += '<button type="button" class="ce-mv" data-dir="-1" title="上移一步">↑</button>';
+      if (!deleted && !isLast) moveBtns += '<button type="button" class="ce-mv" data-dir="1" title="下移一步">↓</button>';
       row.innerHTML =
-        '<span class="ce-grip" title="拖动调整顺序">☰</span>' +
+        '<span class="ce-move">' + moveBtns + '</span>' +
         '<span class="ce-node" style="background:' + (CE_GROUP_CSS[t.group] || '#86868b') + '">' + activeNo + '</span>' +
         '<div class="ce-main"><div class="ce-type" style="color:' + (CE_GROUP_CSS[t.group] || '#86868b') + '">' + esc(t.label) + badge + '</div>' +
         '<div class="ce-desc">' + (s.element ? esc(s.element) + (s.param ? ' · <b>' + esc(s.param) + '</b>' : '')
           : (s.param ? '<b>' + esc(s.param) + '</b>' : '')) +
         (s.desc ? ' <span style="color:var(--muted2)">' + esc(s.desc) + '</span>' : '') + '</div></div><span></span>';
       row.addEventListener('click', () => { _ceSel = i; renderCeSteps(); renderCeEditor(); });
-      const grip = row.querySelector('.ce-grip');
-      grip.addEventListener('pointerdown', e => ceStartDrag(e, i, row));
+      row.querySelectorAll('.ce-mv').forEach(b => b.addEventListener('click', e => {
+        e.stopPropagation();
+        ceMoveStep(i, +b.dataset.dir);
+      }));
       box.appendChild(row);
     });
     if (!items.length) box.innerHTML = '<div class="ce-none">没有匹配的步骤</div>';
