@@ -92,6 +92,7 @@ async function loadProjects() {
    只重建选项并尽量保留当前选中值，不打断正在填的表单。 */
 function fillProjectSelects() {
   const fill = (sel, opts) => {
+    if (!sel) return;   // 面板已下线（如用例编排）时对应下拉不存在，跳过不报错
     const cur = sel.value;
     sel.innerHTML = opts.map(o =>
       '<option value="' + esc(o.v) + '"' + (String(o.v) === cur ? ' selected' : '') + '>' + esc(o.t) + '</option>').join('');

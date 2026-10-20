@@ -1128,6 +1128,10 @@ function showRunPanel(name) {
   if (name === 'asserts' && typeof loadAssertions === 'function') loadAssertions();
   if (name === 'visuals' && typeof loadVisualAssets === 'function') loadVisualAssets();
   if (name === 'projects' && typeof loadProjects === 'function') loadProjects();   // 进入项目管理即查询列表
+  if (name === 'caselist' && typeof loadProjects === 'function') {
+    // 进入用例管理即加载：先项目数据（列表列名映射用），再用例列表
+    (async () => { await loadProjects(); if (typeof renderCaseList === 'function') await renderCaseList(); })();
+  }
   /* 测试报告面板：首次进入才加载 iframe（含 hash 深链/刷新场景——
      此前只挂在菜单点击上，刷新后停在报告页 iframe 恒空 → 白屏） */
   if (name === 'report') {
