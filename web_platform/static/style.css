@@ -926,8 +926,18 @@ html.night ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, .26
 .case-item b { display: block; color: var(--ink); font-size: 13px; }
 .case-item .path { font-size: 11.5px; }
 
-/* 测试报告面板：iframe 嵌入 /report（子页 embedded 态自动隐藏自带导航） */
-.report-frame { width: 100%; height: calc(100vh - 200px); min-height: 480px; border: 0; border-radius: var(--r-card); background: var(--panel); box-shadow: var(--shadow); }
+/* 测试报告面板：iframe 嵌入 /report（子页 embedded 态自动隐藏自带导航）。
+   高度由 app.js 按内容自适应——固定高度会让列表在 iframe 内部滚动，
+   底部看似被截断、外层阴影圆角把内容框住，与测试套件等普通面板观感不一致 */
+.report-frame { width: 100%; height: calc(100vh - 200px); min-height: 480px; border: 0; background: transparent; }
+
+/* 子页 embedded 态（目前仅报告页）：自带导航已隐藏，main 顶部不再预留导航高度，
+   内容整体上移、顶部只留 20px；底部间距交给外层页面自然滚动 */
+html.embedded main { padding: 20px 22px 0; }
+
+/* 报告列表卡底部「清空全部数据」条：右对齐弱收尾（无边框线，不与卡底形成截断感） */
+.report-foot { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 14px; }
+.report-foot .muted { font-size: 11.5px; }
 
 /* 用例编排顶栏（SceneBuilder 头部：用例选择 + 名称/描述/创建人 + 保存/执行） */
 .orchtoolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }

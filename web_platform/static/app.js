@@ -1159,7 +1159,29 @@ function showRunPanel(name) {
      此前只挂在菜单点击上，刷新后停在报告页 iframe 恒空 → 白屏） */
   if (name === 'report') {
     const f = $('#reportFrame');
-    if (f && !f.src) f.src = '/report';
+    if (f && !f.src) {
+      f.src = '/report';
+      /* 高度自适应：固定高度会让列表在 iframe 内部滚动，底部看似被截断、
+         内容像套在框里。同源可测内页实际高度；RO 监听内页文档尺寸，
+         列表异步渲染、详情展开、窗口缩放重排时均跟随 */
+      f.addEventListener('load', () => {
+        let last = 0;
+        const fit = () => {
+          try {
+            const d = f.contentDocument;
+            if (!d || !d.body) return;
+            const h = Math.max(d.documentElement.scrollHeight, d.body.scrollHeight);
+            if (h > 0 && Math.abs(h - last) > 1) { last = h; f.style.height = h + 'px'; }
+          } catch (e) { /* 异常时保持 CSS 兜底高度 */ }
+        };
+        fit();
+        try {
+          if (window.ResizeObserver && f.contentDocument.documentElement) {
+            new ResizeObserver(fit).observe(f.contentDocument.documentElement);
+          }
+        } catch (e) {}
+      });
+    }
   }
 }
 function initRunPanels() {
