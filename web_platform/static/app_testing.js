@@ -769,7 +769,8 @@ async function saveCaseCreate() {
     const d = await postJson('/api/cases/file/create', {
       stem: stem,
       cn_name: $('#caseCCnName').value.trim(),
-      page_file: $('#caseCPage').value.trim(),
+      page_file: ($('#caseCPage').value === '__page_new__')
+        ? $('#caseCPageNew').value.trim() : $('#caseCPage').value.trim(),
       element_file: $('#caseCElement').value,
     });
     toast(d.msg || (d.ok ? '已创建' : '创建失败'), !!d.ok);
@@ -1093,7 +1094,9 @@ async function appTestingInit() {
   $('#btnClNew').addEventListener('click', async () => {
     $('#caseCStem').value = '';
     $('#caseCCnName').value = '';
-    $('#caseCPage').value = '';
+    const pageSel = $('#caseCPage');
+    pageSel.innerHTML = '<option value="">自动派生（按用例名生成，如 settingsflowPage.py）</option>';
+    $('#caseCPageNew').value = ''; $('#caseCPageNew').style.display = 'none';
     const sel = $('#caseCElement');
     sel.innerHTML = '<option value="">自动派生（同名 Elements.py，已存在则复用）</option>';
     $('#caseCreateMask').classList.add('show');
@@ -1102,6 +1105,16 @@ async function appTestingInit() {
       const d = await api('/api/appui/elements');
       (d.existing_files || []).forEach(f => sel.add(new Option(f + '（复用已有）', f)));
     } catch (_) {}   // 元素文件列表拉取失败不阻塞：保留自动派生选项
+    /* 页面文件下拉：列出全部现有 Page 文件（后端枚举），可直接选复用 */
+    try {
+      const d = await fetch('/api/appui/pages').then(x => x.json());
+      (d.pages || []).forEach(p => pageSel.add(new Option(p + '（复用已有）', p)));
+      pageSel.add(new Option('✏️ 自定义输入…', '__page_new__'));
+      pageSel.onchange = function () {
+        $('#caseCPageNew').style.display = this.value === '__page_new__' ? '' : 'none';
+        if (this.value === '__page_new__') $('#caseCPageNew').focus();
+      };
+    } catch (_) {}
   });
   $('#caseCCancel').addEventListener('click', () => $('#caseCreateMask').classList.remove('show'));
   $('#caseCreateMask').addEventListener('click', (e) => {

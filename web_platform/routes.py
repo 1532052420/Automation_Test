@@ -532,6 +532,17 @@ def api_visual_assets_debug(name):
     return jsonify({'ok': ok, **({'data': r} if ok else {'msg': r})})
 
 
+@bp.route('/api/appui/pages')
+def api_appui_pages():
+    """现有页面对象文件列表（新建用例「页面文件名」下拉复用已有）"""
+    import sys
+    el_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'element_locator')
+    if el_dir not in sys.path:
+        sys.path.insert(0, el_dir)
+    from element_locator import case_generator as cg
+    return jsonify({'ok': True, 'pages': cg.list_page_files()})
+
+
 @bp.route('/api/appui/visual_assets/debug_free', methods=['POST'])
 def api_visual_assets_debug_free():
     """自由调试比对（零落盘）：手动上传基线图与实际图（multipart：baseline / actual 字段），
