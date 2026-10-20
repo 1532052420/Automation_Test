@@ -89,7 +89,7 @@
 
   /* ---------- 初始化：顶部面包屑（左上角路径）+ 事件绑定 + 首载 ---------- */
   if (window.PlatformNav) {
-    PlatformNav.render(document.getElementById('sidebar'), '/run', '', '视觉断言日志');
+    PlatformNav.render(document.getElementById('sidebar'), '/run', '', ['视觉断言', '视觉断言日志']);
   }
   ['vlScope', 'vlResult'].forEach(function (id) {
     document.getElementById(id).addEventListener('change', function () { page = 1; load(); });

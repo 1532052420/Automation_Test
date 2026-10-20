@@ -92,6 +92,8 @@ const ICONS = {
       + '<path d="M7.7 6.9c6.2 1.5 5.5 7.4 8.8 9.6"/>',
   layers: '<path d="M12 3.4 21 8.4 12 13.4 3 8.4Z"/>'
         + '<path d="m4.6 12.2-1.6.9 9 5 9-5-1.6-.9"/>',
+  /* 视觉断言用：眼睛（视觉/查看语义，24 网格线性风格） */
+  visual: '<path d="M2.8 12S6.2 5.6 12 5.6 21.2 12 21.2 12 18 18.4 12 18.4 2.8 12 2.8 12Z"/><circle cx="12" cy="12" r="2.7"/>',
 };
 function icon(name, size) {
   const n = size || 24;
@@ -1113,7 +1115,7 @@ async function initRun() {
 const RUN_PANELS = ['projects', 'elements', 'asserts', 'visuals', 'cases', 'caselist', 'caseedit', 'suites', 'report', 'exec'];
 /* 面板名 → 顶部面包屑第三级文案 */
 const RUN_PANEL_NAMES = {
-  projects: '项目管理', elements: '元素管理', asserts: '断言管理', visuals: '视觉断言管理', cases: '执行用例', caselist: '用例管理',
+  projects: '项目管理', elements: '元素管理', asserts: '断言管理', visuals: '视觉断言', cases: '执行用例', caselist: '用例管理',
   caseedit: '步骤编辑', suites: '测试套件', report: '测试报告', exec: '设备配置',
 };
 function showRunPanel(name) {

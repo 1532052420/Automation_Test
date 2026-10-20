@@ -28,12 +28,17 @@ window.PlatformNav = (function () {
     var crumbs = '<a class="crumb crumb-home" href="/" title="回到首页">首页</a>';
     if (active && active !== '/') {
       crumbs += '<span class="crumb-sep">/</span><span class="crumb cur">' + page + '</span>';
-      if (sub) crumbs += '<span class="crumb-sep">/</span><span class="crumb sub"></span>';
     }
+    /* sub 支持字符串（单级，向后兼容）或数组（多级路径） */
+    var subs = sub == null ? [] : (Array.isArray(sub) ? sub.slice() : [String(sub)]);
+    subs.forEach(function () {
+      crumbs += '<span class="crumb-sep">/</span><span class="crumb sub"></span>';
+    });
     el.innerHTML =
       '<a class="brand" href="/"><span class="logo">✓</span>自动化测试平台</a>' +
       '<nav class="crumbs">' + crumbs + '</nav>' + (footHtml || '');
-    if (sub) setSub(el, sub);
+    var subEls = el.querySelectorAll('.crumb.sub');
+    subs.forEach(function (s2, i) { if (subEls[i]) subEls[i].textContent = s2; });
     return el;
   }
 
