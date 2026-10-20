@@ -2,9 +2,9 @@
 
 本项目的所有任务在执行前，必须先声明：**「我已按照 agents.md 执行了 xxx skill」**，并 genuinely 按对应 skill 的规范执行，而不是只走声明形式。
 
-## 六条强制规范（全项目默认启用）+ 一条按需规范
+## 强制规范清单（全项目默认启用；标注「按需」的除外）
 
-以下四条规范为**项目默认生效**，无需每次手动指定、无需用户显式调用 skill；只要任务落在对应触发范围内，即自动适用。
+以下规范为**项目默认生效**，无需每次手动指定、无需用户显式调用 skill；只要任务落在对应触发范围内，即自动适用。
 
 | # | skill | 默认启用的触发范围 | 安装位置 |
 |---|-------|------------------|---------|
@@ -16,6 +16,7 @@
 | 6 | `version-github-release` | **版本号迭代收尾**（version-changelog 递增之后）：双数→推送 GitHub，单数→不上传 | `.workbuddy/skills/version-github-release/` |
 | 7 | `webapp-testing` | Web 端功能测试（Playwright：前端功能验证/UI行为调试/截图/服务生命周期），来源 anthropics/skills 官方仓库（179k★） | `.workbuddy/skills/webapp-testing/` |
 | 8 | `frontend-design`（官方版） | Web 端 UI/视觉设计方向（美学/排版/布局，anthropics 官方最新版，覆盖旧版） | `.workbuddy/skills/frontend-design/` |
+| 9 | `self-test-gate` | **代码修改任务完成编码后必过四道门禁**（语法/引用完整+改动行审计/行为自测+影响面回归/数据链）+ 收尾执行声明 | `.workbuddy/skills/self-test-gate/` |
 
 > 同一份 skill 亦同步存放于 `.zcode/skills/`（ZCode/Qoder 运行时读取路径）。两处内容需保持一致，权威副本为 `.workbuddy/skills/`。
 
@@ -63,6 +64,18 @@ ponytail 完整插件仓库备份在 `ponytail-main/`（含 hooks、MCP、命令
 - **不引外部资源**：内网环境，禁止 CDN 字体 / 外链图片 / 在线 JS。
 - **图标仍走 icon-generator**：需要图标时按第 2 条规范出 SVG 源文件再导出 PNG。
 
+### 质量门禁 — 严格执行 self-test-gate skill
+
+**任何涉及代码修改（新增/删除/重构/修复）的任务，完成编码后必须依次通过四道门禁**（语法 → 引用完整 + 改动行审计 → 行为自测 + 影响面回归 → 数据链），输出自检清单后才可宣告交付，规范见 `.workbuddy/skills/self-test-gate/SKILL.md`：
+
+- **改动行审计（2026-10-20 新增）**：`git diff` 的每一行删除行逐一确认为有意删除；Edit 工具是替换不是插入，old_string 含需保留的既有行时 new_string 必须原样带回——2026-10-20 loadElements() 初始调用被替换误删（元素文件列表全空）已入册为历史案例。
+- **影响面回归（2026-10-20 新增）**：新功能实测之外，被改函数的**原有入口**必须回归——新功能全绿 ≠ 旧功能健在。
+- 用户质问「测过吗 / 为什么又坏 / 为什么删了代码」时立即补执行并如实汇报。
+
+### 收尾执行声明（2026-10-20 用户要求）
+
+任务收尾（版本流程之后）必须原样输出：**「我已执行 xx skill，执行内容：xxxx」**——逐 skill 说明实际执行内容（自测门禁过了哪几道、版本号递增结果等）；未执行的 skill 必须明说未执行及原因。用户据此确认质量动作真的发生，不得沉默跳过。
+
 ## 执行声明格式
 
 每次任务开始时输出一行，例如：
@@ -73,6 +86,8 @@ ponytail 完整插件仓库备份在 `ponytail-main/`（含 hooks、MCP、命令
 - 「我已按照 agents.md 执行了 version-changelog skill」
 
 任务同时涉及多个规范时，逐条声明。未涉及编码/UI/测试/改动的纯问答任务可不声明。
+
+**收尾执行声明（2026-10-20 起，每任务必做）**：任务结束时输出「我已执行 xx skill，执行内容：xxxx」，未执行的 skill 明说未执行及原因——详见「质量门禁」一节与 self-test-gate SKILL.md「收尾执行声明」。
 
 ## 停用方式
 
