@@ -1112,11 +1112,11 @@ async function initRun() {
 /* ---------------- 左侧二级菜单：hash 深链 + 记住上次所在面板 ---------------- */
 /* 用例编排(orch)/用例上传(admin) 面板已从菜单下线（2026-10-19）：入口删除、hash 不可达；
    DOM 与后端 API 保留——appTestingInit 的全部绑定仍挂在 panel-orch 存在性上，勿删面板本体 */
-const RUN_PANELS = ['projects', 'elements', 'asserts', 'visuals', 'cases', 'caselist', 'caseedit', 'suites', 'report', 'exec'];
+const RUN_PANELS = ['projects', 'elements', 'asserts', 'visuals', 'cases', 'caselist', 'caseedit', 'report', 'exec'];
 /* 面板名 → 顶部面包屑第三级文案 */
 const RUN_PANEL_NAMES = {
   projects: '项目管理', elements: '元素管理', asserts: '断言管理', visuals: '视觉断言', cases: '执行用例', caselist: '用例管理',
-  caseedit: '步骤编辑', suites: '测试套件', report: '测试报告', exec: '设备配置',
+  caseedit: '步骤编辑', report: '测试报告', exec: '设备配置',
 };
 function showRunPanel(name) {
   if (!RUN_PANELS.includes(name)) name = 'exec';

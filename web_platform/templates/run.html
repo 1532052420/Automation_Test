@@ -78,7 +78,6 @@
       <a href="#elements" data-panel="elements" data-icon="target">元素管理</a>
       <a href="#asserts" data-panel="asserts" data-icon="check">断言管理</a>
       <a href="#visuals" data-panel="visuals" data-icon="visual">视觉断言</a>
-      <a href="#suites" data-panel="suites" data-icon="layers">测试套件</a>
       <a href="#report" data-panel="report" data-icon="chart">测试报告</a>
       <a href="#exec" data-panel="exec" data-icon="gear">设备配置</a>
     </aside>
@@ -105,7 +104,7 @@
           <div class="tblwrap">
             <table>
               <thead><tr>
-                <th>项目名称</th><th>描述</th><th>状态</th><th>用例数</th><th>套件数</th>
+                <th>项目名称</th><th>描述</th><th>状态</th><th>用例数</th>
                 <th>负责人</th><th>创建时间</th><th style="width:250px">操作</th>
               </tr></thead>
               <tbody id="projTbody"></tbody>
@@ -674,39 +673,6 @@
 
       <!-- 用例编排（testhub SceneBuilder 移植：顶栏用例信息条 + 三栏 操作面板/画布/参数配置）
            用例 = 元素 + 页面操作的有序组合；保存时编译成框架三件套接入执行链路 -->
-      <section class="panel" id="panel-suites" hidden>
-        <div class="card">
-          <div class="cardhead">
-            <h3>设备配置 <span class="muted">套件与用例执行共用，与「设备配置」页同一数据源</span></h3>
-          </div>
-          <div class="fields" style="grid-template-columns:1.2fr 1fr 1fr">
-            <div class="field"><label>设备配置（conf）</label><select id="suiteConf"></select></div>
-            <div class="field"><label>设备编号 udid（留空用 conf 默认）</label><input type="text" id="suiteUdid" placeholder="自动"></div>
-            <div class="field"><label>发起人（用于追溯）</label><input type="text" id="suiteOwner" placeholder="你的名字"></div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="cardhead">
-            <h3>测试套件 <span class="muted">有序用例集合，按顺序批量执行并统计结果</span></h3>
-          </div>
-          <div class="treebar">
-            <select id="suiteProj" style="max-width:170px" title="按项目筛选"><option value="">全部项目</option></select>
-            <button class="ghost mini" id="btnSuiteRefresh">刷新</button>
-            <button id="btnSuiteNew" style="margin-left:auto">新建套件</button>
-          </div>
-          <div class="tblwrap">
-            <table>
-              <thead><tr>
-                <th>套件</th><th>用例</th><th>执行状态</th><th>最近结果</th>
-                <th>通过 / 失败</th><th>最后执行</th><th>操作</th>
-              </tr></thead>
-              <tbody id="suiteTbody"></tbody>
-            </table>
-          </div>
-          <div id="suiteEmpty" class="empty" style="display:none">还没有测试套件 —— 点「新建套件」把用例编排成批</div>
-          <div class="list-pager" id="suPager"></div>
-        </div>
-      </section>
 
     </div>
   </div>
@@ -789,46 +755,6 @@
     </div>
   </div>
 </div>
-<!-- 套件 编辑/新建 弹窗：左可选用例 + 右已选用例（拖拽排序，testhub SuiteList 双栏交互） -->
-<div class="mask" id="suiteMask">
-  <div class="modal suitemodal">
-    <h4 id="suiteModalTitle">新建套件</h4>
-    <div class="fields" style="grid-template-columns:2fr 3fr 2fr">
-      <div class="field"><label>套件名称</label><input type="text" id="suMName" placeholder="如：回归冒烟"></div>
-      <div class="field"><label>描述</label><input type="text" id="suMDesc" placeholder="套件用途（可选）"></div>
-      <div class="field"><label>所属项目 <span class="muted">选定后可选用例只列同项目与未分组</span></label>
-        <select id="suMProj"><option value="">— 未分组 —</option></select></div>
-    </div>
-    <div class="suitelayout">
-      <div class="orchcol">
-        <div class="orchcol-title">可选用例 <span class="muted">点击加入</span></div>
-        <input type="search" id="suMSearch" placeholder="搜索用例">
-        <div class="orchtree" id="suMAvail"></div>
-      </div>
-      <div class="orchcol">
-        <div class="orchcol-title">已选用例 <span class="muted">按此顺序执行，可拖拽排序</span></div>
-        <div class="orchsteps" id="suMSelected"></div>
-      </div>
-    </div>
-    <div class="mops mt">
-      <button class="ghost" id="suMCancel">取消</button>
-      <button id="suMSave">保存</button>
-    </div>
-  </div>
-</div>
-<!-- 套件执行历史弹窗（testhub SuiteList 历史弹窗：run 明细 + 查看详情） -->
-<div class="mask" id="histMask">
-  <div class="modal suitemodal">
-    <h4 id="histTitle">执行历史</h4>
-    <div class="tblwrap">
-      <table>
-        <thead><tr><th>Run</th><th>开始时间</th><th>状态</th><th>通过</th><th>失败</th><th>操作</th></tr></thead>
-        <tbody id="histTbody"></tbody>
-      </table>
-    </div>
-    <div class="mops mt"><button id="histClose">关闭</button></div>
-  </div>
-</div>
 <!-- 项目 新建/编辑 弹窗（状态/负责人/描述） -->
 <div class="mask" id="projMask">
   <div class="modal envmodal">
@@ -857,8 +783,6 @@
         <div class="orchtree" id="pjdCases"></div>
       </div>
       <div class="orchcol">
-        <div class="orchcol-title">套件 <span class="muted" id="pjdSuiteCount"></span></div>
-        <div class="orchtree" id="pjdSuites"></div>
       </div>
     </div>
     <div class="mops mt"><button id="pjdClose">关闭</button></div>

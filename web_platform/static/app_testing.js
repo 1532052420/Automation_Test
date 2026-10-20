@@ -34,8 +34,6 @@ let _atElFiles = [];         // 元素文件清单
 let _cases = [];           // 用例列表（用例面板 / 套件弹窗共用）
 let _projects = [];        // 项目列表（项目管理面板 / 各处项目下拉共用）
 let _projId = 0;           // 弹窗正在编辑的项目 id（0 = 新建）
-let _suiteSel = [];        // 套件弹窗已选用例 [{id, name, step_count}]
-let _suiteId = 0;          // 弹窗正在编辑的套件 id（0 = 新建）
 
 /* 操作词表（与 element_locator.case_generator.STEP_TYPES 一致） */
 const STEP_META = {
@@ -61,12 +59,6 @@ function stepLabel(type) { return (STEP_META[type] || {}).label || type; }
 /* ================= 工具 ================= */
 function fmtTs(ts) {
   return ts ? new Date(ts * 1000).toLocaleString('zh-CN', { hour12: false }) : '—';
-}
-
-function suiteResultHtml(s) {
-  /* NOT_RUN 复用 PENDING 徽章样式（statusBadge 只认 PENDING/RUNNING/PASSED/FAILED/ERROR） */
-  const raw = s.execution_result || s.execution_status || 'NOT_RUN';
-  return statusBadge(raw === 'NOT_RUN' ? 'PENDING' : raw);
 }
 
 function projName(id) {
@@ -102,7 +94,6 @@ function fillProjectSelects() {
   fill($('#orchProj'), [{ v: '', t: '— 未分组 —' }].concat(projOpts));
   fill($('#suMProj'), [{ v: '', t: '— 未分组 —' }].concat(projOpts));
   fill($('#clProj'), [{ v: '', t: '全部项目' }, { v: 'none', t: '未分组' }].concat(projOpts));
-  fill($('#suiteProj'), [{ v: '', t: '全部项目' }, { v: 'none', t: '未分组' }].concat(projOpts));
   fill($('#cnRegProj'), [{ v: '', t: '— 未分组 —' }].concat(projOpts));   // 新建用例弹窗 ④ 项目
   fill($('#mvProj'), [{ v: '', t: '— 未分组 —' }].concat(projOpts));      // 移动用例到项目弹窗
 }
@@ -131,7 +122,6 @@ function renderProjects() {
     '<td>' + esc(p.description || '—') + '</td>' +
     '<td><span class="proj-status">' + esc(p.status || '进行中') + '</span></td>' +
     '<td>' + (p.case_count || 0) + '</td>' +
-    '<td>' + (p.suite_count || 0) + '</td>' +
     '<td>' + esc(p.owner || p.created_by || '—') + '</td>' +
     '<td>' + fmtTs(p.created_at) + '</td>' +
     '<td class="ops"><button class="mini" data-detail="' + p.id + '">详情</button>' +
@@ -182,33 +172,27 @@ async function saveProj() {
   toast('项目已保存', true);
   await loadProjects();
   renderCaseList();
-  renderSuites();
 }
 
 async function openProjDetail(pid) {
   const p = _projects.find(x => x.id === +pid);
   if (!p) return;
-  const [cd, sd, fd] = await Promise.all([
-    api(AT_PREFIX + '/api/cases'), api(AT_PREFIX + '/api/suites'), api(AT_PREFIX + '/api/cases/framework')]);
+  const [cd, fd] = await Promise.all([
+    api(AT_PREFIX + '/api/cases'), api(AT_PREFIX + '/api/cases/framework')]);
   /* 步数以框架反解为准：登记实体没有 steps 字段（用例已走框架文件），直接取 c.steps 恒为 0 */
   const fwByNode = {};
   (fd.ok ? fd.results : []).forEach(r => { fwByNode[r.node] = r.step_count || 0; });
   const cases = (cd.ok ? cd.results : []).filter(c => +c.project_id === +pid);
-  const suites = (sd.ok ? sd.results : []).filter(s => +s.project_id === +pid);
   $('#pjdTitle').textContent = '项目详情 · ' + p.name;
   $('#pjdMeta').innerHTML =
     '状态 <b>' + esc(p.status || '进行中') + '</b> · 负责人 <b>' + esc(p.owner || p.created_by || '—') + '</b>' +
     (p.description ? ' · ' + esc(p.description) : '');
   $('#pjdCaseCount').textContent = cases.length + ' 个';
-  $('#pjdSuiteCount').textContent = suites.length + ' 个';
   $('#pjdCases').innerHTML = cases.length ? cases.map(c => {
     const sc = fwByNode[c.node];
     return '<div class="orch-add">' + esc(c.name) + ' <span class="muted">(' +
       (sc != null ? sc + ' 步' : '步骤未反解') + ')</span></div>';
   }).join('') : '<div class="orch-empty">项目下还没有用例</div>';
-  $('#pjdSuites').innerHTML = suites.length ? suites.map(s =>
-    '<div class="orch-add">' + esc(s.name) + ' <span class="muted">(' + (s.case_ids || []).length + ' 个用例)</span></div>').join('')
-    : '<div class="orch-empty">项目下还没有套件</div>';
   $('#projDetailMask').classList.add('show');
 }
 
@@ -216,15 +200,13 @@ async function deleteProj(pid) {
   const p = _projects.find(x => x.id === +pid);
   if (!p) return;
   const ok = await confirmModal('删除项目「' + p.name + '」',
-    '将级联删除：' + (p.case_count || 0) + ' 个用例（生成的页面/用例文件一并清理）、' +
-    (p.suite_count || 0) + ' 个套件；其他套件里对这些用例的引用同步移除。此操作不可恢复。', true);
+    '将级联删除：' + (p.case_count || 0) + ' 个用例（生成的页面/用例文件一并清理）。此操作不可恢复。', true);
   if (!ok) return;
   const d = await del(AT_PREFIX + '/api/projects/' + pid);
   toast(d.ok ? (d.msg || '已删除') : (d.msg || '删除失败'), d.ok);
   if (d.ok) {
     await loadProjects();
     renderCaseList();
-    renderSuites();
   }
 }
 
@@ -882,176 +864,6 @@ async function saveCaseMove() {
   await loadProjects();                        // 项目管理用例数同步刷新
 }
 
-/* ================= 测试套件（SuiteList：配置卡 + 表格 + 双栏弹窗 + 历史） ================= */
-async function loadSuiteConfs() {
-  const d = await api('/api/confs');
-  const confs = d.ok ? (d.confs || []) : [];
-  $('#suiteConf').innerHTML = confs.map(c => {
-    const dev = (c.devices || [])[0] || {};
-    return '<option value="' + esc(c.file) + '">' + esc(c.file.split('/').pop()) +
-      (dev.udid ? ' · ' + esc(dev.udid) : '') + '</option>';
-  }).join('');
-}
-
-async function renderSuites() {
-  const d = await api(AT_PREFIX + '/api/suites');
-  if (!d.ok) return toast(d.msg || '套件加载失败', false);
-  const pf = $('#suiteProj') ? $('#suiteProj').value : '';
-  const list = (d.results || []).filter(s => matchProj(s, pf));
-  $('#suiteEmpty').style.display = list.length ? 'none' : '';
-  /* 分页（项目管理同款：10/20/50，默认 20） */
-  const pages = Math.max(1, Math.ceil(list.length / _suPageSize));
-  if (_suPage > pages) _suPage = pages;
-  if (_suPage < 1) _suPage = 1;
-  const view = list.slice((_suPage - 1) * _suPageSize, _suPage * _suPageSize);
-  $('#suiteTbody').innerHTML = view.map(s => {
-    const stats = (s.execution_status === 'NOT_RUN') ? '—' :
-      '<b class="num-ok">' + (s.passed_count || 0) + '</b> / <b class="num-bad">' + (s.failed_count || 0) + '</b>';
-    const detail = (s.cases || []).map(c => esc(c.name)).join('、') || '<span class="muted">未选用例</span>';
-    const proj = projName(s.project_id);
-    return '<tr>' +
-      '<td><b>' + esc(s.name) + '</b>' +
-      ((proj || s.description) ? '<div class="path">' + esc([proj && '项目：' + proj, s.description].filter(Boolean).join(' · ')) + '</div>' : '') + '</td>' +
-      '<td>' + (s.cases || []).length + ' 个<div class="path" style="max-width:260px">' + detail + '</div></td>' +
-      '<td>' + statusBadge(s.execution_status) + '</td>' +
-      '<td>' + suiteResultHtml(s) + '</td>' +
-      '<td>' + stats + '</td>' +
-      '<td>' + fmtTs(s.last_run_at) + '</td>' +
-      '<td class="ops"><button class="mini" data-run="' + s.id + '">执行</button>' +
-      '<button class="ghost mini" data-edit="' + s.id + '">编辑</button>' +
-      '<button class="ghost mini" data-hist="' + s.id + '">历史</button>' +
-      '<button class="danger mini" data-del="' + s.id + '">删除</button></td></tr>';
-  }).join('');
-  listPager('#suPager', list.length, _suPage, _suPageSize, p => { _suPage = p; renderSuites(); },
-    s => { _suPageSize = s; _suPage = 1; renderSuites(); });
-}
-
-function renderSuiteModal() {
-  const kw = ($('#suMSearch').value || '').trim().toLowerCase();
-  const selIds = new Set(_suiteSel.map(c => c.id));
-  /* 套件选了项目 → 可选用例只列同项目与未分组（跨项目用例不允许混入） */
-  const pj = $('#suMProj') ? $('#suMProj').value : '';
-  const avail = _cases.filter(c => !selIds.has(c.id) && matchProj(c, pj) &&
-    (!kw || c.name.toLowerCase().includes(kw)));
-  $('#suMAvail').innerHTML = avail.length ? avail.map(c =>
-    '<div class="case-item" data-add="' + c.id + '"><b>' + esc(c.name) + '</b>' +
-    '<span class="path">' + (c.steps || []).length + ' 步' +
-    (c.description ? ' · ' + esc(c.description) : '') + '</span></div>').join('')
-    : '<div class="orch-empty">没有可添加的用例</div>';
-  $('#suMSelected').innerHTML = _suiteSel.length ? _suiteSel.map((c, i) =>
-    '<div class="orch-step" draggable="true" data-idx="' + i + '">' +
-    '<span class="drag-handle">⋮⋮</span><span class="orch-index">' + (i + 1) + '</span>' +
-    '<span class="orch-step-name">' + esc(c.name) + '</span>' +
-    '<span class="orch-step-node">' + (c.step_count != null ? c.step_count : (c.steps || []).length) + ' 步</span>' +
-    '<button class="orch-del" data-rm="' + i + '" title="移除">✕</button></div>').join('')
-    : '<div class="orch-empty">从左侧点击用例加入</div>';
-}
-
-async function openSuiteModal(sid) {
-  _suiteId = +sid || 0;
-  if (!_cases.length) {
-    const d = await api(AT_PREFIX + '/api/cases');
-    _cases = d.ok ? (d.results || []) : [];
-  }
-  if (_suiteId) {
-    const d = await api(AT_PREFIX + '/api/suites/' + _suiteId);
-    if (!d.ok) return toast(d.msg || '套件加载失败', false);
-    $('#suiteModalTitle').textContent = '编辑套件';
-    $('#suMName').value = d.suite.name;
-    $('#suMDesc').value = d.suite.description || '';
-    $('#suMProj').value = d.suite.project_id || '';
-    _suiteSel = (d.suite.cases || []).map(c => ({ ...c }));
-  } else {
-    $('#suiteModalTitle').textContent = '新建套件';
-    $('#suMName').value = '';
-    $('#suMDesc').value = '';
-    $('#suMProj').value = $('#suiteProj').value !== 'none' ? $('#suiteProj').value : '';
-    _suiteSel = [];
-  }
-  $('#suMSearch').value = '';
-  renderSuiteModal();
-  $('#suiteMask').classList.add('show');
-}
-
-async function saveSuite() {
-  const name = ($('#suMName').value || '').trim();
-  if (!name) return toast('请填写套件名称', false);
-  const body = { name, description: $('#suMDesc').value.trim(),
-                 project_id: $('#suMProj').value || '',
-                 case_ids: _suiteSel.map(c => c.id) };
-  const d = _suiteId ? await api(AT_PREFIX + '/api/suites/' + _suiteId,
-    { method: 'PUT', body: JSON.stringify(body) })
-    : await postJson(AT_PREFIX + '/api/suites', body);
-  if (!d.ok) return toast(d.msg || '保存失败', false);
-  $('#suiteMask').classList.remove('show');
-  toast('套件已保存', true);
-  renderSuites();
-}
-
-async function runSuite(sid) {
-  const d = await postJson(AT_PREFIX + '/api/suites/' + sid + '/run', _runBody());
-  if (!d.ok) return toast(d.msg || '执行失败', false);
-  toast('套件已开始执行 → Run ' + d.run_id + '，稍后可看「历史」或「测试报告」', true);
-  renderSuites();
-  setTimeout(renderSuites, 3000);   // 3 秒后刷一次，把 RUNNING 状态刷出来（对齐 testhub 延迟刷新）
-}
-
-async function openSuiteHist(sid) {
-  const d = await api(AT_PREFIX + '/api/suites/' + sid);
-  if (!d.ok) return toast(d.msg || '历史加载失败', false);
-  $('#histTitle').textContent = '执行历史 · ' + d.suite.name;
-  const runs = d.suite.runs || [];
-  $('#histTbody').innerHTML = runs.length ? runs.map(r =>
-    '<tr><td>' + esc(r.run_id || '—') + '</td>' +
-    '<td>' + fmtTs(r.start_time) + '</td>' +
-    '<td>' + (r.status ? statusBadge(r.status) : statusBadge('RUNNING')) + '</td>' +
-    '<td>' + (r.passed != null ? r.passed : '—') + '</td>' +
-    '<td>' + (r.failed != null ? r.failed : '—') + '</td>' +
-    '<td class="ops"><a class="ghost mini" href="/runs/' + esc(r.run_id) + '">查看详情</a></td></tr>').join('')
-    : '<tr><td colspan="6" class="muted" style="text-align:center;padding:18px">该套件还没有执行记录</td></tr>';
-  $('#histMask').classList.add('show');
-}
-
-/* ================= 原生拖拽（画布内排序 + 面板拖入） ================= */
-function bindCanvasDnD(box, onReorder, onExternal) {
-  let dragIdx = -1;
-  box.addEventListener('dragstart', e => {
-    const item = e.target.closest('.orch-step');
-    if (item) {
-      dragIdx = +item.dataset.idx;
-      item.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      return;
-    }
-    const add = e.target.closest('.orch-add');   // 面板项拖入
-    if (add) {
-      e.dataTransfer.setData('text/plain', add.dataset.type || '');
-      e.dataTransfer.effectAllowed = 'copy';
-    }
-  });
-  box.addEventListener('dragend', e => {
-    box.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
-    box.querySelectorAll('.drop-before').forEach(el => el.classList.remove('drop-before'));
-  });
-  box.addEventListener('dragover', e => {
-    e.preventDefault();
-    const item = e.target.closest('.orch-step');
-    box.querySelectorAll('.drop-before').forEach(el => el.classList.remove('drop-before'));
-    if (item && +item.dataset.idx !== dragIdx) item.classList.add('drop-before');
-  });
-  box.addEventListener('drop', e => {
-    e.preventDefault();
-    const item = e.target.closest('.orch-step');
-    if (dragIdx >= 0) {                           // 画布内排序
-      if (item && +item.dataset.idx !== dragIdx) onReorder(dragIdx, +item.dataset.idx);
-      dragIdx = -1;
-      return;
-    }
-    const type = e.dataTransfer.getData('text/plain');   // 面板拖入
-    if (type && STEP_META[type] && onExternal) onExternal(type, item ? +item.dataset.idx : undefined);
-  });
-}
-
 /* ================= 面板初始化（initRun 调用） ================= */
 async function appTestingInit() {
   if (!$('#panel-projects')) return;   // 全部面板绑定挂在项目管理面板存在性上（编排面板已删除）
@@ -1434,72 +1246,20 @@ async function appTestingInit() {
     if (mv) return openCaseMove(mv.dataset.mvnode);
     if (delBtn) {
       const f = delBtn.dataset.delfile;
-      const ok = await confirmModal('删除用例', '确定删除该用例？删除后不可恢复，登记信息与套件引用将同步清理。', true);
+      const ok = await confirmModal('删除用例', '确定删除该用例？删除后不可恢复，登记信息将同步清理。', true);
       if (!ok) return;
       const d = await del(AT_PREFIX + '/api/case/file?file=' + encodeURIComponent(f));
       toast(d.ok ? '已删除' : (d.msg || '删除失败'), d.ok);
       if (d.ok) {
         renderCaseList();
-        renderSuites();
         await loadCaseSelectPanel();   // 执行用例面板同步刷新（删掉的节点立即消失）
         await loadProjects();          // 项目管理用例数同步
       }
     }
   });
 
-  /* ---- 套件：执行配置卡 + 表格 ---- */
-  loadSuiteConfs();
-  $('#suiteProj').addEventListener('change', renderSuites);
-  $('#btnSuiteRefresh').addEventListener('click', renderSuites);
-  $('#btnSuiteNew').addEventListener('click', () => openSuiteModal(0));
-  $('#suiteTbody').addEventListener('click', async e => {
-    const run = e.target.closest('[data-run]'), edit = e.target.closest('[data-edit]'),
-          hist = e.target.closest('[data-hist]'), delBtn = e.target.closest('[data-del]');
-    if (run) return runSuite(+run.dataset.run);
-    if (edit) return openSuiteModal(+edit.dataset.edit);
-    if (hist) return openSuiteHist(+hist.dataset.hist);
-    if (delBtn) {
-      const ok = await confirmModal('删除套件', '确定删除该套件？用例本身不受影响。', true);
-      if (!ok) return;
-      const d = await del(AT_PREFIX + '/api/suites/' + delBtn.dataset.del);
-      toast(d.ok ? '已删除' : (d.msg || '删除失败'), d.ok);
-      renderSuites();
-    }
-  });
-
-  /* ---- 套件：双栏编辑弹窗 ---- */
-  $('#suMSearch').addEventListener('input', renderSuiteModal);
-  $('#suMProj').addEventListener('change', renderSuiteModal);
-  $('#suMAvail').addEventListener('click', e => {
-    const add = e.target.closest('[data-add]');
-    if (!add) return;
-    const c = _cases.find(x => x.id === +add.dataset.add);
-    if (c) { _suiteSel.push({ ...c }); renderSuiteModal(); }
-  });
-  $('#suMSelected').addEventListener('click', e => {
-    const rm = e.target.closest('[data-rm]');
-    if (rm) { _suiteSel.splice(+rm.dataset.rm, 1); renderSuiteModal(); }
-  });
-  bindCanvasDnD($('#suMSelected'), (from, to) => {
-    const [c] = _suiteSel.splice(from, 1);
-    _suiteSel.splice(from < to ? to - 1 : to, 0, c);
-    renderSuiteModal();
-  });
-  $('#suMSave').addEventListener('click', saveSuite);
-  $('#suMCancel').addEventListener('click', () => $('#suiteMask').classList.remove('show'));
-  $('#suiteMask').addEventListener('click', e => {
-    if (e.target === e.currentTarget) e.currentTarget.classList.remove('show');
-  });
-
-  /* ---- 套件：执行历史弹窗 ---- */
-  $('#histClose').addEventListener('click', () => $('#histMask').classList.remove('show'));
-  $('#histMask').addEventListener('click', e => {
-    if (e.target === e.currentTarget) e.currentTarget.classList.remove('show');
-  });
-
   await loadProjects();
   await renderCaseList();
-  await renderSuites();
 }
 
 /* ---------------- Appium 服务启停（设备配置面板；绿=运行中，灰=未运行，点击切换） ---------------- */
