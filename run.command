@@ -119,7 +119,10 @@ case "$1" in
         exit 1
       fi
     fi
-    open "$PLATFORM_URL"
+    # 强刷式打开：URL 带秒级时间戳 = 每次唯一 → 浏览器必然真实导航（不会聚焦旧标签页
+    # 而不重载），页面与静态资源全量拉新（平台全局 no-store，无缓存可命中）。
+    # 「清缓存」由服务端 no-store 天然保证（浏览器对本平台恒不缓存，脚本无法也无须触碰）。
+    open "${PLATFORM_URL}?_fresh=$(date +%s)"
     ;;
   stop-platform)
     if [ -z "$(port_pids "$PLATFORM_PORT")" ]; then
