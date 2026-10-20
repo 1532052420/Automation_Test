@@ -384,11 +384,25 @@ def page_method_code(step):
         return _method_block('assert_%s' % el, desc, [],
                              'self.appOperator.getElement(self._elements.%s)\n%s' % (el, _shot_line(desc)))
     if t == 'assert_text':
+        # v6.15.73：改用 assert_text_or_fail——实际值入 allure JSON，报告「实际结果」显示真实读值
+        # v6.16.11：失败消息参数化——同一方法可被多个断言步骤以不同文本复用，报告文案随 expected 走
+        if '「' in desc:
+            pre, rest = desc.rsplit('「', 1)
+            tail = rest[rest.find('」'):] if '」' in rest else ''
+        else:
+            pre, tail = desc + '（', '）'
         return _method_block('assert_%s_text' % el, desc, ['expected'],
-                             "assert self.appOperator.getText(self._elements.%s) == expected, '%s'\n%s" % (el, desc, _shot_line(desc)))
+                             "self.appOperator.assert_text_or_fail(self._elements.%s, expected, '%s「' + expected + '%s')" % (el, pre, tail))
     if t == 'assert_toast':
+        # v6.15.73：改用 assert_toast_or_fail——结果入 allure JSON
+        # v6.16.11：失败消息参数化（同 assert_text）
+        if '「' in desc:
+            pre, rest = desc.rsplit('「', 1)
+            tail = rest[rest.find('」'):] if '」' in rest else ''
+        else:
+            pre, tail = desc + '「', '」'
         return _method_block('assert_toast', desc, ['text'],
-                             "assert self.appOperator.is_toast_visible(text, wait_seconds=5), '%s'\n%s" % (desc, _shot_line(desc)))
+                             "self.appOperator.assert_toast_or_fail(text, '%s「' + text + '%s')" % (pre, tail))
     if t == 'wait_element':
         # 轮询等待元素出现：探针按 PRESENCE 等待 timeout_seconds，超时 getElement 抛错=用例失败
         try:

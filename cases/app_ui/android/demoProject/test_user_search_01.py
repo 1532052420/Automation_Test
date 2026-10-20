@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# 用例中文名：用户搜索-精确昵称
+# 用例中文名：用户搜索昵称
 # 用例包 user_search_01 · 点击「搜索入口」
 # 流程：
 # 1. 拉起快歌主页面
@@ -24,7 +24,7 @@ class TestUserSearch01:
 
     @allure.title('点击「搜索入口」')
     def test_user_search_01(self):
-        """点击「搜索入口」 → 在「搜索输入框」输入「所谓伊人，在水一方」 → 点击「搜索提交」 → 断言「用户昵称」文本为「所谓伊人，在水一方」"""
+        """点击「搜索入口」 → 在「搜索输入框」输入「所谓伊人，在水一方」 → 点击「搜索提交」 → 断言「用户昵称」文本为「所谓伊人，在水一方」 → 断言「用户昵称」文本为「错误1」"""
         page = self.page
 
         # 1. 点击「搜索入口」
@@ -35,6 +35,8 @@ class TestUserSearch01:
         page.click_search_submit()
         # 断言「用户昵称」文本为「所谓伊人，在水一方」
         page.assert_user_nick_text('所谓伊人，在水一方')
+        # 断言「用户昵称」文本为「错误1」
+        page.assert_user_nick_text('错误1')
 
     def teardown_class(self):
         self.appOperator.close_app()
