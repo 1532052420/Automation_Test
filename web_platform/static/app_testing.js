@@ -174,27 +174,96 @@ async function saveProj() {
   renderCaseList();
 }
 
+let _pjdCtx = null;   // 详情弹窗上下文：{ pid, items, pending: { node: 目标project_id(0=移出) } }
+
 async function openProjDetail(pid) {
   const p = _projects.find(x => x.id === +pid);
   if (!p) return;
   const [cd, fd] = await Promise.all([
     api(AT_PREFIX + '/api/cases'), api(AT_PREFIX + '/api/cases/framework')]);
-  /* 步数以框架反解为准：登记实体没有 steps 字段（用例已走框架文件），直接取 c.steps 恒为 0 */
-  const fwByNode = {};
-  (fd.ok ? fd.results : []).forEach(r => { fwByNode[r.node] = r.step_count || 0; });
-  const cases = (cd.ok ? cd.results : []).filter(c => +c.project_id === +pid);
+  /* 双栏数据：与用例管理列表同源（框架反解序）；右栏=本项目，左栏=其余全部 */
+  const pidN = +pid;
+  const items = (fd.ok ? fd.results : []).map(r => {
+    const reg = r.case;
+    return { id: reg ? reg.id : null, node: r.node,
+             name: r.cn_name || (reg && reg.name) || r.method,
+             steps: r.step_count != null ? r.step_count + ' 步' : '步骤未反解',
+             curPid: reg ? (+reg.project_id || 0) : 0,
+             addedAt: (reg && reg.created_at) || '',
+             regName: reg ? (reg.name || '') : '' };
+  });
+  _pjdCtx = { pid: pidN, items, pending: {} };
   $('#pjdTitle').textContent = '项目详情 · ' + p.name;
   $('#pjdMeta').innerHTML =
     '状态 <b>' + esc(p.status || '进行中') + '</b> · 负责人 <b>' + esc(p.owner || p.created_by || '—') + '</b>' +
     (p.description ? ' · ' + esc(p.description) : '');
-  $('#pjdCaseCount').textContent = cases.length + ' 个';
-  $('#pjdCases').innerHTML = cases.length ? cases.map(c => {
-    const sc = fwByNode[c.node];
-    return '<div class="orch-add">' + esc(c.name) + ' <span class="muted">(' +
-      (sc != null ? sc + ' 步' : '步骤未反解') + ')</span></div>';
-  }).join('') : '<div class="orch-empty">项目下还没有用例</div>';
+  renderPjdPanes();
   $('#projDetailMask').classList.add('show');
 }
+
+function pjdEffPid(x) {
+  /* 目标归属：pending 有记录用记录（键=node），否则用当前归属 */
+  const t = _pjdCtx.pending[x.node];
+  return t === undefined ? x.curPid : (+t || 0);
+}
+
+function renderPjdPanes() {
+  const ctx = _pjdCtx; if (!ctx) return;
+  const inProj = ctx.items.filter(x => pjdEffPid(x) === ctx.pid)
+    .sort((a, b) => String(b.addedAt || '').localeCompare(String(a.addedAt || '')));   // 加入顺序倒序
+  const notIn = ctx.items.filter(x => pjdEffPid(x) !== ctx.pid);                        // 框架顺序（与用例管理一致）
+  $('#pjdCaseCount').textContent = inProj.length + ' 个';
+  $('#pjdNotCount').textContent = notIn.length + ' 个';
+  $('#pjdInList').innerHTML = inProj.length ? inProj.map(x =>
+    '<label class="pjd-row"><input type="checkbox" checked data-node="' + esc(x.node) + '">' +
+    '<span class="pjd-name">' + esc(x.name) + '</span>' +
+    '<span class="muted">' + x.steps + '</span></label>').join('')
+    : '<div class="orch-empty">项目下还没有用例（从左侧勾选添加）</div>';
+  $('#pjdNotList').innerHTML = notIn.length ? notIn.map(x =>
+    '<label class="pjd-row"><input type="checkbox" data-node="' + esc(x.node) + '">' +
+    '<span class="pjd-name">' + esc(x.name) + '</span>' +
+    '<span class="muted">' + x.steps + (x.otherProj ? ' · ' + esc(x.otherProj) : '') + '</span></label>').join('')
+    : '<div class="orch-empty">全部用例都已添加进项目</div>';
+}
+
+async function pjdSave() {
+  const ctx = _pjdCtx; if (!ctx) return;
+  const entries = Object.entries(ctx.pending);
+  if (!entries.length) { $('#projDetailMask').classList.remove('show'); return; }
+  let okN = 0;
+  for (const [node, target] of entries) {
+    const x = ctx.items.find(x => x.node === node);
+    try {
+      if (x && !x.id) {
+        /* 未登记用例：登记进平台并归属本项目（名称默认取中文名/方法名） */
+        if (!target) continue;
+        await postJson(AT_PREFIX + '/api/cases',
+          { name: x.regName || x.name, created_by: '', project_id: String(ctx.pid), node: x.node });
+      } else {
+        await api(AT_PREFIX + '/api/cases/' + x.id + '/project',
+          { method: 'PUT', body: JSON.stringify({ project_id: String(target || '') }) });
+      }
+      okN++;
+    } catch (e) { toast('保存失败：' + e.message, false); }
+  }
+  toast('已保存 ' + okN + ' 项修改', true);
+  ctx.pending = {};
+  await renderProjects();
+  await openProjDetail(ctx.pid);       // 重拉最新数据
+}
+
+function pjdToggle(input) {
+  const node = input.dataset.node;
+  const x = _pjdCtx.items.find(x => x.node === node);
+  if (!x) return;
+  const target = input.checked ? _pjdCtx.pid : 0;
+  if (pjdEffPid(x) === target) return;               // 状态未变
+  _pjdCtx.pending[node] = target;
+  renderPjdPanes();                                  // 双栏按最新归属重排
+}
+document.getElementById('pjdInList').addEventListener('change', e => { if (e.target.matches('input[type=checkbox]')) pjdToggle(e.target); });
+document.getElementById('pjdNotList').addEventListener('change', e => { if (e.target.matches('input[type=checkbox]')) pjdToggle(e.target); });
+document.getElementById('pjdSave').addEventListener('click', pjdSave);
 
 async function deleteProj(pid) {
   const p = _projects.find(x => x.id === +pid);

@@ -777,13 +777,21 @@
     <div class="cfg-meta" id="pjdMeta"></div>
     <div class="suitelayout">
       <div class="orchcol">
-        <div class="orchcol-title">用例 <span class="muted" id="pjdCaseCount"></span></div>
-        <div class="orchtree" id="pjdCases"></div>
+        <div class="orchcol-title">未添加进项目 <span class="muted" id="pjdNotCount"></span></div>
+        <div class="orchtree" id="pjdNotList"></div>
       </div>
       <div class="orchcol">
+        <div class="orchcol-title">已添加进项目 <span class="muted" id="pjdCaseCount"></span></div>
+        <div class="orchtree" id="pjdInList"></div>
       </div>
     </div>
-    <div class="mops mt"><button id="pjdClose">关闭</button></div>
+    <div class="mops mt" style="justify-content:space-between;align-items:center">
+      <span class="muted" style="font-size:11px">勾选 = 添加进本项目；取消勾选 = 移出项目；点「保存修改」生效</span>
+      <span style="display:flex;gap:8px">
+        <button class="ghost" id="pjdClose">关闭</button>
+        <button id="pjdSave">保存修改</button>
+      </span>
+    </div>
   </div>
 </div>
 <!-- 移动用例到项目 弹窗（已登记 = 只改归属；未登记 = 顺带登记到平台，框架文件不动） -->
