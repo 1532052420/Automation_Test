@@ -1158,6 +1158,63 @@ async function appTestingInit() {
     });
   }
 
+  /* ---- 步骤拖拽排序（手柄长按/按下拖动，松手落位；保存后顺序写入文件） ---- */
+  let _ceDrag = null;
+  function ceStartDrag(e, i, row) {
+    if (!_ceCtx || _ceDrag) return;
+    if (_ceDelSids.indexOf((_cePending[i] || {})._sid) >= 0) return;   // 已删除行不参与拖动
+    e.preventDefault();
+    const grip = e.currentTarget;
+    try { grip.setPointerCapture(e.pointerId); } catch (_) {}
+    _ceDrag = { i, row, grip, startY: e.clientY };
+    row.classList.add('ce-dragging');
+    const onMove = function (ev) {
+      const dy = ev.clientY - _ceDrag.startY;
+      if (Math.abs(dy) > 4) _ceDrag.moved = true;
+      row.style.transform = 'translateY(' + dy + 'px)';
+    };
+    const onUp = function (ev) {
+      grip.removeEventListener('pointermove', onMove);
+      grip.removeEventListener('pointerup', onUp);
+      grip.removeEventListener('pointercancel', onUp);
+      row.classList.remove('ce-dragging');
+      row.style.transform = '';
+      const dy = ev.clientY - _ceDrag.startY;
+      const drag = _ceDrag; _ceDrag = null;
+      if (Math.abs(dy) < 6) return;                  // 位移过小视为点击，不重排
+      const slot = ceDropSlot(ev.clientY, row);
+      ceApplyReorder(drag.i, slot);
+    };
+    grip.addEventListener('pointermove', onMove);
+    grip.addEventListener('pointerup', onUp);
+    grip.addEventListener('pointercancel', onUp);
+  }
+  function ceDropSlot(pointerY, dragRow) {
+    const rows = [...document.querySelectorAll('#ceSteps .ce-step')].filter(r => r !== dragRow);
+    let slot = rows.length;
+    for (let p = 0; p < rows.length; p++) {
+      const r = rows[p].getBoundingClientRect();
+      if (pointerY < r.top + r.height / 2) { slot = p; break; }
+    }
+    return slot;
+  }
+  function ceApplyReorder(i, slot) {
+    const kw = ($('#ceQ').value || '').trim().toLowerCase();
+    const visIdxs = [];
+    (_cePending || []).forEach(function (s, idx) {
+      const t = ceTypeMeta(s.type);
+      if (!kw || [s.desc, s.element, s.param, t.label].some(v => String(v || '').toLowerCase().includes(kw))) visIdxs.push(idx);
+    });
+    const others = visIdxs.filter(function (idx) { return idx !== i; });
+    let before = slot < others.length ? others[slot] : (_cePending.length);
+    const item = _cePending.splice(i, 1)[0];
+    let j = before; if (j > i) j -= 1;
+    _cePending.splice(j, 0, item);
+    _ceSel = j;
+    $('#ceDirty').style.display = '';               // 顺序变化待保存（保存即写入新顺序）
+    renderCeSteps(); renderCeEditor();
+  }
+
   function renderCeSteps() {
     if (!_ceCtx) return;
     const kw = ($('#ceQ').value || '').trim().toLowerCase();
@@ -1177,13 +1234,15 @@ async function appTestingInit() {
       const row = document.createElement('div');
       row.className = 'ce-step' + (i === _ceSel ? ' sel' : '') + (deleted ? ' ce-del' : '');
       row.innerHTML =
-        '<span class="ce-grip">☰</span>' +
+        '<span class="ce-grip" title="拖动调整顺序">☰</span>' +
         '<span class="ce-node" style="background:' + (CE_GROUP_CSS[t.group] || '#86868b') + '">' + activeNo + '</span>' +
-        '<div class="ce-main"><div class="ce-type">' + esc(t.label) + badge + '</div>' +
+        '<div class="ce-main"><div class="ce-type" style="color:' + (CE_GROUP_CSS[t.group] || '#86868b') + '">' + esc(t.label) + badge + '</div>' +
         '<div class="ce-desc">' + (s.element ? esc(s.element) + (s.param ? ' · <b>' + esc(s.param) + '</b>' : '')
           : (s.param ? '<b>' + esc(s.param) + '</b>' : '')) +
         (s.desc ? ' <span style="color:var(--muted2)">' + esc(s.desc) + '</span>' : '') + '</div></div><span></span>';
       row.addEventListener('click', () => { _ceSel = i; renderCeSteps(); renderCeEditor(); });
+      const grip = row.querySelector('.ce-grip');
+      grip.addEventListener('pointerdown', e => ceStartDrag(e, i, row));
       box.appendChild(row);
     });
     if (!items.length) box.innerHTML = '<div class="ce-none">没有匹配的步骤</div>';
@@ -1264,6 +1323,20 @@ async function appTestingInit() {
 
   $('#ceQ').addEventListener('input', renderCeSteps);
   $('#ceType').addEventListener('change', ceTouch);
+  /* 参数修改时，备注中「」内的同值内容同步更新
+     （如 断言「用户昵称」文本为「错误」→ 改期望文本「错误」→「正确」即同步）
+     注意：须先于 ceTouch 注册，才能取到修改前的旧参数值做匹配 */
+  $('#ceParam').addEventListener('input', function () {
+    const s = (_cePending || [])[_ceSel]; if (!s) return;
+    const oldP = String(s.param || '');
+    const nv = this.value.trim();
+    if (!oldP || oldP === nv) return;
+    const token = '「' + oldP + '」';
+    if ((s.desc || '').indexOf(token) >= 0) {
+      s.desc = s.desc.split(token).join('「' + nv + '」');
+      $('#ceDesc').value = s.desc;
+    }
+  });
   $('#ceParam').addEventListener('input', ceTouch);
   $('#ceWait').addEventListener('change', ceTouch);
   $('#ceSec').addEventListener('input', ceTouch);
