@@ -1115,7 +1115,7 @@ async function initRun() {
 const RUN_PANELS = ['projects', 'elements', 'asserts', 'visuals', 'cases', 'caselist', 'caseedit', 'report', 'exec'];
 /* 面板名 → 顶部面包屑第三级文案 */
 const RUN_PANEL_NAMES = {
-  projects: '项目管理', elements: '元素管理', asserts: '断言管理', visuals: '视觉断言', cases: '执行用例', caselist: '用例管理',
+  projects: '项目管理', elements: '对象管理', asserts: '断言管理', visuals: '视觉断言', cases: '执行用例', caselist: '用例管理',
   caseedit: '步骤编辑', report: '测试报告', exec: '设备配置',
 };
 function showRunPanel(name) {
@@ -1613,13 +1613,6 @@ async function deletePageFile(name) {
 }
 
 function initElementsPanel() {
-  $('#btnElRefresh').addEventListener('click', () => {
-    /* 重置：清空搜索词并回到文件列表视图；页面文件视图下重置 = 刷新页面文件列表 */
-    $('#elSearch').value = '';
-    _elMgrFile = null;
-    if (_pfMode) { loadPageFiles(); return; }
-    loadElements();
-  });
   $('#btnElCreate').addEventListener('click', () => {
     $('#elCStem').value = '';
     $('#elCCnName').value = '';
