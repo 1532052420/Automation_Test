@@ -729,7 +729,9 @@ def api_video_evidence_clear():
     """一键删除录制视频与断言失败截图：
     - output/video_evidence/** 全部（完整视频 / 断言前后 5 秒视频 / 失败截图）
     - output/runs/*/allure-results/*-attachment.png（断言失败截图的 allure 附件副本）
-    不删除：设计截图（output/screenshots）、Allure 报告、测试结果 JSON。"""
+    - output/runs/*/report/recording_*.mp4（在线报告引用的录屏副本）
+    - output/runs/*/allure-results/*-attachment.mp4（断言前后 5 秒视频的附件副本）
+    不删除：设计截图（output/screenshots）、Allure 报告页面、测试结果 JSON。"""
     import shutil as _shutil
     removed = {'videos': 0, 'shots': 0}
     ve = os.path.join(BASE_DIR, 'output', 'video_evidence')
@@ -757,6 +759,16 @@ def api_video_evidence_clear():
             removed['shots'] += 1
         except Exception:
             pass
+    # 在线报告引用的录屏副本与断言前后 5 秒视频附件副本——
+    # 用户预期「一键删除后在线报告不再有视频」：这些正是报告回放的视频来源，一并清除
+    for pat in (os.path.join(BASE_DIR, 'output', 'runs', '*', 'report', 'recording_*.mp4'),
+                os.path.join(BASE_DIR, 'output', 'runs', '*', 'allure-results', '*-attachment.mp4')):
+        for f in glob.glob(pat):
+            try:
+                os.remove(f)
+                removed['videos'] += 1
+            except Exception:
+                pass
     return jsonify({'ok': True, 'msg': '已删除录制视频 %d 个、断言失败截图 %d 张' %
                     (removed['videos'], removed['shots'])})
 

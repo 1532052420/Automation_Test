@@ -1135,6 +1135,9 @@ async function appTestingInit() {
   function ceTypeMeta(t) { return STEP_META[t] || CE_EXTRA_TYPES[t] || { label: t || '未知', group: '其他', param: null }; }
 
   async function openCaseEditor(node) {
+    if (window._ceOpening) return;                  // 已在打开流程中：防面板分支→open→面板分支无限递归
+    window._ceOpening = true;
+    try {
     const row = _fwCases.find(c => c.node === node);
     if (!row) return toast('用例行数据未就绪，请刷新列表后重试', false);
     const d = await api(AT_PREFIX + '/api/case/steps?file=' + encodeURIComponent(row.file) + '&method=' + encodeURIComponent(row.method));
@@ -1153,8 +1156,12 @@ async function appTestingInit() {
     renderCeShell();
     renderCeSteps();
     renderCeEditor();
+    try { sessionStorage.setItem('ceLast', JSON.stringify({ node: node })); } catch (_) {}
+    history.replaceState(null, '', '#caseedit');   // 刷新后停留在当前页（凭 ceLast 重进）
     showRunPanel('caseedit');
+    } finally { window._ceOpening = false; }       // 全流程收尾解除守卫（后续手动进入仍可触发）
   }
+  window.openCaseEditor = openCaseEditor;          // 暴露给 app.js 面板驻留分支（刷新后重进步骤编辑）
 
   function renderCeShell() {
     const { row, steps } = _ceCtx;

@@ -1134,6 +1134,27 @@ function showRunPanel(name) {
     // 进入用例管理即加载：先项目数据（列表列名映射用），再用例列表
     (async () => { await loadProjects(); if (typeof renderCaseList === 'function') await renderCaseList(); })();
   }
+  if (name === 'caseedit') {
+    // 步骤编辑驻留：刷新后凭会话保存的编辑上下文重进（无上下文则回用例管理）。
+    // _ceOpening 守卫：openCaseEditor 内部会再调 showRunPanel('caseedit')，防止无限递归
+    var savedCe = null;
+    try { savedCe = JSON.parse(sessionStorage.getItem('ceLast') || 'null'); } catch (e) {}
+    if (savedCe && savedCe.node) {
+      // 驻留重进：openCaseEditor 由 app_testing.js 挂到 window（晚于本函数执行），
+      // 轮询等待就绪 + 列表数据（openCaseEditor 依赖 _fwCases）后打开步骤编辑
+      (async () => {
+        for (var t = 0; t < 40 && typeof window.openCaseEditor !== 'function'; t++) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+        if (typeof window.openCaseEditor !== 'function') return;   // 等不到（异常场景）放弃驻留
+        if (typeof loadProjects === 'function') { try { await loadProjects(); } catch (e) {} }
+        if (typeof renderCaseList === 'function') { try { await renderCaseList(); } catch (e) {} }
+        try { await window.openCaseEditor(savedCe.node); } catch (e) {}
+      })();
+      return;
+    }
+    name = 'caselist';
+  }
   /* 测试报告面板：首次进入才加载 iframe（含 hash 深链/刷新场景——
      此前只挂在菜单点击上，刷新后停在报告页 iframe 恒空 → 白屏） */
   if (name === 'report') {

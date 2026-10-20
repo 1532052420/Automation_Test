@@ -16,12 +16,7 @@
 <body data-page="report">
 <header class="gnav" id="sidebar"></header>
 <main>
-  <div class="pagehead">
-    <h1>测试报告</h1>
-    <div class="actions"><button class="danger" id="btnClearAll3">清空全部数据</button></div>
-  </div>
-
-  <!-- 执行总览（自首页迁入）：统计卡 + 最近执行 -->
+  <!-- 执行总览（自首页迁入）：统计卡 + 最近执行（「测试报告」标题与清空按钮已按需移除/下沉） -->
   <div class="stats">
     <div class="stat s-blue" data-ico="flask"><span class="bgico"></span><div class="num" id="cardRuns">—</div><div class="label">总执行次数</div></div>
     <div class="stat s-green" data-ico="check"><span class="bgico"></span><div class="num" id="cardPass">—</div><div class="label">通过</div></div>
@@ -38,6 +33,10 @@
       </table>
     </div>
     <div class="pager" id="reportPager"></div>
+      <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--line,#e8e8ed)">
+        <span class="muted" style="font-size:11.5px">清空全部执行记录、在线报告与录屏视频</span>
+        <button class="danger" id="btnClearAll3">清空全部数据</button>
+      </div>
   </div>
   <div class="card mt">
     <div class="cardhead"><h3>用例执行记录</h3><span class="sub">点上方 run 的「详情」加载该次执行的用例、步骤、证据与执行日志</span></div>
