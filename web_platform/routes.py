@@ -534,13 +534,21 @@ def api_visual_assets_debug(name):
 
 @bp.route('/api/appui/pages')
 def api_appui_pages():
-    """现有页面对象文件列表（新建用例「页面文件名」下拉复用已有）"""
+    """现有页面对象文件列表（新建用例「页面文件名」下拉展示）。
+    usage: 页面文件 → 关联用例数。口径 = 用例 self.page 绑定解析成功（case_files_info）；
+    同名页面类歧义的用例不计入任何文件；统计异常时不带 usage 字段（前端退回纯文件名）。"""
     import sys
     el_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'element_locator')
     if el_dir not in sys.path:
         sys.path.insert(0, el_dir)
     from element_locator import case_generator as cg
-    return jsonify({'ok': True, 'pages': cg.list_page_files()})
+    usage = {}
+    try:
+        from collections import Counter
+        usage = dict(Counter(i['page_file'] for i in cg.case_files_info() if i.get('page_file')))
+    except Exception:
+        usage = {}
+    return jsonify({'ok': True, 'pages': cg.list_page_files(), 'usage': usage})
 
 
 @bp.route('/api/appui/visual_assets/debug_free', methods=['POST'])

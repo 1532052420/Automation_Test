@@ -1105,10 +1105,16 @@ async function appTestingInit() {
       const d = await api('/api/appui/elements');
       (d.existing_files || []).forEach(f => sel.add(new Option(f + '（复用已有）', f)));
     } catch (_) {}   // 元素文件列表拉取失败不阻塞：保留自动派生选项
-    /* 页面文件下拉：列出全部现有 Page 文件（后端枚举），可直接选复用 */
+    /* 页面文件下拉：列出全部现有 Page 文件（后端枚举），后缀 = 关联用例数（B 案，
+       口径：用例 self.page 绑定解析成功才计入）；usage 缺失（统计失败）时退回纯
+       文件名，避免把「统计不可用」误标成「已关联 0 个用例」 */
     try {
       const d = await fetch('/api/appui/pages').then(x => x.json());
-      (d.pages || []).forEach(p => pageSel.add(new Option(p + '（复用已有）', p)));
+      const usage = d.usage || null;
+      (d.pages || []).forEach(p => {
+        const tag = usage ? `（已关联 ${Object.prototype.hasOwnProperty.call(usage, p) ? usage[p] : 0} 个用例）` : '';
+        pageSel.add(new Option(p + tag, p));
+      });
       pageSel.add(new Option('✏️ 自定义输入…', '__page_new__'));
       pageSel.onchange = function () {
         $('#caseCPageNew').style.display = this.value === '__page_new__' ? '' : 'none';
