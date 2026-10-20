@@ -16,6 +16,7 @@ window.PlatformNav = (function () {
     '/connect': '设备连接',
     '/locator': '元素定位器',
     '/ai-case': 'AI 用例生成',
+    '/api-test': '接口测试',
     '/perf': '性能压测',
     '/report': '测试报告'
   };
