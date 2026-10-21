@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Trace 失败诊断 · 自动化测试平台</title>
+<title>录制调试中心 · 自动化测试平台</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="icon" sizes="32x32" href="/static/favicon-32.png">
 <link rel="shortcut icon" href="/static/favicon.ico">
@@ -12,75 +12,163 @@
 <link rel="stylesheet" href="/assets/{{ asset_v }}/nav.css">
 <link rel="stylesheet" href="/assets/{{ asset_v }}/style.css">
 <style>
-  /* Trace 诊断页专属样式（其余一律走全局 style.css，颜色全部取 CSS 变量，日/夜自动适配） */
-  .tl-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  .tl-actions input { min-width: 300px; }
-  .tl-status { font-size: 13px; color: var(--ink2); }
-  .tl-runs { display: flex; flex-direction: column; gap: 10px; }
-  .tl-run {
+  /* 录制调试中心 · 向导式（颜色全部取全局 CSS 变量，日/夜自动适配） */
+  .rc-steps { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .rc-step {
+    display: flex; align-items: center; gap: 8px; padding: 8px 16px; cursor: pointer;
+    border: 1px solid var(--line-soft); border-radius: 980px; background: var(--panel2);
+    color: var(--ink2); font-size: 13.5px;
+  }
+  .rc-step .n {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 50%; font-size: 12px; font-weight: 600;
+    background: rgba(128, 128, 128, .16); color: var(--ink2);
+  }
+  .rc-step.active { color: var(--ink); font-weight: 600; border-color: var(--primary); }
+  .rc-step.active .n { background: var(--primary); color: var(--primary-ink); }
+  .rc-step .sum { font-size: 12px; color: var(--muted); font-weight: 400; }
+  .rc-step-arrow { color: var(--muted); }
+  .rc-seg { display: inline-flex; border: 1px solid var(--line-soft); border-radius: 980px; overflow: hidden; }
+  .rc-seg button { border-radius: 0; border: none; }
+  .rc-seg button.on { background: var(--primary); color: var(--primary-ink); }
+  .rc-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .rc-actions input { min-width: 300px; }
+  .rc-status { font-size: 13px; color: var(--ink2); }
+  .rc-tip { font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+  .rc-runs { display: flex; flex-direction: column; gap: 10px; }
+  .rc-run {
     display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
     background: var(--panel2); border: 1px solid var(--line-soft); border-radius: 14px; padding: 12px 16px;
   }
-  .tl-run .tl-id { font-weight: 600; color: var(--ink); font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
-  .tl-run .tl-meta { font-size: 12.5px; color: var(--muted); word-break: break-all; }
-  .tl-run .tl-ops { margin-left: auto; display: flex; gap: 8px; }
-  .tl-badge {
+  .rc-run .rc-id { font-weight: 600; color: var(--ink); font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .rc-run .rc-meta { font-size: 12.5px; color: var(--muted); word-break: break-all; }
+  .rc-run .rc-ops { margin-left: auto; display: flex; gap: 8px; }
+  .rc-badge {
     display: inline-block; padding: 2px 10px; border-radius: 980px;
     font-size: 12px; font-weight: 600; background: rgba(128, 128, 128, .14);
   }
-  .tl-badge.run { color: var(--run); }
-  .tl-badge.ok { color: var(--ok-text); }
-  .tl-badge.bad { color: var(--bad-text); }
-  .tl-badge.stop { color: var(--stop); }
-  /* 日志区沿用平台约定：深底浅字（两套主题都保持深色，更易读） */
-  .tl-log {
+  .rc-badge.run { color: var(--run); }
+  .rc-badge.ok { color: var(--ok-text); }
+  .rc-badge.bad { color: var(--bad-text); }
+  .rc-badge.stop { color: var(--stop); }
+  .rc-log {
     background: var(--dark); color: var(--dark-ink); border-radius: 14px; padding: 16px 18px;
     font: 12px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    max-height: 340px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+    max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
   }
-  .tl-tip { font-size: 12.5px; color: var(--muted); margin-top: 10px; }
-  @media (max-width: 640px) { .tl-actions input { min-width: 0; flex: 1; } .tl-run .tl-ops { margin-left: 0; } }
+  .rc-fold > summary { cursor: pointer; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
+  .rc-fold[open] > summary { margin-bottom: 12px; }
+  .rc-fold { padding: 4px 0; }
+  .rc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .rc-grid .field label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 4px; }
+  .rc-grid .field input, .rc-grid .field select { width: 100%; }
+  @media (max-width: 640px) { .rc-actions input { min-width: 0; flex: 1; } .rc-run .rc-ops { margin-left: 0; } }
 </style>
 </head>
 <body data-page="tracelab">
 <header class="gnav" id="sidebar"></header>
 <main>
   <div class="pagehead">
-    <h1>Trace 失败诊断</h1>
-    <p class="sub">Playwright Trace 回放：操作步骤 + 截图 + DOM 快照 + 网络请求，合一在时间线上逐步回看。
-      现阶段为独立调试链路（录制跑在 trace_lab 专属环境，与用例框架解耦），跑通后再接入用例执行。</p>
+    <h1>录制调试中心</h1>
+    <p class="sub">Web 用 Playwright 官方 codegen 录制、App 用 Maestro Studio 录制（上游工具原封未动，平台只负责拉起与产物落盘）；
+      录制产物一键「带 trace 调试运行」，失败现场在官方 viewer / 回放报告里逐步查看。</p>
   </div>
 
   <div class="card">
-    <h3>App 用例失败现场 <span class="muted">外部观察者自动采集 · 框架零改动</span></h3>
-    <p class="muted" id="appObsStatus">观察者状态检查中…</p>
-    <div id="appTraces" class="tl-runs">加载中…</div>
-    <p class="tl-tip">真实 App 用例在平台执行时，观察者自动留现场：连续采证（截图 + UI 树）+ 全程 logcat + 运行日志步骤标定。
-      用例通过自动清现场，失败/停止自动保留。</p>
-  </div>
-
-  <div class="card">
-    <h3>录制调试 Trace</h3>
-    <div class="tl-actions">
-      <input type="text" id="traceUrl" value="https://www.baidu.com"
-             placeholder="要录制的页面地址，https:// 开头">
-      <button id="btnTraceRecord">开始录制</button>
-      <button class="ghost" id="btnTraceStop" hidden>停止</button>
-      <span class="tl-status" id="traceStatus">就绪</span>
+    <div class="rc-steps">
+      <div class="rc-step active" id="rcStep1" onclick="rcGoto(1)">
+        <span class="n">1</span> 项目配置 <span class="sum" id="rcCfgSum"></span>
+      </div>
+      <span class="rc-step-arrow">→</span>
+      <div class="rc-step" id="rcStep2" onclick="rcGoto(2)">
+        <span class="n">2</span> 录制
+      </div>
+      <span class="rc-step-arrow">→</span>
+      <div class="rc-step" id="rcStep3" onclick="rcGoto(3)">
+        <span class="n">3</span> 调试运行
+      </div>
     </div>
-    <p class="muted mt" id="traceEnv">环境检查中…</p>
-    <p class="tl-tip">录制内容为固定样板动作（打开页面 → 等待 → 截图 → 刷新）：先验证「录得上、放得出」，
-      接入用例框架后由用例步骤产生真实操作轨迹。</p>
+  </div>
+
+  <!-- 步骤 1：项目配置 -->
+  <div class="card" id="rcPane1">
+    <h3>项目配置 <span class="muted">trace_lab/record_project.yaml · 保存后自动折叠为摘要</span></h3>
+    <div class="rc-grid">
+      <div class="field"><label>Web 入口地址（录制默认打开）</label><input type="text" id="cfgBaseUrl"></div>
+      <div class="field"><label>Web 浏览器</label>
+        <select id="cfgBrowser"><option value="chromium">chromium</option><option value="firefox">firefox</option><option value="webkit">webkit</option></select>
+      </div>
+      <div class="field"><label>Web 视口（宽,高）</label><input type="text" id="cfgViewport" placeholder="1280,720"></div>
+      <div class="field"><label>Web 产物保存目录（项目内相对路径）</label><input type="text" id="cfgWebDir"></div>
+      <div class="field"><label>App 产物保存目录（项目内相对路径）</label><input type="text" id="cfgAppDir"></div>
+    </div>
+    <div class="rc-actions mt">
+      <button id="btnCfgSave">保存并进入录制</button>
+      <span class="rc-status" id="cfgEnv"></span>
+    </div>
+  </div>
+
+  <!-- 步骤 2：录制 -->
+  <div class="card" id="rcPane2" hidden>
+    <div class="rc-actions" style="margin-bottom:14px">
+      <div class="rc-seg">
+        <button class="on" id="rcSegWeb" onclick="rcSeg('web')">Web 录制</button>
+        <button id="rcSegApp" onclick="rcSeg('app')">App 录制</button>
+      </div>
+    </div>
+
+    <div id="rcWebPane">
+      <h3 style="margin-top:0">Web 录制 <span class="muted">Playwright codegen · 真实浏览器窗口操作，代码实时写入产物文件</span></h3>
+      <div class="rc-actions">
+        <input type="text" id="recUrl" placeholder="留空则用项目配置里的入口地址">
+        <button id="btnRecWeb">开始录制</button>
+        <button class="ghost" id="btnRecWebStop" hidden>停止录制</button>
+        <span class="rc-status" id="recWebStatus"></span>
+      </div>
+      <p class="rc-tip">点「开始录制」会弹出一个真实浏览器窗口：在里面点选/输入，脚本代码实时写入保存目录；
+        录完关掉窗口或点「停止录制」，产物出现在本页底部「录制产物」里，点它的「调试运行」进入第 3 步。</p>
+    </div>
+
+    <div id="rcAppPane" hidden>
+      <h3 style="margin-top:0">App 录制 <span class="muted">Maestro Studio · 真机界面操作生成流程</span></h3>
+      <div class="rc-actions">
+        <button id="btnRecApp">启动 Maestro Studio</button>
+        <button class="ghost" id="btnRecAppStop" hidden>停止</button>
+        <button class="ghost" id="btnStudioOpen" hidden>打开 Studio 界面</button>
+        <span class="rc-status" id="recAppStatus"></span>
+      </div>
+      <p class="rc-tip">需设备在线（adb devices 可见）。Studio 打开后在界面上选设备、点选控件生成命令，导出 YAML 存到
+        「App 产物保存目录」即进入录制产物列表；流程里写好 appPackage/appActivity 后可点「调试运行」。</p>
+    </div>
+  </div>
+
+  <!-- 步骤 3：调试运行 -->
+  <div class="card" id="rcPane3" hidden>
+    <h3 style="margin-top:0">调试运行 <span class="muted">带 trace 执行录制产物，失败现场官方 viewer 逐步回放</span></h3>
+    <div class="rc-actions">
+      <span class="rc-badge" id="dbgBadge">空闲</span>
+      <span class="rc-status" id="dbgStatus">在下方「录制产物」里点「调试运行」开始</span>
+      <button class="ghost" id="btnDbgReplay" hidden>打开 trace 回放</button>
+    </div>
+    <div class="rc-log mt" id="dbgLog">（未开始）</div>
   </div>
 
   <div class="card">
-    <h3>录制历史</h3>
-    <div id="traceRuns" class="tl-runs">加载中…</div>
-  </div>
-
-  <div class="card">
-    <h3>执行日志 <span class="muted" id="traceLogRun"></span></h3>
-    <div class="tl-log" id="traceLog">（未开始）</div>
+    <details class="rc-fold" open>
+      <summary>录制产物（Web=.py 脚本 · App=.yaml 流程）</summary>
+      <div id="recFiles" class="rc-runs">加载中…</div>
+    </details>
+    <details class="rc-fold" open>
+      <summary>App 用例失败现场（外部观察者自动采集 · 框架零改动）</summary>
+      <p class="muted" id="appObsStatus" style="margin:0 0 8px">观察者状态检查中…</p>
+      <div id="appTraces" class="rc-runs">加载中…</div>
+      <p class="rc-tip">真实 App 用例在平台执行时，观察者自动留现场：连续采证（截图 + UI 树）+ 全程 logcat + 运行日志步骤标定。
+        用例通过自动清现场，失败/停止自动保留。</p>
+    </details>
+    <details class="rc-fold">
+      <summary>录制历史（调试运行与历史 trace）</summary>
+      <div id="traceRuns" class="rc-runs">加载中…</div>
+    </details>
   </div>
 </main>
 <div id="toast"></div>

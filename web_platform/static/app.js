@@ -2179,18 +2179,50 @@ async function initPerf() {
 }
 
 /* ================= Trace 失败诊断（Playwright Trace 回放 · 调试阶段，与用例框架解耦） ================= */
-let traceActiveRun = '', traceLogTotal = 0;
+let rcDebugRunId = '', rcDebugOffset = 0, rcDebugDone = true;
 
 async function initTraceLab() {
   renderSidebar('/trace-lab');
-  $('#btnTraceRecord').addEventListener('click', traceStart);
-  $('#btnTraceStop').addEventListener('click', traceStop);
-  const st = await api('/api/trace-lab/status');
-  setText('#traceEnv', st.hint
-    ? st.hint
-    : '录制环境就绪（trace_lab/.venv · playwright' + (st.playwright_version ? ' ' + st.playwright_version : '') + ' + Chromium），与平台主环境隔离');
+  $('#btnCfgSave').addEventListener('click', rcSaveCfg);
+  $('#btnRecWeb').addEventListener('click', rcWebStart);
+  $('#btnRecWebStop').addEventListener('click', () => rcStop('web'));
+  $('#btnRecApp').addEventListener('click', rcAppStart);
+  $('#btnRecAppStop').addEventListener('click', () => rcStop('app'));
+  $('#btnStudioOpen').addEventListener('click', () => window.open('http://127.0.0.1:9999', '_blank'));
+  $('#btnDbgReplay').addEventListener('click', () => {
+    if (rcDebugRunId) window.open('/trace-lab/viewer/' + rcDebugRunId);
+  });
+  rcLoadConfig();
+  rcLoadFiles();
+  rcRefreshStatus();
   traceLoadRuns();
   appObsRefresh();
+  rcGoto(1);
+  rcSeg('web');
+}
+
+/* ---- 向导导航：①配置 → ②录制 → ③调试 ---- */
+function rcGoto(n) {
+  [1, 2, 3].forEach(i => {
+    const chip = $('#rcStep' + i);
+    const pane = $('#rcPane' + i);
+    if (chip) chip.classList.toggle('active', i === n);
+    if (pane) pane.hidden = (i !== n);
+  });
+}
+
+function rcSeg(kind) {
+  const web = kind === 'web';
+  $('#rcSegWeb').classList.toggle('on', web);
+  $('#rcSegApp').classList.toggle('on', !web);
+  $('#rcWebPane').hidden = !web;
+  $('#rcAppPane').hidden = web;
+}
+
+function rcCfgSummary(c) {
+  const w = (c && c.web) || {};
+  setText('#rcCfgSum', w.base_url ? '· ' + (w.browser || 'chromium') + ' · ' + (w.viewport || '默认视口')
+    + ' · ' + (w.save_dir || 'recordings/web') : '');
 }
 
 /* ---- App 失败现场（外部观察者自动采集，框架零改动） ---- */
@@ -2217,13 +2249,13 @@ async function appObsRefresh() {
 
 function appTraceRow(t) {
   const badge = { PASSED: 'ok', FAILED: 'bad', ERROR: 'bad' }[t.status] || 'stop';
-  return '<div class="tl-run">'
-    + '<span class="tl-badge ' + badge + '">' + esc(t.status) + '</span>'
-    + '<span class="tl-id">' + esc(t.run_id) + '</span>'
-    + '<span class="tl-meta">' + esc(t.device_model || t.udid || '') + '</span>'
-    + '<span class="tl-meta">' + esc(t.app_package || '') + '</span>'
-    + '<span class="tl-meta">步骤 ' + (t.steps || 0) + ' · 采证 ' + (t.caps || 0) + '</span>'
-    + '<span class="tl-ops">'
+  return '<div class="rc-run">'
+    + '<span class="rc-badge ' + badge + '">' + esc(t.status) + '</span>'
+    + '<span class="rc-id">' + esc(t.run_id) + '</span>'
+    + '<span class="rc-meta">' + esc(t.device_model || t.udid || '') + '</span>'
+    + '<span class="rc-meta">' + esc(t.app_package || '') + '</span>'
+    + '<span class="rc-meta">步骤 ' + (t.steps || 0) + ' · 采证 ' + (t.caps || 0) + '</span>'
+    + '<span class="rc-ops">'
     + '<button class="mini" data-act="replay" data-run="' + t.run_id + '">步骤回放</button>'
     + '<button class="ghost mini" data-act="report" data-run="' + t.run_id + '">在线回放报告</button>'
     + '</span></div>';
@@ -2305,57 +2337,173 @@ async function atSelect(i) {
   }
 }
 
-async function traceStart() {
-  const r = await postJson('/api/trace-lab/record', { url: $('#traceUrl').value.trim() });
+/* ---- 项目配置 ---- */
+async function rcLoadConfig() {
+  const d = await api('/api/record/config');
+  if (!d.ok) return;
+  const c = d.config || {};
+  $('#cfgBaseUrl').value = (c.web || {}).base_url || '';
+  $('#cfgBrowser').value = (c.web || {}).browser || 'chromium';
+  $('#cfgViewport').value = (c.web || {}).viewport || '';
+  $('#cfgWebDir').value = (c.web || {}).save_dir || '';
+  $('#cfgAppDir').value = (c.app || {}).save_dir || '';
+  const env = d.env || {};
+  const devs = (env.devices || []).filter(x => x.state === 'device');
+  setText('#cfgEnv', 'Playwright codegen ' + (env.pw_ready ? '就绪' : '未就绪（trace_lab/.venv 缺失）')
+    + ' · maestro ' + (env.maestro || '未安装')
+    + ' · 在线设备 ' + (devs.length ? devs.map(x => x.udid).join('、') : '无（App 录制/调试需先连接）'));
+  rcCfgSummary(d.config);
+}
+
+async function rcSaveCfg() {
+  const r = await postJson('/api/record/config', {
+    web: { base_url: $('#cfgBaseUrl').value, browser: $('#cfgBrowser').value,
+           viewport: $('#cfgViewport').value, save_dir: $('#cfgWebDir').value },
+    app: { save_dir: $('#cfgAppDir').value }
+  });
+  toast(r.msg || (r.ok ? '已保存' : '保存失败'), r.ok);
+  if (r.ok) {
+    rcCfgSummary(r.config);
+    rcGoto(2);
+  }
+}
+
+/* ---- Web / App 录制 ---- */
+async function rcWebStart() {
+  const r = await postJson('/api/record/web/start', { url: $('#recUrl').value.trim() });
+  toast(r.msg || (r.ok ? '已开始' : '启动失败'), r.ok);
+  rcRefreshStatus();
+}
+
+async function rcAppStart() {
+  const r = await postJson('/api/record/app/start', {});
   toast(r.msg || (r.ok ? '已启动' : '启动失败'), r.ok);
-  if (!r.ok) return;
-  traceActiveRun = r.run_id;
-  traceLogTotal = 0;
-  setText('#traceLogRun', r.run_id);
-  setHtml('#traceLog', '');
-  setText('#traceStatus', '录制中…');
-  $('#btnTraceStop').hidden = false;
-  tracePoll();
+  if (r.ok && r.studio_url) $('#btnStudioOpen').hidden = false;
+  rcRefreshStatus();
 }
 
-async function traceStop() {
-  const r = await postJson('/api/trace-lab/stop', { run_id: traceActiveRun });
-  toast(r.msg || '停止信号已发送', r.ok);
+async function rcStop(kind) {
+  const r = await postJson('/api/record/' + (kind === 'web' ? 'web/stop' : 'app/stop'), {});
+  toast(r.msg || '已停止', r.ok);
+  rcRefreshStatus();
 }
 
-/* 录制期间 1.5s 轮询：增量日志 + 状态；结束后刷新列表 */
-async function tracePoll() {
-  if (!traceActiveRun) return;
-  const d = await api('/api/trace-lab/run/' + traceActiveRun + '?offset=' + traceLogTotal).catch(() => null);
-  if (!d || d.ok === false) { traceActiveRun = ''; return; }
-  (d.log_lines || []).forEach(l => traceLogAppend(l));
-  traceLogTotal = d.log_total || traceLogTotal;
-  if (d.status === 'RUNNING') {
-    setText('#traceStatus', '录制中…');
-    setTimeout(tracePoll, 1500);
+function rcRefreshStatus() {
+  api('/api/record/status').then(d => {
+    if (!d.ok) return;
+    setText('#recWebStatus', d.web.running ? '录制中：操作弹出的真实浏览器窗口，代码实时写入产物文件' : '');
+    $('#btnRecWebStop').hidden = !d.web.running;
+    setText('#recAppStatus', d.app.running ? 'Maestro Studio 运行中：' + d.app.studio_url : '');
+    $('#btnRecAppStop').hidden = !d.app.running;
+    $('#btnStudioOpen').hidden = !d.app.running;
+    if (d.debug.running || d.debug.run_id) rcDebugPoll();
+  }).catch(() => {});
+}
+
+/* ---- 录制产物 ---- */
+function rcTime(ts) {
+  const t = new Date(ts * 1000);
+  const p = n => String(n).padStart(2, '0');
+  return (t.getMonth() + 1) + '-' + t.getDate() + ' ' + p(t.getHours()) + ':' + p(t.getMinutes());
+}
+
+async function rcLoadFiles() {
+  const d = await api('/api/record/files');
+  const box = $('#recFiles');
+  const files = (d && d.files) || [];
+  if (!files.length) {
+    box.innerHTML = '<p class="muted">还没有录制产物。Web 点「开始录制」在弹出的浏览器里操作；App 启动 Maestro Studio 导出 YAML 存到保存目录。</p>';
     return;
   }
-  setText('#traceStatus', { FINISHED: '已完成', FAILED: '失败（详见日志）', STOPPED: '已停止' }[d.status] || d.status);
-  $('#btnTraceStop').hidden = true;
-  traceActiveRun = '';
-  traceLoadRuns();
+  box.innerHTML = files.map(f =>
+    '<div class="rc-run">'
+    + '<span class="rc-badge ' + (f.kind === 'web' ? 'ok' : 'run') + '">' + (f.kind === 'web' ? 'Web' : 'App') + '</span>'
+    + '<span class="rc-id">' + esc(f.rel) + '</span>'
+    + '<span class="rc-meta">' + (f.size / 1024).toFixed(1) + 'KB · ' + rcTime(f.mtime) + '</span>'
+    + '<span class="rc-ops">'
+    + '<button class="mini" data-act="debug" data-rel="' + esc(f.rel) + '">调试运行</button>'
+    + '<button class="ghost mini" data-act="view" data-rel="' + esc(f.rel) + '">查看</button>'
+    + '<button class="ghost mini" data-act="del" data-rel="' + esc(f.rel) + '">删除</button>'
+    + '</span></div>').join('')
+    + '<pre class="rc-log" id="recView" hidden></pre>';
+  box.querySelectorAll('[data-act]').forEach(btn =>
+    btn.addEventListener('click', () => rcFileAct(btn.dataset.act, btn.dataset.rel)));
 }
 
-function traceLogAppend(line) {
-  const box = $('#traceLog');
-  const div = document.createElement('div');
-  div.textContent = line;
-  const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
-  box.appendChild(div);
-  if (nearBottom) box.scrollTop = box.scrollHeight;
+async function rcFileAct(act, rel) {
+  if (act === 'debug') {
+    const isWeb = rel.startsWith('web/');
+    const r = await postJson('/api/record/' + (isWeb ? 'web/debug' : 'app/debug'), { rel: rel });
+    toast(r.msg || (r.ok ? '已启动' : '启动失败'), r.ok);
+    if (r.ok) {
+      rcDebugRunId = r.run_id;
+      rcDebugDone = true;
+      rcGoto(3);
+      rcDebugPoll();
+    }
+    return;
+  }
+  if (act === 'view') {
+    const box = $('#recView');
+    box.hidden = false;
+    box.textContent = '加载中…';
+    const d = await api('/api/record/source?rel=' + encodeURIComponent(rel));
+    box.textContent = d.ok ? d.content : (d.msg || '读取失败');
+    return;
+  }
+  if (act === 'del') {
+    svcConfirm('删除录制产物？', rel + ' 将被删除，不可恢复。', async () => {
+      const r = await postJson('/api/record/delete', { rel: rel });
+      toast(r.msg || (r.ok ? '已删除' : '删除失败'), r.ok);
+      if (r.ok) rcLoadFiles();
+    });
+  }
 }
 
+/* ---- 调试运行（录制产物自动带 trace 执行，官方 viewer 回放） ---- */
+function rcDebugPoll() {
+  if (!rcDebugDone) return;
+  rcDebugDone = false;
+  rcDebugTick();
+}
+
+async function rcDebugTick() {
+  const d = await api('/api/record/debug/log?offset=' + rcDebugOffset).catch(() => null);
+  if (d && d.ok && d.lines && d.lines.length) {
+    const box = $('#dbgLog');
+    if (rcDebugOffset === 0) box.textContent = '';
+    d.lines.forEach(l => { const div = document.createElement('div'); div.textContent = l; box.appendChild(div); });
+    box.scrollTop = box.scrollHeight;
+    rcDebugOffset = d.offset;
+  }
+  const s = await api('/api/record/debug/status').catch(() => null);
+  if (s && s.ok && s.run_id) {
+    rcDebugRunId = s.run_id;
+    if (s.running) {
+      setText('#dbgStatus', '调试运行中（' + (s.kind === 'web' ? '网页脚本' : 'App 流程') + ' · ' + s.run_id + '）');
+      $('#dbgBadge').className = 'rc-badge run';
+      $('#dbgBadge').textContent = '运行中';
+      setTimeout(() => { rcDebugDone = true; rcDebugTick(); }, 1500);
+      return;
+    }
+    const ok = s.kind === 'web' ? (s.exit === 0 && s.has_zip) : s.exit === 0;
+    setText('#dbgStatus', s.run_id + ' · '
+      + (ok ? '运行完成' + (s.kind === 'web' && s.has_zip ? '，可打开 trace 回放' : '')
+            : '运行失败（退出码 ' + s.exit + '，详见日志）'));
+    $('#dbgBadge').className = 'rc-badge ' + (ok ? 'ok' : 'bad');
+    $('#dbgBadge').textContent = ok ? '完成' : '失败';
+    $('#btnDbgReplay').hidden = !(s.kind === 'web' && s.has_zip);
+  }
+  rcDebugDone = true;
+}
+
+/* ---- 录制历史（trace 列表：调试运行与历史网页录制） ---- */
 async function traceLoadRuns() {
   const d = await api('/api/trace-lab/runs');
   const box = $('#traceRuns');
   const runs = d.runs || [];
   if (!runs.length) {
-    box.innerHTML = '<p class="muted">还没有录制记录。填地址点「开始录制」，产物（trace.zip + 整页截图）会出现在这里，点「回放」逐步查看。</p>';
+    box.innerHTML = '<p class="muted">还没有 trace。在上方对录制产物点「调试运行」，trace 会出现在这里，点「回放」在官方 viewer 逐步查看。</p>';
     return;
   }
   box.innerHTML = runs.map(traceRunRow).join('');
@@ -2364,10 +2512,10 @@ async function traceLoadRuns() {
 }
 
 const TRACE_ST = {
-  RUNNING: '<span class="tl-badge run">录制中</span>',
-  FINISHED: '<span class="tl-badge ok">已完成</span>',
-  FAILED: '<span class="tl-badge bad">失败</span>',
-  STOPPED: '<span class="tl-badge stop">已停止</span>'
+  RUNNING: '<span class="rc-badge run">进行中</span>',
+  FINISHED: '<span class="rc-badge ok">已完成</span>',
+  FAILED: '<span class="rc-badge bad">失败</span>',
+  STOPPED: '<span class="rc-badge stop">已停止</span>'
 };
 
 function traceRunRow(r) {
@@ -2375,29 +2523,18 @@ function traceRunRow(r) {
   const ops = r.has_zip
     ? '<button class="mini" data-act="view" data-run="' + r.run_id + '">回放</button>'
       + '<button class="ghost mini" data-act="shot" data-run="' + r.run_id + '"' + (r.has_png ? '' : ' disabled') + '>截图</button>'
-      + '<button class="ghost mini" data-act="dl" data-run="' + r.run_id + '">下载</button>'
       + '<button class="ghost mini" data-act="del" data-run="' + r.run_id + '">删除</button>'
-    : '<button class="ghost mini" data-act="log" data-run="' + r.run_id + '">看日志</button>'
-      + '<button class="ghost mini" data-act="del" data-run="' + r.run_id + '">删除</button>';
-  return '<div class="tl-run">' + (TRACE_ST[r.status] || '<span class="tl-badge">' + esc(r.status) + '</span>')
-    + '<span class="tl-id">' + esc(r.run_id) + '</span>'
-    + '<span class="tl-meta">' + (esc(r.url) || '（平台重启前的历史任务）') + '</span>'
-    + '<span class="tl-meta">' + dur + '</span>'
-    + '<span class="tl-ops">' + ops + '</span></div>';
+    : '<button class="ghost mini" data-act="del" data-run="' + r.run_id + '">删除</button>';
+  return '<div class="rc-run">' + (TRACE_ST[r.status] || '<span class="rc-badge">' + esc(r.status) + '</span>')
+    + '<span class="rc-id">' + esc(r.run_id) + '</span>'
+    + '<span class="rc-meta">' + (esc(r.url) || '（平台重启前的历史任务）') + '</span>'
+    + '<span class="rc-meta">' + dur + '</span>'
+    + '<span class="rc-ops">' + ops + '</span></div>';
 }
 
 function traceRunAct(act, runId) {
   if (act === 'view') { window.open('/trace-lab/viewer/' + runId); return; }
   if (act === 'shot') { window.open('/trace-lab/file/' + runId + '/trace.png'); return; }
-  if (act === 'dl') { location.href = '/trace-lab/file/' + runId + '/trace.zip?dl=1'; return; }
-  if (act === 'log') {
-    traceActiveRun = '';
-    traceLogTotal = 0;
-    setText('#traceLogRun', runId);
-    setHtml('#traceLog', '');
-    api('/api/trace-lab/run/' + runId).then(d => (d.log_lines || []).forEach(traceLogAppend));
-    return;
-  }
   if (act === 'del') {
     svcConfirm('删除这条录制？', runId + ' 的 trace.zip / 截图 / 日志将一并删除，不可恢复。', async () => {
       const r = await postJson('/api/trace-lab/run/' + runId + '/delete', {});
