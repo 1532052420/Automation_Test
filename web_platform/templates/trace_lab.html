@@ -59,6 +59,15 @@
   .rc-fold > summary { cursor: pointer; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
   .rc-fold[open] > summary { margin-bottom: 12px; }
   .rc-fold { padding: 4px 0; }
+  .rc-gen-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .rc-gen-grid { grid-template-columns: 1fr; } }
+  .rc-gen-label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+  .rc-gen-yaml {
+    width: 100%; min-height: 340px; resize: vertical;
+    font: 12.5px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  .rc-spec { font-size: 12.5px; }
+  .rc-spec td { word-break: break-all; }
   .rc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
   .rc-grid .field label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 4px; }
   .rc-grid .field input, .rc-grid .field select { width: 100%; }
@@ -114,6 +123,7 @@
       <div class="rc-seg">
         <button class="on" id="rcSegWeb" onclick="rcSeg('web')">Web 录制</button>
         <button id="rcSegApp" onclick="rcSeg('app')">App 录制</button>
+        <button id="rcSegGen" onclick="rcSeg('gen')">步骤生成</button>
       </div>
     </div>
 
@@ -139,6 +149,45 @@
       </div>
       <p class="rc-tip">需设备在线（adb devices 可见）。Studio 打开后在界面上选设备、点选控件生成命令，导出 YAML 存到
         「App 产物保存目录」即进入录制产物列表；流程里写好 appPackage/appActivity 后可点「调试运行」。</p>
+    </div>
+
+    <div id="rcGenPane" hidden>
+      <h3 style="margin-top:0">步骤生成 <span class="muted">先写步骤稿（YAML）→ 生成 Playwright 脚本 → 可反复调试运行</span></h3>
+      <div class="rc-actions" style="margin-bottom:10px">
+        <button class="ghost" id="btnGenTemplate">加载步骤模板</button>
+        <button id="btnGenRun">校验并生成脚本</button>
+        <span class="rc-status" id="genStatus"></span>
+      </div>
+      <div class="rc-gen-grid">
+        <div>
+          <label class="rc-gen-label">步骤稿（改完可反复重新生成；生成物同名 .py）</label>
+          <textarea id="genYaml" class="rc-gen-yaml" spellcheck="false"
+                    placeholder="点「加载步骤模板」开始写，或直接粘贴"></textarea>
+        </div>
+        <div>
+          <label class="rc-gen-label">步骤规范速查（选择器用 Playwright 语法：#id · text=登录 · role=button[name="提交"]）</label>
+          <table class="table table-sm rc-spec">
+            <thead><tr><th>动作</th><th>写法示例</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>goto</td><td>- goto: /search?kw=x</td><td>打开页面（相对 base_url 或完整 URL）</td></tr>
+              <tr><td>fill</td><td>- fill: {selector: "#kw", text: "自动化"}</td><td>输入框输入</td></tr>
+              <tr><td>click</td><td>- click: "#su"</td><td>点击（可简写选择器）</td></tr>
+              <tr><td>press</td><td>- press: Enter</td><td>按键</td></tr>
+              <tr><td>wait</td><td>- wait: 2</td><td>等待秒数</td></tr>
+              <tr><td>wait_for</td><td>- wait_for: "#list"</td><td>等元素出现</td></tr>
+              <tr><td>hover</td><td>- hover: ".menu"</td><td>悬停</td></tr>
+              <tr><td>select</td><td>- select: {selector: "#s", value: "M"}</td><td>下拉（value/label/index 三选一）</td></tr>
+              <tr><td>check / uncheck</td><td>- check: "#agree"</td><td>勾选 / 取消勾选</td></tr>
+              <tr><td>screenshot</td><td>- screenshot: 结果.png</td><td>整页截图（存 output/record_shots/）</td></tr>
+              <tr><td>slide / drag</td><td>- slide: {selector: ".btn", distance: 300}</td><td>滑块/拖拽（codegen 录不到的手势）：distance 像素 / to: 目标元素 / track: 轨道拖到底，可加 steps: 30（分步移动）、hold: 0.3（松手前停顿秒）</td></tr>
+              <tr><td>assert_visible</td><td>- assert_visible: "#list"</td><td>断言元素可见</td></tr>
+              <tr><td>assert_text</td><td>- assert_text: {selector: "body", contains: "ok"}</td><td>断言文本（contains / text）</td></tr>
+              <tr><td>assert_title</td><td>- assert_title: {contains: "百度"}</td><td>断言页面标题</td></tr>
+            </tbody>
+          </table>
+          <p class="rc-tip">通用：每步可加 <code>desc: 说明</code> 生成注释。App 端无需生成——Maestro 的 YAML 本身就是步骤规范（appId/launchApp/tapOn/inputText/assertVisible…），写好直接「调试运行」。</p>
+        </div>
+      </div>
     </div>
   </div>
 
