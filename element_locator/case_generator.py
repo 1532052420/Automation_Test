@@ -7,6 +7,7 @@ GUI 元素定位器 · 元素/操作 追加到用例（「添加到元素库」�
 支持：追加 test 方法体代码行 / 同名页面方法覆盖 / 自动补 import（用例文件本身在平台上传或手动创建）
 """
 
+import ast
 import os
 import re
 import time
@@ -44,6 +45,12 @@ TOOL_METHODS = {'wait_and_shot', 'tap_xy', 'assert_toast', 'dismiss_keyboard',
 # 需要构造探针元素（CreateElement/Locator_Type/Wait_By）的步骤类型：
 # 生成页面方法时页面文件缺这三个 import 会自动补齐
 PROBE_STEP_TYPES = {'wait_element', 'assert_gone', 'if_click', 'deal_first_launch_dialogs'}
+
+# 步骤编辑「等待方式」覆盖支持的元素操作步骤（等待条件+最长等待仅本步生效，不改元素全局定义）；
+# assert_text 的等待条件固定为存在探针（_assert_probe PRESENCE），仅支持覆盖最长等待秒数
+WAIT_OVERRIDE_OPS = {'click', 'input', 'long_press', 'assert_visible', 'assert_text'}
+# Wait_Type 的合法值（与 page_objects/app_ui/wait_type.py 同源；页面方法 kwargs 直接传框架）
+WAIT_TYPE_VALUES = ('visibility_of', 'presence_of_element_located', 'element_to_be_clickable')
 
 
 def list_case_files():
@@ -362,37 +369,80 @@ def _probe_body_lines(element_name, seconds_var='timeout_seconds'):
     ) % (element_name, element_name, seconds_var)
 
 
-def page_method_code(step):
+def _has_wait_override(step):
+    """步骤是否带等待覆盖（合法秒数或合法等待条件）"""
+    if step.get('type') not in WAIT_OVERRIDE_OPS:
+        return False
+    if re.match(r'^\d+$', str(step.get('wait_sec') or '').strip()):
+        return True
+    return str(step.get('wait_type') or '').strip() in WAIT_TYPE_VALUES
+
+
+# 等待覆盖版页面方法的公共体前缀：按本步参数克隆元素（不改元素全局定义，框架按克隆定义等待）
+_WAIT_EL_OVERRIDE_BODY = (
+    "el = self._elements.%s\n"
+    "if wait_seconds is not None or wait_type is not None:\n"
+    "    el = CreateElement.create(el.locator_type, el.locator_value, "
+    "wait_type=wait_type or el.wait_type, "
+    "wait_seconds=wait_seconds if wait_seconds is not None else el.wait_seconds, "
+    "desc=getattr(el, 'desc', None))")
+
+
+def page_method_code(step, force_wait_capable=False):
     """步骤 → 页面方法代码块；sleep/custom 返回 None（不需要页面方法）。
     step.comment（操作备注）优先作为方法 docstring，缺省用步骤描述。
-    四栏改版：step.asserts 非空时生成「操作段+断言段」组合方法（全量执行，失败汇总）。"""
+    四栏改版：step.asserts 非空时生成「操作段+断言段」组合方法（全量执行，失败汇总）。
+    force_wait_capable：等待覆盖版签名（wait_seconds/wait_type kwargs）——元素操作步骤带
+    等待覆盖时生成；不带覆盖时传 True 可维持已升级签名（避免同方法多用例共用时降级）。"""
     if _asserts_of(step):
         return _combo_method_code(step)
     t = step.get('type', '')
     el = step.get('element') or ''
     desc = (step.get('comment') or '').strip() or step_desc(step)
+    capable = force_wait_capable or _has_wait_override(step)
     if t == 'click':
+        if capable:
+            return _method_block('click_%s' % el, desc, ['wait_seconds=None', 'wait_type=None'],
+                                 (_WAIT_EL_OVERRIDE_BODY % el) + '\nself.appOperator.click(el)')
         return _method_block('click_%s' % el, desc, [],
                              'self.appOperator.click(self._elements.%s)' % el)
     if t == 'input':
+        if capable:
+            return _method_block('input_%s' % el, desc, ['text', 'wait_seconds=None', 'wait_type=None'],
+                                 (_WAIT_EL_OVERRIDE_BODY % el) + '\nself.appOperator.sendText(el, text)')
         return _method_block('input_%s' % el, desc, ['text'],
                              'self.appOperator.sendText(self._elements.%s, text)' % el)
     if t == 'long_press':
+        if capable:
+            return _method_block('long_press_%s' % el, desc, ['wait_seconds=None', 'wait_type=None'],
+                                 (_WAIT_EL_OVERRIDE_BODY % el) + '\nself.appOperator.touch_long_press(el, duration_sconds=2)')
         return _method_block('long_press_%s' % el, desc, [],
                              'self.appOperator.touch_long_press(self._elements.%s, duration_sconds=2)' % el)
     if t == 'assert_visible':
+        if capable:
+            return _method_block('assert_%s' % el, desc, ['wait_seconds=None', 'wait_type=None'],
+                                 (_WAIT_EL_OVERRIDE_BODY % el) + '\nself.appOperator.getElement(el)\n%s' % _shot_line(desc))
         return _method_block('assert_%s' % el, desc, [],
                              'self.appOperator.getElement(self._elements.%s)\n%s' % (el, _shot_line(desc)))
     if t == 'assert_text':
         # v6.15.73：改用 assert_text_or_fail——实际值入 allure JSON，报告「实际结果」显示真实读值
         # v6.16.11：失败消息参数化——同一方法可被多个断言步骤以不同文本复用，报告文案随 expected 走
+        # 等待覆盖：探针语义固定 PRESENCE，仅透传最长等待秒数（wait_seconds or 3 = 框架原默认）
         if '「' in desc:
             pre, rest = desc.rsplit('「', 1)
             tail = rest[rest.find('」'):] if '」' in rest else ''
         else:
             pre, tail = desc + '（', '）'
-        return _method_block('assert_%s_text' % el, desc, ['expected'],
-                             "self.appOperator.assert_text_or_fail(self._elements.%s, expected, '%s「' + expected + '%s')" % (el, pre, tail))
+        body = "self.appOperator.assert_text_or_fail(self._elements.%s, expected, '%s「' + expected + '%s')" % (el, pre, tail)
+        if capable:
+            body = ("el = self._elements.%s\n"
+                    "if wait_seconds is not None:\n"
+                    "    el = CreateElement.create(el.locator_type, el.locator_value, "
+                    "wait_type=el.wait_type, wait_seconds=wait_seconds, desc=getattr(el, 'desc', None))\n"
+                    "self.appOperator.assert_text_or_fail(el, expected, '%s「' + expected + '%s', wait_seconds=wait_seconds or 3)"
+                    ) % (el, pre, tail)
+            return _method_block('assert_%s_text' % el, desc, ['expected', 'wait_seconds=None'], body)
+        return _method_block('assert_%s_text' % el, desc, ['expected'], body)
     if t == 'assert_toast':
         # v6.15.73：改用 assert_toast_or_fail——结果入 allure JSON
         # v6.16.11：失败消息参数化（同 assert_text）
@@ -544,6 +594,61 @@ TYPE_NAMES_CN = {
 }
 
 
+def _split_call_kwargs(args):
+    """调用参数串拆分：尾部关键字参数（wait_seconds=8）与位置参数分离。
+    引号内逗号/等号不切分；位置参数以 ', ' 重组（与原串等价）。
+    返回 (位置参数串, {关键字名: 值(去引号)})"""
+    parts, cur, q = [], '', None
+    for ch in args:
+        if q:
+            cur += ch
+            if ch == q:
+                q = None
+        elif ch in '\'"':
+            cur += ch
+            q = ch
+        elif ch == ',':
+            parts.append(cur.strip())
+            cur = ''
+        else:
+            cur += ch
+    if cur.strip():
+        parts.append(cur.strip())
+    pos, kw = [], {}
+    for p in parts:
+        m = re.match(r'^(\w+)\s*=\s*(.+)$', p)
+        if m and p[0] not in '\'"':
+            kw[m.group(1)] = _unq(m.group(2))
+        else:
+            pos.append(p)
+    return ', '.join(pos), kw
+
+
+def _step_wait_kwargs(step):
+    """步骤的等待覆盖 → 生成调用行尾的 kwargs 串（', wait_seconds=8, wait_type=...'）。
+    非法秒数/越界等待条件静默忽略（与 wait_element 非法回落默认值同一口径）。
+    assert_text 等待条件固定为存在探针，只覆盖秒数。"""
+    t = step.get('type', '')
+    extra = ''
+    ws = str(step.get('wait_sec') or '').strip()
+    if t in WAIT_OVERRIDE_OPS and re.match(r'^\d+$', ws):
+        extra += ', wait_seconds=%d' % int(ws)
+    if t in WAIT_OVERRIDE_OPS - {'assert_text'}:
+        wt = str(step.get('wait_type') or '').strip()
+        if wt in WAIT_TYPE_VALUES:
+            extra += ", wait_type='%s'" % wt
+    return extra
+
+
+def _wait_of_parsed(t, kwargs):
+    """反解出的关键字参数 → 步骤的等待覆盖字段（wait_type/wait_sec，无覆盖为空串）"""
+    if t not in WAIT_OVERRIDE_OPS:
+        return '', ''
+    wt = kwargs.get('wait_type', '')
+    ws = kwargs.get('wait_seconds', '')
+    return (wt if wt in WAIT_TYPE_VALUES else '', str(int(ws)) if re.match(r'^\d+$', str(ws)) else '')
+
+
 def case_step_line(step, var='page'):
     """步骤 → 用例里的一行调用；sleep/custom 返回特殊行（非 page.xxx 调用）。
     var=目标页面对象变量名：'page' 走既有局部别名风格 page.xxx()（兼容历史用例），
@@ -553,15 +658,15 @@ def case_step_line(step, var='page'):
     p = step.get('param') or ''
     pfx = 'page.' if var == 'page' else 'self.%s.' % var
     if t == 'click':
-        return '%sclick_%s()' % (pfx, el)
+        return '%sclick_%s(%s)' % (pfx, el, _step_wait_kwargs(step).lstrip(', '))
     if t == 'input':
-        return '%sinput_%s(%s)' % (pfx, el, _q(p))
+        return '%sinput_%s(%s%s)' % (pfx, el, _q(p), _step_wait_kwargs(step))
     if t == 'long_press':
-        return '%slong_press_%s()' % (pfx, el)
+        return '%slong_press_%s(%s)' % (pfx, el, _step_wait_kwargs(step).lstrip(', '))
     if t == 'assert_visible':
-        return '%sassert_%s()' % (pfx, el)
+        return '%sassert_%s(%s)' % (pfx, el, _step_wait_kwargs(step).lstrip(', '))
     if t == 'assert_text':
-        return '%sassert_%s_text(%s)' % (pfx, el, _q(p))
+        return '%sassert_%s_text(%s%s)' % (pfx, el, _q(p), _step_wait_kwargs(step))
     if t == 'assert_toast':
         return '%sassert_toast(%s)' % (pfx, _q(p))
     if t == 'wait_element':
@@ -846,13 +951,16 @@ def element_usage_in_cases(element_name):
     return used
 
 
+def _unq(a):
+    """剥掉一层成对引号（调用参数/关键字参数值的字面量还原）"""
+    a = a.strip()
+    if len(a) >= 2 and a[0] == a[-1] and a[0] in '\'"':
+        return a[1:-1]
+    return a
+
+
 def _call_to_step(mod, fn, args):
     """调用行 → (type, element, param)：与 case_step_line 的生成规则互逆反解。"""
-    def _unq(a):
-        a = a.strip()
-        if len(a) >= 2 and a[0] == a[-1] and a[0] in '\'"':
-            return a[1:-1]
-        return a
     if mod == 'time' and fn == 'sleep':
         return 'sleep', '', _unq(args)
     if mod != 'page':
@@ -922,7 +1030,10 @@ def parse_case_steps(content, method_name):
         if cur is None:
             cur = {'desc': '', 'call': '', 'type': 'custom', 'element': '', 'param': ''}
         cur['call'] = s
-        cur['type'], cur['element'], cur['param'] = _call_to_step(m.group(1), m.group(2), m.group(3).strip())
+        pos, kwargs = _split_call_kwargs(m.group(3).strip())
+        cur['type'], cur['element'], cur['param'] = _call_to_step(m.group(1), m.group(2), pos)
+        # 等待覆盖（wait_seconds/wait_type kwargs）反解：仅元素操作步骤携带，无覆盖为空串
+        cur['wait_type'], cur['wait_sec'] = _wait_of_parsed(cur['type'], kwargs)
         _flush()
     _flush()
     return steps
@@ -957,6 +1068,100 @@ def replace_case_steps(content, method_name, steps):
     doc = ' → '.join(descs) if descs else '（无步骤）'
     new_body = '\n'.join(lines) + '\n\n'
     return content[:body_start] + '%s"""%s"""\n%s' % (IND * 2, doc, new_body) + content[body_end:], ''
+
+
+# 老版（无等待参数）页面方法的标准生成形态：签名 + 调用体严格匹配，均对得上才允许升级改写
+# （防止覆盖用户手工改过的方法）；assert_visible 块内还带截图行，一并按体匹配
+_OLD_STD_BODY = {
+    'click': (r'\(self\)', r'self\.appOperator\.click\(self\._elements\.\w+\)'),
+    'input': (r'\(self, text\)', r'self\.appOperator\.sendText\(self\._elements\.\w+, text\)'),
+    'long_press': (r'\(self\)', r'self\.appOperator\.touch_long_press\(self\._elements\.\w+, duration_sconds=2\)'),
+    'assert_visible': (r'\(self\)', r'self\.appOperator\.getElement\(self\._elements\.\w+\)'),
+    'assert_text': (r'\(self, expected\)', r"self\.appOperator\.assert_text_or_fail\(self\._elements\.\w+, expected, '[^\n]*'\)"),
+}
+_WAIT_MNAME = {'click': 'click_%s', 'input': 'input_%s', 'long_press': 'long_press_%s',
+               'assert_visible': 'assert_%s', 'assert_text': 'assert_%s_text'}
+
+
+def _page_method_block(content, mname):
+    """页面文件里取方法：返回 (def 行参数串, 方法块全文)；方法不存在返回 (None, '')"""
+    m = re.search(r'^%sdef %s\((self[^\n]*)\)[ \t]*:' % (IND, re.escape(mname)), content, re.MULTILINE)
+    if not m:
+        return None, ''
+    nxt = re.search(r'\n%s(?:def |@|class )' % IND, content[m.end():])
+    end = m.end() + (nxt.start() + 1 if nxt else len(content) - m.end())
+    return m.group(1), content[m.start():end]
+
+
+def sync_page_methods_for_wait(content, method_name, steps):
+    """步骤编辑保存前把页面方法同步到「等待覆盖」形态（api_case_steps_save 专用）。
+
+    - 步骤带等待覆盖（wait_sec/wait_type）→ 对应页面方法升级为可接受 wait_seconds/wait_type
+      的签名：方法体内按本步参数克隆元素（复用定位与描述，不改元素全局定义），框架按克隆
+      定义等待；assert_text 仅透传秒数（探针条件固定 PRESENCE）。
+    - 已是覆盖签名（def 行含 wait_seconds=None）→ 按最新步骤重建（同步 docstring 与元素），
+      绝不降级回老签名——页面被多个用例共用，其他用例可能仍以 kwargs 调用。
+    - 老签名方法仅在严格匹配标准生成形态时改写；对不上（手工改过）→ 报错，调用方须中止保存，
+      否则用例以 kwargs 调用老签名会 TypeError。
+    返回 (ok, msg)；页面无需改动时返回 (True, '')。页面文件写盘前 ast 校验。"""
+    cls_block = next((b for _name, b in _class_blocks(content)
+                      if re.search(r'^%sdef %s\(' % (IND, re.escape(method_name)), b, re.MULTILINE)), None)
+    if cls_block is None:
+        return False, '用例文件里没有方法 %s' % method_name
+    page_class = _page_class_of(cls_block)
+    if not page_class:
+        return False, '用例方法未绑定页面对象（self.page = XxxPage(...)），无法同步等待覆盖'
+    page_file, elements_file = resolve_page(page_class)
+    if not page_file:
+        return False, '解析不到页面文件（页面类 %s），无法同步等待覆盖' % page_class
+    ppath = os.path.join(PAGES_DIR, page_file)
+    if not os.path.isfile(ppath):
+        return False, '页面文件不存在：%s' % page_file
+    pcontent = _read(ppath)
+
+    blocks, touched, errs = [], [], []
+    seen = set()
+    for st in steps or []:
+        t, el = st.get('type', ''), st.get('element') or ''
+        if t not in WAIT_OVERRIDE_OPS or not el:
+            continue
+        mname = _WAIT_MNAME[t] % el
+        if mname in seen:
+            continue
+        seen.add(mname)
+        args, _block = _page_method_block(pcontent, mname)
+        if args is not None and 'wait_seconds=None' in args:
+            blocks.append(page_method_code(st, force_wait_capable=True))
+            touched.append(mname)
+            continue
+        if not _has_wait_override(st):
+            continue   # 无覆盖且未升级过：保持原样（老签名照常工作）
+        if args is None:
+            blocks.append(page_method_code(st, force_wait_capable=True))
+            touched.append(mname)
+            continue
+        sig_re, body_re = _OLD_STD_BODY[t]
+        if re.search(r'def %s%s' % (re.escape(mname), sig_re), _block) and \
+                re.search(body_re + r'[ \t]*$', _block, re.MULTILINE):
+            blocks.append(page_method_code(st, force_wait_capable=True))
+            touched.append(mname)
+        else:
+            errs.append('页面方法 %s() 非标准生成形态（可能手工改过），无法升级等待参数'
+                        '——请在 %s 手动为其添加 wait_seconds/wait_type 可选参数' % (mname, page_file))
+    if errs:
+        return False, '；'.join(errs)
+    if not blocks:
+        return True, ''
+    if elements_file:
+        pcontent = _ensure_elements_import(pcontent, elements_file, _elements_class_of(elements_file))
+    pcontent = _ensure_probe_imports(pcontent)
+    pcontent = _upsert_class_method(pcontent, page_class, blocks)
+    try:
+        ast.parse(pcontent)
+    except SyntaxError as e:
+        return False, '页面方法升级后语法校验失败（页面文件未改动）：%s' % e.msg
+    _write(ppath, pcontent)
+    return True, '页面方法已支持等待覆盖：%s（%s）' % ('、'.join(touched), page_file)
 
 
 def case_files_info():

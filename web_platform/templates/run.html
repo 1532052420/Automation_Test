@@ -656,12 +656,19 @@
                 <div class="ce-el-preview" id="ceElPreview"></div>
               </div>
               <div class="field" id="ceParamWrap"><label id="ceParamLab">参数</label><input type="text" id="ceParam"></div>
-              <div class="ce-row2">
-                <div class="field"><label>等待条件</label>
-                  <select id="ceWait"><option>出现即可</option><option>可见后操作</option><option>可点击后操作</option><option>不等待</option></select>
+              <!-- 等待方式仅本步生效：保存写入用例调用参数（wait_seconds/wait_type），页面方法按本步参数克隆元素等待，不改元素全局定义 -->
+              <div class="ce-row2" id="ceWaitWrap">
+                <div class="field" id="ceWaitTypeWrap"><label>等待条件（仅本步）</label>
+                  <select id="ceWaitType">
+                    <option value="">跟随元素定义</option>
+                    <option value="visibility_of">元素出现且可见</option>
+                    <option value="presence_of_element_located">元素存在即可（不要求可见）</option>
+                    <option value="element_to_be_clickable">可见且可点击</option>
+                  </select>
                 </div>
-                <div class="field"><label>最长等待（秒）</label><input type="text" id="ceSec" value="10"></div>
+                <div class="field"><label>最长等待（秒）</label><input type="text" id="ceWaitSec" inputmode="numeric" autocomplete="off" placeholder=""></div>
               </div>
+              <div class="ce-el-preview" id="ceWaitHint"></div>
               <div class="field"><label>备注（可选）</label><textarea id="ceDesc" rows="2" placeholder="给看报告的人一句话说明"></textarea></div>
               <div class="ed-foot ce-foot">
                 <button class="ghost mini" id="ceDup">复制步骤</button>

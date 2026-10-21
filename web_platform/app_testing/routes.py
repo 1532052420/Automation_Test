@@ -372,17 +372,22 @@ def api_case_steps_save():
         return _bad('用例文件不存在', 404)
     with open(path, 'r', encoding='utf-8') as f:
         src = f.read()
-    from element_locator.case_generator import replace_case_steps
+    from element_locator.case_generator import replace_case_steps, sync_page_methods_for_wait
     new, msg = replace_case_steps(src, method, steps)
     if new is None:
         return _bad(msg)
+    # 等待覆盖同步先行：带 wait_sec/wait_type 的步骤需页面方法支持 kwargs，失败则整体中止
+    # （页面方法升级是加可选参数，向后兼容；即便用例文件随后写入失败也无副作用）
+    ok2, msg2 = sync_page_methods_for_wait(src, method, steps)
+    if not ok2:
+        return _bad(msg2)
     try:
         ast.parse(new)
     except SyntaxError:
         return _bad('重建代码语法校验未通过，已放弃写入')
     with open(path, 'w', encoding='utf-8') as f:
         f.write(new)
-    return _ok(saved=len(steps))
+    return _ok(saved=len(steps), **({'sync': msg2} if msg2 else {}))
 
 
 @bp.route('/api/cases/<int:cid>/run', methods=['POST'])

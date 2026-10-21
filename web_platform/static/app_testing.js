@@ -1114,7 +1114,10 @@ async function appTestingInit() {
       if (!deleted) activeNo += 1;
       const badge = deleted ? ' <span class="ce-badge" style="background:#86868b">已删除</span>'
         : (_ceNewSids.indexOf(s._sid) >= 0 ? ' <span class="ce-badge" style="background:#248a3d">新增</span>'
-        : (_ceModSids.indexOf(s._sid) >= 0 ? ' <span class="ce-badge" style="background:#b26a00">已修改</span>' : ''));
+        : (_ceModSids.indexOf(s._sid) >= 0 ? ' <span class="ce-badge" style="background:#b26a00">已修改</span>' : ''))
+        + ((s.wait_sec || s.wait_type) ? ' <span class="ce-badge" style="background:#0a6ebd">⏱' +
+          (s.wait_sec ? s.wait_sec + '秒' : '') + (s.wait_sec && s.wait_type ? '·' : '') +
+          ({visibility_of: '可见', presence_of_element_located: '存在', element_to_be_clickable: '可点击'}[s.wait_type] || '') + '</span>' : '');
       const row = document.createElement('div');
       row.className = 'ce-step' + (i === _ceSel ? ' sel' : '') + (deleted ? ' ce-del' : '');
       const isFirst = items.length > 0 && items[0].i === i;
@@ -1157,10 +1160,57 @@ async function appTestingInit() {
     $('#ceParamLab').textContent = t.param || '参数';
     $('#ceEl').value = s.element || '';   // 元素改为可输入的下拉组合框，直接回显（库外元素也天然支持）
     $('#ceParam').value = s.param || '';
-    $('#ceWait').value = s.wait || '出现即可';
-    $('#ceSec').value = s.sec || '10';
     $('#ceDesc').value = s.desc || '';
     ceElPreview();
+    ceWaitInit(s, t);
+  }
+
+  /* 等待方式（仅本步生效）：条件与秒数随步骤保存为调用参数（页面方法按本步参数克隆元素等待）；
+     留空=跟随元素定义（时长与条件来自元素库，定位器采集时设定）。非元素步骤隐藏整块。 */
+  function ceWaitInit(s, t) {
+    const wrap = document.getElementById('ceWaitWrap');
+    if (!wrap) return;
+    const noElement = !s || !s.element || (t && t.el === false);
+    wrap.style.display = noElement ? 'none' : '';
+    document.getElementById('ceWaitHint').textContent = '';
+    if (noElement) {   // 非元素步骤无等待语义：清掉残留，防止 ceTouch 把上一步的覆盖写进本步
+      document.getElementById('ceWaitType').value = '';
+      document.getElementById('ceWaitSec').value = '';
+      return;
+    }
+    const e = (_ceElements || []).find(x => x.name === s.element);
+    const defSec = e ? (e.wait_seconds || 6) : 6;
+    const wtSel = document.getElementById('ceWaitType');
+    const isAssertText = s.type === 'assert_text';   // 断言按存在探针等待（框架固定），条件不可覆盖，仅秒数可调
+    document.getElementById('ceWaitTypeWrap').style.display = isAssertText ? 'none' : '';
+    wtSel.value = (s.wait_type || '');
+    const sec = document.getElementById('ceWaitSec');
+    sec.value = (s.wait_sec || '');
+    sec.placeholder = '默认 ' + defSec + ' 秒';
+    ceWaitHint();
+  }
+
+  function ceWaitHint() {
+    const s = (_cePending || [])[_ceSel];
+    const box = document.getElementById('ceWaitHint');
+    if (!box || !s) return;
+    const e = (_ceElements || []).find(x => x.name === s.element);
+    const defSec = e ? (e.wait_seconds || 6) : 6;
+    const WT_CN = {
+      visibility_of: '元素出现且可见',
+      presence_of_element_located: '元素存在即可（不要求可见）',
+      element_to_be_clickable: '可见且可点击',
+    };
+    const secRaw = String(document.getElementById('ceWaitSec').value || '').trim();
+    const wtSel = document.getElementById('ceWaitType');
+    const parts = [];
+    if (!e) parts.push('元素「' + s.element + '」不在元素库，无法显示元素默认等待');
+    else parts.push('元素默认：最长 ' + (e.wait_seconds || 6) + ' 秒 · ' + (WT_CN[e.wait_type || 'visibility_of'] || '元素出现且可见'));
+    if (secRaw && !/^\d+$/.test(secRaw)) { parts.push('秒数需为正整数，否则保存时忽略'); box.textContent = parts.join('；'); return; }
+    const effSec = secRaw || defSec;
+    const effWt = (wtSel.style.display !== 'none') ? (wtSel.value || (e ? (e.wait_type || 'visibility_of') : 'visibility_of')) : '';
+    parts.push('本步执行：' + (WT_CN[effWt] || '元素出现且可见') + ' · 最长 ' + effSec + ' 秒' + ((secRaw || wtSel.value) ? '（仅本步覆盖）' : ''));
+    box.textContent = parts.join('；');
   }
 
   function ceElPreview() {
@@ -1175,18 +1225,19 @@ async function appTestingInit() {
     const s = (_cePending || [])[_ceSel]; if (!s) return;
     s.type = $('#ceType').value; s.element = $('#ceEl').value.trim();
     s.param = $('#ceParam').value.trim();
-    s.wait = $('#ceWait').value; s.sec = $('#ceSec').value.trim();
+    s.wait_type = ($('#ceWaitType') || {}).value || '';
+    s.wait_sec = ($('#ceWaitSec') || {}).value.trim();
     s.desc = $('#ceDesc').value.trim();
     if (_ceNewSids.indexOf(s._sid) < 0 && _ceDelSids.indexOf(s._sid) < 0) {
       /* 与文件反解值比对：改回原值则摘掉「已修改」标记，避免无变化也提示未保存 */
       const savedS = (_ceCtx.steps || [])[s._sid] || {};
-      const same = ['type', 'element', 'param', 'desc'].every(k => (s[k] || '') === (savedS[k] || ''));
+      const same = ['type', 'element', 'param', 'desc', 'wait_type', 'wait_sec'].every(k => (s[k] || '') === (savedS[k] || ''));
       _ceModSids = _ceModSids.filter(id => id !== s._sid);
       if (!same) _ceModSids.push(s._sid);
     }
     const anyPending = _ceDelSids.length || _ceNewSids.length || _ceModSids.length;
     $('#ceDirty').style.display = anyPending ? '' : 'none';
-    renderCeSteps(); ceElPreview();
+    renderCeSteps(); ceElPreview(); ceWaitHint();
   }
 
   /* 元素下拉组合框：输入过滤 + 限高滚动列表，替代原生 select 的超长下拉 */
@@ -1230,8 +1281,8 @@ async function appTestingInit() {
     }
   });
   $('#ceParam').addEventListener('input', ceTouch);
-  $('#ceWait').addEventListener('change', ceTouch);
-  $('#ceSec').addEventListener('input', ceTouch);
+  $('#ceWaitType').addEventListener('change', ceTouch);
+  $('#ceWaitSec').addEventListener('input', ceTouch);   // ceTouch 末尾统一刷新等待提示
   $('#ceDesc').addEventListener('input', ceTouch);
   $('#ceDup').addEventListener('click', () => {
     if (!_ceCtx || _ceSel < 0) return;
