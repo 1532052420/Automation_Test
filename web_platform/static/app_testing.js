@@ -1021,6 +1021,17 @@ async function appTestingInit() {
 
   function ceTypeMeta(t) { return STEP_META[t] || CE_EXTRA_TYPES[t] || { label: t || '未知', group: '其他', param: null }; }
 
+  /* 元素中文名显示（仅回显，不参与提交——提交/写码始终用英文元素名） */
+  function ceElCn(name) {
+    if (!name) return '';
+    const e = (_ceElements || []).find(x => x.name === name);
+    return (e && e.cn_name) ? e.cn_name : '';
+  }
+  function ceElLabel(name) {
+    const cn = ceElCn(name);
+    return cn ? cn + '（' + name + '）' : (name || '');
+  }
+
   async function openCaseEditor(node) {
     if (window._ceOpening) return;                  // 已在打开流程中：防面板分支→open→面板分支无限递归
     window._ceOpening = true;
@@ -1074,7 +1085,7 @@ async function appTestingInit() {
     const visIdxs = [];
     (_cePending || []).forEach(function (s, idx) {
       const t = ceTypeMeta(s.type);
-      if (!kw || [s.desc, s.element, s.param, t.label].some(v => String(v || '').toLowerCase().includes(kw))) visIdxs.push(idx);
+      if (!kw || [s.desc, s.element, ceElCn(s.element), s.param, t.label].some(v => String(v || '').toLowerCase().includes(kw))) visIdxs.push(idx);
     });
     const pos = visIdxs.indexOf(i);
     if (pos < 0) return;
@@ -1094,7 +1105,7 @@ async function appTestingInit() {
     const box = $('#ceSteps');
     box.innerHTML = '';
     const items = (_cePending || []).map((s, i) => ({ s, i }))
-      .filter(({s}) => !kw || [s.desc, s.element, s.param, ceTypeMeta(s.type).label]
+      .filter(({s}) => !kw || [s.desc, s.element, ceElCn(s.element), s.param, ceTypeMeta(s.type).label]
         .some(v => String(v || '').toLowerCase().includes(kw)));
     let activeNo = 0;
     items.forEach(({s, i}) => {
@@ -1115,7 +1126,7 @@ async function appTestingInit() {
         '<span class="ce-move">' + moveBtns + '</span>' +
         '<span class="ce-node" style="background:' + (CE_GROUP_CSS[t.group] || '#86868b') + '">' + activeNo + '</span>' +
         '<div class="ce-main"><div class="ce-type" style="color:' + (CE_GROUP_CSS[t.group] || '#86868b') + '">' + esc(t.label) + badge + '</div>' +
-        '<div class="ce-desc">' + (s.element ? esc(s.element) + (s.param ? ' · <b>' + esc(s.param) + '</b>' : '')
+        '<div class="ce-desc">' + (s.element ? esc(ceElLabel(s.element)) + (s.param ? ' · <b>' + esc(s.param) + '</b>' : '')
           : (s.param ? '<b>' + esc(s.param) + '</b>' : '')) +
         (s.desc ? ' <span style="color:var(--muted2)">' + esc(s.desc) + '</span>' : '') + '</div></div><span></span>';
       row.addEventListener('click', () => { _ceSel = i; renderCeSteps(); renderCeEditor(); });
@@ -1155,7 +1166,8 @@ async function appTestingInit() {
   function ceElPreview() {
     const name = $('#ceEl').value;
     const e = (_ceElements || []).find(x => x.name === name);
-    $('#ceElPreview').innerHTML = e ? '定位：<code>' + esc((e.type || '') + ' = ' + (e.value || '')) + '</code>'
+    const cn = ceElCn(name);
+    $('#ceElPreview').innerHTML = e ? (cn ? '<b>' + esc(cn) + '</b> · ' : '') + '定位：<code>' + esc((e.type || '') + ' = ' + (e.value || '')) + '</code>'
       : (name ? '元素「' + esc(name) + '」不在元素库（页面对象内引用）' : '未选择元素');
   }
 
