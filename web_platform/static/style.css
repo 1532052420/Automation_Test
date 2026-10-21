@@ -994,12 +994,19 @@ html.night .pf-tok-fn { color: #86b9ec; }
 /* 项目状态徽章（对齐 testhub 项目管理列表的「进行中」样式） */
 .proj-status { display: inline-block; padding: 2px 10px; border-radius: 999px; background: var(--brand-tint); color: var(--brand); font-size: 11.5px; white-space: nowrap; }
 
-/* 测试用例列表：六列等宽（table-layout:fixed 平分，内容再长列位置不位移）+ 单元格超长单行截断（省略号，悬停 title 看全称） */
-#panel-caselist table { table-layout: fixed; }
+/* 测试用例列表：五列按比例分配（26/17/11/20/26，疏密均衡，大小屏随比例自适应）；
+   表格 min-width 880px——窄屏不出换行而出横向滚动（.tblwrap 自带 overflow），操作列
+   「编辑步骤/重命名/删除」三按钮任何屏宽都单行；按钮收紧一档内边距适配比例列宽 */
+#panel-caselist table { table-layout: fixed; min-width: 880px; }
 #panel-caselist th, #panel-caselist td { padding: 12px 8px; }
 #panel-caselist td { overflow: hidden; }
-#panel-caselist td.ops { white-space: normal; }   /* 操作列按钮等宽列下放不下就换行，不截断 */
-#panel-caselist td.ops .mini { margin: 3px 6px 3px 0; }   /* 覆盖全局 10px 左间距，换行后行首不缩进 */
+#panel-caselist th:nth-child(1) { width: 26%; }   /* 用例 */
+#panel-caselist th:nth-child(2) { width: 17%; }   /* 项目 */
+#panel-caselist th:nth-child(3) { width: 11%; }   /* 步骤 */
+#panel-caselist th:nth-child(4) { width: 20%; }   /* 创建时间 */
+#panel-caselist th:last-child { width: 26%; }     /* 操作：三按钮单行 */
+#panel-caselist td.ops { white-space: nowrap; }
+#panel-caselist td.ops .mini { margin: 3px 6px 3px 0; padding: 4px 8px; }
 #panel-caselist .clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 
 /* 选择用例列表：固定列宽 + 场景描述等长文本单行截断（悬停 title 看全文），长描述不再换行撑破行高 */
