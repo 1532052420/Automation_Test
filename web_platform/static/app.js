@@ -2178,6 +2178,235 @@ async function initPerf() {
   $('#btnPerfReport').addEventListener('click', () => { if (perfRunId) location.href = '/perf/report/' + perfRunId; });
 }
 
+/* ================= Trace 失败诊断（Playwright Trace 回放 · 调试阶段，与用例框架解耦） ================= */
+let traceActiveRun = '', traceLogTotal = 0;
+
+async function initTraceLab() {
+  renderSidebar('/trace-lab');
+  $('#btnTraceRecord').addEventListener('click', traceStart);
+  $('#btnTraceStop').addEventListener('click', traceStop);
+  const st = await api('/api/trace-lab/status');
+  setText('#traceEnv', st.hint
+    ? st.hint
+    : '录制环境就绪（trace_lab/.venv · playwright' + (st.playwright_version ? ' ' + st.playwright_version : '') + ' + Chromium），与平台主环境隔离');
+  traceLoadRuns();
+  appObsRefresh();
+}
+
+/* ---- App 失败现场（外部观察者自动采集，框架零改动） ---- */
+async function appObsRefresh() {
+  const st = await api('/api/trace-lab/app/status').catch(() => null);
+  if (st) {
+    setText('#appObsStatus', st.phase === 'watching'
+      ? '观察中：正在旁观真实用例执行（' + st.run_id + '），已标定步骤 ' + (st.steps || 0) + ' · 采证 ' + (st.caps || 0) + ' 张'
+        + (st.error ? ' · 最近异常 ' + st.error : '')
+      : (st.error ? '观察者待命（最近异常 ' + st.error + '）' : '观察者待命：平台跑真实 App 用例时自动留现场'));
+  }
+  const d = await api('/api/trace-lab/app/traces').catch(() => null);
+  const box = $('#appTraces');
+  if (!box) return;
+  const traces = (d && d.traces) || [];
+  if (!traces.length) {
+    box.innerHTML = '<p class="muted">暂无保留的失败现场。跑一条真实 App 用例（失败或停止）后，这里会出现逐步回放入口。</p>';
+    return;
+  }
+  box.innerHTML = traces.map(appTraceRow).join('');
+  box.querySelectorAll('[data-act]').forEach(btn =>
+    btn.addEventListener('click', () => appTraceAct(btn.dataset.act, btn.dataset.run)));
+}
+
+function appTraceRow(t) {
+  const badge = { PASSED: 'ok', FAILED: 'bad', ERROR: 'bad' }[t.status] || 'stop';
+  return '<div class="tl-run">'
+    + '<span class="tl-badge ' + badge + '">' + esc(t.status) + '</span>'
+    + '<span class="tl-id">' + esc(t.run_id) + '</span>'
+    + '<span class="tl-meta">' + esc(t.device_model || t.udid || '') + '</span>'
+    + '<span class="tl-meta">' + esc(t.app_package || '') + '</span>'
+    + '<span class="tl-meta">步骤 ' + (t.steps || 0) + ' · 采证 ' + (t.caps || 0) + '</span>'
+    + '<span class="tl-ops">'
+    + '<button class="mini" data-act="replay" data-run="' + t.run_id + '">步骤回放</button>'
+    + '<button class="ghost mini" data-act="report" data-run="' + t.run_id + '">在线回放报告</button>'
+    + '</span></div>';
+}
+
+async function appTraceAct(act, runId) {
+  if (act === 'replay') { window.open('/trace-lab/app-replay/' + runId); return; }
+  if (act === 'report') {
+    const r = await postJson('/api/run/' + runId + '/midscene/open', {});
+    if (r.ok && r.url) window.open(r.url);
+    else toast(r.msg || '报告生成失败', false);
+  }
+}
+
+/* ---- App 失败现场回放页（/trace-lab/app-replay/<run_id>） ---- */
+let atSteps = [];
+
+async function initAppTrace() {
+  renderSidebar('/trace-lab');
+  const runId = document.body.dataset.run;
+  const d = await api('/api/trace-lab/app/' + runId);
+  if (!d.ok) { setText('#atSteps', d.msg || '现场不存在'); return; }
+  const m = d.meta || {};
+  setText('#atMeta', (m.device_model || m.udid || '设备') + ' · ' + (m.app_package || '')
+    + ' · 终态 ' + (m.status || '-') + ' · 步骤 ' + (d.steps || []).length
+    + ' · 采证 ' + (d.caps_total || 0) + ' 张' + (d.has_logcat ? ' · logcat 已捕获' : ''));
+  atSteps = d.steps || [];
+  const box = $('#atSteps');
+  if (!atSteps.length) {
+    box.innerHTML = '<p class="muted">运行日志里没有标定到步骤（用例可能在 setup 阶段即失败），直接看采证与 logcat。</p>';
+    return;
+  }
+  box.innerHTML = atSteps.map((s, i) =>
+    '<div class="at-step" data-i="' + i + '">'
+    + '<span class="no">' + esc(s.no) + '</span>'
+    + '<span>' + esc(s.action) + '</span>'
+    + (s.ok === true ? '<span class="at-badge ok">✔</span>' : s.ok === false ? '<span class="at-badge bad">✖</span>' : '')
+    + '<span class="at-badge ts">' + esc(String(s.ts || '').slice(11)) + '</span></div>').join('');
+  box.querySelectorAll('.at-step').forEach(el =>
+    el.addEventListener('click', () => atSelect(+el.dataset.i)));
+  atSelect(0);
+}
+
+async function atSelect(i) {
+  const s = atSteps[i] || {};
+  const runId = document.body.dataset.run;
+  document.querySelectorAll('.at-step').forEach(el =>
+    el.classList.toggle('active', +el.dataset.i === i));
+  if (s.img) {
+    $('#atShot').hidden = false;
+    $('#atShot').src = '/trace-lab/app/' + runId + '/' + s.img;
+    $('#atNoShot').hidden = true;
+    setText('#atShotTs', '· 采证于 ' + (s.ts || '-'));
+  } else {
+    $('#atShot').hidden = true;
+    $('#atNoShot').hidden = false;
+    setText('#atShotTs', '');
+  }
+  const srcFold = $('#atSrcFold');
+  const srcPre = $('#atSrc');
+  if (s.src) {
+    srcFold.hidden = false;
+    srcPre.textContent = '加载中…';
+    try {
+      const r = await fetch('/trace-lab/app/' + runId + '/' + s.src);
+      srcPre.textContent = (await r.text()).slice(0, 200000);
+    } catch (e) { srcPre.textContent = '加载失败: ' + e; }
+  } else {
+    srcFold.hidden = true;
+  }
+  const log = $('#atLogcat');
+  if (s.ts) {
+    log.textContent = '加载中…';
+    const d = await api('/api/trace-lab/app/' + runId + '/logcat?ts=' + encodeURIComponent(s.ts))
+      .catch(() => null);
+    log.textContent = d && d.ok ? ((d.lines || []).join('\n') || '（切片为空）') : 'logcat 不可用';
+  } else {
+    log.textContent = '（该步骤无时间戳，无法定位 logcat 切片）';
+  }
+}
+
+async function traceStart() {
+  const r = await postJson('/api/trace-lab/record', { url: $('#traceUrl').value.trim() });
+  toast(r.msg || (r.ok ? '已启动' : '启动失败'), r.ok);
+  if (!r.ok) return;
+  traceActiveRun = r.run_id;
+  traceLogTotal = 0;
+  setText('#traceLogRun', r.run_id);
+  setHtml('#traceLog', '');
+  setText('#traceStatus', '录制中…');
+  $('#btnTraceStop').hidden = false;
+  tracePoll();
+}
+
+async function traceStop() {
+  const r = await postJson('/api/trace-lab/stop', { run_id: traceActiveRun });
+  toast(r.msg || '停止信号已发送', r.ok);
+}
+
+/* 录制期间 1.5s 轮询：增量日志 + 状态；结束后刷新列表 */
+async function tracePoll() {
+  if (!traceActiveRun) return;
+  const d = await api('/api/trace-lab/run/' + traceActiveRun + '?offset=' + traceLogTotal).catch(() => null);
+  if (!d || d.ok === false) { traceActiveRun = ''; return; }
+  (d.log_lines || []).forEach(l => traceLogAppend(l));
+  traceLogTotal = d.log_total || traceLogTotal;
+  if (d.status === 'RUNNING') {
+    setText('#traceStatus', '录制中…');
+    setTimeout(tracePoll, 1500);
+    return;
+  }
+  setText('#traceStatus', { FINISHED: '已完成', FAILED: '失败（详见日志）', STOPPED: '已停止' }[d.status] || d.status);
+  $('#btnTraceStop').hidden = true;
+  traceActiveRun = '';
+  traceLoadRuns();
+}
+
+function traceLogAppend(line) {
+  const box = $('#traceLog');
+  const div = document.createElement('div');
+  div.textContent = line;
+  const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  box.appendChild(div);
+  if (nearBottom) box.scrollTop = box.scrollHeight;
+}
+
+async function traceLoadRuns() {
+  const d = await api('/api/trace-lab/runs');
+  const box = $('#traceRuns');
+  const runs = d.runs || [];
+  if (!runs.length) {
+    box.innerHTML = '<p class="muted">还没有录制记录。填地址点「开始录制」，产物（trace.zip + 整页截图）会出现在这里，点「回放」逐步查看。</p>';
+    return;
+  }
+  box.innerHTML = runs.map(traceRunRow).join('');
+  box.querySelectorAll('[data-act]').forEach(btn =>
+    btn.addEventListener('click', () => traceRunAct(btn.dataset.act, btn.dataset.run)));
+}
+
+const TRACE_ST = {
+  RUNNING: '<span class="tl-badge run">录制中</span>',
+  FINISHED: '<span class="tl-badge ok">已完成</span>',
+  FAILED: '<span class="tl-badge bad">失败</span>',
+  STOPPED: '<span class="tl-badge stop">已停止</span>'
+};
+
+function traceRunRow(r) {
+  const dur = r.duration_ms ? (r.duration_ms / 1000).toFixed(1) + 's' : '';
+  const ops = r.has_zip
+    ? '<button class="mini" data-act="view" data-run="' + r.run_id + '">回放</button>'
+      + '<button class="ghost mini" data-act="shot" data-run="' + r.run_id + '"' + (r.has_png ? '' : ' disabled') + '>截图</button>'
+      + '<button class="ghost mini" data-act="dl" data-run="' + r.run_id + '">下载</button>'
+      + '<button class="ghost mini" data-act="del" data-run="' + r.run_id + '">删除</button>'
+    : '<button class="ghost mini" data-act="log" data-run="' + r.run_id + '">看日志</button>'
+      + '<button class="ghost mini" data-act="del" data-run="' + r.run_id + '">删除</button>';
+  return '<div class="tl-run">' + (TRACE_ST[r.status] || '<span class="tl-badge">' + esc(r.status) + '</span>')
+    + '<span class="tl-id">' + esc(r.run_id) + '</span>'
+    + '<span class="tl-meta">' + (esc(r.url) || '（平台重启前的历史任务）') + '</span>'
+    + '<span class="tl-meta">' + dur + '</span>'
+    + '<span class="tl-ops">' + ops + '</span></div>';
+}
+
+function traceRunAct(act, runId) {
+  if (act === 'view') { window.open('/trace-lab/viewer/' + runId); return; }
+  if (act === 'shot') { window.open('/trace-lab/file/' + runId + '/trace.png'); return; }
+  if (act === 'dl') { location.href = '/trace-lab/file/' + runId + '/trace.zip?dl=1'; return; }
+  if (act === 'log') {
+    traceActiveRun = '';
+    traceLogTotal = 0;
+    setText('#traceLogRun', runId);
+    setHtml('#traceLog', '');
+    api('/api/trace-lab/run/' + runId).then(d => (d.log_lines || []).forEach(traceLogAppend));
+    return;
+  }
+  if (act === 'del') {
+    svcConfirm('删除这条录制？', runId + ' 的 trace.zip / 截图 / 日志将一并删除，不可恢复。', async () => {
+      const r = await postJson('/api/trace-lab/run/' + runId + '/delete', {});
+      toast(r.msg || (r.ok ? '已删除' : '删除失败'), r.ok);
+      if (r.ok) traceLoadRuns();
+    });
+  }
+}
+
 /* ================= 页面分发 ================= */
 document.addEventListener('DOMContentLoaded', () => {
   const page = document.body.dataset.page;
@@ -2187,6 +2416,8 @@ document.addEventListener('DOMContentLoaded', () => {
   else if (page === 'detail') initRunDetail();
   else if (page === 'report') initReport();
   else if (page === 'perf') initPerf();
+  else if (page === 'tracelab') initTraceLab();
+  else if (page === 'apptrace') initAppTrace();
   /* api-test 页已随接口测试模块移除，首页入口为死按钮 */
 });
 

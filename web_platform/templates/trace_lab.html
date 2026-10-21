@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trace 失败诊断 · 自动化测试平台</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="icon" sizes="32x32" href="/static/favicon-32.png">
+<link rel="shortcut icon" href="/static/favicon.ico">
+
+<script src="/assets/{{ asset_v }}/theme.js"></script>
+<link rel="stylesheet" href="/assets/{{ asset_v }}/nav.css">
+<link rel="stylesheet" href="/assets/{{ asset_v }}/style.css">
+<style>
+  /* Trace 诊断页专属样式（其余一律走全局 style.css，颜色全部取 CSS 变量，日/夜自动适配） */
+  .tl-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .tl-actions input { min-width: 300px; }
+  .tl-status { font-size: 13px; color: var(--ink2); }
+  .tl-runs { display: flex; flex-direction: column; gap: 10px; }
+  .tl-run {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: var(--panel2); border: 1px solid var(--line-soft); border-radius: 14px; padding: 12px 16px;
+  }
+  .tl-run .tl-id { font-weight: 600; color: var(--ink); font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .tl-run .tl-meta { font-size: 12.5px; color: var(--muted); word-break: break-all; }
+  .tl-run .tl-ops { margin-left: auto; display: flex; gap: 8px; }
+  .tl-badge {
+    display: inline-block; padding: 2px 10px; border-radius: 980px;
+    font-size: 12px; font-weight: 600; background: rgba(128, 128, 128, .14);
+  }
+  .tl-badge.run { color: var(--run); }
+  .tl-badge.ok { color: var(--ok-text); }
+  .tl-badge.bad { color: var(--bad-text); }
+  .tl-badge.stop { color: var(--stop); }
+  /* 日志区沿用平台约定：深底浅字（两套主题都保持深色，更易读） */
+  .tl-log {
+    background: var(--dark); color: var(--dark-ink); border-radius: 14px; padding: 16px 18px;
+    font: 12px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    max-height: 340px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+  }
+  .tl-tip { font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+  @media (max-width: 640px) { .tl-actions input { min-width: 0; flex: 1; } .tl-run .tl-ops { margin-left: 0; } }
+</style>
+</head>
+<body data-page="tracelab">
+<header class="gnav" id="sidebar"></header>
+<main>
+  <div class="pagehead">
+    <h1>Trace 失败诊断</h1>
+    <p class="sub">Playwright Trace 回放：操作步骤 + 截图 + DOM 快照 + 网络请求，合一在时间线上逐步回看。
+      现阶段为独立调试链路（录制跑在 trace_lab 专属环境，与用例框架解耦），跑通后再接入用例执行。</p>
+  </div>
+
+  <div class="card">
+    <h3>App 用例失败现场 <span class="muted">外部观察者自动采集 · 框架零改动</span></h3>
+    <p class="muted" id="appObsStatus">观察者状态检查中…</p>
+    <div id="appTraces" class="tl-runs">加载中…</div>
+    <p class="tl-tip">真实 App 用例在平台执行时，观察者自动留现场：连续采证（截图 + UI 树）+ 全程 logcat + 运行日志步骤标定。
+      用例通过自动清现场，失败/停止自动保留。</p>
+  </div>
+
+  <div class="card">
+    <h3>录制调试 Trace</h3>
+    <div class="tl-actions">
+      <input type="text" id="traceUrl" value="https://www.baidu.com"
+             placeholder="要录制的页面地址，https:// 开头">
+      <button id="btnTraceRecord">开始录制</button>
+      <button class="ghost" id="btnTraceStop" hidden>停止</button>
+      <span class="tl-status" id="traceStatus">就绪</span>
+    </div>
+    <p class="muted mt" id="traceEnv">环境检查中…</p>
+    <p class="tl-tip">录制内容为固定样板动作（打开页面 → 等待 → 截图 → 刷新）：先验证「录得上、放得出」，
+      接入用例框架后由用例步骤产生真实操作轨迹。</p>
+  </div>
+
+  <div class="card">
+    <h3>录制历史</h3>
+    <div id="traceRuns" class="tl-runs">加载中…</div>
+  </div>
+
+  <div class="card">
+    <h3>执行日志 <span class="muted" id="traceLogRun"></span></h3>
+    <div class="tl-log" id="traceLog">（未开始）</div>
+  </div>
+</main>
+<div id="toast"></div>
+<script src="/assets/{{ asset_v }}/nav.js"></script>
+<script src="/assets/{{ asset_v }}/app.js"></script>
+</body>
+</html>

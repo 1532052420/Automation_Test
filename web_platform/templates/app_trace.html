@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>App 失败现场 · {{ run_id }} · 自动化测试平台</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="icon" sizes="32x32" href="/static/favicon-32.png">
+<link rel="shortcut icon" href="/static/favicon.ico">
+
+<script src="/assets/{{ asset_v }}/theme.js"></script>
+<link rel="stylesheet" href="/assets/{{ asset_v }}/nav.css">
+<link rel="stylesheet" href="/assets/{{ asset_v }}/style.css">
+<style>
+  /* App 失败现场回放页专属样式（颜色全部取全局 CSS 变量，日/夜自动适配） */
+  .at-layout { display: grid; grid-template-columns: 360px 1fr; gap: 14px; align-items: start; }
+  @media (max-width: 900px) { .at-layout { grid-template-columns: 1fr; } }
+  .at-steps { display: flex; flex-direction: column; gap: 6px; max-height: 70vh; overflow-y: auto; }
+  .at-step {
+    display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer;
+    background: var(--panel2); border: 1px solid var(--line-soft); border-radius: 10px;
+    font-size: 12.5px; color: var(--ink2); word-break: break-all;
+  }
+  .at-step.active { border-color: var(--sky); color: var(--ink); }
+  .at-step .no { font-weight: 600; color: var(--ink); white-space: nowrap; }
+  .at-badge { padding: 1px 8px; border-radius: 980px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .at-badge.ok { color: var(--ok-text); background: rgba(128, 128, 128, .14); }
+  .at-badge.bad { color: var(--bad-text); background: rgba(128, 128, 128, .14); }
+  .at-badge.ts { color: var(--muted); background: rgba(128, 128, 128, .10); }
+  .at-shot { width: 100%; border: 1px solid var(--line-soft); border-radius: 14px; background: var(--panel2); }
+  .at-panel h4 { margin: 14px 0 6px; font-size: 14px; color: var(--ink); }
+  .at-pre {
+    background: var(--dark); color: var(--dark-ink); border-radius: 12px; padding: 12px 14px;
+    font: 11.5px/1.55 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    max-height: 320px; overflow: auto; white-space: pre; word-break: normal;
+  }
+  .at-meta { font-size: 12.5px; color: var(--muted); margin: 6px 0 0; }
+  details.at-fold > summary { cursor: pointer; color: var(--ink2); font-size: 13px; }
+</style>
+</head>
+<body data-page="apptrace" data-run="{{ run_id }}">
+<header class="gnav" id="sidebar"></header>
+<main>
+  <div class="pagehead">
+    <h1>App 失败现场 · {{ run_id }}</h1>
+    <p class="sub" id="atMeta">加载中…</p>
+  </div>
+
+  <div class="at-layout">
+    <div class="card">
+      <h3>步骤标定 <span class="muted">来自运行日志的「▶ 步骤N」</span></h3>
+      <div class="at-steps" id="atSteps">加载中…</div>
+      <p class="at-meta" id="atCaps"></p>
+    </div>
+
+    <div class="card at-panel">
+      <h3>现场画面 <span class="muted" id="atShotTs"></span></h3>
+      <img class="at-shot" id="atShot" alt="该步骤后的设备画面" hidden>
+      <p class="muted" id="atNoShot">选中左侧步骤查看其后的设备画面与界面树。</p>
+      <details class="at-fold" id="atSrcFold" hidden>
+        <summary>UI 树（该步骤后的 page_source，点开查看元素层级）</summary>
+        <pre class="at-pre" id="atSrc">（未加载）</pre>
+      </details>
+      <details class="at-fold" open>
+        <summary>logcat 切片（该步骤时间点前后各 100 行）</summary>
+        <pre class="at-pre" id="atLogcat">（选中步骤后加载）</pre>
+      </details>
+    </div>
+  </div>
+</main>
+<div id="toast"></div>
+<script src="/assets/{{ asset_v }}/nav.js"></script>
+<script src="/assets/{{ asset_v }}/app.js"></script>
+</body>
+</html>

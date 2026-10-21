@@ -1,0 +1,4 @@
+# Trace 失败诊断 · 独立环境依赖（与平台主环境 .venv 完全隔离）
+# 安装：python3 -m venv trace_lab/.venv && trace_lab/.venv/bin/pip install -r trace_lab/requirements-trace.txt
+# 浏览器：trace_lab/.venv/bin/playwright install chromium
+playwright==1.57.0

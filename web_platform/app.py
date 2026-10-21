@@ -81,6 +81,11 @@ app.register_blueprint(ai_case_bp)
 from web_platform.connect_routes import bp as connect_bp
 app.register_blueprint(connect_bp)
 
+# Trace 失败诊断（调试阶段 · 与主框架解耦）：Playwright trace 录制跑 trace_lab/.venv 子进程，
+# 回放用官方 trace viewer 离线副本（static/trace_viewer/）；跑通后再接入 runner 按步骤埋点
+from web_platform.trace_lab import bp as trace_lab_bp
+app.register_blueprint(trace_lab_bp)
+
 # 托管服务管理：卡片开关 + 页面心跳 + 5 小时未用自动关闭（2026-10-12「所有服务默认关闭」策略）
 from web_platform.service_manager import start_auto_close_daemon
 start_auto_close_daemon()
