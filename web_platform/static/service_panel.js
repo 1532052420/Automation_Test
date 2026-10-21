@@ -75,10 +75,22 @@
     document.getElementById('svcBtnShutdown').addEventListener('click', shutdownService);
   }
 
+  /* 把悬浮球拉回视口内（自适应不同屏幕/窗口尺寸）：
+     换小屏幕或缩小窗口后，记忆位置或默认位置都可能出界——出界即拉回 */
+  function clampToViewport(fab) {
+    var w = fab.offsetWidth || 120, h = fab.offsetHeight || 44;
+    var x = Math.max(4, Math.min(window.innerWidth - w - 4, fab.offsetLeft));
+    var y = Math.max(4, Math.min(window.innerHeight - h - 4, fab.offsetTop));
+    if (x !== fab.offsetLeft || y !== fab.offsetTop) {
+      fab.style.left = x + 'px';
+      fab.style.top = y + 'px';
+    }
+  }
+
   function makeDraggable(fab) {
     var POS_KEY = 'svcFabPos';
     var drag = null, moved = false;
-    // 恢复上次位置
+    // 恢复上次位置（超出现口边界时先拉回，避免换屏/缩窗后悬浮球消失）
     try {
       var saved = JSON.parse(localStorage.getItem(POS_KEY) || 'null');
       if (saved && saved.x != null) {
@@ -86,6 +98,7 @@
         fab.style.top = saved.y + 'px';
         fab.style.right = 'auto';
         fab.style.bottom = 'auto';
+        clampToViewport(fab);
       }
     } catch (e) { /* 忽略 */ }
     function save() {
@@ -121,6 +134,8 @@
     fab.addEventListener('click', function () {
       if (!moved) toggleDrawer();
     });
+    // 窗口尺寸变化（缩窗/换屏/外接显示器切换）时把出界的悬浮球拉回视口
+    window.addEventListener('resize', function () { clampToViewport(fab); });
   }
 
   function toggleDrawer() {
@@ -239,39 +254,10 @@
 
   function restartService() {
     if (!confirm('重启平台服务？将结束所有服务进程并拉起全新实例（3~5 秒）。')) return;
-    toast('服务重启中…');
-    /* 正确顺序（用户 2026-10-15 拍板）：记录旧实例身份证 → 下发重启 →
-       轮询到「boot_id 变化 + 服务就绪」才刷新页面。上一版用「首次成功/失败」分段，
-       旧实例的成功响应会被误判为新实例就绪 → 旧实例未死透就 reload → 页面裸奔。 */
-    function poll(oldBoot) {
-      var tries = 0;
-      var t = setInterval(function () {
-        if (++tries > 120) { clearInterval(t); location.reload(); return; }  // 3 分钟兜底
-        fetch('/api/status', { cache: 'no-store' })
-          .then(function (r) { return r.text(); })
-          .then(function (s) {
-            var d;
-            try { d = JSON.parse(s); } catch (e) { return; }
-            if (!d || d.service !== 'automation-test-platform') return;
-            /* boot_id 与重启前不同 = 新实例已就绪；旧实例响应 boot_id 相同，跳过 */
-            if (d.boot_id && String(d.boot_id) !== String(oldBoot || '')) {
-              clearInterval(t); location.reload();
-            }
-          })
-          .catch(function () { /* 旧实例已下线/新实例未起：继续等 */ });
-      }, 1500);
-    }
-    fetch('/api/status', { cache: 'no-store' })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        post('/api/service/restart', {}).catch(function () {});
-        poll(d && d.boot_id ? String(d.boot_id) : '');
-      })
-      .catch(function () {
-        /* 重启前服务已不可用：拿不到旧身份证，下发重启后直接轮询就绪 */
-        post('/api/service/restart', {}).catch(function () {});
-        poll('');
-      });
+    /* 复用 app.js 全局重启流程：boot_id 轮询 → 「重启成功」横幅 → 2 秒后带缓存标记刷新。
+       （上一版本面板自带一份轮询实现，与首页按钮逻辑分叉：首页仍是旧的
+       /api/changelog 轮询、不校验身份证——现统一收口到 app.js restartServiceRun） */
+    restartServiceRun(document.getElementById('svcBtnRestart'));
   }
 
   function shutdownService() {

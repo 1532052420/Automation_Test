@@ -101,3 +101,10 @@ ponytail 完整插件仓库备份在 `ponytail-main/`（含 hooks、MCP、命令
 - 服务需要启动/重启时，**唯一正确做法**：告知用户在自己终端执行 `./run.command restart-platform`（或 `platform` / `stop-platform`），并等待用户确认完成。
 - 代理会话只负责：改代码、跑测试断言前的**只读**健康检查（psutil 读进程环境/端口、HTTP 探测）、以及给出准确的排查结论。
 - 例外：仅当用户当次明确提出"由你来重启"时方可执行，且完成后必须用 psutil 复核进程环境无注入（HTTP_PROXY/PYTHONPATH/NODE_OPTIONS 均不存在）并如实报告。
+
+## 八、真机抓包代理铁律（2026-10-20 断网事故沉淀，最高优先级）
+
+给真机配置抓包代理（Charles 等）时：
+
+- **优先 WiFi 手动代理，慎用全局代理**：`adb shell settings put global http_proxy` 作用于设备全部网络（含蜂窝），Mac 端代理进程一旦退出，设备即整网断网；WiFi 手动代理影响面限单个 WiFi。若必须用全局代理，交付首条必须醒目写明「Mac 端代理退出 = 设备断网」，收工立即 `adb shell settings delete global http_proxy` 恢复。
+- **收工即回滚**：抓包结束（或用户喊停）立即清理设备代理与证书文件、还原代理端配置，恢复原状；用户明确要求保留的除外。

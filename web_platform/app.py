@@ -86,6 +86,11 @@ app.register_blueprint(connect_bp)
 from web_platform.trace_lab import bp as trace_lab_bp
 app.register_blueprint(trace_lab_bp)
 
+# 录制调试中心：Web=Playwright 官方 codegen、App=Maestro Studio（上游工具原封不动），
+# 本蓝图只做启动器/产物落盘/项目配置；调试运行为录制产物自动带 trace 执行
+from web_platform.record_center import bp as record_center_bp
+app.register_blueprint(record_center_bp)
+
 # 托管服务管理：卡片开关 + 页面心跳 + 5 小时未用自动关闭（2026-10-12「所有服务默认关闭」策略）
 from web_platform.service_manager import start_auto_close_daemon
 start_auto_close_daemon()

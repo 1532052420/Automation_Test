@@ -2192,6 +2192,8 @@ async function initTraceLab() {
   $('#btnDbgReplay').addEventListener('click', () => {
     if (rcDebugRunId) window.open('/trace-lab/viewer/' + rcDebugRunId);
   });
+  $('#btnGenTemplate').addEventListener('click', rcGenLoadTemplate);
+  $('#btnGenRun').addEventListener('click', rcGenSubmit);
   rcLoadConfig();
   rcLoadFiles();
   rcRefreshStatus();
@@ -2212,11 +2214,12 @@ function rcGoto(n) {
 }
 
 function rcSeg(kind) {
-  const web = kind === 'web';
-  $('#rcSegWeb').classList.toggle('on', web);
-  $('#rcSegApp').classList.toggle('on', !web);
-  $('#rcWebPane').hidden = !web;
-  $('#rcAppPane').hidden = web;
+  $('#rcSegWeb').classList.toggle('on', kind === 'web');
+  $('#rcSegApp').classList.toggle('on', kind === 'app');
+  $('#rcSegGen').classList.toggle('on', kind === 'gen');
+  $('#rcWebPane').hidden = kind !== 'web';
+  $('#rcAppPane').hidden = kind !== 'app';
+  $('#rcGenPane').hidden = kind !== 'gen';
 }
 
 function rcCfgSummary(c) {
@@ -2412,25 +2415,36 @@ async function rcLoadFiles() {
   const box = $('#recFiles');
   const files = (d && d.files) || [];
   if (!files.length) {
-    box.innerHTML = '<p class="muted">还没有录制产物。Web 点「开始录制」在弹出的浏览器里操作；App 启动 Maestro Studio 导出 YAML 存到保存目录。</p>';
+    box.innerHTML = '<p class="muted">还没有产物。三种来源：Web 点「开始录制」操作浏览器；App 启动 Maestro Studio 导出 YAML；或在「步骤生成」里写步骤稿生成脚本。</p>';
     return;
   }
-  box.innerHTML = files.map(f =>
-    '<div class="rc-run">'
-    + '<span class="rc-badge ' + (f.kind === 'web' ? 'ok' : 'run') + '">' + (f.kind === 'web' ? 'Web' : 'App') + '</span>'
-    + '<span class="rc-id">' + esc(f.rel) + '</span>'
-    + '<span class="rc-meta">' + (f.size / 1024).toFixed(1) + 'KB · ' + rcTime(f.mtime) + '</span>'
-    + '<span class="rc-ops">'
-    + '<button class="mini" data-act="debug" data-rel="' + esc(f.rel) + '">调试运行</button>'
-    + '<button class="ghost mini" data-act="view" data-rel="' + esc(f.rel) + '">查看</button>'
-    + '<button class="ghost mini" data-act="del" data-rel="' + esc(f.rel) + '">删除</button>'
-    + '</span></div>').join('')
-    + '<pre class="rc-log" id="recView" hidden></pre>';
+  box.innerHTML = files.map(f => {
+    const isSteps = f.rel.endsWith('.steps.yaml');
+    const ops = isSteps
+      ? '<button class="mini" data-act="gen" data-rel="' + esc(f.rel) + '">生成脚本</button>'
+        + '<button class="ghost mini" data-act="view" data-rel="' + esc(f.rel) + '">查看</button>'
+        + '<button class="ghost mini" data-act="del" data-rel="' + esc(f.rel) + '">删除</button>'
+      : '<button class="mini" data-act="debug" data-rel="' + esc(f.rel) + '">调试运行</button>'
+        + '<button class="ghost mini" data-act="view" data-rel="' + esc(f.rel) + '">查看</button>'
+        + '<button class="ghost mini" data-act="del" data-rel="' + esc(f.rel) + '">删除</button>';
+    const kindName = f.kind === 'web' ? (isSteps ? 'Web 步骤稿' : 'Web') : 'App';
+    return '<div class="rc-run">'
+      + '<span class="rc-badge ' + (f.kind === 'web' ? 'ok' : 'run') + '">' + kindName + '</span>'
+      + '<span class="rc-id">' + esc(f.rel) + '</span>'
+      + '<span class="rc-meta">' + (f.size / 1024).toFixed(1) + 'KB · ' + rcTime(f.mtime) + '</span>'
+      + '<span class="rc-ops">' + ops + '</span></div>';
+  }).join('') + '<pre class="rc-log" id="recView" hidden></pre>';
   box.querySelectorAll('[data-act]').forEach(btn =>
     btn.addEventListener('click', () => rcFileAct(btn.dataset.act, btn.dataset.rel)));
 }
 
 async function rcFileAct(act, rel) {
+  if (act === 'gen') {
+    const r = await postJson('/api/record/gen/from_file', { rel: rel });
+    toast(r.msg || (r.ok ? '已生成' : '生成失败'), r.ok);
+    if (r.ok) rcLoadFiles();
+    return;
+  }
   if (act === 'debug') {
     const isWeb = rel.startsWith('web/');
     const r = await postJson('/api/record/' + (isWeb ? 'web/debug' : 'app/debug'), { rel: rel });
@@ -2458,6 +2472,21 @@ async function rcFileAct(act, rel) {
       if (r.ok) rcLoadFiles();
     });
   }
+}
+
+/* ---- 步骤生成（写好步骤稿 YAML → 生成 Playwright 脚本） ---- */
+async function rcGenLoadTemplate() {
+  const d = await api('/api/record/gen/template');
+  if (d.ok) $('#genYaml').value = d.template;
+}
+
+async function rcGenSubmit() {
+  const text = $('#genYaml').value;
+  if (!text.trim()) { toast('步骤稿为空：点「加载步骤模板」或直接粘贴', false); return; }
+  const r = await postJson('/api/record/gen', { yaml: text });
+  toast(r.msg || (r.ok ? '已生成' : '生成失败'), r.ok);
+  setText('#genStatus', r.ok ? ('产物：' + r.rel) : '');
+  if (r.ok) rcLoadFiles();
 }
 
 /* ---- 调试运行（录制产物自动带 trace 执行，官方 viewer 回放） ---- */

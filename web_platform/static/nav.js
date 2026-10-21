@@ -18,7 +18,7 @@ window.PlatformNav = (function () {
     '/ai-case': 'AI 用例生成',
     '/api-test': '接口测试',
     '/perf': '性能压测',
-    '/trace-lab': 'Trace 诊断',
+    '/trace-lab': '录制调试',
     '/report': '测试报告'
   };
 

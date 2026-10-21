@@ -29,9 +29,11 @@ STEP_TYPES = [
     'screenshot', 'tap', 'sleep', 'hide_keyboard', 'custom',
     'deal_first_launch_dialogs',
     # v6.15.33：框架原生手势/设备能力（appOperator 直映射），贴合原框架设定
+    # （v6.16.36 按用户要求从操作类型列表移除设备开关五项：press_keycode/background_app/
+    #   activate_app/toggle_wifi/toggle_airplane——白名单关闭入口，/api/cases step_types 同步收缩，
+    #   前端下拉即不再出现；下方历史生成逻辑暂留未删，入口已关不再可达）
     'swipe_up', 'swipe_down', 'swipe_left', 'swipe_right',
-    'drag_to', 'press_keycode', 'background_app', 'activate_app',
-    'toggle_wifi', 'toggle_airplane',
+    'drag_to',
 ]
 
 # ④断言栏 · 组合断言类型（操作与断言解耦：一步 = 操作 + 断言组合）

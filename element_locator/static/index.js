@@ -49,11 +49,6 @@ const STEP_TYPES = [
   { v: 'swipe_left', n: '左滑', el: true, param: true, ph: '时长ms(默认500)', group: '手势·设备', defv: '500', v2: true },
   { v: 'swipe_right', n: '右滑', el: true, param: true, ph: '时长ms(默认500)', group: '手势·设备', defv: '500', v2: true },
   { v: 'drag_to', n: '拖拽到元素', el: true, param: true, ph: '目标元素名(元素库已有)', group: '手势·设备', defv: '', v2: true },
-  { v: 'press_keycode', n: '按键(键码)', el: false, param: true, ph: '键码，4=返回', group: '手势·设备', defv: '4', v2: true },
-  { v: 'background_app', n: '退后台(秒)', el: false, param: true, ph: '秒数，-1=停用', group: '手势·设备', defv: '3', v2: true },
-  { v: 'activate_app', n: '拉起应用', el: false, param: true, ph: '应用包名', group: '手势·设备', defv: '', v2: true },
-  { v: 'toggle_wifi', n: '切换WiFi', el: false, param: false, ph: '', group: '手势·设备', defv: '', v2: true },
-  { v: 'toggle_airplane', n: '切换飞行模式', el: false, param: false, ph: '', group: '手势·设备', defv: '', v2: true },
 ];
 /* 特殊操作：与元素无关的用例级动作，单独下拉（el-op-special）。不写元素库、元素栏禁用；
    选中后只需选目标用例 + 插入位置。deal_first_launch_dialogs 固定前插（见 onCaseFileChange） */
