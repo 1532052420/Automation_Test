@@ -1112,13 +1112,19 @@ async function initRun() {
 /* ---------------- 左侧二级菜单：hash 深链 + 记住上次所在面板 ---------------- */
 /* 用例编排(orch)/用例上传(admin) 面板已从菜单下线（2026-10-19）：入口删除、hash 不可达；
    DOM 与后端 API 保留——appTestingInit 的全部绑定仍挂在 panel-orch 存在性上，勿删面板本体 */
-const RUN_PANELS = ['projects', 'elements', 'asserts', 'visuals', 'cases', 'caselist', 'caseedit', 'report', 'exec'];
+const RUN_PANELS = ['projects', 'elements', 'asserts', 'cases', 'caselist', 'caseedit', 'report', 'exec'];
 /* 面板名 → 顶部面包屑第三级文案 */
 const RUN_PANEL_NAMES = {
-  projects: '项目管理', elements: '对象管理', asserts: '断言管理', visuals: '视觉断言', cases: '执行用例', caselist: '用例管理',
+  projects: '项目管理', elements: '对象管理', asserts: '断言管理', cases: '执行用例', caselist: '用例管理',
   caseedit: '步骤编辑', report: '测试报告', exec: '设备配置',
 };
+/* 旧面板名归一：视觉断言已并入断言管理（页签二）——旧深链 #visuals 落到断言管理并激活视觉页签 */
+function normRunPanel(name) {
+  if (name === 'visuals') { window._asTab = 'visual'; return 'asserts'; }
+  return name;
+}
 function showRunPanel(name) {
+  name = normRunPanel(name);
   if (!RUN_PANELS.includes(name)) name = 'exec';
   RUN_PANELS.forEach(p => {
     const sec = $('#panel-' + p);
@@ -1127,8 +1133,8 @@ function showRunPanel(name) {
   document.querySelectorAll('#subnav a').forEach(a =>
     a.classList.toggle('on', a.dataset.panel === name));
   setCrumbSub(RUN_PANEL_NAMES[name]);
-  if (name === 'asserts' && typeof loadAssertions === 'function') loadAssertions();
-  if (name === 'visuals' && typeof loadVisualAssets === 'function') loadVisualAssets();
+  /* 断言管理：按当前页签（断言列表/视觉断言）进入并重载数据；页签状态跨面板切换驻留 */
+  if (name === 'asserts' && typeof setAssertsTab === 'function') setAssertsTab(window._asTab || 'list');
   if (name === 'elements' && typeof loadPageFiles === 'function') loadPageFiles();   // 进入元素管理即刷新页面文件列表
   if (name === 'projects' && typeof loadProjects === 'function') loadProjects();   // 进入项目管理即查询列表
   if (name === 'caselist' && typeof loadProjects === 'function') {
@@ -1202,8 +1208,8 @@ function initRunPanels() {
       history.replaceState(null, '', '#' + a.dataset.panel);
     });
   });
-  /* 初始面板：hash 深链优先，否则默认第一个（项目管理）——不恢复上次停留 */
-  let start = (location.hash || '').replace('#', '');
+  /* 初始面板：hash 深链优先（旧名先归一），否则默认第一个（项目管理）——不恢复上次停留 */
+  let start = normRunPanel((location.hash || '').replace('#', ''));
   if (!RUN_PANELS.includes(start)) start = RUN_PANELS[0];
   showRunPanel(start);
 }

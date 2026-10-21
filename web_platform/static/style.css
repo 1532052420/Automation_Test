@@ -731,8 +731,8 @@ html.night .nav-card p { color: #a1a1a6; }
 }
 .as-thumb:hover { border-color: var(--brand); box-shadow: 0 2px 10px rgba(0,0,0,.12); }
 
-/* 视觉断言管理列表：统一 70×70 缩略图（居中裁切，所有图片显示一致） */
-#panel-visuals .as-thumb {
+/* 视觉断言列表（断言管理·视觉断言页签）：统一 70×70 缩略图（居中裁切，所有图片显示一致） */
+#visView .as-thumb {
   width: 70px; height: 70px; object-fit: cover;
   display: block; margin: 0 auto; cursor: zoom-in;
 }

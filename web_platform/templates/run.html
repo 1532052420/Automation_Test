@@ -83,7 +83,6 @@
       <a href="#cases" data-panel="cases" data-icon="list">执行用例</a>
       <a href="#elements" data-panel="elements" data-icon="target">对象管理</a>
       <a href="#asserts" data-panel="asserts" data-icon="check">断言管理</a>
-      <a href="#visuals" data-panel="visuals" data-icon="visual">视觉断言</a>
       <a href="#report" data-panel="report" data-icon="chart">测试报告</a>
       <a href="#exec" data-panel="exec" data-icon="gear">设备配置</a>
     </aside>
@@ -291,12 +290,17 @@
         <iframe id="reportFrame" class="report-frame" title="测试报告"></iframe>
       </section>
 
-      <!-- 断言管理（按用例筛选断言列表，编辑断言内容） -->
+      <!-- 断言管理（页签切换：断言列表 / 视觉断言，交互同对象管理「元素文件/页面文件」） -->
       <section class="panel" id="panel-asserts" hidden>
         <div class="card">
           <div class="cardhead">
-            <h3>断言管理 <span class="muted">扫描用例中的断言步骤（含组合断言/视觉断言），仅支持修改断言内容</span></h3>
+            <div class="seg" id="asTabs">
+              <button type="button" data-mode="list" class="on">断言列表</button>
+              <button type="button" data-mode="visual">视觉断言</button>
+            </div>
           </div>
+          <!-- 页签一：断言列表（扫描用例中的断言步骤，仅支持修改断言内容） -->
+          <div id="asListView">
           <div class="treebar">
             <select id="asMgrCase" style="max-width:280px"><option value="">全部用例</option></select>
             <select id="asMgrKind" style="max-width:180px">
@@ -327,6 +331,7 @@
             <span class="muted" id="asMgrPageNow"></span>
             <button class="ghost mini" id="btnAsMgrNext">›</button>
           </div>
+          </div><!-- /asListView -->
         </div>
         <!-- 断言内容编辑弹窗（静态字段 + 动态内容字段） -->
         <div class="mask" id="asEditMask">
@@ -347,14 +352,10 @@
         <div class="mask" id="asImgViewer" style="cursor:zoom-out;align-items:center;justify-content:center">
           <img id="asImgViewerImg" alt="基线大图" style="max-width:82vw;max-height:84vh;border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.4)">
         </div>
-      </section>
+        <!-- 页签二：视觉断言（原独立面板整体迁入：搜索/重置/日志/调试 工具条 + 资产表 + 分页 + 全部弹窗，功能原封不动） -->
+        <div id="visView" style="display:none">
 
-      <!-- 用例管理（原独立模块并入）：上传用例包 zip，覆盖确认 + 自动备份 -->
-      <section class="panel" id="panel-visuals" hidden>
-        <div class="card">
-          <div class="cardhead">
-            <h3>视觉断言 <span class="muted">元素定位器「视觉断言」采集的资产在此统一管理；数据随包进 git</span></h3>
-          </div>
+          <div class="card">
           <div class="treebar">
             <input type="search" id="visSearch" placeholder="搜索名称" style="max-width:220px">
             <select id="visScope" style="max-width:170px">
@@ -590,6 +591,7 @@
         <div class="mask" id="vaMgrViewer" style="cursor:zoom-out;align-items:center;justify-content:center">
           <img id="vaMgrViewerImg" alt="基线大图" style="max-width:82vw;max-height:84vh;border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.4)">
         </div>
+        </div><!-- /visView -->
       </section>
       <section class="panel" id="panel-caselist" hidden>
         <div class="card">

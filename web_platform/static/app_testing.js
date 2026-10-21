@@ -1510,9 +1510,24 @@ function openAsImgViewer(src) {
 /* ================= 视觉断言管理（定位器采集的视觉资产；筛选/分页/大图/删除，UI 与项目管理同款） ================= */
 let _visAll = [], _visPage = 1, _visPageSize = 10;
 
-/* 视觉断言管理：筛选/分页/重置事件绑定（此前控件未绑定事件，为死按钮——补齐） */
+/* 断言管理页签切换（同对象管理「元素文件/页面文件」）：断言列表 / 视觉断言；
+   每次激活都重载对应数据（与原「进入面板即刷新」语义一致），页签状态跨面板驻留在 window._asTab */
+function setAssertsTab(mode) {
+  window._asTab = (mode === 'visual') ? 'visual' : 'list';
+  document.querySelectorAll('#asTabs button').forEach(b =>
+    b.classList.toggle('on', b.dataset.mode === window._asTab));
+  const lv = document.getElementById('asListView'), vv = document.getElementById('visView');
+  if (lv) lv.style.display = window._asTab === 'list' ? '' : 'none';
+  if (vv) vv.style.display = window._asTab === 'visual' ? '' : 'none';
+  if (window._asTab === 'list') { if (typeof loadAssertions === 'function') loadAssertions(); }
+  else if (typeof loadVisualAssets === 'function') loadVisualAssets();
+}
+
+/* 视觉断言管理：筛选/分页/重置/页签事件绑定（此前控件未绑定事件，为死按钮——补齐） */
 (function () {
   const on = (id, ev, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
+  document.querySelectorAll('#asTabs button').forEach(b =>
+    b.addEventListener('click', () => setAssertsTab(b.dataset.mode)));
   on('visScope', 'change', () => { _visPage = 1; renderVisualAssets(); });
   on('visMatch', 'change', () => { _visPage = 1; renderVisualAssets(); });
   on('visSearch', 'input', () => { _visPage = 1; renderVisualAssets(); });
