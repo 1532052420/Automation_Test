@@ -1055,23 +1055,75 @@ html.night .pf-tok-fn { color: #86b9ec; }
   font-weight: 700; line-height: 1; padding: 4px 0;
 }
 
-/* ---------- 列表操作列统一右对齐：项目管理/元素管理(两级)/执行用例/用例管理/测试套件/执行历史 ---------- */
-#panel-projects th:last-child, #panel-projects td:last-child,
-#elFilesView th:last-child, #elFilesView td:last-child,
-#elElemsView th:last-child, #elElemsView td:last-child,
-#panel-cases th:last-child, #panel-cases td:last-child,
-#panel-caselist th:last-child, #panel-caselist td:last-child,
-#panel-suites th:last-child, #panel-suites td:last-child,
-#histMask th:last-child, #histMask td:last-child {
-  text-align: right;
+/* ---------- 全平台列表统一（v6.16.26）：比例列宽疏密均衡 + min-width 窄屏横滚不换行 ----------
+   操作列保持在表格最右位置，列内按钮与其他字段一致左对齐（不再贴右对齐）；
+   min-width 之下 .tblwrap 横向滚动，操作按钮任何屏宽都单行不换行 */
+#panel-projects table { table-layout: fixed; min-width: 900px; }
+#panel-projects th:nth-child(1) { width: 15%; }   /* 项目名称 */
+#panel-projects th:nth-child(2) { width: 24%; }   /* 描述 */
+#panel-projects th:nth-child(3) { width: 9%; }    /* 状态 */
+#panel-projects th:nth-child(4) { width: 8%; }    /* 用例数 */
+#panel-projects th:nth-child(5) { width: 11%; }   /* 负责人 */
+#panel-projects th:nth-child(6) { width: 15%; }   /* 创建时间 */
+/* 操作列 250px（th inline） */
+#panel-projects td { overflow: hidden; }
+
+#panel-cases table { table-layout: fixed; min-width: 720px; }
+#panel-cases th:nth-child(2) { width: 30%; }      /* 用例名称 */
+#panel-cases th:nth-child(3) { width: 44%; }      /* 步骤描述 */
+/* 勾选 36px / 更新时间 110px / 操作 140px（th inline） */
+#panel-cases td { overflow: hidden; }
+
+#elFilesView table { table-layout: fixed; min-width: 480px; }
+#elFilesView th:last-child { width: 170px; }      /* 操作：编辑/删除 */
+#elFilesView td { overflow: hidden; }
+
+#pfView table { table-layout: fixed; min-width: 680px; }
+#pfView th:nth-child(1) { width: 26%; }           /* 页面文件名 */
+#pfView th:nth-child(2) { width: 18%; }           /* 关联用例 */
+#pfView th:nth-child(3) { width: 12%; }           /* 大小 */
+#pfView th:nth-child(4) { width: 20%; }           /* 最后修改 */
+#pfView th:last-child { width: 24%; }             /* 操作：编辑/删除 */
+#pfView td { overflow: hidden; }
+
+#elElemsView table { table-layout: fixed; min-width: 920px; }
+#elElemsView th:nth-child(1) { width: 16%; }      /* 名称 */
+#elElemsView th:nth-child(2) { width: 8%; }       /* 类型 */
+#elElemsView th:nth-child(3) { width: 13%; }      /* 标签 */
+#elElemsView th:nth-child(4) { width: 20%; }      /* 预览 */
+#elElemsView th:nth-child(5) { width: 9%; }       /* 使用次数 */
+#elElemsView th:nth-child(6) { width: 14%; }      /* 创建时间 */
+#elElemsView th:last-child { width: 20%; }        /* 操作：编辑/复制/删除 */
+#elElemsView td { overflow: hidden; }
+
+#asListView table { table-layout: fixed; min-width: 760px; }
+#asListView th:nth-child(1) { width: 22%; }       /* 所属方法 */
+#asListView th:nth-child(2) { width: 16%; }       /* 断言方式 */
+#asListView th:nth-child(3) { width: 18%; }       /* 元素 / 描述 */
+#asListView th:nth-child(4) { width: 30%; }       /* 断言内容 */
+#asListView th:last-child { width: 14%; }         /* 操作：编辑 */
+#asListView td { overflow: hidden; }
+
+#visView table { table-layout: fixed; min-width: 1000px; }
+#visView th:nth-child(1) { width: 9%; }           /* 名称 */
+#visView th:nth-child(2) { width: 9%; }           /* 视觉资产 */
+#visView th:nth-child(3) { width: 8%; }           /* 断言范围 */
+#visView th:nth-child(4) { width: 10%; }          /* 视觉对象类型 */
+#visView th:nth-child(5) { width: 10%; }          /* 比较模式 */
+#visView th:nth-child(6) { width: 8%; }           /* 相似度阈值 */
+#visView th:nth-child(7) { width: 8%; }           /* 忽略区域 */
+#visView th:nth-child(8) { width: 11%; }          /* 所属用例 */
+#visView th:nth-child(9) { width: 9%; }           /* 创建时间 */
+/* 操作列 190px（th inline）：编辑/调试/删除 */
+#visView td { overflow: hidden; }
+
+/* 列表操作列：按钮组不换行（窄屏由 min-width + 横滚承接），对齐方式与字段一致（左对齐） */
+#panel-projects td.ops, #panel-cases td.ops, #panel-caselist td.ops, #visView td.ops,
+#elFilesView td .ops, #elElemsView td .ops, #pfView td .ops {
+  white-space: nowrap; flex-wrap: nowrap;
 }
-#panel-projects td:last-child .ops,
-#elFilesView td .ops,
-#elElemsView td:last-child .ops,
-#panel-cases td:last-child .ops,
-#panel-caselist td:last-child .ops,
-#panel-suites td:last-child .ops,
-#histMask td:last-child .ops { justify-content: flex-end; }
+#panel-projects td.ops .mini, #panel-cases td.ops .mini,
+#panel-caselist td.ops .mini, #visView td.ops .mini { margin: 3px 6px 3px 0; }
 
 
 /* Appium 启停按钮：运行中绿色、未运行灰色（iOS 系统色） */
